@@ -3,15 +3,58 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/components/theme-provider";
+import { useAuth } from "@/hooks/use-auth";
+import { Skeleton } from "@/components/ui/skeleton";
 import NotFound from "@/pages/not-found";
+import LandingPage from "@/pages/landing";
+import DashboardPage from "@/pages/dashboard";
+import WalletPage from "@/pages/wallet";
+import TransactionsPage from "@/pages/transactions";
+import PaymentLinksPage from "@/pages/payment-links";
+import ApiKeysPage from "@/pages/api-keys";
+import PayPage from "@/pages/pay";
 
-function Router() {
+function AuthenticatedRoutes() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/" component={DashboardPage} />
+      <Route path="/dashboard" component={DashboardPage} />
+      <Route path="/wallet" component={WalletPage} />
+      <Route path="/transactions" component={TransactionsPage} />
+      <Route path="/payment-links" component={PaymentLinksPage} />
+      <Route path="/api-keys" component={ApiKeysPage} />
       <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function Router() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="space-y-4 w-full max-w-md p-8">
+          <Skeleton className="h-12 w-48 mx-auto" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Switch>
+      <Route path="/pay/:slug" component={PayPage} />
+      {user ? (
+        <AuthenticatedRoutes />
+      ) : (
+        <>
+          <Route path="/" component={LandingPage} />
+          <Route component={LandingPage} />
+        </>
+      )}
     </Switch>
   );
 }
@@ -19,10 +62,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <ThemeProvider defaultTheme="light" storageKey="solvaxpay-ui-theme">
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
