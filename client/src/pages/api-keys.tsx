@@ -153,7 +153,7 @@ export default function ApiKeysPage() {
                 <DialogDescription>
                   {newKey 
                     ? "Copiez cette clé maintenant. Elle ne sera plus affichée."
-                    : "Créez une nouvelle clé API pour intégrer SolvaxPay"}
+                    : "Créez une nouvelle clé API pour intégrer SolvexPay"}
                 </DialogDescription>
               </DialogHeader>
               
@@ -249,7 +249,7 @@ export default function ApiKeysPage() {
           <CardHeader>
             <CardTitle>Vos clés API</CardTitle>
             <CardDescription>
-              Gérez vos clés API pour intégrer SolvaxPay
+              Gérez vos clés API pour intégrer SolvexPay
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -335,7 +335,7 @@ export default function ApiKeysPage() {
           <CardHeader>
             <CardTitle>Documentation API</CardTitle>
             <CardDescription>
-              Intégrez SolvaxPay en quelques minutes
+              Intégrez SolvexPay en quelques minutes
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

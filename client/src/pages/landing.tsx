@@ -24,7 +24,7 @@ export default function LandingPage() {
               <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
                 <CreditCard className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="font-bold text-xl" data-testid="text-logo">SolvaxPay</span>
+              <span className="font-bold text-xl" data-testid="text-logo">SolvexPay</span>
             </div>
             
             <div className="hidden md:flex items-center gap-6">
@@ -359,11 +359,11 @@ export default function LandingPage() {
               <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
                 <CreditCard className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="font-bold text-xl">SolvaxPay</span>
+              <span className="font-bold text-xl">SolvexPay</span>
             </div>
             
             <p className="text-sm text-muted-foreground">
-              © 2024 SolvaxPay. Tous droits réservés.
+              © 2024 SolvexPay. Tous droits réservés.
             </p>
             
             <div className="flex items-center gap-6 text-sm text-muted-foreground">

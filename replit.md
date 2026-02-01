@@ -1,8 +1,8 @@
-# SolvaxPay - Pan-African Payment Aggregator
+# SolvexPay - Pan-African Payment Aggregator
 
 ## Overview
 
-SolvaxPay is a pan-African payment aggregation platform that enables businesses to accept Mobile Money payments across multiple African countries. The application provides a merchant dashboard for managing wallets, transactions, payment links, and API keys. It supports multiple Mobile Money providers (MTN, Orange Money, Wave, Moov, Free, Airtel) and currencies (XOF, NGN, GHS, KES).
+SolvexPay is a pan-African payment aggregation platform that enables businesses to accept Mobile Money payments across multiple African countries. The application provides a merchant dashboard for managing wallets, transactions, payment links, and API keys. It supports multiple Mobile Money providers (MTN, Orange Money, Wave, Moov, Free, Airtel) and currencies (XOF, NGN, GHS, KES).
 
 ## User Preferences
 

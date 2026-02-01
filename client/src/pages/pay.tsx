@@ -212,7 +212,7 @@ export default function PayPage() {
           </form>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
-            Paiement sécurisé par SolvaxPay
+            Paiement sécurisé par SolvexPay
           </p>
         </CardContent>
       </Card>

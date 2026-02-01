@@ -261,7 +261,7 @@ export default function DashboardPage() {
             <div>
               <CardTitle>Commencer avec l'API</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Intégrez SolvaxPay dans votre application
+                Intégrez SolvexPay dans votre application
               </p>
             </div>
             <TrendingUp className="h-5 w-5 text-muted-foreground" />

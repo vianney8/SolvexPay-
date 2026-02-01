@@ -70,7 +70,7 @@ export function AppSidebar() {
             <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
               <CreditCard className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-bold text-lg">SolvaxPay</span>
+            <span className="font-bold text-lg">SolvexPay</span>
           </div>
         </Link>
       </SidebarHeader>
