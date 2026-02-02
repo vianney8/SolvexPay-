@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
-import { sendavaPayService } from "./services/sendavapay";
+import { sendavaPayService, verifyWebhookSignature, isApiKeyConfigured } from "./services/sendavapay";
 import { z } from "zod";
 
 const SUPPORTED_CURRENCIES = ["XOF", "NGN", "GHS", "KES"] as const;
@@ -263,6 +263,10 @@ export async function registerRoutes(
       }
 
       if (provider === "solvexpay") {
+        if (!isApiKeyConfigured()) {
+          return res.status(503).json({ message: "Service de paiement SolvexPay non configuré" });
+        }
+        
         try {
           const paymentResponse = await sendavaPayService.createPayment({
             amount: parseFloat(paymentLink.amount),
@@ -330,7 +334,15 @@ export async function registerRoutes(
 
   app.post("/api/webhooks/sendavapay", async (req, res) => {
     try {
-      const { event, data } = req.body;
+      const signature = req.headers["x-sendavapay-signature"] as string || "";
+      const event = req.headers["x-sendavapay-event"] as string;
+      
+      if (!verifyWebhookSignature(req.body, signature)) {
+        console.error("Invalid webhook signature");
+        return res.status(401).json({ error: "Invalid signature" });
+      }
+
+      const { data } = req.body;
 
       if (event === "payment.completed") {
         const { reference, amount } = data;

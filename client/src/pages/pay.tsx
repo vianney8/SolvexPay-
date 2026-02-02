@@ -183,12 +183,12 @@ export default function PayPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {providers.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
+                    <SelectItem key={p.id} value={p.id} data-testid={`option-provider-${p.id}`}>
                       <div className="flex items-center gap-2">
                         <div className={`h-4 w-4 rounded-full ${p.color}`} />
                         {p.name}
                         {(p as any).recommended && (
-                          <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                          <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded" data-testid="badge-recommended">
                             Recommandé
                           </span>
                         )}

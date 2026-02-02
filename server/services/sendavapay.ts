@@ -1,7 +1,9 @@
 import axios from "axios";
+import crypto from "crypto";
 
 const SENDAVAPAY_BASE_URL = "https://sendavapay.com/api/v1";
 const SENDAVAPAY_API_KEY = process.env.SENDAVAPAY_API_KEY;
+const SENDAVAPAY_WEBHOOK_SECRET = process.env.SENDAVAPAY_WEBHOOK_SECRET;
 
 interface CreatePaymentParams {
   amount: number;
@@ -117,6 +119,24 @@ class SendavaPayService {
       throw new Error(error.response?.data?.message || "Failed to get transactions");
     }
   }
+}
+
+export function verifyWebhookSignature(payload: any, signature: string): boolean {
+  if (!SENDAVAPAY_WEBHOOK_SECRET) {
+    console.warn("SENDAVAPAY_WEBHOOK_SECRET not configured, skipping signature verification");
+    return true;
+  }
+  
+  const expectedSignature = crypto
+    .createHmac("sha256", SENDAVAPAY_WEBHOOK_SECRET)
+    .update(JSON.stringify(payload))
+    .digest("hex");
+  
+  return signature === expectedSignature;
+}
+
+export function isApiKeyConfigured(): boolean {
+  return !!SENDAVAPAY_API_KEY;
 }
 
 export const sendavaPayService = new SendavaPayService();
