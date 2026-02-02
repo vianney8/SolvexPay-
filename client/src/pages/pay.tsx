@@ -19,6 +19,7 @@ import { CreditCard, Smartphone, CheckCircle2, XCircle } from "lucide-react";
 import type { PaymentLink } from "@shared/schema";
 
 const providers = [
+  { id: "solvexpay", name: "SolvexPay", color: "bg-primary", recommended: true },
   { id: "mtn", name: "MTN Mobile Money", color: "bg-yellow-500" },
   { id: "orange", name: "Orange Money", color: "bg-orange-500" },
   { id: "wave", name: "Wave", color: "bg-blue-500" },
@@ -53,10 +54,15 @@ export default function PayPage() {
 
   const payMutation = useMutation({
     mutationFn: async (data: { provider: string; phoneNumber: string }) => {
-      return apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
+      const response = await apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
+      return response.json();
     },
-    onSuccess: () => {
-      setPaymentStatus("success");
+    onSuccess: (data: any) => {
+      if (data.redirectToPayment && data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        setPaymentStatus("success");
+      }
     },
     onError: () => {
       setPaymentStatus("error");
@@ -171,7 +177,7 @@ export default function PayPage() {
           <form onSubmit={handlePay} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="provider">Mode de paiement</Label>
-              <Select name="provider" defaultValue="mtn">
+              <Select name="provider" defaultValue="solvexpay">
                 <SelectTrigger id="provider" data-testid="select-pay-provider">
                   <SelectValue placeholder="Sélectionner" />
                 </SelectTrigger>
@@ -181,6 +187,11 @@ export default function PayPage() {
                       <div className="flex items-center gap-2">
                         <div className={`h-4 w-4 rounded-full ${p.color}`} />
                         {p.name}
+                        {(p as any).recommended && (
+                          <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                            Recommandé
+                          </span>
+                        )}
                       </div>
                     </SelectItem>
                   ))}

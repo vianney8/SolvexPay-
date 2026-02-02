@@ -2,10 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
+import { sendavaPayService } from "./services/sendavapay";
 import { z } from "zod";
 
 const SUPPORTED_CURRENCIES = ["XOF", "NGN", "GHS", "KES"] as const;
-const SUPPORTED_PROVIDERS = ["mtn", "orange", "wave", "moov", "free", "airtel"] as const;
+const SUPPORTED_PROVIDERS = ["mtn", "orange", "wave", "moov", "free", "airtel", "solvexpay"] as const;
 
 const depositWithdrawSchema = z.object({
   amount: z.number().min(100, "Montant minimum: 100"),
@@ -261,6 +262,45 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Payment link is inactive" });
       }
 
+      if (provider === "solvexpay") {
+        try {
+          const paymentResponse = await sendavaPayService.createPayment({
+            amount: parseFloat(paymentLink.amount),
+            currency: paymentLink.currency,
+            description: paymentLink.description || paymentLink.name,
+            externalReference: `${slug}-${Date.now()}`,
+            customerPhone: phoneNumber,
+          });
+
+          if (paymentResponse.success && paymentResponse.data.paymentUrl) {
+            const transaction = await storage.createTransaction({
+              userId: paymentLink.userId,
+              type: "deposit",
+              amount: paymentLink.amount,
+              currency: paymentLink.currency,
+              provider: "solvexpay",
+              phoneNumber,
+              reference: paymentResponse.data.reference,
+              status: "pending",
+              description: `Paiement SolvexPay: ${paymentLink.name}`,
+            });
+
+            await storage.incrementPaymentLinkUsage(paymentLink.id);
+
+            return res.json({
+              ...transaction,
+              paymentUrl: paymentResponse.data.paymentUrl,
+              redirectToPayment: true,
+            });
+          } else {
+            return res.status(400).json({ message: "Échec de la création du paiement" });
+          }
+        } catch (error: any) {
+          console.error("SolvexPay payment error:", error);
+          return res.status(500).json({ message: error.message || "Erreur de paiement SolvexPay" });
+        }
+      }
+
       const transaction = await storage.createTransaction({
         userId: paymentLink.userId,
         type: "deposit",
@@ -285,6 +325,66 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error processing payment:", error);
       res.status(500).json({ message: "Failed to process payment" });
+    }
+  });
+
+  app.post("/api/webhooks/sendavapay", async (req, res) => {
+    try {
+      const { event, data } = req.body;
+
+      if (event === "payment.completed") {
+        const { reference, amount } = data;
+        
+        const transaction = await storage.getTransactionByReference(reference);
+        if (transaction && transaction.status === "pending") {
+          await storage.updateTransactionStatus(transaction.id, "completed");
+          await storage.updateWalletBalance(
+            transaction.userId,
+            transaction.currency,
+            parseFloat(transaction.amount)
+          );
+        }
+      } else if (event === "payment.failed") {
+        const { reference } = data;
+        const transaction = await storage.getTransactionByReference(reference);
+        if (transaction && transaction.status === "pending") {
+          await storage.updateTransactionStatus(transaction.id, "failed");
+        }
+      }
+
+      res.json({ received: true });
+    } catch (error) {
+      console.error("Webhook error:", error);
+      res.status(500).json({ message: "Webhook processing failed" });
+    }
+  });
+
+  app.post("/api/payments/verify", isAuthenticated, async (req: any, res) => {
+    try {
+      const { reference } = req.body;
+      
+      if (!reference) {
+        return res.status(400).json({ message: "Reference requise" });
+      }
+
+      const verifyResponse = await sendavaPayService.verifyPayment(reference);
+      
+      if (verifyResponse.success && verifyResponse.data.status === "completed") {
+        const transaction = await storage.getTransactionByReference(reference);
+        if (transaction && transaction.status === "pending") {
+          await storage.updateTransactionStatus(transaction.id, "completed");
+          await storage.updateWalletBalance(
+            transaction.userId,
+            transaction.currency,
+            parseFloat(transaction.amount)
+          );
+        }
+      }
+
+      res.json(verifyResponse);
+    } catch (error: any) {
+      console.error("Payment verification error:", error);
+      res.status(500).json({ message: error.message || "Erreur de vérification" });
     }
   });
 
