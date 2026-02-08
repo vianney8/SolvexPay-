@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ShieldCheck, ArrowRight, ChevronDown } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ArrowRight, ChevronDown } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
 const countryCodes = [
@@ -49,12 +49,9 @@ export function LoginPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-3">
           <Link href="/" className="inline-block">
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto" data-testid="icon-login-logo">
-              <ShieldCheck className="w-7 h-7 text-primary" />
-            </div>
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-14 h-14 rounded-md object-cover mx-auto" data-testid="img-login-logo" />
           </Link>
           <h1 className="text-2xl font-bold" data-testid="text-login-title">Se connecter</h1>
-          <p className="text-muted-foreground text-sm">Accédez à votre tableau de bord SolvexPay.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -76,8 +73,8 @@ export function LoginPage() {
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mot de Passe</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="relative flex items-center">
+              <Lock className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 type={showPassword ? "text" : "password"}
                 placeholder="Votre mot de passe"
@@ -87,16 +84,14 @@ export function LoginPage() {
                 className="pl-10 pr-10"
                 data-testid="input-password"
               />
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-0"
+                className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => setShowPassword(!showPassword)}
                 data-testid="button-toggle-password"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
+              </button>
             </div>
           </div>
 
@@ -197,12 +192,9 @@ export function RegisterPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-3">
           <Link href="/" className="inline-block">
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto" data-testid="icon-register-logo">
-              <ShieldCheck className="w-7 h-7 text-primary" />
-            </div>
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-14 h-14 rounded-md object-cover mx-auto" data-testid="img-register-logo" />
           </Link>
           <h1 className="text-2xl font-bold" data-testid="text-register-title">Créer un compte</h1>
-          <p className="text-muted-foreground text-sm">Rejoignez l'infrastructure financière des talents africains.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -289,8 +281,8 @@ export function RegisterPage() {
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mot de Passe</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="relative flex items-center">
+              <Lock className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 type={showPassword ? "text" : "password"}
                 placeholder="6 caractères minimum"
@@ -300,16 +292,14 @@ export function RegisterPage() {
                 className="pl-10 pr-10"
                 data-testid="input-password"
               />
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-0"
+                className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => setShowPassword(!showPassword)}
                 data-testid="button-toggle-password"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
+              </button>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
               <span className={`text-xs flex items-center gap-1 ${passwordChecks.minLength ? "text-primary" : "text-muted-foreground"}`}>
@@ -325,8 +315,8 @@ export function RegisterPage() {
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Confirmer</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="relative flex items-center">
+              <Lock className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 type={showConfirm ? "text" : "password"}
                 placeholder="Confirmez votre mot de passe"
@@ -336,16 +326,14 @@ export function RegisterPage() {
                 className="pl-10 pr-10"
                 data-testid="input-confirm-password"
               />
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-0"
+                className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => setShowConfirm(!showConfirm)}
                 data-testid="button-toggle-confirm"
               >
                 {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
+              </button>
             </div>
             {formData.confirmPassword.length > 0 && formData.password !== formData.confirmPassword && (
               <p className="text-xs text-destructive" data-testid="text-password-mismatch">Les mots de passe ne correspondent pas</p>
