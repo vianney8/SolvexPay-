@@ -1,13 +1,9 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { 
-  ArrowRight, 
   CreditCard, 
-  Smartphone, 
-  BarChart3,
   CheckCircle2,
   ChevronRight
 } from "lucide-react";
@@ -82,83 +78,6 @@ export default function LandingPage() {
               </div>
             </div>
             
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
-              <Card className="relative p-6 sm:p-8 space-y-6">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Solde total</p>
-                    <p className="text-3xl font-bold" data-testid="text-demo-balance">2,450,000 XOF</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <BarChart3 className="h-6 w-6 text-primary" />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <p className="text-sm text-muted-foreground">Dépôts</p>
-                    <p className="text-xl font-semibold text-primary">+1.2M</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <p className="text-sm text-muted-foreground">Retraits</p>
-                    <p className="text-xl font-semibold">-350K</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 flex-wrap gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                        <Smartphone className="h-5 w-5 text-yellow-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">MTN Mobile Money</p>
-                        <p className="text-xs text-muted-foreground">Il y a 2 min</p>
-                      </div>
-                    </div>
-                    <span className="font-semibold text-primary">+25,000 XOF</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 flex-wrap gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center">
-                        <Smartphone className="h-5 w-5 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">Orange Money</p>
-                        <p className="text-xs text-muted-foreground">Il y a 5 min</p>
-                      </div>
-                    </div>
-                    <span className="font-semibold text-primary">+15,000 XOF</span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 px-4">
-        <div className="max-w-3xl mx-auto text-center space-y-8">
-          <h2 className="text-3xl sm:text-4xl font-bold">
-            Prêt à simplifier vos paiements ?
-          </h2>
-          <p className="text-lg text-muted-foreground">
-            Rejoignez plus de 500 marchands qui utilisent déjà SolvexPay pour développer leur activité en Afrique.
-          </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Link href="/register">
-              <Button size="lg" data-testid="button-cta-bottom">
-                Créer un compte gratuit
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button size="lg" variant="outline" data-testid="button-login-bottom">
-                Se connecter
-              </Button>
-            </Link>
           </div>
         </div>
       </section>
