@@ -211,120 +211,49 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="py-16 px-4 bg-muted/30">
+      <section className="py-12 px-4 bg-muted/30">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 space-y-4">
-            <h2 className="text-3xl sm:text-4xl font-bold" data-testid="text-why-title">
-              Pourquoi choisir <span className="text-primary">SolvexPay</span> ?
-            </h2>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="p-6 space-y-4" data-testid="card-advantage-security">
-              <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center">
-                <Shield className="w-6 h-6 text-primary" />
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 flex-wrap">
+            <div className="flex items-center gap-8 flex-wrap">
+              <div className="flex items-center gap-2" data-testid="text-advantage-security">
+                <Shield className="w-5 h-5 text-primary" />
+                <span className="text-sm font-medium">Transactions sécurisées</span>
               </div>
-              <h3 className="text-lg font-bold">Sécurité maximale</h3>
-              <p className="text-muted-foreground text-sm">
-                Toutes les transactions sont cryptées et sécurisées. 
-                Vos fonds sont protégés à chaque étape.
-              </p>
-            </Card>
-            <Card className="p-6 space-y-4" data-testid="card-advantage-speed">
-              <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center">
-                <Zap className="w-6 h-6 text-primary" />
+              <div className="flex items-center gap-2" data-testid="text-advantage-speed">
+                <Zap className="w-5 h-5 text-primary" />
+                <span className="text-sm font-medium">Paiements instantanés</span>
               </div>
-              <h3 className="text-lg font-bold">Paiements instantanés</h3>
-              <p className="text-muted-foreground text-sm">
-                Recevez vos paiements en temps réel. 
-                Pas d'attente, pas de délais de traitement.
-              </p>
-            </Card>
-            <Card className="p-6 space-y-4 sm:col-span-2 lg:col-span-1" data-testid="card-advantage-coverage">
-              <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center">
-                <Globe className="w-6 h-6 text-primary" />
+              <div className="flex items-center gap-2" data-testid="text-advantage-coverage">
+                <Globe className="w-5 h-5 text-primary" />
+                <span className="text-sm font-medium">Couverture pan-africaine</span>
               </div>
-              <h3 className="text-lg font-bold">Couverture pan-africaine</h3>
-              <p className="text-muted-foreground text-sm">
-                MTN, Orange, Wave, Moov, Airtel, Free. 
-                Acceptez tous les opérateurs Mobile Money d'Afrique.
-              </p>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 px-4">
-        <div className="max-w-3xl mx-auto text-center space-y-8">
-          <h2 className="text-3xl sm:text-4xl font-bold" data-testid="text-cta-title">
-            Prêt à simplifier vos paiements ?
-          </h2>
-          <p className="text-lg text-muted-foreground">
-            Rejoignez les marchands qui utilisent SolvexPay pour développer 
-            leur activité en Afrique.
-          </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            </div>
             <Link href="/register">
-              <Button size="lg" data-testid="button-cta-bottom">
+              <Button data-testid="button-cta-bottom">
                 Commencer maintenant
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button size="lg" variant="outline" data-testid="button-login-bottom">
-                Se connecter
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </div>
         </div>
       </section>
 
-      <footer className="py-12 px-4 border-t border-border">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-primary-foreground" />
-                </div>
-                <span className="font-bold text-lg">SolvexPay</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                La plateforme de paiement pan-africaine pour les entreprises modernes.
-              </p>
+      <footer className="py-6 px-4 border-t border-border">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
+              <CreditCard className="w-3.5 h-3.5 text-primary-foreground" />
             </div>
-            
-            <div>
-              <h4 className="font-semibold mb-3">Produit</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/register" className="hover:text-foreground transition-colors">Commencer</Link></li>
-                <li><Link href="/login" className="hover:text-foreground transition-colors">Connexion</Link></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-3">Entreprise</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">À propos</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Carrières</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-3">Légal</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Confidentialité</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Conditions</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
-              </ul>
-            </div>
+            <span className="font-bold text-sm">SolvexPay</span>
           </div>
-          
-          <div className="border-t border-border pt-8">
-            <p className="text-sm text-muted-foreground text-center" data-testid="text-copyright">
-              &copy; 2025 SolvexPay. Tous droits réservés.
-            </p>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+            <a href="#" className="hover:text-foreground transition-colors">Confidentialité</a>
+            <a href="#" className="hover:text-foreground transition-colors">Conditions</a>
+            <a href="#" className="hover:text-foreground transition-colors">Contact</a>
           </div>
+          <p className="text-xs text-muted-foreground" data-testid="text-copyright">
+            &copy; 2025 SolvexPay
+          </p>
         </div>
       </footer>
     </div>
