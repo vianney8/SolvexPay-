@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -22,7 +21,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Alert,
@@ -31,7 +29,7 @@ import {
 } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Key, Copy, Trash2, AlertTriangle, Eye, EyeOff, Shield, Code2, Zap } from "lucide-react";
+import { Plus, Key, Copy, Trash2, AlertTriangle, Eye, EyeOff, ExternalLink } from "lucide-react";
 import type { ApiKey } from "@shared/schema";
 
 function formatDate(date: string | Date | null) {
@@ -108,137 +106,91 @@ export default function ApiKeysPage() {
     setShowKey(false);
   };
 
-  const testKeys = apiKeys?.filter(k => k.environment === "test") || [];
-  const liveKeys = apiKeys?.filter(k => k.environment === "live") || [];
-
   return (
     <DashboardLayout title="Cles API" breadcrumbs={[{ label: "Cles API" }]}>
       <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Key className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total cles</p>
-                  <p className="text-2xl font-bold" data-testid="text-total-keys">{apiKeys?.length || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                  <Code2 className="h-5 w-5 text-orange-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Cles Test</p>
-                  <p className="text-2xl font-bold" data-testid="text-test-keys">{testKeys.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <Zap className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Cles Production</p>
-                  <p className="text-2xl font-bold" data-testid="text-live-keys">{liveKeys.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div>
+          <h1 className="text-2xl font-bold" data-testid="text-api-title">Cles API</h1>
+          <p className="text-muted-foreground mt-1" data-testid="text-api-subtitle">Integrez SolvexPay dans votre application</p>
         </div>
 
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Securite importante</AlertTitle>
-          <AlertDescription>
-            Ne partagez jamais vos cles API. Utilisez les cles de test pour le developpement
-            et les cles live uniquement en production.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button variant="outline" className="gap-2" data-testid="button-documentation">
+            <ExternalLink className="h-4 w-4" />
+            Documentation
+          </Button>
+          <Button className="gap-2" onClick={() => setCreateOpen(true)} data-testid="button-create-key">
+            <Plus className="h-4 w-4" />
+            Nouvelle cle
+          </Button>
+        </div>
 
-        <div className="flex justify-end">
-          <Dialog open={createOpen} onOpenChange={handleCloseCreateDialog}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-create-key">
-                <Plus className="h-4 w-4" />
-                Creer une cle API
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>{newKey ? "Cle API creee" : "Creer une cle API"}</DialogTitle>
-                <DialogDescription>
-                  {newKey
-                    ? "Copiez cette cle maintenant. Elle ne sera plus affichee."
-                    : "Creez une nouvelle cle API pour integrer SolvexPay"}
-                </DialogDescription>
-              </DialogHeader>
+        <Dialog open={createOpen} onOpenChange={handleCloseCreateDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{newKey ? "Cle API creee" : "Creer une cle API"}</DialogTitle>
+              <DialogDescription>
+                {newKey
+                  ? "Copiez cette cle maintenant. Elle ne sera plus affichee."
+                  : "Creez une nouvelle cle API pour integrer SolvexPay"}
+              </DialogDescription>
+            </DialogHeader>
 
-              {newKey ? (
-                <div className="space-y-4">
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Important</AlertTitle>
-                    <AlertDescription>
-                      Cette cle ne sera affichee qu'une seule fois. Copiez-la maintenant.
-                    </AlertDescription>
-                  </Alert>
-                  <div className="space-y-2">
-                    <Label>Votre cle API</Label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Input
-                          value={showKey ? newKey : newKey.replace(/./g, "\u2022")}
-                          readOnly
-                          className="pr-10 font-mono text-sm"
-                          data-testid="input-new-key"
-                        />
-                        <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0" onClick={() => setShowKey(!showKey)}>
-                          {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      <Button type="button" variant="outline" size="icon" onClick={() => copyKey(newKey)} data-testid="button-copy-new-key">
-                        <Copy className="h-4 w-4" />
+            {newKey ? (
+              <div className="space-y-4">
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Important</AlertTitle>
+                  <AlertDescription>
+                    Cette cle ne sera affichee qu'une seule fois. Copiez-la maintenant.
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-2">
+                  <Label>Votre cle API</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        value={showKey ? newKey : newKey.replace(/./g, "\u2022")}
+                        readOnly
+                        className="pr-10 font-mono text-sm"
+                        data-testid="input-new-key"
+                      />
+                      <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0" onClick={() => setShowKey(!showKey)}>
+                        {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
+                    <Button type="button" variant="outline" size="icon" onClick={() => copyKey(newKey)} data-testid="button-copy-new-key">
+                      <Copy className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button className="w-full" onClick={handleCloseCreateDialog} data-testid="button-done">
-                    J'ai copie ma cle
-                  </Button>
                 </div>
-              ) : (
-                <form onSubmit={handleCreate} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="key-name">Nom de la cle</Label>
-                    <Input id="key-name" name="name" placeholder="Ex: Mon application mobile" required data-testid="input-key-name" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="key-environment">Environnement</Label>
-                    <Select name="environment" defaultValue="test">
-                      <SelectTrigger id="key-environment" data-testid="select-key-environment"><SelectValue placeholder="Environnement" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="test">Test (Sandbox)</SelectItem>
-                        <SelectItem value="live">Production (Live)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-confirm-create-key">
-                    {createMutation.isPending ? "Creation..." : "Creer la cle"}
-                  </Button>
-                </form>
-              )}
-            </DialogContent>
-          </Dialog>
-        </div>
+                <Button className="w-full" onClick={handleCloseCreateDialog} data-testid="button-done">
+                  J'ai copie ma cle
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="key-name">Nom de la cle</Label>
+                  <Input id="key-name" name="name" placeholder="Ex: Mon application mobile" required data-testid="input-key-name" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="key-environment">Environnement</Label>
+                  <Select name="environment" defaultValue="test">
+                    <SelectTrigger id="key-environment" data-testid="select-key-environment"><SelectValue placeholder="Environnement" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="test">Test (Sandbox)</SelectItem>
+                      <SelectItem value="live">Production (Live)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-confirm-create-key">
+                  {createMutation.isPending ? "Creation..." : "Creer la cle"}
+                </Button>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {isLoading ? (
           <div className="space-y-4">
@@ -247,9 +199,12 @@ export default function ApiKeysPage() {
         ) : !apiKeys || apiKeys.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <Key className="h-12 w-12 mx-auto mb-3 opacity-50 text-muted-foreground" />
-              <p className="font-medium text-muted-foreground">Aucune cle API</p>
-              <p className="text-sm text-muted-foreground mt-1">Creez votre premiere cle pour commencer l'integration</p>
+              <Key className="h-12 w-12 mx-auto mb-4 text-primary opacity-70" data-testid="icon-empty-keys" />
+              <p className="font-medium text-muted-foreground mb-4" data-testid="text-empty-message">Vous n'avez pas encore cree de cle API</p>
+              <Button className="gap-2" onClick={() => setCreateOpen(true)} data-testid="button-create-first-key">
+                <Plus className="h-4 w-4" />
+                Creer votre premiere cle API
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -290,54 +245,6 @@ export default function ApiKeysPage() {
             ))}
           </div>
         )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Guide d'integration rapide</CardTitle>
-            <CardDescription>Integrez SolvexPay dans votre application</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div>
-              <h4 className="font-semibold text-sm mb-2">1. Authentification</h4>
-              <p className="text-sm text-muted-foreground mb-2">
-                Incluez votre cle API dans l'en-tete de chaque requete.
-              </p>
-              <div className="rounded-lg bg-muted/50 p-3 font-mono text-xs overflow-x-auto">
-                <pre className="text-muted-foreground">Authorization: Bearer sk_test_xxxxxxxxxxxxx</pre>
-              </div>
-            </div>
-            <Separator />
-            <div>
-              <h4 className="font-semibold text-sm mb-2">2. Initier un paiement</h4>
-              <div className="rounded-lg bg-muted/50 p-3 font-mono text-xs overflow-x-auto">
-                <pre className="text-muted-foreground">
-{`POST /v1/payments
-{
-  "amount": 10000,
-  "currency": "XOF",
-  "provider": "mtn",
-  "phone": "+229970000000"
-}`}
-                </pre>
-              </div>
-            </div>
-            <Separator />
-            <div>
-              <h4 className="font-semibold text-sm mb-2">3. Reponse</h4>
-              <div className="rounded-lg bg-muted/50 p-3 font-mono text-xs overflow-x-auto">
-                <pre className="text-muted-foreground">
-{`{
-  "id": "txn_1234567890",
-  "status": "pending",
-  "amount": 10000,
-  "currency": "XOF",
-  "reference": "REF-ABC123"
-}`}
-                </pre>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );

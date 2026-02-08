@@ -169,7 +169,7 @@ export default function KycPage() {
                       id="id-number"
                       value={idNumber}
                       onChange={(e) => setIdNumber(e.target.value)}
-                      placeholder="Entrez le numero de votre document"
+                      placeholder="Numero de la carte"
                       className="pl-10"
                       required
                       data-testid="input-id-number"

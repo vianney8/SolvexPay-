@@ -132,15 +132,6 @@ function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSu
                   data-testid="input-link-description"
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Options avancees</CardTitle>
-              <CardDescription>Personnalisez davantage votre lien de paiement</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="link-redirect" className="flex items-center gap-2">
                   <RedirectIcon className="h-4 w-4 text-muted-foreground" />
@@ -156,8 +147,6 @@ function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSu
                 />
                 <p className="text-xs text-muted-foreground">Redirigez vos clients apres un paiement reussi</p>
               </div>
-
-              <Separator />
 
               <div className="space-y-2">
                 <Label htmlFor="link-image" className="flex items-center gap-2">
@@ -179,10 +168,7 @@ function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSu
 
           {previewAmount > 0 && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Recapitulatif</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="pt-5 space-y-3">
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <span className="text-sm text-muted-foreground">Montant du paiement</span>
                   <span className="font-medium" data-testid="text-preview-amount">{formatCurrency(previewAmount)}</span>

@@ -267,7 +267,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground mt-1">
                   Un envoi simple, rapide et securise vers vos proches.
                 </p>
-                <Link href="/transactions">
+                <Link href="/transfer">
                   <Button variant="outline" className="mt-3" data-testid="button-transfer">
                     Transferez maintenant
                   </Button>
