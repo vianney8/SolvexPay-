@@ -49,6 +49,9 @@ export function AppSidebar() {
     if (user?.firstName && user?.lastName) {
       return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
     }
+    if (user?.firstName) {
+      return user.firstName[0].toUpperCase();
+    }
     if (user?.email) {
       return user.email[0].toUpperCase();
     }
@@ -56,8 +59,8 @@ export function AppSidebar() {
   };
 
   const getDisplayName = () => {
-    if (user?.firstName && user?.lastName) {
-      return `${user.firstName} ${user.lastName}`;
+    if (user?.firstName) {
+      return [user.firstName, user.lastName].filter(Boolean).join(" ");
     }
     return user?.email || "Utilisateur";
   };

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,12 +42,12 @@ export function LoginPage() {
 
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <a href="/" className="inline-flex items-center gap-2">
+          <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
               <CreditCard className="w-6 h-6 text-primary-foreground" />
             </div>
             <span className="font-bold text-2xl" data-testid="text-logo">SolvexPay</span>
-          </a>
+          </Link>
           <p className="text-muted-foreground">Connectez-vous à votre compte</p>
         </div>
 
@@ -111,9 +111,9 @@ export function LoginPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           Pas encore de compte ?{" "}
-          <a href="/register" className="text-primary font-medium hover:underline" data-testid="link-register">
+          <Link href="/register" className="text-primary font-medium hover:underline" data-testid="link-register">
             Créer un compte
-          </a>
+          </Link>
         </p>
       </div>
     </div>
@@ -173,12 +173,12 @@ export function RegisterPage() {
 
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <a href="/" className="inline-flex items-center gap-2">
+          <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
               <CreditCard className="w-6 h-6 text-primary-foreground" />
             </div>
             <span className="font-bold text-2xl" data-testid="text-logo">SolvexPay</span>
-          </a>
+          </Link>
           <p className="text-muted-foreground">Créez votre compte marchand</p>
         </div>
 
@@ -268,9 +268,9 @@ export function RegisterPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           Déjà un compte ?{" "}
-          <a href="/login" className="text-primary font-medium hover:underline" data-testid="link-login">
+          <Link href="/login" className="text-primary font-medium hover:underline" data-testid="link-login">
             Se connecter
-          </a>
+          </Link>
         </p>
       </div>
     </div>

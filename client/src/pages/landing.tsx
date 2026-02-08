@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,17 +45,17 @@ export default function LandingPage() {
             
             <div className="flex items-center gap-3">
               <ThemeToggle />
-              <a href="/login" data-testid="link-login">
+              <Link href="/login" data-testid="link-login">
                 <Button variant="ghost" data-testid="button-login">
                   Connexion
                 </Button>
-              </a>
-              <a href="/register" data-testid="link-get-started">
+              </Link>
+              <Link href="/register" data-testid="link-get-started">
                 <Button data-testid="button-get-started">
                   Commencer
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -81,12 +82,12 @@ export default function LandingPage() {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/register">
+                <Link href="/register">
                   <Button size="lg" className="w-full sm:w-auto" data-testid="button-cta-primary">
                     Créer un compte gratuit
                     <ChevronRight className="ml-2 h-5 w-5" />
                   </Button>
-                </a>
+                </Link>
                 <a href="#features">
                   <Button size="lg" variant="outline" className="w-full sm:w-auto" data-testid="button-cta-secondary">
                     Découvrir les fonctionnalités
@@ -380,9 +381,9 @@ export default function LandingPage() {
                   Support email
                 </li>
               </ul>
-              <a href="/register">
+              <Link href="/register">
                 <Button variant="outline" className="w-full" data-testid="button-pricing-starter">Commencer</Button>
-              </a>
+              </Link>
             </Card>
             
             <Card className="p-8 text-left border-primary relative">
@@ -407,9 +408,9 @@ export default function LandingPage() {
                   Support prioritaire
                 </li>
               </ul>
-              <a href="/register">
+              <Link href="/register">
                 <Button className="w-full" data-testid="button-pricing-business">Commencer</Button>
-              </a>
+              </Link>
             </Card>
             
             <Card className="p-8 text-left">
@@ -447,17 +448,17 @@ export default function LandingPage() {
             Rejoignez plus de 500 marchands qui utilisent déjà SolvexPay pour développer leur activité en Afrique.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <a href="/register">
+            <Link href="/register">
               <Button size="lg" data-testid="button-cta-bottom">
                 Créer un compte gratuit
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-            </a>
-            <a href="/login">
+            </Link>
+            <Link href="/login">
               <Button size="lg" variant="outline" data-testid="button-login-bottom">
                 Se connecter
               </Button>
-            </a>
+            </Link>
           </div>
         </div>
       </section>
