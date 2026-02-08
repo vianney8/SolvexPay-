@@ -28,14 +28,8 @@ export default function LandingPage() {
             <div className="flex items-center gap-3">
               <ThemeToggle />
               <Link href="/login" data-testid="link-login">
-                <Button variant="ghost" data-testid="button-login">
-                  Connexion
-                </Button>
-              </Link>
-              <Link href="/register" data-testid="link-get-started">
-                <Button data-testid="button-get-started">
-                  Commencer
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <Button variant="outline" data-testid="button-login">
+                  Se connecter
                 </Button>
               </Link>
             </div>
