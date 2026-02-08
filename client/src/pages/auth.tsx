@@ -8,11 +8,11 @@ import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ArrowRight, ChevronDown 
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
 const countryCodes = [
-  { code: "+229", country: "Bénin" },
-  { code: "+225", country: "Côte d'Ivoire" },
-  { code: "+226", country: "Burkina Faso" },
-  { code: "+228", country: "Togo" },
-  { code: "+221", country: "Sénégal" },
+  { code: "+229", country: "Bénin", flag: "\u{1F1E7}\u{1F1EF}" },
+  { code: "+225", country: "Côte d'Ivoire", flag: "\u{1F1E8}\u{1F1EE}" },
+  { code: "+226", country: "Burkina Faso", flag: "\u{1F1E7}\u{1F1EB}" },
+  { code: "+228", country: "Togo", flag: "\u{1F1F9}\u{1F1EC}" },
+  { code: "+221", country: "Sénégal", flag: "\u{1F1F8}\u{1F1F3}" },
 ];
 
 export function LoginPage() {
@@ -237,30 +237,40 @@ export function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                  className="flex items-center gap-1 border border-input rounded-md px-3 h-9 text-sm bg-background hover-elevate min-w-[90px]"
+                  className="flex items-center gap-1.5 border border-input rounded-md px-3 h-9 text-sm bg-background hover-elevate min-w-[100px]"
                   data-testid="button-country-code"
                 >
-                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-base">{countryCodes.find(c => c.code === countryCode)?.flag}</span>
                   <span className="font-medium">{countryCode}</span>
                   <ChevronDown className="h-3 w-3 text-muted-foreground" />
                 </button>
                 {showCountryDropdown && (
-                  <div className="absolute top-full left-0 mt-1 bg-background border border-border rounded-md shadow-md z-50 min-w-[180px]">
-                    {countryCodes.map((cc) => (
-                      <button
-                        key={cc.code}
-                        type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover-elevate flex items-center gap-2"
-                        onClick={() => {
-                          setCountryCode(cc.code);
-                          setShowCountryDropdown(false);
-                        }}
-                        data-testid={`option-country-${cc.code}`}
-                      >
-                        <span className="font-medium">{cc.code}</span>
-                        <span className="text-muted-foreground">{cc.country}</span>
-                      </button>
-                    ))}
+                  <div className="absolute top-full left-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 min-w-[230px] py-1 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+                    {countryCodes.map((cc) => {
+                      const isSelected = cc.code === countryCode;
+                      return (
+                        <button
+                          key={cc.code}
+                          type="button"
+                          className={`w-full text-left px-3 py-2.5 text-sm flex items-center gap-2.5 transition-colors ${
+                            isSelected
+                              ? "bg-primary text-primary-foreground font-semibold"
+                              : "hover:bg-muted"
+                          }`}
+                          onClick={() => {
+                            setCountryCode(cc.code);
+                            setShowCountryDropdown(false);
+                          }}
+                          data-testid={`option-country-${cc.code}`}
+                        >
+                          {isSelected && (
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          )}
+                          <span className="text-base">{cc.flag}</span>
+                          <span>{cc.country} ({cc.code})</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
