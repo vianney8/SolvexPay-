@@ -19,6 +19,19 @@ import heroBanner from "../assets/images/hero-banner.png";
 import paymentLinksImg from "../assets/images/payment-links.png";
 import mobileMoneyImg from "../assets/images/mobile-money.png";
 import apiGatewayImg from "../assets/images/api-gateway.png";
+import flagBenin from "../assets/images/flag-benin.png";
+import flagBurkina from "../assets/images/flag-burkina.png";
+import flagCotedivoire from "../assets/images/flag-cotedivoire.png";
+import flagSenegal from "../assets/images/flag-senegal.png";
+import flagTogo from "../assets/images/flag-togo.png";
+
+const countries = [
+  { name: "Bénin", flag: flagBenin },
+  { name: "Burkina Faso", flag: flagBurkina },
+  { name: "Côte d'Ivoire", flag: flagCotedivoire },
+  { name: "Sénégal", flag: flagSenegal },
+  { name: "Togo", flag: flagTogo },
+];
 
 export default function LandingPage() {
   return (
@@ -47,9 +60,19 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto relative">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
-              <Badge variant="secondary" className="px-4 py-1.5">
-                Agrégateur de paiement pan-africain
-              </Badge>
+              <div className="overflow-hidden max-w-xs" data-testid="flags-marquee">
+                <div className="flex animate-marquee gap-3">
+                  {[...countries, ...countries].map((country, i) => (
+                    <div
+                      key={`${country.name}-${i}`}
+                      className="flex-shrink-0 flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5"
+                    >
+                      <img src={country.flag} alt={country.name} className="w-6 h-4 rounded-sm object-cover" />
+                      <span className="text-xs font-medium whitespace-nowrap">{country.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
               
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight" data-testid="text-hero-title">
                 Simplifiez vos{" "}
