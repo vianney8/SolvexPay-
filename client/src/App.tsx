@@ -65,7 +65,7 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="solvexpay-ui-theme">
+      <ThemeProvider>
         <TooltipProvider>
           <Toaster />
           <Router />

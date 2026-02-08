@@ -2,9 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { 
-  CreditCard, 
   CheckCircle2,
   ChevronRight,
   LinkIcon,
@@ -16,6 +14,7 @@ import {
   Globe
 } from "lucide-react";
 
+import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 import heroBanner from "../assets/images/hero-banner.png";
 import paymentLinksImg from "../assets/images/payment-links.png";
 import mobileMoneyImg from "../assets/images/mobile-money.png";
@@ -28,14 +27,11 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-primary-foreground" />
-              </div>
+              <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-md object-cover" />
               <span className="font-bold text-xl" data-testid="text-logo">SolvexPay</span>
             </div>
             
             <div className="flex items-center gap-3">
-              <ThemeToggle />
               <Link href="/login" data-testid="link-login">
                 <Button variant="outline" data-testid="button-login">
                   Se connecter
@@ -47,12 +43,12 @@ export default function LandingPage() {
       </nav>
 
       <section className="relative pt-32 pb-20 px-4 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 dark:from-primary/10 dark:to-primary/5" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
         <div className="max-w-7xl mx-auto relative">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
               <Badge variant="secondary" className="px-4 py-1.5">
-                La solution de paiement #1 en Afrique
+                Agrégateur de paiement pan-africain
               </Badge>
               
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight" data-testid="text-hero-title">
@@ -141,48 +137,30 @@ export default function LandingPage() {
             </Card>
 
             <Card className="overflow-hidden" data-testid="card-mobile-money">
-              <div className="relative">
-                <img 
-                  src={mobileMoneyImg} 
-                  alt="Paiements Mobile Money SolvexPay" 
-                  className="w-full h-64 sm:h-80 object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                  <Smartphone className="w-5 h-5 text-primary" />
+              <div className="grid md:grid-cols-2">
+                <div className="relative">
+                  <img 
+                    src={mobileMoneyImg} 
+                    alt="Paiements Mobile Money SolvexPay" 
+                    className="w-full h-48 md:h-full object-cover"
+                  />
                 </div>
-                <h3 className="text-xl font-bold" data-testid="text-feature-mobile-money">Paiements Mobile Money</h3>
-                <p className="text-muted-foreground">
-                  Acceptez les paiements via tous les opérateurs Mobile Money d'Afrique de l'Ouest. 
-                  Orange Money, MTN, Moov, Wave, Free Money, T-Money et bien plus. 
-                  Transactions instantanées, sécurisées et fiables.
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Badge variant="secondary" data-testid="badge-orange-money">
-                    <span className="w-2 h-2 rounded-full bg-orange-500 mr-2" />
-                    Orange Money
-                  </Badge>
-                  <Badge variant="secondary" data-testid="badge-mtn">
-                    <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2" />
-                    MTN
-                  </Badge>
-                  <Badge variant="secondary" data-testid="badge-moov">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 mr-2" />
-                    Moov
-                  </Badge>
-                  <Badge variant="secondary" data-testid="badge-wave">
-                    <span className="w-2 h-2 rounded-full bg-cyan-500 mr-2" />
-                    Wave
-                  </Badge>
-                  <Badge variant="secondary" data-testid="badge-free">
-                    <span className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-                    Free Money
-                  </Badge>
-                  <Badge variant="secondary" data-testid="badge-others">
-                    + 6 autres
-                  </Badge>
+                <div className="p-6 space-y-3 flex flex-col justify-center">
+                  <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+                    <Smartphone className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-bold" data-testid="text-feature-mobile-money">Mobile Money</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Acceptez les paiements via tous les opérateurs d'Afrique : 
+                    Orange, MTN, Wave, Moov, Airtel, Free et plus encore.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <Badge variant="secondary" data-testid="badge-orange-money">Orange</Badge>
+                    <Badge variant="secondary" data-testid="badge-mtn">MTN</Badge>
+                    <Badge variant="secondary" data-testid="badge-wave">Wave</Badge>
+                    <Badge variant="secondary" data-testid="badge-moov">Moov</Badge>
+                    <Badge variant="secondary" data-testid="badge-others">+4</Badge>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -241,18 +219,11 @@ export default function LandingPage() {
       <footer className="py-6 px-4 border-t border-border">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-              <CreditCard className="w-3.5 h-3.5 text-primary-foreground" />
-            </div>
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-6 h-6 rounded-md object-cover" />
             <span className="font-bold text-sm">SolvexPay</span>
           </div>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-            <a href="#" className="hover:text-foreground transition-colors">Confidentialité</a>
-            <a href="#" className="hover:text-foreground transition-colors">Conditions</a>
-            <a href="#" className="hover:text-foreground transition-colors">Contact</a>
-          </div>
           <p className="text-xs text-muted-foreground" data-testid="text-copyright">
-            &copy; 2025 SolvexPay
+            &copy; 2025 SolvexPay. Tous droits réservés.
           </p>
         </div>
       </footer>

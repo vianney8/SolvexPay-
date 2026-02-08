@@ -29,9 +29,9 @@ import {
   Settings,
   LogOut,
   ChevronUp,
-  CreditCard,
   Wallet,
 } from "lucide-react";
+import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
 const menuItems = [
   { title: "Tableau de bord", url: "/dashboard", icon: LayoutDashboard },
@@ -70,9 +70,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <Link href="/dashboard">
           <div className="flex items-center gap-2 cursor-pointer" data-testid="link-logo">
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-              <CreditCard className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-md object-cover" />
             <span className="font-bold text-lg">SolvexPay</span>
           </div>
         </Link>

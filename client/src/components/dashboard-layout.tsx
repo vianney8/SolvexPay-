@@ -1,6 +1,5 @@
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -50,7 +49,6 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
                 </BreadcrumbList>
               </Breadcrumb>
             </div>
-            <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto p-4 lg:p-6">
             <div className="mb-6">

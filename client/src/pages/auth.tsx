@@ -6,9 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CreditCard, Eye, EyeOff, Loader2 } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
-
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 export function LoginPage() {
   const [, navigate] = useLocation();
   const { login } = useAuth();
@@ -36,16 +35,12 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
+
 
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-              <CreditCard className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-10 h-10 rounded-md object-cover" />
             <span className="font-bold text-2xl" data-testid="text-logo">SolvexPay</span>
           </Link>
           <p className="text-muted-foreground">Connectez-vous à votre compte</p>
@@ -167,16 +162,12 @@ export function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
+
 
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-              <CreditCard className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-10 h-10 rounded-md object-cover" />
             <span className="font-bold text-2xl" data-testid="text-logo">SolvexPay</span>
           </Link>
           <p className="text-muted-foreground">Créez votre compte marchand</p>
