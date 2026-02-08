@@ -14,6 +14,7 @@ import WalletPage from "@/pages/wallet";
 import TransactionsPage from "@/pages/transactions";
 import PaymentLinksPage from "@/pages/payment-links";
 import ApiKeysPage from "@/pages/api-keys";
+import SettingsPage from "@/pages/settings";
 import PayPage from "@/pages/pay";
 
 function AuthenticatedRoutes() {
@@ -25,6 +26,7 @@ function AuthenticatedRoutes() {
       <Route path="/transactions" component={TransactionsPage} />
       <Route path="/payment-links" component={PaymentLinksPage} />
       <Route path="/api-keys" component={ApiKeysPage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );

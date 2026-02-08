@@ -39,6 +39,7 @@ const menuItems = [
   { title: "Transactions", url: "/transactions", icon: ArrowDownUp },
   { title: "Liens de paiement", url: "/payment-links", icon: Link2 },
   { title: "Clés API", url: "/api-keys", icon: Key },
+  { title: "Paramètres", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -83,7 +84,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url}>
+                  <SidebarMenuButton asChild isActive={location === item.url || (item.url === "/dashboard" && location === "/")}>
                     <Link href={item.url} data-testid={`link-${item.url.replace("/", "")}`}>
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>

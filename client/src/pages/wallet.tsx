@@ -287,7 +287,7 @@ export default function WalletPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {currencies.map((currency) => {
             const balanceKey = `balance${currency.code}` as keyof WalletType;
-            const balance = wallet?.[balanceKey] || "0";
+            const balance = String(wallet?.[balanceKey] || "0");
             
             return (
               <Card key={currency.code}>
