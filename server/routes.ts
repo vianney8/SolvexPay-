@@ -5,7 +5,7 @@ import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integra
 import { sendavaPayService, verifyWebhookSignature, isApiKeyConfigured } from "./services/sendavapay";
 import { z } from "zod";
 
-const SUPPORTED_CURRENCIES = ["XOF", "NGN", "GHS", "KES"] as const;
+const SUPPORTED_CURRENCIES = ["XOF"] as const;
 const SUPPORTED_PROVIDERS = ["mtn", "orange", "wave", "moov", "free", "airtel", "solvexpay"] as const;
 
 const depositWithdrawSchema = z.object({

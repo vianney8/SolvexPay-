@@ -50,9 +50,6 @@ export const wallets = pgTable("wallets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().unique(),
   balanceXOF: decimal("balance_xof", { precision: 12, scale: 2 }).notNull().default("0"),
-  balanceNGN: decimal("balance_ngn", { precision: 12, scale: 2 }).notNull().default("0"),
-  balanceGHS: decimal("balance_ghs", { precision: 12, scale: 2 }).notNull().default("0"),
-  balanceKES: decimal("balance_kes", { precision: 12, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -61,31 +61,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateWalletBalance(userId: string, currency: string, amount: number): Promise<Wallet> {
-    const validCurrencies = ["XOF", "NGN", "GHS", "KES"];
-    if (!validCurrencies.includes(currency)) {
-      throw new Error(`Invalid currency: ${currency}`);
-    }
-    
-    let updateSet: Record<string, any> = { updatedAt: new Date() };
-    
-    switch (currency) {
-      case "XOF":
-        updateSet.balanceXOF = sql`${wallets.balanceXOF} + ${amount}`;
-        break;
-      case "NGN":
-        updateSet.balanceNGN = sql`${wallets.balanceNGN} + ${amount}`;
-        break;
-      case "GHS":
-        updateSet.balanceGHS = sql`${wallets.balanceGHS} + ${amount}`;
-        break;
-      case "KES":
-        updateSet.balanceKES = sql`${wallets.balanceKES} + ${amount}`;
-        break;
+    if (currency !== "XOF") {
+      throw new Error(`Devise non supportee: ${currency}. Seul le XOF est accepte.`);
     }
     
     const [wallet] = await db
       .update(wallets)
-      .set(updateSet)
+      .set({
+        updatedAt: new Date(),
+        balanceXOF: sql`${wallets.balanceXOF} + ${amount}`,
+      })
       .where(eq(wallets.userId, userId))
       .returning();
     return wallet;

@@ -30,9 +30,9 @@ const countries = [
   { code: "ML", name: "Mali", flag: "ML", prefix: "+223", currency: "XOF" },
   { code: "NE", name: "Niger", flag: "NE", prefix: "+227", currency: "XOF" },
   { code: "GW", name: "Guinee-Bissau", flag: "GW", prefix: "+245", currency: "XOF" },
-  { code: "NG", name: "Nigeria", flag: "NG", prefix: "+234", currency: "NGN" },
-  { code: "GH", name: "Ghana", flag: "GH", prefix: "+233", currency: "GHS" },
-  { code: "KE", name: "Kenya", flag: "KE", prefix: "+254", currency: "KES" },
+  { code: "NG", name: "Nigeria", flag: "NG", prefix: "+234", currency: "XOF" },
+  { code: "GH", name: "Ghana", flag: "GH", prefix: "+233", currency: "XOF" },
+  { code: "KE", name: "Kenya", flag: "KE", prefix: "+254", currency: "XOF" },
 ];
 
 const providers = [
