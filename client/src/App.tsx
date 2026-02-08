@@ -10,10 +10,10 @@ import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import { LoginPage, RegisterPage } from "@/pages/auth";
 import DashboardPage from "@/pages/dashboard";
-import WalletPage from "@/pages/wallet";
 import TransactionsPage from "@/pages/transactions";
 import PaymentLinksPage from "@/pages/payment-links";
 import ApiKeysPage from "@/pages/api-keys";
+import KycPage from "@/pages/kyc";
 import SettingsPage from "@/pages/settings";
 import PayPage from "@/pages/pay";
 
@@ -22,10 +22,10 @@ function AuthenticatedRoutes() {
     <Switch>
       <Route path="/" component={DashboardPage} />
       <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/wallet" component={WalletPage} />
       <Route path="/transactions" component={TransactionsPage} />
       <Route path="/payment-links" component={PaymentLinksPage} />
       <Route path="/api-keys" component={ApiKeysPage} />
+      <Route path="/kyc" component={KycPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>

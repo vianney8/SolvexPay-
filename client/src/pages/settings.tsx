@@ -289,14 +289,16 @@ export default function SettingsPage() {
                     required
                     data-testid="input-current-password"
                   />
-                  <button
+                  <Button
                     type="button"
-                    className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                     data-testid="button-toggle-current-password"
                   >
                     {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -314,14 +316,16 @@ export default function SettingsPage() {
                     required
                     data-testid="input-new-password"
                   />
-                  <button
+                  <Button
                     type="button"
-                    className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0"
                     onClick={() => setShowNewPassword(!showNewPassword)}
                     data-testid="button-toggle-new-password"
                   >
                     {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                  </Button>
                 </div>
                 {passwordData.newPassword.length > 0 && passwordData.newPassword.length < 6 && (
                   <p className="text-xs text-destructive">6 caracteres minimum</p>
@@ -342,14 +346,16 @@ export default function SettingsPage() {
                     required
                     data-testid="input-confirm-new-password"
                   />
-                  <button
+                  <Button
                     type="button"
-                    className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     data-testid="button-toggle-confirm-new-password"
                   >
                     {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                  </Button>
                 </div>
                 {passwordData.confirmPassword.length > 0 && passwordData.newPassword !== passwordData.confirmPassword && (
                   <p className="text-xs text-destructive" data-testid="text-password-mismatch">Les mots de passe ne correspondent pas</p>
@@ -386,14 +392,6 @@ export default function SettingsPage() {
                 <div>
                   <p className="font-medium text-sm">Notifications par email</p>
                   <p className="text-sm text-muted-foreground">Recevez des alertes pour chaque transaction</p>
-                </div>
-                <Badge variant="secondary">Bientot</Badge>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-medium text-sm">Notifications SMS</p>
-                  <p className="text-sm text-muted-foreground">Alertes par SMS pour les transactions importantes</p>
                 </div>
                 <Badge variant="secondary">Bientot</Badge>
               </div>
@@ -437,14 +435,6 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Devise principale pour les transactions</p>
                 </div>
                 <Badge>XOF (FCFA)</Badge>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-medium text-sm">Fuseau horaire</p>
-                  <p className="text-sm text-muted-foreground">Fuseau horaire pour les dates</p>
-                </div>
-                <Badge variant="secondary">Africa/Porto-Novo</Badge>
               </div>
             </div>
           </CardContent>

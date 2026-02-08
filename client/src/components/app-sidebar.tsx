@@ -29,16 +29,16 @@ import {
   Settings,
   LogOut,
   ChevronUp,
-  Wallet,
+  ShieldCheck,
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
 const menuItems = [
   { title: "Tableau de bord", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Portefeuille", url: "/wallet", icon: Wallet },
   { title: "Transactions", url: "/transactions", icon: ArrowDownUp },
   { title: "Liens de paiement", url: "/payment-links", icon: Link2 },
   { title: "Clés API", url: "/api-keys", icon: Key },
+  { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck },
   { title: "Paramètres", url: "/settings", icon: Settings },
 ];
 
