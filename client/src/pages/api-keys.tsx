@@ -1,20 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -22,14 +16,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Key, Copy, Trash2, AlertTriangle, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Plus, Key, Copy, Trash2, Eye, EyeOff, Code, Globe, Lock, Zap, BookOpen } from "lucide-react";
 import type { ApiKey } from "@shared/schema";
 
 function formatDate(date: string | Date | null) {
@@ -46,21 +35,21 @@ function formatDate(date: string | Date | null) {
 export default function ApiKeysPage() {
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
-  const [newKey, setNewKey] = useState<string | null>(null);
-  const [showKey, setShowKey] = useState(false);
+  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
 
   const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
     queryKey: ["/api/api-keys"],
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; environment: string }) => {
+    mutationFn: async (data: { name: string }) => {
       const response = await apiRequest("POST", "/api/api-keys", data);
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
-      setNewKey(data.key);
+      setCreateOpen(false);
+      toast({ title: "Cle creee", description: "Votre nouvelle cle API de production est prete." });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de creer la cle API.", variant: "destructive" });
@@ -91,7 +80,6 @@ export default function ApiKeysPage() {
     const formData = new FormData(e.currentTarget);
     createMutation.mutate({
       name: formData.get("name") as string,
-      environment: formData.get("environment") as string,
     });
   };
 
@@ -100,10 +88,8 @@ export default function ApiKeysPage() {
     toast({ title: "Cle copiee", description: "La cle API a ete copiee dans le presse-papiers." });
   };
 
-  const handleCloseCreateDialog = () => {
-    setCreateOpen(false);
-    setNewKey(null);
-    setShowKey(false);
+  const toggleKeyVisibility = (id: string) => {
+    setVisibleKeys(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
@@ -115,80 +101,29 @@ export default function ApiKeysPage() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <Button variant="outline" className="gap-2" data-testid="button-documentation">
-            <ExternalLink className="h-4 w-4" />
-            Documentation
-          </Button>
           <Button className="gap-2" onClick={() => setCreateOpen(true)} data-testid="button-create-key">
             <Plus className="h-4 w-4" />
             Nouvelle cle
           </Button>
         </div>
 
-        <Dialog open={createOpen} onOpenChange={handleCloseCreateDialog}>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>{newKey ? "Cle API creee" : "Creer une cle API"}</DialogTitle>
+              <DialogTitle>Creer une cle API de production</DialogTitle>
               <DialogDescription>
-                {newKey
-                  ? "Copiez cette cle maintenant. Elle ne sera plus affichee."
-                  : "Creez une nouvelle cle API pour integrer SolvexPay"}
+                Cette cle vous permettra d'integrer SolvexPay dans votre application
               </DialogDescription>
             </DialogHeader>
-
-            {newKey ? (
-              <div className="space-y-4">
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Important</AlertTitle>
-                  <AlertDescription>
-                    Cette cle ne sera affichee qu'une seule fois. Copiez-la maintenant.
-                  </AlertDescription>
-                </Alert>
-                <div className="space-y-2">
-                  <Label>Votre cle API</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        value={showKey ? newKey : newKey.replace(/./g, "\u2022")}
-                        readOnly
-                        className="pr-10 font-mono text-sm"
-                        data-testid="input-new-key"
-                      />
-                      <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0" onClick={() => setShowKey(!showKey)}>
-                        {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    <Button type="button" variant="outline" size="icon" onClick={() => copyKey(newKey)} data-testid="button-copy-new-key">
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <Button className="w-full" onClick={handleCloseCreateDialog} data-testid="button-done">
-                  J'ai copie ma cle
-                </Button>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="key-name">Nom de la cle</Label>
+                <Input id="key-name" name="name" placeholder="Ex: Mon application mobile" required data-testid="input-key-name" />
               </div>
-            ) : (
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="key-name">Nom de la cle</Label>
-                  <Input id="key-name" name="name" placeholder="Ex: Mon application mobile" required data-testid="input-key-name" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="key-environment">Environnement</Label>
-                  <Select name="environment" defaultValue="test">
-                    <SelectTrigger id="key-environment" data-testid="select-key-environment"><SelectValue placeholder="Environnement" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="test">Test (Sandbox)</SelectItem>
-                      <SelectItem value="live">Production (Live)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-confirm-create-key">
-                  {createMutation.isPending ? "Creation..." : "Creer la cle"}
-                </Button>
-              </form>
-            )}
+              <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-confirm-create-key">
+                {createMutation.isPending ? "Creation..." : "Creer la cle de production"}
+              </Button>
+            </form>
           </DialogContent>
         </Dialog>
 
@@ -212,31 +147,41 @@ export default function ApiKeysPage() {
             {apiKeys.map((key) => (
               <Card key={key.id} className="overflow-visible" data-testid={`key-row-${key.id}`}>
                 <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-sm">{key.name}</h3>
-                        <Badge variant={key.environment === "live" ? "default" : "secondary"} className="text-xs">
-                          {key.environment === "live" ? "Production" : "Test"}
-                        </Badge>
-                        <Badge variant={key.isActive ? "default" : "destructive"} className="text-xs">
-                          {key.isActive ? "Active" : "Inactive"}
-                        </Badge>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-sm">{key.name}</h3>
+                          <Badge variant="default" className="text-xs">Production</Badge>
+                          <Badge variant={key.isActive ? "default" : "destructive"} className="text-xs">
+                            {key.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 mt-1 flex-wrap">
+                          <span className="text-xs text-muted-foreground">Creee le {key.createdAt && formatDate(key.createdAt)}</span>
+                          <span className="text-xs text-muted-foreground">Derniere utilisation: {formatDate(key.lastUsedAt)}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 mt-2 flex-wrap">
-                        <code className="bg-muted px-2 py-1 rounded text-xs font-mono">{key.keyPrefix}...</code>
-                        <span className="text-xs text-muted-foreground">Creee le {key.createdAt && formatDate(key.createdAt)}</span>
-                        <span className="text-xs text-muted-foreground">Derniere utilisation: {formatDate(key.lastUsedAt)}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Switch
+                          checked={key.isActive}
+                          onCheckedChange={(checked) => toggleMutation.mutate({ id: key.id, isActive: checked })}
+                          data-testid={`switch-key-${key.id}`}
+                        />
+                        <Button variant="outline" size="icon" onClick={() => deleteMutation.mutate(key.id)} className="text-destructive" data-testid={`button-delete-key-${key.id}`}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Switch
-                        checked={key.isActive}
-                        onCheckedChange={(checked) => toggleMutation.mutate({ id: key.id, isActive: checked })}
-                        data-testid={`switch-key-${key.id}`}
-                      />
-                      <Button variant="outline" size="icon" onClick={() => deleteMutation.mutate(key.id)} className="text-destructive" data-testid={`button-delete-key-${key.id}`}>
-                        <Trash2 className="h-4 w-4" />
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-muted px-3 py-2 rounded text-xs font-mono truncate" data-testid={`text-key-value-${key.id}`}>
+                        {visibleKeys[key.id] ? (key.fullKey || `${key.keyPrefix}...`) : `${key.keyPrefix}${"*".repeat(32)}`}
+                      </code>
+                      <Button variant="outline" size="icon" onClick={() => toggleKeyVisibility(key.id)} data-testid={`button-toggle-key-${key.id}`}>
+                        {visibleKeys[key.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button variant="outline" size="icon" onClick={() => copyKey(key.fullKey || key.keyPrefix)} data-testid={`button-copy-key-${key.id}`}>
+                        <Copy className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -245,6 +190,165 @@ export default function ApiKeysPage() {
             ))}
           </div>
         )}
+
+        <Separator className="my-8" />
+
+        <div className="space-y-6" data-testid="section-documentation">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Documentation API
+            </h2>
+            <p className="text-muted-foreground mt-1">Guide d'integration de l'API SolvexPay</p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Demarrage rapide
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Utilisez votre cle API pour authentifier vos requetes. Ajoutez-la dans le header de chaque requete :
+              </p>
+              <div className="bg-muted rounded-lg p-4">
+                <code className="text-xs font-mono block whitespace-pre text-foreground">
+{`curl -X POST https://api.solvexpay.com/v1/payments \\
+  -H "Authorization: Bearer sk_live_xxxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "amount": 10000,
+    "currency": "XOF",
+    "provider": "mtn",
+    "phone": "+22997000000",
+    "description": "Paiement commande #123"
+  }'`}
+                </code>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                Endpoints disponibles
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Badge className="mt-0.5 text-xs flex-shrink-0">POST</Badge>
+                  <div>
+                    <code className="text-sm font-mono font-semibold">/v1/payments</code>
+                    <p className="text-xs text-muted-foreground mt-1">Creer un nouveau paiement Mobile Money</p>
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-start gap-3">
+                  <Badge variant="secondary" className="mt-0.5 text-xs flex-shrink-0">GET</Badge>
+                  <div>
+                    <code className="text-sm font-mono font-semibold">/v1/payments/:id</code>
+                    <p className="text-xs text-muted-foreground mt-1">Verifier le statut d'un paiement</p>
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-start gap-3">
+                  <Badge className="mt-0.5 text-xs flex-shrink-0">POST</Badge>
+                  <div>
+                    <code className="text-sm font-mono font-semibold">/v1/transfers</code>
+                    <p className="text-xs text-muted-foreground mt-1">Effectuer un transfert vers un numero Mobile Money</p>
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-start gap-3">
+                  <Badge variant="secondary" className="mt-0.5 text-xs flex-shrink-0">GET</Badge>
+                  <div>
+                    <code className="text-sm font-mono font-semibold">/v1/balance</code>
+                    <p className="text-xs text-muted-foreground mt-1">Consulter le solde de votre compte</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                Securite
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Votre cle API donne acces a votre compte. Suivez ces bonnes pratiques :
+              </p>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-1 flex-shrink-0">1.</span>
+                  Ne partagez jamais votre cle API publiquement
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-1 flex-shrink-0">2.</span>
+                  Stockez-la dans des variables d'environnement
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-1 flex-shrink-0">3.</span>
+                  Utilisez HTTPS pour toutes vos requetes
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-1 flex-shrink-0">4.</span>
+                  Configurez les webhooks pour recevoir les notifications de paiement
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Code className="h-4 w-4" />
+                Exemple d'integration
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-muted rounded-lg p-4">
+                <code className="text-xs font-mono block whitespace-pre text-foreground">
+{`// Node.js - Exemple d'integration
+const axios = require('axios');
+
+const solvexpay = axios.create({
+  baseURL: 'https://api.solvexpay.com/v1',
+  headers: {
+    'Authorization': 'Bearer ' + process.env.SOLVEXPAY_API_KEY,
+    'Content-Type': 'application/json'
+  }
+});
+
+// Creer un paiement
+async function createPayment(amount, phone, provider) {
+  const response = await solvexpay.post('/payments', {
+    amount,
+    currency: 'XOF',
+    provider,  // mtn, orange, wave, moov
+    phone,
+    description: 'Paiement via API'
+  });
+  return response.data;
+}
+
+// Verifier un paiement
+async function checkPayment(paymentId) {
+  const response = await solvexpay.get('/payments/' + paymentId);
+  return response.data;
+}`}
+                </code>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -38,9 +38,10 @@ export const apiKeys = pgTable("api_keys", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
-  keyPrefix: text("key_prefix").notNull(), // first 8 chars for display
-  keyHash: text("key_hash").notNull(), // hashed full key
-  environment: text("environment").notNull().default("test"), // test, live
+  keyPrefix: text("key_prefix").notNull(),
+  keyHash: text("key_hash").notNull(),
+  fullKey: text("full_key"),
+  environment: text("environment").notNull().default("live"),
   isActive: boolean("is_active").notNull().default(true),
   lastUsedAt: timestamp("last_used_at"),
   createdAt: timestamp("created_at").defaultNow(),

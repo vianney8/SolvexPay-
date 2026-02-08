@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,12 +10,19 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Plus, Link2, Copy, ExternalLink, Trash2, Search,
   Globe, Activity, ArrowLeft, ImagePlus, ExternalLink as RedirectIcon,
-  Info, AlertCircle,
+  Info, Pencil, Upload, X,
 } from "lucide-react";
 import type { PaymentLink } from "@shared/schema";
 
@@ -35,13 +42,24 @@ function formatDate(date: string | Date) {
   }).format(new Date(date));
 }
 
-function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSuccess: () => void }) {
+function PaymentLinkForm({
+  onBack,
+  onSuccess,
+  editLink,
+}: {
+  onBack: () => void;
+  onSuccess: () => void;
+  editLink?: PaymentLink | null;
+}) {
   const { toast } = useToast();
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [redirectUrl, setRedirectUrl] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState(editLink?.name || "");
+  const [amount, setAmount] = useState(editLink ? editLink.amount : "");
+  const [description, setDescription] = useState(editLink?.description || "");
+  const [redirectUrl, setRedirectUrl] = useState(editLink?.redirectUrl || "");
+  const [imageUrl, setImageUrl] = useState(editLink?.imageUrl || "");
+  const [imagePreview, setImagePreview] = useState(editLink?.imageUrl || "");
+  const [uploading, setUploading] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; amount: number; currency: string; description?: string; redirectUrl?: string; imageUrl?: string }) => {
@@ -58,33 +76,94 @@ function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSu
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (data: { name: string; amount: number; description?: string | null; redirectUrl?: string | null; imageUrl?: string | null }) => {
+      return apiRequest("PATCH", `/api/payment-links/${editLink!.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
+      toast({ title: "Lien modifie", description: "Votre lien de paiement a ete mis a jour." });
+      onSuccess();
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le lien de paiement.", variant: "destructive" });
+    },
+  });
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      if (data.imageUrl) {
+        setImageUrl(data.imageUrl);
+        toast({ title: "Image ajoutee", description: "L'image a ete telechargee avec succes." });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de telecharger l'image.", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = () => {
+    setImageUrl("");
+    setImagePreview("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !amount) return;
-    createMutation.mutate({
+    const payload = {
       name: name.trim(),
-      amount: parseFloat(amount),
+      amount: parseFloat(String(amount)),
       currency: "XOF",
       description: description.trim() || undefined,
       redirectUrl: redirectUrl.trim() || undefined,
       imageUrl: imageUrl.trim() || undefined,
-    });
+    };
+
+    if (editLink) {
+      updateMutation.mutate({
+        name: payload.name,
+        amount: payload.amount,
+        description: payload.description || null,
+        redirectUrl: payload.redirectUrl || null,
+        imageUrl: payload.imageUrl || null,
+      });
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
-  const previewAmount = amount ? parseFloat(amount) : 0;
+  const previewAmount = amount ? parseFloat(String(amount)) : 0;
   const fees = previewAmount * 0.04;
   const netAmount = previewAmount - fees;
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <DashboardLayout title="" breadcrumbs={[{ label: "Liens de paiement", href: "/payment-links" }, { label: "Nouveau lien" }]}>
+    <DashboardLayout title="" breadcrumbs={[{ label: "Liens de paiement", href: "/payment-links" }, { label: editLink ? "Modifier" : "Nouveau lien" }]}>
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-links">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-xl font-semibold">Nouveau lien de paiement</h2>
-            <p className="text-sm text-muted-foreground">Creez un lien personnalise pour recevoir des paiements</p>
+            <h2 className="text-xl font-semibold">{editLink ? "Modifier le lien de paiement" : "Nouveau lien de paiement"}</h2>
+            <p className="text-sm text-muted-foreground">{editLink ? "Modifiez les informations de votre lien" : "Creez un lien personnalise pour recevoir des paiements"}</p>
           </div>
         </div>
 
@@ -132,6 +211,7 @@ function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSu
                   data-testid="input-link-description"
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="link-redirect" className="flex items-center gap-2">
                   <RedirectIcon className="h-4 w-4 text-muted-foreground" />
@@ -149,19 +229,43 @@ function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSu
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="link-image" className="flex items-center gap-2">
+                <Label className="flex items-center gap-2">
                   <ImagePlus className="h-4 w-4 text-muted-foreground" />
                   Image du produit (optionnel)
                 </Label>
-                <Input
-                  id="link-image"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  type="url"
-                  placeholder="https://votre-site.com/image-produit.jpg"
-                  data-testid="input-link-image"
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  data-testid="input-link-image-file"
                 />
-                <p className="text-xs text-muted-foreground">Ajoutez une image pour illustrer votre produit ou service</p>
+                {imagePreview ? (
+                  <div className="relative rounded-lg border overflow-hidden">
+                    <img src={imagePreview} alt="Apercu du produit" className="w-full h-48 object-cover" data-testid="img-link-preview" />
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      <Button type="button" variant="secondary" size="icon" onClick={() => fileInputRef.current?.click()} data-testid="button-change-image">
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" variant="destructive" size="icon" onClick={removeImage} data-testid="button-remove-image">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                    data-testid="button-upload-image"
+                  >
+                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {uploading ? "Telechargement en cours..." : "Cliquez pour ajouter une image"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">JPG, PNG, GIF ou WebP (max 5 MB)</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -189,7 +293,7 @@ function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSu
           <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Des frais d'encaissement de 4% seront appliques sur chaque paiement recu via ce lien. 
+              Des frais d'encaissement de 4% seront appliques sur chaque paiement recu via ce lien.
               Ces frais couvrent les couts de traitement des paiements Mobile Money.
             </p>
           </div>
@@ -198,8 +302,8 @@ function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSu
             <Button type="button" variant="outline" onClick={onBack} className="flex-1" data-testid="button-cancel-create">
               Annuler
             </Button>
-            <Button type="submit" className="flex-1" disabled={createMutation.isPending} data-testid="button-confirm-create-link">
-              {createMutation.isPending ? "Creation en cours..." : "Creer le lien de paiement"}
+            <Button type="submit" className="flex-1" disabled={isPending} data-testid="button-confirm-create-link">
+              {isPending ? (editLink ? "Modification..." : "Creation en cours...") : (editLink ? "Enregistrer les modifications" : "Creer le lien de paiement")}
             </Button>
           </div>
         </form>
@@ -211,6 +315,7 @@ function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSu
 export default function PaymentLinksPage() {
   const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
+  const [editingLink, setEditingLink] = useState<PaymentLink | null>(null);
   const [search, setSearch] = useState("");
 
   const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
@@ -243,11 +348,12 @@ export default function PaymentLinksPage() {
     toast({ title: "Lien copie", description: "Le lien a ete copie dans le presse-papiers." });
   };
 
-  if (showCreate) {
+  if (showCreate || editingLink) {
     return (
-      <CreatePaymentLinkForm
-        onBack={() => setShowCreate(false)}
-        onSuccess={() => setShowCreate(false)}
+      <PaymentLinkForm
+        onBack={() => { setShowCreate(false); setEditingLink(null); }}
+        onSuccess={() => { setShowCreate(false); setEditingLink(null); }}
+        editLink={editingLink}
       />
     );
   }
@@ -341,7 +447,12 @@ export default function PaymentLinksPage() {
             {filteredLinks.map((link) => (
               <Card key={link.id} className="overflow-visible" data-testid={`link-row-${link.id}`}>
                 <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {link.imageUrl && (
+                      <div className="sm:w-24 sm:h-24 h-40 rounded-lg overflow-hidden flex-shrink-0">
+                        <img src={link.imageUrl} alt={link.name} className="w-full h-full object-cover" data-testid={`img-link-${link.id}`} />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-sm truncate">{link.name}</h3>
@@ -364,6 +475,9 @@ export default function PaymentLinksPage() {
                         onCheckedChange={(checked) => toggleMutation.mutate({ id: link.id, isActive: checked })}
                         data-testid={`switch-link-${link.id}`}
                       />
+                      <Button variant="outline" size="icon" onClick={() => setEditingLink(link)} data-testid={`button-edit-link-${link.id}`}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <Button variant="outline" size="icon" onClick={() => copyLink(link.slug)} data-testid={`button-copy-link-${link.id}`}>
                         <Copy className="h-4 w-4" />
                       </Button>

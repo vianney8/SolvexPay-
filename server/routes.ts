@@ -4,6 +4,31 @@ import { storage, generateApiKey, generateSlug, generateReference } from "./stor
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
 import { sendavaPayService, verifyWebhookSignature, isApiKeyConfigured } from "./services/sendavapay";
 import { z } from "zod";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mime = allowed.test(file.mimetype);
+    cb(null, ext && mime);
+  },
+});
 
 const SUPPORTED_CURRENCIES = ["XOF"] as const;
 const SUPPORTED_PROVIDERS = ["mtn", "orange", "wave", "moov", "free", "airtel", "solvexpay"] as const;
@@ -26,7 +51,15 @@ const createPaymentLinkSchema = z.object({
 
 const createApiKeySchema = z.object({
   name: z.string().min(1, "Nom requis"),
-  environment: z.enum(["test", "live"]),
+});
+
+const updatePaymentLinkSchema = z.object({
+  name: z.string().min(1).optional(),
+  amount: z.number().min(100).optional(),
+  description: z.string().optional().nullable(),
+  redirectUrl: z.string().url().optional().or(z.literal("")).nullable(),
+  imageUrl: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
 });
 
 const publicPaySchema = z.object({
@@ -204,13 +237,21 @@ export async function registerRoutes(
   app.patch("/api/payment-links/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { isActive } = req.body;
-
-      if (typeof isActive !== "boolean") {
-        return res.status(400).json({ message: "isActive must be a boolean" });
+      const validation = updatePaymentLinkSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
       }
 
-      const paymentLink = await storage.updatePaymentLink(id, { isActive });
+      const updateData: any = {};
+      const { name, amount, description, redirectUrl, imageUrl, isActive } = validation.data;
+      if (name !== undefined) updateData.name = name;
+      if (amount !== undefined) updateData.amount = amount.toString();
+      if (description !== undefined) updateData.description = description;
+      if (redirectUrl !== undefined) updateData.redirectUrl = redirectUrl || null;
+      if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
+      if (isActive !== undefined) updateData.isActive = isActive;
+
+      const paymentLink = await storage.updatePaymentLink(id, updateData);
       res.json(paymentLink);
     } catch (error) {
       console.error("Error updating payment link:", error);
@@ -424,7 +465,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { name, environment } = validation.data;
+      const { name } = validation.data;
 
       const { key, prefix, hash } = generateApiKey();
 
@@ -433,11 +474,12 @@ export async function registerRoutes(
         name,
         keyPrefix: prefix,
         keyHash: hash,
-        environment,
+        fullKey: key,
+        environment: "live",
         isActive: true,
       });
 
-      res.json({ ...apiKey, key });
+      res.json(apiKey);
     } catch (error) {
       console.error("Error creating API key:", error);
       res.status(500).json({ message: "Failed to create API key" });
@@ -471,6 +513,16 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to delete API key" });
     }
   });
+
+  app.post("/api/upload", isAuthenticated, upload.single("image"), (req: any, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: "Aucun fichier fourni" });
+    }
+    const imageUrl = `/uploads/${req.file.filename}`;
+    res.json({ imageUrl });
+  });
+
+  app.use("/uploads", (await import("express")).default.static(uploadDir));
 
   return httpServer;
 }
