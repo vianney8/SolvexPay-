@@ -1,12 +1,25 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   CreditCard, 
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  LinkIcon,
+  Store,
+  Code2,
+  ArrowRight,
+  Shield,
+  Zap,
+  Globe
 } from "lucide-react";
+
+import heroBanner from "../assets/images/hero-banner.png";
+import paymentLinksImg from "../assets/images/payment-links.png";
+import merchantLinksImg from "../assets/images/merchant-links.png";
+import apiGatewayImg from "../assets/images/api-gateway.png";
 
 export default function LandingPage() {
   return (
@@ -33,8 +46,9 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <section className="pt-32 pb-20 px-4">
-        <div className="max-w-7xl mx-auto">
+      <section className="relative pt-32 pb-20 px-4 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 dark:from-primary/10 dark:to-primary/5" />
+        <div className="max-w-7xl mx-auto relative">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
               <Badge variant="secondary" className="px-4 py-1.5">
@@ -78,6 +92,162 @@ export default function LandingPage() {
               </div>
             </div>
             
+            <div className="relative hidden lg:block">
+              <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
+              <img 
+                src={heroBanner} 
+                alt="SolvexPay - Plateforme de paiement africaine" 
+                className="relative rounded-2xl w-full object-cover"
+                data-testid="img-hero-banner"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12 space-y-4">
+            <Badge variant="secondary" className="px-4 py-1.5">Nos Solutions</Badge>
+            <h2 className="text-3xl sm:text-4xl font-bold" data-testid="text-solutions-title">
+              Tout ce dont vous avez besoin pour{" "}
+              <span className="text-primary">accepter les paiements</span>
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+              Des outils puissants et simples pour gérer vos paiements Mobile Money en Afrique.
+            </p>
+          </div>
+
+          <div className="space-y-8">
+            <Card className="overflow-hidden" data-testid="card-payment-links">
+              <div className="relative">
+                <img 
+                  src={paymentLinksImg} 
+                  alt="Liens de Paiement SolvexPay" 
+                  className="w-full h-64 sm:h-80 object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+              </div>
+              <div className="p-6 space-y-3">
+                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+                  <LinkIcon className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold" data-testid="text-feature-payment-links">Liens de Paiement</h3>
+                <p className="text-muted-foreground">
+                  Créez des liens personnalisés pour vos produits et services. 
+                  Partagez-les facilement avec vos clients par SMS, WhatsApp ou email.
+                </p>
+              </div>
+            </Card>
+
+            <Card className="overflow-hidden" data-testid="card-merchant-links">
+              <div className="relative">
+                <img 
+                  src={merchantLinksImg} 
+                  alt="Liens Marchands SolvexPay" 
+                  className="w-full h-64 sm:h-80 object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+              </div>
+              <div className="p-6 space-y-3">
+                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+                  <Store className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold" data-testid="text-feature-merchant-links">Liens Marchands</h3>
+                <p className="text-muted-foreground">
+                  Un lien unique pour votre entreprise. Vos clients choisissent 
+                  le montant à payer. Idéal pour les commerces et services.
+                </p>
+              </div>
+            </Card>
+
+            <Card className="overflow-hidden" data-testid="card-api-gateway">
+              <div className="relative">
+                <img 
+                  src={apiGatewayImg} 
+                  alt="API Gateway SolvexPay" 
+                  className="w-full h-64 sm:h-80 object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+              </div>
+              <div className="p-6 space-y-3">
+                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+                  <Code2 className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold" data-testid="text-feature-api">API Gateway</h3>
+                <p className="text-muted-foreground">
+                  Intégrez les paiements directement dans votre site web ou 
+                  application avec notre API sécurisée et documentée.
+                </p>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 px-4 bg-muted/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12 space-y-4">
+            <h2 className="text-3xl sm:text-4xl font-bold" data-testid="text-why-title">
+              Pourquoi choisir <span className="text-primary">SolvexPay</span> ?
+            </h2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card className="p-6 space-y-4" data-testid="card-advantage-security">
+              <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center">
+                <Shield className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-bold">Sécurité maximale</h3>
+              <p className="text-muted-foreground text-sm">
+                Toutes les transactions sont cryptées et sécurisées. 
+                Vos fonds sont protégés à chaque étape.
+              </p>
+            </Card>
+            <Card className="p-6 space-y-4" data-testid="card-advantage-speed">
+              <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center">
+                <Zap className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-bold">Paiements instantanés</h3>
+              <p className="text-muted-foreground text-sm">
+                Recevez vos paiements en temps réel. 
+                Pas d'attente, pas de délais de traitement.
+              </p>
+            </Card>
+            <Card className="p-6 space-y-4 sm:col-span-2 lg:col-span-1" data-testid="card-advantage-coverage">
+              <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center">
+                <Globe className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-bold">Couverture pan-africaine</h3>
+              <p className="text-muted-foreground text-sm">
+                MTN, Orange, Wave, Moov, Airtel, Free. 
+                Acceptez tous les opérateurs Mobile Money d'Afrique.
+              </p>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 px-4">
+        <div className="max-w-3xl mx-auto text-center space-y-8">
+          <h2 className="text-3xl sm:text-4xl font-bold" data-testid="text-cta-title">
+            Prêt à simplifier vos paiements ?
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            Rejoignez les marchands qui utilisent SolvexPay pour développer 
+            leur activité en Afrique.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <Link href="/register">
+              <Button size="lg" data-testid="button-cta-bottom">
+                Commencer maintenant
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/login">
+              <Button size="lg" variant="outline" data-testid="button-login-bottom">
+                Se connecter
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -125,8 +295,8 @@ export default function LandingPage() {
           </div>
           
           <div className="border-t border-border pt-8">
-            <p className="text-sm text-muted-foreground text-center">
-              © 2025 SolvexPay. Tous droits réservés.
+            <p className="text-sm text-muted-foreground text-center" data-testid="text-copyright">
+              &copy; 2025 SolvexPay. Tous droits réservés.
             </p>
           </div>
         </div>
