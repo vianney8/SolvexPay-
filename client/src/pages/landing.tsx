@@ -122,7 +122,6 @@ export default function LandingPage() {
                   alt="Liens de Paiement SolvexPay" 
                   className="w-full h-64 sm:h-80 object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
               </div>
               <div className="p-6 space-y-3">
                 <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
@@ -154,13 +153,6 @@ export default function LandingPage() {
                     Acceptez les paiements via tous les opérateurs d'Afrique : 
                     Orange, MTN, Wave, Moov, Airtel, Free et plus encore.
                   </p>
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    <Badge variant="secondary" data-testid="badge-orange-money">Orange</Badge>
-                    <Badge variant="secondary" data-testid="badge-mtn">MTN</Badge>
-                    <Badge variant="secondary" data-testid="badge-wave">Wave</Badge>
-                    <Badge variant="secondary" data-testid="badge-moov">Moov</Badge>
-                    <Badge variant="secondary" data-testid="badge-others">+4</Badge>
-                  </div>
                 </div>
               </div>
             </Card>
@@ -172,7 +164,6 @@ export default function LandingPage() {
                   alt="API Gateway SolvexPay" 
                   className="w-full h-64 sm:h-80 object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
               </div>
               <div className="p-6 space-y-3">
                 <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
