@@ -65,10 +65,9 @@ export default function LandingPage() {
                   {[...countries, ...countries].map((country, i) => (
                     <div
                       key={`${country.name}-${i}`}
-                      className="flex-shrink-0 flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5"
+                      className="flex-shrink-0 rounded-md border border-border bg-card p-1.5"
                     >
-                      <img src={country.flag} alt={country.name} className="w-6 h-4 rounded-sm object-cover" />
-                      <span className="text-xs font-medium whitespace-nowrap">{country.name}</span>
+                      <img src={country.flag} alt={country.name} className="w-10 h-7 rounded-sm object-cover" />
                     </div>
                   ))}
                 </div>
