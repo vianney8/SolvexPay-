@@ -11,7 +11,10 @@ import {
   Smartphone, 
   BarChart3,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  Users,
+  TrendingUp,
+  Lock
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -41,12 +44,12 @@ export default function LandingPage() {
             
             <div className="flex items-center gap-3">
               <ThemeToggle />
-              <a href="/api/login" data-testid="link-login">
+              <a href="/login" data-testid="link-login">
                 <Button variant="ghost" data-testid="button-login">
                   Connexion
                 </Button>
               </a>
-              <a href="/api/login" data-testid="link-get-started">
+              <a href="/register" data-testid="link-get-started">
                 <Button data-testid="button-get-started">
                   Commencer
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -78,7 +81,7 @@ export default function LandingPage() {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/api/login">
+                <a href="/register">
                   <Button size="lg" className="w-full sm:w-auto" data-testid="button-cta-primary">
                     Créer un compte gratuit
                     <ChevronRight className="ml-2 h-5 w-5" />
@@ -91,7 +94,7 @@ export default function LandingPage() {
                 </a>
               </div>
               
-              <div className="flex items-center gap-6 pt-4">
+              <div className="flex flex-wrap items-center gap-6 pt-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CheckCircle2 className="h-4 w-4 text-primary" />
                   <span>Gratuit pour commencer</span>
@@ -100,13 +103,17 @@ export default function LandingPage() {
                   <CheckCircle2 className="h-4 w-4 text-primary" />
                   <span>Sans carte bancaire</span>
                 </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <span>Inscription en 30 secondes</span>
+                </div>
               </div>
             </div>
             
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
               <Card className="relative p-6 sm:p-8 space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <p className="text-sm text-muted-foreground">Solde total</p>
                     <p className="text-3xl font-bold" data-testid="text-demo-balance">2,450,000 XOF</p>
@@ -128,7 +135,7 @@ export default function LandingPage() {
                 </div>
                 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 flex-wrap gap-2">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
                         <Smartphone className="h-5 w-5 text-yellow-600" />
@@ -141,7 +148,7 @@ export default function LandingPage() {
                     <span className="font-semibold text-primary">+25,000 XOF</span>
                   </div>
                   
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 flex-wrap gap-2">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center">
                         <Smartphone className="h-5 w-5 text-orange-600" />
@@ -160,7 +167,30 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="features" className="py-20 px-4 bg-muted/30">
+      <section className="py-16 px-4 border-y border-border bg-muted/20">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div data-testid="stat-merchants">
+              <p className="text-3xl sm:text-4xl font-bold text-primary">500+</p>
+              <p className="text-sm text-muted-foreground mt-1">Marchands actifs</p>
+            </div>
+            <div data-testid="stat-transactions">
+              <p className="text-3xl sm:text-4xl font-bold text-primary">50K+</p>
+              <p className="text-sm text-muted-foreground mt-1">Transactions/mois</p>
+            </div>
+            <div data-testid="stat-countries">
+              <p className="text-3xl sm:text-4xl font-bold text-primary">15+</p>
+              <p className="text-sm text-muted-foreground mt-1">Pays couverts</p>
+            </div>
+            <div data-testid="stat-uptime">
+              <p className="text-3xl sm:text-4xl font-bold text-primary">99.9%</p>
+              <p className="text-sm text-muted-foreground mt-1">Disponibilité</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <Badge variant="secondary" className="mb-4">Fonctionnalités</Badge>
@@ -242,6 +272,52 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="py-20 px-4 bg-muted/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <Badge variant="secondary" className="mb-4">Comment ça marche</Badge>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+              Démarrez en 3 étapes simples
+            </h2>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center space-y-4">
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <Users className="h-8 w-8 text-primary" />
+              </div>
+              <div className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">1</div>
+              <h3 className="text-xl font-semibold">Créez votre compte</h3>
+              <p className="text-muted-foreground">
+                Inscrivez-vous gratuitement en moins de 30 secondes avec votre nom, email et téléphone.
+              </p>
+            </div>
+            
+            <div className="text-center space-y-4">
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <Lock className="h-8 w-8 text-primary" />
+              </div>
+              <div className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">2</div>
+              <h3 className="text-xl font-semibold">Configurez vos paiements</h3>
+              <p className="text-muted-foreground">
+                Créez des liens de paiement ou intégrez notre API dans votre application.
+              </p>
+            </div>
+            
+            <div className="text-center space-y-4">
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <TrendingUp className="h-8 w-8 text-primary" />
+              </div>
+              <div className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">3</div>
+              <h3 className="text-xl font-semibold">Recevez vos paiements</h3>
+              <p className="text-muted-foreground">
+                Commencez à recevoir des paiements Mobile Money depuis toute l'Afrique.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="providers" className="py-20 px-4">
         <div className="max-w-7xl mx-auto text-center">
           <Badge variant="secondary" className="mb-4">Fournisseurs</Badge>
@@ -252,10 +328,20 @@ export default function LandingPage() {
             Nous supportons les principaux fournisseurs de Mobile Money en Afrique de l'Ouest et de l'Est
           </p>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-            {["MTN", "Orange", "Wave", "Airtel", "Moov", "Free"].map((provider) => (
-              <Card key={provider} className="p-6 flex items-center justify-center hover-elevate">
-                <span className="font-semibold text-lg">{provider}</span>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            {[
+              { name: "MTN", color: "bg-yellow-500/10 text-yellow-600" },
+              { name: "Orange", color: "bg-orange-500/10 text-orange-600" },
+              { name: "Wave", color: "bg-blue-500/10 text-blue-600" },
+              { name: "Airtel", color: "bg-red-500/10 text-red-600" },
+              { name: "Moov", color: "bg-cyan-500/10 text-cyan-600" },
+              { name: "Free", color: "bg-green-500/10 text-green-600" },
+            ].map((provider) => (
+              <Card key={provider.name} className="p-6 flex flex-col items-center justify-center gap-3 hover-elevate" data-testid={`card-provider-${provider.name.toLowerCase()}`}>
+                <div className={`h-12 w-12 rounded-full flex items-center justify-center ${provider.color}`}>
+                  <Smartphone className="h-6 w-6" />
+                </div>
+                <span className="font-semibold">{provider.name}</span>
               </Card>
             ))}
           </div>
@@ -282,20 +368,20 @@ export default function LandingPage() {
               </div>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                   Jusqu'à 5M XOF/mois
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                   API complète
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                   Support email
                 </li>
               </ul>
-              <a href="/api/login">
-                <Button variant="outline" className="w-full">Commencer</Button>
+              <a href="/register">
+                <Button variant="outline" className="w-full" data-testid="button-pricing-starter">Commencer</Button>
               </a>
             </Card>
             
@@ -309,20 +395,20 @@ export default function LandingPage() {
               </div>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                   Volume illimité
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                   Webhooks avancés
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                   Support prioritaire
                 </li>
               </ul>
-              <a href="/api/login">
-                <Button className="w-full">Commencer</Button>
+              <a href="/register">
+                <Button className="w-full" data-testid="button-pricing-business">Commencer</Button>
               </a>
             </Card>
             
@@ -334,43 +420,95 @@ export default function LandingPage() {
               </div>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                   Tarifs négociés
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                   SLA personnalisé
                 </li>
                 <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                   Account manager dédié
                 </li>
               </ul>
-              <Button variant="outline" className="w-full">Nous contacter</Button>
+              <Button variant="outline" className="w-full" data-testid="button-pricing-enterprise">Nous contacter</Button>
             </Card>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 px-4">
+        <div className="max-w-3xl mx-auto text-center space-y-8">
+          <h2 className="text-3xl sm:text-4xl font-bold">
+            Prêt à simplifier vos paiements ?
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            Rejoignez plus de 500 marchands qui utilisent déjà SolvexPay pour développer leur activité en Afrique.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <a href="/register">
+              <Button size="lg" data-testid="button-cta-bottom">
+                Créer un compte gratuit
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </a>
+            <a href="/login">
+              <Button size="lg" variant="outline" data-testid="button-login-bottom">
+                Se connecter
+              </Button>
+            </a>
           </div>
         </div>
       </section>
 
       <footer className="py-12 px-4 border-t border-border">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-primary-foreground" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <span className="font-bold text-lg">SolvexPay</span>
               </div>
-              <span className="font-bold text-xl">SolvexPay</span>
+              <p className="text-sm text-muted-foreground">
+                La plateforme de paiement pan-africaine pour les entreprises modernes.
+              </p>
             </div>
             
-            <p className="text-sm text-muted-foreground">
-              © 2024 SolvexPay. Tous droits réservés.
+            <div>
+              <h4 className="font-semibold mb-3">Produit</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="#features" className="hover:text-foreground transition-colors">Fonctionnalités</a></li>
+                <li><a href="#pricing" className="hover:text-foreground transition-colors">Tarifs</a></li>
+                <li><a href="#providers" className="hover:text-foreground transition-colors">Fournisseurs</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-3">Entreprise</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="#" className="hover:text-foreground transition-colors">À propos</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Carrières</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-3">Légal</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="#" className="hover:text-foreground transition-colors">Confidentialité</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Conditions</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="border-t border-border pt-8">
+            <p className="text-sm text-muted-foreground text-center">
+              © 2025 SolvexPay. Tous droits réservés.
             </p>
-            
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">Confidentialité</a>
-              <a href="#" className="hover:text-foreground transition-colors">Conditions</a>
-              <a href="#" className="hover:text-foreground transition-colors">Contact</a>
-            </div>
           </div>
         </div>
       </footer>

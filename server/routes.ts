@@ -41,7 +41,7 @@ export async function registerRoutes(
 
   app.get("/api/wallet", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       let wallet = await storage.getWallet(userId);
       
       if (!wallet) {
@@ -57,7 +57,7 @@ export async function registerRoutes(
 
   app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const stats = await storage.getStats(userId);
       res.json(stats);
     } catch (error) {
@@ -68,7 +68,7 @@ export async function registerRoutes(
 
   app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const transactions = await storage.getTransactions(userId);
       res.json(transactions);
     } catch (error) {
@@ -79,7 +79,7 @@ export async function registerRoutes(
 
   app.post("/api/transactions/deposit", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       const validation = depositWithdrawSchema.safeParse(req.body);
       if (!validation.success) {
@@ -116,7 +116,7 @@ export async function registerRoutes(
 
   app.post("/api/transactions/withdraw", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       const validation = depositWithdrawSchema.safeParse(req.body);
       if (!validation.success) {
@@ -160,7 +160,7 @@ export async function registerRoutes(
 
   app.get("/api/payment-links", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const paymentLinks = await storage.getPaymentLinks(userId);
       res.json(paymentLinks);
     } catch (error) {
@@ -171,7 +171,7 @@ export async function registerRoutes(
 
   app.post("/api/payment-links", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       const validation = createPaymentLinkSchema.safeParse(req.body);
       if (!validation.success) {
@@ -402,7 +402,7 @@ export async function registerRoutes(
 
   app.get("/api/api-keys", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const apiKeys = await storage.getApiKeys(userId);
       res.json(apiKeys);
     } catch (error) {
@@ -413,7 +413,7 @@ export async function registerRoutes(
 
   app.post("/api/api-keys", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       const validation = createApiKeySchema.safeParse(req.body);
       if (!validation.success) {

@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
+import { LoginPage, RegisterPage } from "@/pages/auth";
 import DashboardPage from "@/pages/dashboard";
 import WalletPage from "@/pages/wallet";
 import TransactionsPage from "@/pages/transactions";
@@ -52,6 +53,8 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={LandingPage} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/register" component={RegisterPage} />
           <Route component={LandingPage} />
         </>
       )}
@@ -62,7 +65,7 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="solvaxpay-ui-theme">
+      <ThemeProvider defaultTheme="light" storageKey="solvexpay-ui-theme">
         <TooltipProvider>
           <Toaster />
           <Router />
