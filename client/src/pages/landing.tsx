@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   ChevronRight,
   LinkIcon,
-  Store,
+  Smartphone,
   Code2,
   ArrowRight,
   Shield,
@@ -18,7 +18,7 @@ import {
 
 import heroBanner from "../assets/images/hero-banner.png";
 import paymentLinksImg from "../assets/images/payment-links.png";
-import merchantLinksImg from "../assets/images/merchant-links.png";
+import mobileMoneyImg from "../assets/images/mobile-money.png";
 import apiGatewayImg from "../assets/images/api-gateway.png";
 
 export default function LandingPage() {
@@ -140,24 +140,50 @@ export default function LandingPage() {
               </div>
             </Card>
 
-            <Card className="overflow-hidden" data-testid="card-merchant-links">
+            <Card className="overflow-hidden" data-testid="card-mobile-money">
               <div className="relative">
                 <img 
-                  src={merchantLinksImg} 
-                  alt="Liens Marchands SolvexPay" 
+                  src={mobileMoneyImg} 
+                  alt="Paiements Mobile Money SolvexPay" 
                   className="w-full h-64 sm:h-80 object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
               </div>
-              <div className="p-6 space-y-3">
+              <div className="p-6 space-y-4">
                 <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                  <Store className="w-5 h-5 text-primary" />
+                  <Smartphone className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="text-xl font-bold" data-testid="text-feature-merchant-links">Liens Marchands</h3>
+                <h3 className="text-xl font-bold" data-testid="text-feature-mobile-money">Paiements Mobile Money</h3>
                 <p className="text-muted-foreground">
-                  Un lien unique pour votre entreprise. Vos clients choisissent 
-                  le montant à payer. Idéal pour les commerces et services.
+                  Acceptez les paiements via tous les opérateurs Mobile Money d'Afrique de l'Ouest. 
+                  Orange Money, MTN, Moov, Wave, Free Money, T-Money et bien plus. 
+                  Transactions instantanées, sécurisées et fiables.
                 </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Badge variant="secondary" data-testid="badge-orange-money">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 mr-2" />
+                    Orange Money
+                  </Badge>
+                  <Badge variant="secondary" data-testid="badge-mtn">
+                    <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2" />
+                    MTN
+                  </Badge>
+                  <Badge variant="secondary" data-testid="badge-moov">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 mr-2" />
+                    Moov
+                  </Badge>
+                  <Badge variant="secondary" data-testid="badge-wave">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500 mr-2" />
+                    Wave
+                  </Badge>
+                  <Badge variant="secondary" data-testid="badge-free">
+                    <span className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+                    Free Money
+                  </Badge>
+                  <Badge variant="secondary" data-testid="badge-others">
+                    + 6 autres
+                  </Badge>
+                </div>
               </div>
             </Card>
 
