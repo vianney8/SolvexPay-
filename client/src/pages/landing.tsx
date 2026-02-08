@@ -116,6 +116,8 @@ export default function LandingPage() {
                 src={heroBanner} 
                 alt="SolvexPay - Plateforme de paiement africaine" 
                 className="relative rounded-2xl w-full object-cover"
+                loading="eager"
+                decoding="async"
                 data-testid="img-hero-banner"
               />
             </div>
@@ -143,6 +145,8 @@ export default function LandingPage() {
                   src={paymentLinksImg} 
                   alt="Liens de Paiement SolvexPay" 
                   className="w-full h-64 sm:h-80 object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
               <div className="p-6 space-y-3">
@@ -164,6 +168,8 @@ export default function LandingPage() {
                     src={mobileMoneyImg} 
                     alt="Paiements Mobile Money SolvexPay" 
                     className="w-full h-48 md:h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <div className="p-6 space-y-3 flex flex-col justify-center">
@@ -185,6 +191,8 @@ export default function LandingPage() {
                   src={apiGatewayImg} 
                   alt="API Gateway SolvexPay" 
                   className="w-full h-64 sm:h-80 object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
               <div className="p-6 space-y-3">
