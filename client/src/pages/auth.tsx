@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ArrowRight, ChevronDown, CreditCard } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ArrowRight, ChevronDown } from "lucide-react";
+import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
 const countryCodes = [
   { code: "+229", country: "Bénin", flag: "\u{1F1E7}\u{1F1EF}" },
@@ -48,9 +49,7 @@ export function LoginPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-3">
           <Link href="/" className="inline-block">
-            <div className="w-14 h-14 rounded-md bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center mx-auto" data-testid="img-login-logo">
-              <CreditCard className="w-7 h-7 text-white" />
-            </div>
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-14 h-14 rounded-md object-cover mx-auto" data-testid="img-login-logo" />
           </Link>
           <h1 className="text-2xl font-bold" data-testid="text-login-title">Se connecter</h1>
         </div>
@@ -193,9 +192,7 @@ export function RegisterPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-3">
           <Link href="/" className="inline-block">
-            <div className="w-14 h-14 rounded-md bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center mx-auto" data-testid="img-register-logo">
-              <CreditCard className="w-7 h-7 text-white" />
-            </div>
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-14 h-14 rounded-md object-cover mx-auto" data-testid="img-register-logo" />
           </Link>
           <h1 className="text-2xl font-bold" data-testid="text-register-title">Créer un compte</h1>
         </div>
