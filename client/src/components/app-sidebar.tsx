@@ -30,12 +30,14 @@ import {
   LogOut,
   ChevronUp,
   ShieldCheck,
+  Send,
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
 const menuItems = [
   { title: "Tableau de bord", url: "/dashboard", icon: LayoutDashboard },
   { title: "Transactions", url: "/transactions", icon: ArrowDownUp },
+  { title: "Transfert", url: "/transfer", icon: Send },
   { title: "Liens de paiement", url: "/payment-links", icon: Link2 },
   { title: "Clés API", url: "/api-keys", icon: Key },
   { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck },

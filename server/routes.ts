@@ -18,8 +18,10 @@ const depositWithdrawSchema = z.object({
 const createPaymentLinkSchema = z.object({
   name: z.string().min(1, "Nom requis"),
   amount: z.number().min(100, "Montant minimum: 100"),
-  currency: z.enum(SUPPORTED_CURRENCIES),
+  currency: z.enum(SUPPORTED_CURRENCIES).default("XOF"),
   description: z.string().optional(),
+  redirectUrl: z.string().url().optional().or(z.literal("")),
+  imageUrl: z.string().optional(),
 });
 
 const createApiKeySchema = z.object({
@@ -178,7 +180,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { name, amount, currency, description } = validation.data;
+      const { name, amount, currency, description, redirectUrl, imageUrl } = validation.data;
 
       const paymentLink = await storage.createPaymentLink({
         userId,
@@ -186,6 +188,8 @@ export async function registerRoutes(
         amount: amount.toString(),
         currency,
         description,
+        redirectUrl: redirectUrl || null,
+        imageUrl: imageUrl || null,
         slug: generateSlug(),
         isActive: true,
       });

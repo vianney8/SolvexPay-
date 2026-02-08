@@ -10,41 +10,21 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Link2, Copy, ExternalLink, Trash2, Search, Globe, Activity } from "lucide-react";
+import {
+  Plus, Link2, Copy, ExternalLink, Trash2, Search,
+  Globe, Activity, ArrowLeft, ImagePlus, ExternalLink as RedirectIcon,
+  Info, AlertCircle,
+} from "lucide-react";
 import type { PaymentLink } from "@shared/schema";
 
-const currencies = [
-  { code: "XOF", name: "Franc CFA (BCEAO)" },
-  { code: "NGN", name: "Naira nigerian" },
-  { code: "GHS", name: "Cedi ghaneen" },
-  { code: "KES", name: "Shilling kenyan" },
-];
-
-function formatCurrency(amount: string | number, currency = "XOF") {
+function formatCurrency(amount: string | number) {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
   return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(num);
+  }).format(num) + " XOF";
 }
 
 function formatDate(date: string | Date) {
@@ -55,28 +35,200 @@ function formatDate(date: string | Date) {
   }).format(new Date(date));
 }
 
-export default function PaymentLinksPage() {
+function CreatePaymentLinkForm({ onBack, onSuccess }: { onBack: () => void; onSuccess: () => void }) {
   const { toast } = useToast();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [search, setSearch] = useState("");
-
-  const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
-    queryKey: ["/api/payment-links"],
-  });
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [redirectUrl, setRedirectUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; amount: number; currency: string; description?: string }) => {
+    mutationFn: async (data: { name: string; amount: number; currency: string; description?: string; redirectUrl?: string; imageUrl?: string }) => {
       return apiRequest("POST", "/api/payment-links", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      setCreateOpen(false);
-      toast({ title: "Lien cree", description: "Votre lien de paiement a ete cree avec succes." });
+      toast({ title: "Lien cree avec succes", description: "Votre lien de paiement est pret a etre partage." });
+      onSuccess();
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de creer le lien de paiement.", variant: "destructive" });
     },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !amount) return;
+    createMutation.mutate({
+      name: name.trim(),
+      amount: parseFloat(amount),
+      currency: "XOF",
+      description: description.trim() || undefined,
+      redirectUrl: redirectUrl.trim() || undefined,
+      imageUrl: imageUrl.trim() || undefined,
+    });
+  };
+
+  const previewAmount = amount ? parseFloat(amount) : 0;
+  const fees = previewAmount * 0.04;
+  const netAmount = previewAmount - fees;
+
+  return (
+    <DashboardLayout title="" breadcrumbs={[{ label: "Liens de paiement", href: "/payment-links" }, { label: "Nouveau lien" }]}>
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-links">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h2 className="text-xl font-semibold">Nouveau lien de paiement</h2>
+            <p className="text-sm text-muted-foreground">Creez un lien personnalise pour recevoir des paiements</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Informations du paiement</CardTitle>
+              <CardDescription>Les details essentiels de votre lien de paiement</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="link-name">Nom du produit ou service</Label>
+                <Input
+                  id="link-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex: T-shirt personnalise, Abonnement mensuel..."
+                  required
+                  data-testid="input-link-name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="link-amount">Montant (XOF)</Label>
+                <Input
+                  id="link-amount"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  type="number"
+                  placeholder="10 000"
+                  min="100"
+                  required
+                  data-testid="input-link-amount"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="link-description">Description (optionnel)</Label>
+                <Textarea
+                  id="link-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Decrivez votre produit ou service pour vos clients..."
+                  rows={3}
+                  data-testid="input-link-description"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Options avancees</CardTitle>
+              <CardDescription>Personnalisez davantage votre lien de paiement</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="link-redirect" className="flex items-center gap-2">
+                  <RedirectIcon className="h-4 w-4 text-muted-foreground" />
+                  URL de redirection (optionnel)
+                </Label>
+                <Input
+                  id="link-redirect"
+                  value={redirectUrl}
+                  onChange={(e) => setRedirectUrl(e.target.value)}
+                  type="url"
+                  placeholder="https://votre-site.com/merci"
+                  data-testid="input-link-redirect"
+                />
+                <p className="text-xs text-muted-foreground">Redirigez vos clients apres un paiement reussi</p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label htmlFor="link-image" className="flex items-center gap-2">
+                  <ImagePlus className="h-4 w-4 text-muted-foreground" />
+                  Image du produit (optionnel)
+                </Label>
+                <Input
+                  id="link-image"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  type="url"
+                  placeholder="https://votre-site.com/image-produit.jpg"
+                  data-testid="input-link-image"
+                />
+                <p className="text-xs text-muted-foreground">Ajoutez une image pour illustrer votre produit ou service</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {previewAmount > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Recapitulatif</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Montant du paiement</span>
+                  <span className="font-medium" data-testid="text-preview-amount">{formatCurrency(previewAmount)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Frais d'encaissement (4%)</span>
+                  <span className="text-sm text-destructive" data-testid="text-preview-fees">- {formatCurrency(fees)}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <span className="font-medium">Montant net recu</span>
+                  <span className="font-bold text-lg" data-testid="text-preview-net">{formatCurrency(netAmount)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
+            <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-muted-foreground">
+              Des frais d'encaissement de 4% seront appliques sur chaque paiement recu via ce lien. 
+              Ces frais couvrent les couts de traitement des paiements Mobile Money.
+            </p>
+          </div>
+
+          <div className="flex gap-3 flex-wrap">
+            <Button type="button" variant="outline" onClick={onBack} className="flex-1" data-testid="button-cancel-create">
+              Annuler
+            </Button>
+            <Button type="submit" className="flex-1" disabled={createMutation.isPending} data-testid="button-confirm-create-link">
+              {createMutation.isPending ? "Creation en cours..." : "Creer le lien de paiement"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </DashboardLayout>
+  );
+}
+
+export default function PaymentLinksPage() {
+  const { toast } = useToast();
+  const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
+    queryKey: ["/api/payment-links"],
   });
 
   const toggleMutation = useMutation({
@@ -99,22 +251,20 @@ export default function PaymentLinksPage() {
     },
   });
 
-  const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    createMutation.mutate({
-      name: formData.get("name") as string,
-      amount: parseFloat(formData.get("amount") as string),
-      currency: formData.get("currency") as string,
-      description: formData.get("description") as string || undefined,
-    });
-  };
-
   const copyLink = (slug: string) => {
     const url = `${window.location.origin}/pay/${slug}`;
     navigator.clipboard.writeText(url);
     toast({ title: "Lien copie", description: "Le lien a ete copie dans le presse-papiers." });
   };
+
+  if (showCreate) {
+    return (
+      <CreatePaymentLinkForm
+        onBack={() => setShowCreate(false)}
+        onSuccess={() => setShowCreate(false)}
+      />
+    );
+  }
 
   const filteredLinks = paymentLinks?.filter((link) =>
     link.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -180,52 +330,10 @@ export default function PaymentLinksPage() {
               data-testid="input-search-links"
             />
           </div>
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-create-link">
-                <Plus className="h-4 w-4" />
-                Creer un lien
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Creer un lien de paiement</DialogTitle>
-                <DialogDescription>
-                  Creez un lien personnalise a partager avec vos clients
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="link-name">Nom du lien</Label>
-                  <Input id="link-name" name="name" placeholder="Ex: Achat produit X" required data-testid="input-link-name" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="link-amount">Montant</Label>
-                    <Input id="link-amount" name="amount" type="number" placeholder="10000" min="100" required data-testid="input-link-amount" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="link-currency">Devise</Label>
-                    <Select name="currency" defaultValue="XOF">
-                      <SelectTrigger id="link-currency" data-testid="select-link-currency"><SelectValue placeholder="Devise" /></SelectTrigger>
-                      <SelectContent>
-                        {currencies.map((c) => (
-                          <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="link-description">Description (optionnel)</Label>
-                  <Textarea id="link-description" name="description" placeholder="Description du paiement..." rows={3} data-testid="input-link-description" />
-                </div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-confirm-create-link">
-                  {createMutation.isPending ? "Creation..." : "Creer le lien"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button className="gap-2" onClick={() => setShowCreate(true)} data-testid="button-create-link">
+            <Plus className="h-4 w-4" />
+            Creer un lien
+          </Button>
         </div>
 
         {isLoading ? (
@@ -239,7 +347,7 @@ export default function PaymentLinksPage() {
             <CardContent className="py-12 text-center">
               <Link2 className="h-12 w-12 mx-auto mb-3 opacity-50 text-muted-foreground" />
               <p className="font-medium text-muted-foreground">Aucun lien de paiement</p>
-              <p className="text-sm text-muted-foreground mt-1">Creez votre premier lien pour commencer</p>
+              <p className="text-sm text-muted-foreground mt-1">Creez votre premier lien pour commencer a recevoir des paiements</p>
             </CardContent>
           </Card>
         ) : (
@@ -259,7 +367,7 @@ export default function PaymentLinksPage() {
                         <p className="text-sm text-muted-foreground mt-1 truncate">{link.description}</p>
                       )}
                       <div className="flex items-center gap-4 mt-2 flex-wrap">
-                        <span className="font-bold text-base">{formatCurrency(link.amount, link.currency)}</span>
+                        <span className="font-bold text-base">{formatCurrency(link.amount)}</span>
                         <span className="text-xs text-muted-foreground">{link.timesUsed} utilisation{parseInt(String(link.timesUsed)) !== 1 ? "s" : ""}</span>
                         <span className="text-xs text-muted-foreground">{link.createdAt && formatDate(link.createdAt)}</span>
                       </div>

@@ -26,6 +26,8 @@ export const paymentLinks = pgTable("payment_links", {
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   currency: text("currency").notNull().default("XOF"),
   description: text("description"),
+  redirectUrl: text("redirect_url"),
+  imageUrl: text("image_url"),
   slug: text("slug").notNull().unique(),
   isActive: boolean("is_active").notNull().default(true),
   timesUsed: decimal("times_used", { precision: 10, scale: 0 }).notNull().default("0"),

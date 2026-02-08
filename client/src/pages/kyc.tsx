@@ -13,24 +13,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import {
   ShieldCheck,
   Upload,
-  FileText,
   User,
   CheckCircle2,
   Clock,
   AlertCircle,
   Loader2,
-  ArrowLeftRight,
 } from "lucide-react";
 
 type KycStatus = "not_started" | "pending" | "verified" | "rejected";
 
 export default function KycPage() {
-  const { user } = useAuth();
   const { toast } = useToast();
 
   const [kycStatus] = useState<KycStatus>("not_started");
@@ -57,87 +53,97 @@ export default function KycPage() {
     }, 2000);
   };
 
-  const getStatusBadge = (status: KycStatus) => {
+  const getStatusConfig = (status: KycStatus) => {
     switch (status) {
       case "verified":
-        return <Badge className="gap-1"><CheckCircle2 className="h-3 w-3" /> Verifie</Badge>;
+        return {
+          badge: <Badge className="gap-1"><CheckCircle2 className="h-3 w-3" /> Verifie</Badge>,
+          icon: <CheckCircle2 className="h-10 w-10 text-primary" />,
+          title: "Identite verifiee",
+          description: "Votre identite a ete verifiee avec succes. Vous avez acces a toutes les fonctionnalites.",
+          bgColor: "bg-primary/10",
+        };
       case "pending":
-        return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" /> En cours</Badge>;
+        return {
+          badge: <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" /> En cours de verification</Badge>,
+          icon: <Clock className="h-10 w-10 text-muted-foreground" />,
+          title: "Verification en cours",
+          description: "Vos documents sont en cours d'examen. Ce processus prend generalement 24 a 48 heures.",
+          bgColor: "bg-muted",
+        };
       case "rejected":
-        return <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" /> Rejete</Badge>;
+        return {
+          badge: <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" /> Rejete</Badge>,
+          icon: <AlertCircle className="h-10 w-10 text-destructive" />,
+          title: "Verification rejetee",
+          description: "Veuillez soumettre a nouveau vos documents avec des informations correctes.",
+          bgColor: "bg-destructive/10",
+        };
       default:
-        return <Badge variant="secondary" className="gap-1"><AlertCircle className="h-3 w-3" /> Non verifie</Badge>;
+        return {
+          badge: <Badge variant="secondary" className="gap-1"><AlertCircle className="h-3 w-3" /> Non verifie</Badge>,
+          icon: <ShieldCheck className="h-10 w-10 text-muted-foreground" />,
+          title: "Verification requise",
+          description: "Verifiez votre identite pour acceder a toutes les fonctionnalites de SolvexPay.",
+          bgColor: "bg-muted",
+        };
     }
   };
+
+  const statusConfig = getStatusConfig(kycStatus);
 
   return (
     <DashboardLayout title="Verification KYC" breadcrumbs={[{ label: "Verification KYC" }]}>
       <div className="space-y-6 max-w-2xl">
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle data-testid="text-kyc-title">Statut de verification</CardTitle>
-                  <CardDescription>Verifiez votre identite pour acceder a toutes les fonctionnalites</CardDescription>
-                </div>
+          <CardContent className="pt-6 pb-6">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className={`h-14 w-14 rounded-xl ${statusConfig.bgColor} flex items-center justify-center flex-shrink-0`}>
+                {statusConfig.icon}
               </div>
-              {getStatusBadge(kycStatus)}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold ${kycStatus !== "not_started" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                  1
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h3 className="font-semibold text-lg" data-testid="text-kyc-status-title">{statusConfig.title}</h3>
+                  {statusConfig.badge}
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">Informations personnelles</p>
-                  <p className="text-xs text-muted-foreground">Nom, prenom, date de naissance</p>
-                </div>
-                {kycStatus !== "not_started" && <CheckCircle2 className="h-5 w-5 text-primary" />}
-              </div>
-              <Separator />
-              <div className="flex items-center gap-3">
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold ${kycStatus === "verified" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                  2
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">Document d'identite</p>
-                  <p className="text-xs text-muted-foreground">Carte d'identite, passeport ou permis de conduire</p>
-                </div>
-                {kycStatus === "verified" && <CheckCircle2 className="h-5 w-5 text-primary" />}
-              </div>
-              <Separator />
-              <div className="flex items-center gap-3">
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold ${kycStatus === "verified" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                  3
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">Verification</p>
-                  <p className="text-xs text-muted-foreground">Validation par notre equipe</p>
-                </div>
-                {kycStatus === "verified" && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                <p className="text-sm text-muted-foreground">{statusConfig.description}</p>
               </div>
             </div>
+            {kycStatus !== "not_started" && kycStatus !== "rejected" && (
+              <>
+                <Separator className="my-4" />
+                <div className="flex items-center gap-6 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full flex items-center justify-center text-xs font-semibold bg-primary text-primary-foreground">
+                      1
+                    </div>
+                    <span className="text-xs text-muted-foreground">Documents</span>
+                  </div>
+                  <div className="h-px flex-1 bg-border min-w-4" />
+                  <div className="flex items-center gap-2">
+                    <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-semibold ${kycStatus === "pending" || kycStatus === "verified" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                      2
+                    </div>
+                    <span className="text-xs text-muted-foreground">Examen</span>
+                  </div>
+                  <div className="h-px flex-1 bg-border min-w-4" />
+                  <div className="flex items-center gap-2">
+                    <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-semibold ${kycStatus === "verified" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                      3
+                    </div>
+                    <span className="text-xs text-muted-foreground">Valide</span>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        {kycStatus === "not_started" && (
+        {(kycStatus === "not_started" || kycStatus === "rejected") && (
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <CardTitle data-testid="text-kyc-form-title">Soumettre vos documents</CardTitle>
-                  <CardDescription>Remplissez le formulaire ci-dessous pour commencer la verification</CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-base" data-testid="text-kyc-form-title">Soumettre vos documents</CardTitle>
+              <CardDescription>Remplissez le formulaire ci-dessous pour commencer la verification</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-5">
@@ -268,37 +274,6 @@ export default function KycPage() {
             </CardContent>
           </Card>
         )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Pourquoi verifier votre identite ?</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="text-center p-4">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                </div>
-                <p className="font-medium text-sm">Securite renforcee</p>
-                <p className="text-xs text-muted-foreground mt-1">Protection de votre compte contre la fraude</p>
-              </div>
-              <div className="text-center p-4">
-                <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
-                  <ArrowLeftRight className="h-5 w-5 text-blue-500" />
-                </div>
-                <p className="font-medium text-sm">Limites augmentees</p>
-                <p className="text-xs text-muted-foreground mt-1">Des plafonds de transactions plus eleves</p>
-              </div>
-              <div className="text-center p-4">
-                <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center mx-auto mb-3">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                </div>
-                <p className="font-medium text-sm">Conformite reglementaire</p>
-                <p className="text-xs text-muted-foreground mt-1">Respect des normes financieres africaines</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );

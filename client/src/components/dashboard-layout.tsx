@@ -9,6 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -27,7 +28,7 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
       <div className="flex min-h-screen w-full">
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1">
-          <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6">
+          <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 sticky top-0 z-50">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <Separator orientation="vertical" className="h-6" />
             <div className="flex-1">
@@ -48,6 +49,10 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
                   ))}
                 </BreadcrumbList>
               </Breadcrumb>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0" data-testid="header-logo">
+              <img src={solvexpayLogo} alt="SolvexPay" className="w-7 h-7 rounded-md object-cover" />
+              <span className="font-semibold text-sm hidden sm:inline">SolvexPay</span>
             </div>
           </header>
           <main className="flex-1 overflow-auto p-4 lg:p-6">
