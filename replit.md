@@ -6,15 +6,17 @@ SolvexPay is a pan-African payment aggregation platform that enables businesses 
 
 ### SendavaPay Integration (Feb 2026)
 - **API**: SendavaPay API v1 at https://sendavapay.com/api/v1/*
-- **Auth**: Bearer token with secret key (ps_...) in Authorization header
-- **Mode**: Redirect-based - creates paymentUrl, user visits SendavaPay page to pay via Mobile Money
-- **Endpoints**: POST /create-payment, POST /verify-payment, POST /credit-account, GET /balance, GET /transactions
+- **Auth**: HMAC-SHA256 signatures (x-api-key + x-signature headers). Signature = HMAC-SHA256(API_SECRET, JSON.stringify(payload))
+- **Mode**: USSD direct push (no redirect) - payment prompt sent directly to customer's phone
+- **Countries**: TG (Togo), BJ (Benin), BF (Burkina Faso), CM (Cameroun), CI (Cote d'Ivoire), COD (RDC), COG (Congo Brazzaville)
+- **Operators**: MTN, Moov, Orange, TMoney, Wave, Vodacom, Airtel (varies by country)
 - **Currencies**: XOF (UEMOA), XAF (CEMAC), CDF (Congo)
-- **Statuses**: pending, completed, failed, cancelled
-- **Secrets**: SENDAVAPAY_API_KEY (ps_ secret key for Bearer auth), SENDAVAPAY_API_SECRET (for webhook HMAC verification)
+- **Statuses**: PENDING, PROCESSING, SUCCESS, FAILED, CANCELLED
+- **Endpoints**: POST /create-payment (with phoneNumber, operator, country), POST /verify-payment, POST /credit-account (withdraw to Mobile Money), GET /balance, GET /transactions
+- **Secrets**: SENDAVAPAY_API_KEY (for x-api-key header), SENDAVAPAY_API_SECRET (for HMAC signature + webhook verification)
 - **Webhook**: POST /api/webhooks/sendavapay - receives payment.completed, payment.failed, credit.completed events with X-SendavaPay-Signature HMAC-SHA256 verification
-- **Callback**: GET /api/payment/callback - redirect URL after payment, verifies status and redirects to /deposit
-- **Polling**: Frontend polls /api/transactions/verify every 5s as fallback for pending payments
+- **Callback**: GET /api/payment/callback - fallback redirect URL after payment
+- **Polling**: Frontend polls /api/transactions/verify every 5s for pending payments
 - **Webhook URLs endpoint**: GET /api/settings/webhook-urls - returns configured webhook/callback URLs for SendavaPay dashboard setup
 
 ## User Preferences

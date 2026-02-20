@@ -1,15 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { CreditCard, Smartphone, CheckCircle2, XCircle, ExternalLink, Loader2 } from "lucide-react";
+import { CreditCard, Smartphone, CheckCircle2, XCircle, Loader2, Phone } from "lucide-react";
 import type { PaymentLink } from "@shared/schema";
+
+const OPERATORS_BY_COUNTRY: Record<string, { label: string; operators: { value: string; label: string }[] }> = {
+  TG: { label: "Togo", operators: [{ value: "TMoney", label: "TMoney" }, { value: "Moov", label: "Moov" }] },
+  BJ: { label: "Benin", operators: [{ value: "MTN", label: "MTN" }, { value: "Moov", label: "Moov" }] },
+  BF: { label: "Burkina Faso", operators: [{ value: "Orange", label: "Orange" }, { value: "Moov", label: "Moov" }] },
+  CM: { label: "Cameroun", operators: [{ value: "MTN", label: "MTN" }, { value: "Orange", label: "Orange" }] },
+  CI: { label: "Cote d'Ivoire", operators: [{ value: "MTN", label: "MTN" }, { value: "Orange", label: "Orange" }, { value: "Moov", label: "Moov" }, { value: "Wave", label: "Wave" }] },
+  COD: { label: "RD Congo", operators: [{ value: "Vodacom", label: "Vodacom" }, { value: "Airtel", label: "Airtel" }, { value: "Orange", label: "Orange" }] },
+  COG: { label: "Congo Brazzaville", operators: [{ value: "MTN", label: "MTN" }, { value: "Airtel", label: "Airtel" }] },
+};
 
 function formatCurrency(amount: string | number, currency = "XOF") {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -25,7 +36,12 @@ export default function PayPage() {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
-  const [paymentUrl, setPaymentUrl] = useState("");
+  const [pendingReference, setPendingReference] = useState<string | null>(null);
+  const [verifyStatus, setVerifyStatus] = useState<string>("PROCESSING");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [country, setCountry] = useState("TG");
+  const [operator, setOperator] = useState("");
+  const [customerName, setCustomerName] = useState("");
 
   const { data: paymentLink, isLoading, error } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", slug],
@@ -38,19 +54,25 @@ export default function PayPage() {
     },
   });
 
+  useEffect(() => {
+    if (country) {
+      const countryOps = OPERATORS_BY_COUNTRY[country]?.operators || [];
+      if (countryOps.length > 0 && !countryOps.find(op => op.value === operator)) {
+        setOperator(countryOps[0].value);
+      }
+    }
+  }, [country]);
+
   const payMutation = useMutation({
-    mutationFn: async (data: { customerPhone?: string; customerName?: string; customerEmail?: string }) => {
+    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName?: string }) => {
       const response = await apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
       return response.json();
     },
     onSuccess: (data: any) => {
-      if (data.paymentUrl) {
-        setPaymentUrl(data.paymentUrl);
-        setPaymentStatus("success");
-        window.open(data.paymentUrl, "_blank");
-      } else {
-        setPaymentStatus("success");
-      }
+      setPendingReference(data.sendavaReference || data.reference);
+      setVerifyStatus(data.sendavaStatus || "PROCESSING");
+      setPaymentStatus("success");
+      toast({ title: "Paiement initie", description: "Un prompt USSD a ete envoye sur votre telephone." });
     },
     onError: () => {
       setPaymentStatus("error");
@@ -62,13 +84,35 @@ export default function PayPage() {
     },
   });
 
-  const handlePay = (e: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (!pendingReference || verifyStatus === "SUCCESS" || verifyStatus === "FAILED" || verifyStatus === "CANCELLED") return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/payment-links/verify-public", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference: pendingReference }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status) setVerifyStatus(data.status);
+        }
+      } catch {}
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [pendingReference, verifyStatus]);
+
+  const handlePay = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!phoneNumber || !operator || !country) return;
     setPaymentStatus("processing");
-    const formData = new FormData(e.currentTarget);
     payMutation.mutate({
-      customerPhone: (formData.get("phoneNumber") as string) || undefined,
-      customerName: (formData.get("customerName") as string) || undefined,
+      phoneNumber,
+      operator,
+      country,
+      customerName: customerName || undefined,
     });
   };
 
@@ -123,26 +167,41 @@ export default function PayPage() {
   }
 
   if (paymentStatus === "success") {
+    const statusConfig: Record<string, { icon: any; color: string; bg: string; label: string; sublabel: string; spin: boolean }> = {
+      PROCESSING: { icon: Loader2, color: "text-yellow-500", bg: "bg-yellow-500/10", label: "Paiement en cours...", sublabel: "Un prompt USSD a ete envoye. Confirmez sur votre telephone.", spin: true },
+      PENDING: { icon: Loader2, color: "text-yellow-500", bg: "bg-yellow-500/10", label: "En attente", sublabel: "Veuillez confirmer le paiement sur votre telephone.", spin: true },
+      SUCCESS: { icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10", label: "Paiement confirme !", sublabel: "Votre paiement a ete effectue avec succes.", spin: false },
+      FAILED: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Paiement echoue", sublabel: "Le paiement n'a pas abouti. Veuillez reessayer.", spin: false },
+      CANCELLED: { icon: XCircle, color: "text-gray-500", bg: "bg-gray-500/10", label: "Paiement annule", sublabel: "Le paiement a ete annule.", spin: false },
+    };
+
+    const config = statusConfig[verifyStatus] || statusConfig.PROCESSING;
+    const StatusIcon = config.icon;
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <CardContent className="pt-8 pb-8 space-y-4">
-            <CheckCircle2 className="h-16 w-16 mx-auto text-primary" />
-            <h1 className="text-2xl font-bold">Paiement initie</h1>
-            <p className="text-muted-foreground">
-              Cliquez sur le bouton ci-dessous pour completer votre paiement via Mobile Money.
-            </p>
+            <div className={`h-16 w-16 rounded-full ${config.bg} flex items-center justify-center mx-auto`}>
+              <StatusIcon className={`h-8 w-8 ${config.color} ${config.spin ? "animate-spin" : ""}`} />
+            </div>
+            <h1 className="text-2xl font-bold" data-testid="text-payment-status">{config.label}</h1>
+            <p className="text-muted-foreground text-sm">{config.sublabel}</p>
             <p className="font-semibold text-lg">
               {formatCurrency(paymentLink.amount, paymentLink.currency)}
             </p>
-            {paymentUrl && (
+            {pendingReference && (
+              <p className="text-xs text-muted-foreground">
+                Reference: <span className="font-mono">{pendingReference}</span>
+              </p>
+            )}
+            {(verifyStatus === "FAILED" || verifyStatus === "CANCELLED") && (
               <Button
-                className="w-full gap-2"
-                onClick={() => window.open(paymentUrl, "_blank")}
-                data-testid="button-open-payment"
+                className="w-full"
+                onClick={() => { setPaymentStatus("idle"); setPendingReference(null); setVerifyStatus("PROCESSING"); }}
+                data-testid="button-retry-payment"
               >
-                <ExternalLink className="h-4 w-4" />
-                Payer maintenant
+                Reessayer
               </Button>
             )}
           </CardContent>
@@ -150,6 +209,8 @@ export default function PayPage() {
       </div>
     );
   }
+
+  const availableOperators = OPERATORS_BY_COUNTRY[country]?.operators || [];
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -176,7 +237,8 @@ export default function PayPage() {
               <Label htmlFor="customerName">Votre nom (optionnel)</Label>
               <Input
                 id="customerName"
-                name="customerName"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
                 type="text"
                 placeholder="Jean Dupont"
                 data-testid="input-pay-name"
@@ -184,26 +246,60 @@ export default function PayPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Telephone (optionnel)</Label>
+              <Label htmlFor="phoneNumber" className="flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                Numero Mobile Money
+              </Label>
               <Input
                 id="phoneNumber"
-                name="phoneNumber"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
                 type="tel"
-                placeholder="+229 XX XX XX XX"
+                placeholder="+22890123456"
+                required
                 data-testid="input-pay-phone"
               />
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full gap-2" 
-              disabled={payMutation.isPending}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Pays</Label>
+                <Select value={country} onValueChange={setCountry}>
+                  <SelectTrigger data-testid="select-pay-country">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(OPERATORS_BY_COUNTRY).map(([code, data]) => (
+                      <SelectItem key={code} value={code}>{data.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Operateur</Label>
+                <Select value={operator} onValueChange={setOperator}>
+                  <SelectTrigger data-testid="select-pay-operator">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableOperators.map((op) => (
+                      <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full gap-2"
+              disabled={payMutation.isPending || !phoneNumber || !operator}
               data-testid="button-confirm-pay"
             >
               {payMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Traitement...
+                  Envoi en cours...
                 </>
               ) : (
                 <>
@@ -215,7 +311,7 @@ export default function PayPage() {
           </form>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
-            Paiement securise par SolvexPay via SendavaPay
+            Paiement securise par SolvexPay via Mobile Money (USSD direct)
           </p>
         </CardContent>
       </Card>

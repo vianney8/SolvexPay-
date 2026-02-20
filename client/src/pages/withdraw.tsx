@@ -1,16 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowUpRight, Wallet, Info, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowUpRight, Wallet, Info, CheckCircle2, AlertTriangle, Phone } from "lucide-react";
 import { useLocation } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
+
+const OPERATORS_BY_COUNTRY: Record<string, { label: string; operators: { value: string; label: string }[] }> = {
+  TG: { label: "Togo", operators: [{ value: "TMoney", label: "TMoney" }, { value: "Moov", label: "Moov" }] },
+  BJ: { label: "Benin", operators: [{ value: "MTN", label: "MTN" }, { value: "Moov", label: "Moov" }] },
+  BF: { label: "Burkina Faso", operators: [{ value: "Orange", label: "Orange" }, { value: "Moov", label: "Moov" }] },
+  CM: { label: "Cameroun", operators: [{ value: "MTN", label: "MTN" }, { value: "Orange", label: "Orange" }] },
+  CI: { label: "Cote d'Ivoire", operators: [{ value: "MTN", label: "MTN" }, { value: "Orange", label: "Orange" }, { value: "Moov", label: "Moov" }, { value: "Wave", label: "Wave" }] },
+  COD: { label: "RD Congo", operators: [{ value: "Vodacom", label: "Vodacom" }, { value: "Airtel", label: "Airtel" }, { value: "Orange", label: "Orange" }] },
+  COG: { label: "Congo Brazzaville", operators: [{ value: "MTN", label: "MTN" }, { value: "Airtel", label: "Airtel" }] },
+};
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("fr-FR", {
@@ -23,8 +34,9 @@ export default function WithdrawPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [amount, setAmount] = useState("");
-  const [phone, setPhone] = useState("");
-  const [description, setDescription] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [country, setCountry] = useState("TG");
+  const [operator, setOperator] = useState("");
   const [success, setSuccess] = useState(false);
   const [withdrawRef, setWithdrawRef] = useState("");
 
@@ -34,12 +46,19 @@ export default function WithdrawPage() {
 
   const balance = parseFloat(String(wallet?.balanceXOF || 0));
   const withdrawAmount = amount ? parseFloat(amount) : 0;
-  const fees = withdrawAmount * 0.01;
-  const totalDeducted = withdrawAmount + fees;
-  const insufficientFunds = totalDeducted > balance;
+  const insufficientFunds = withdrawAmount > balance;
+
+  useEffect(() => {
+    if (country) {
+      const countryOps = OPERATORS_BY_COUNTRY[country]?.operators || [];
+      if (countryOps.length > 0 && !countryOps.find(op => op.value === operator)) {
+        setOperator(countryOps[0].value);
+      }
+    }
+  }, [country]);
 
   const withdrawMutation = useMutation({
-    mutationFn: async (data: { amount: number; phone: string; description?: string }) => {
+    mutationFn: async (data: { amount: number; phoneNumber: string; operator: string; country: string }) => {
       const res = await apiRequest("POST", "/api/transactions/withdraw", data);
       return res.json();
     },
@@ -49,7 +68,7 @@ export default function WithdrawPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       setWithdrawRef(data.reference || data.sendavaReference || "");
       setSuccess(true);
-      toast({ title: "Retrait initie", description: "Votre retrait est en cours de traitement." });
+      toast({ title: "Retrait initie", description: "Les fonds seront envoyes sur votre Mobile Money." });
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Impossible d'initier le retrait.", variant: "destructive" });
@@ -58,11 +77,12 @@ export default function WithdrawPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !phone || insufficientFunds) return;
+    if (!amount || !phoneNumber || !operator || !country || insufficientFunds) return;
     withdrawMutation.mutate({
       amount: parseFloat(amount),
-      phone,
-      description: description || undefined,
+      phoneNumber,
+      operator,
+      country,
     });
   };
 
@@ -78,11 +98,11 @@ export default function WithdrawPage() {
               <h2 className="text-xl font-bold" data-testid="text-withdraw-status">Retrait initie avec succes</h2>
               <p className="text-muted-foreground text-sm">
                 Retrait de <span className="font-semibold text-foreground">{formatCurrency(parseFloat(amount))} XOF</span> vers{" "}
-                <span className="font-semibold text-foreground">{phone}</span>
+                <span className="font-semibold text-foreground">{phoneNumber}</span> ({operator})
               </p>
               <div className="rounded-lg bg-muted/50 border p-4">
                 <p className="text-xs text-muted-foreground">
-                  Les fonds seront credites sur votre compte SendavaPay lie au numero {phone}. Vous pourrez ensuite retirer vers votre Mobile Money depuis SendavaPay.
+                  Les fonds seront envoyes directement sur votre numero Mobile Money. Le delai de traitement est generalement de quelques minutes.
                 </p>
               </div>
               {withdrawRef && (
@@ -94,7 +114,7 @@ export default function WithdrawPage() {
                 <Button variant="outline" className="flex-1" onClick={() => navigate("/")} data-testid="button-back-dashboard">
                   Retour au tableau de bord
                 </Button>
-                <Button className="flex-1" onClick={() => { setSuccess(false); setAmount(""); setPhone(""); setDescription(""); setWithdrawRef(""); }} data-testid="button-new-withdraw">
+                <Button className="flex-1" onClick={() => { setSuccess(false); setAmount(""); setPhoneNumber(""); setWithdrawRef(""); }} data-testid="button-new-withdraw">
                   Nouveau retrait
                 </Button>
               </div>
@@ -105,6 +125,8 @@ export default function WithdrawPage() {
     );
   }
 
+  const availableOperators = OPERATORS_BY_COUNTRY[country]?.operators || [];
+
   return (
     <DashboardLayout title="Retrait" breadcrumbs={[{ label: "Retrait" }]}>
       <div className="max-w-lg mx-auto space-y-6">
@@ -113,7 +135,7 @@ export default function WithdrawPage() {
             <ArrowUpRight className="h-6 w-6 text-orange-500" />
             Effectuer un retrait
           </h1>
-          <p className="text-muted-foreground mt-1">Retirez vos fonds vers votre compte SendavaPay</p>
+          <p className="text-muted-foreground mt-1">Retirez vos fonds directement vers votre Mobile Money</p>
         </div>
 
         <Card className="border-primary/20 bg-primary/5">
@@ -157,7 +179,7 @@ export default function WithdrawPage() {
                     variant="ghost"
                     size="sm"
                     className="text-xs text-primary"
-                    onClick={() => setAmount(String(Math.floor(balance / 1.01)))}
+                    onClick={() => setAmount(String(Math.floor(balance)))}
                     data-testid="button-max-amount"
                   >
                     Retirer le maximum
@@ -178,32 +200,53 @@ export default function WithdrawPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Numero de telephone</CardTitle>
-              <CardDescription>Le numero lie a votre compte SendavaPay</CardDescription>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Destination Mobile Money
+              </CardTitle>
+              <CardDescription>Les fonds seront envoyes directement sur ce numero</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="withdraw-phone">Telephone</Label>
+                <Label htmlFor="withdraw-phone">Numero de telephone</Label>
                 <Input
                   id="withdraw-phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
                   type="tel"
-                  placeholder="+229 XX XX XX XX"
+                  placeholder="+22890123456"
                   required
                   className="h-12"
                   data-testid="input-withdraw-phone"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="withdraw-description">Description (optionnel)</Label>
-                <Input
-                  id="withdraw-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Ex: Retrait vers Mobile Money"
-                  data-testid="input-withdraw-description"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Pays</Label>
+                  <Select value={country} onValueChange={setCountry}>
+                    <SelectTrigger data-testid="select-withdraw-country">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(OPERATORS_BY_COUNTRY).map(([code, data]) => (
+                        <SelectItem key={code} value={code}>{data.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Operateur</Label>
+                  <Select value={operator} onValueChange={setOperator}>
+                    <SelectTrigger data-testid="select-withdraw-operator">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableOperators.map((op) => (
+                        <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -215,18 +258,10 @@ export default function WithdrawPage() {
                   <span className="text-sm text-muted-foreground">Montant du retrait</span>
                   <span className="font-semibold">{formatCurrency(withdrawAmount)} XOF</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Frais (1%)</span>
-                  <span className="text-sm text-destructive font-medium">- {formatCurrency(fees)} XOF</span>
-                </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Total debite</span>
-                  <span className="text-lg font-bold" data-testid="text-withdraw-total">{formatCurrency(totalDeducted)} XOF</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Vous recevrez</span>
-                  <span className="font-semibold text-primary" data-testid="text-withdraw-receive">{formatCurrency(withdrawAmount)} XOF</span>
+                  <span className="text-lg font-bold" data-testid="text-withdraw-total">{formatCurrency(withdrawAmount)} XOF</span>
                 </div>
               </CardContent>
             </Card>
@@ -235,14 +270,14 @@ export default function WithdrawPage() {
           <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Les fonds seront credites sur votre compte SendavaPay. Vous pourrez ensuite les retirer vers votre Mobile Money (MTN, Moov, Orange, TMoney, Wave) depuis la plateforme SendavaPay. Delai: 1h a 24h.
+              Les fonds seront envoyes directement sur votre numero Mobile Money via {operator || "votre operateur"}. Le traitement est generalement instantane.
             </p>
           </div>
 
           <Button
             type="submit"
             className="w-full h-12 text-base font-semibold"
-            disabled={withdrawMutation.isPending || !amount || !phone || insufficientFunds}
+            disabled={withdrawMutation.isPending || !amount || !phoneNumber || !operator || insufficientFunds}
             data-testid="button-confirm-withdraw"
           >
             {withdrawMutation.isPending ? "Envoi en cours..." : `Retirer ${withdrawAmount > 0 ? formatCurrency(withdrawAmount) + " XOF" : ""}`}
