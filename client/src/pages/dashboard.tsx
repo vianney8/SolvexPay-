@@ -32,17 +32,10 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  Send,
-  TrendingUp,
-  TrendingDown,
   BarChart3,
-  PieChart,
-  Users,
   CreditCard,
   Clock,
   CheckCircle2,
-  XCircle,
-  Wallet,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -408,189 +401,93 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Separator />
-
-        <div>
-          <h3 className="text-lg font-semibold flex items-center gap-2" data-testid="text-stats-title">
-            <BarChart3 className="h-5 w-5" />
-            Statistiques et performances
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">Vue d'ensemble de votre activite sur SolvexPay</p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total depots</p>
-                  <p className="text-lg font-bold" data-testid="text-stat-deposits">
-                    {statsLoading ? <Skeleton className="h-6 w-20" /> : `${formatCurrency(stats?.totalDeposits || 0)} XOF`}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                  <TrendingDown className="h-5 w-5 text-orange-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total retraits</p>
-                  <p className="text-lg font-bold" data-testid="text-stat-withdrawals">
-                    {statsLoading ? <Skeleton className="h-6 w-20" /> : `${formatCurrency(stats?.totalWithdrawals || 0)} XOF`}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <CreditCard className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Transactions</p>
-                  <p className="text-lg font-bold" data-testid="text-stat-tx-count">
-                    {statsLoading ? <Skeleton className="h-6 w-12" /> : stats?.transactionCount || 0}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-                  <Link2 className="h-5 w-5 text-purple-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Liens de paiement</p>
-                  <p className="text-lg font-bold" data-testid="text-stat-links">
-                    {statsLoading ? <Skeleton className="h-6 w-12" /> : stats?.paymentLinksCount || 0}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Taux de reussite</p>
-                  <p className="text-lg font-bold" data-testid="text-stat-success-rate">{successRate}%</p>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                <span>{completedTx.length} reussie{completedTx.length !== 1 ? "s" : ""}</span>
-                <span className="text-muted-foreground/30">|</span>
-                <span>{pendingTx.length} en attente</span>
-                <span className="text-muted-foreground/30">|</span>
-                <span>{failedTx.length} echouee{failedTx.length !== 1 ? "s" : ""}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
-                  <PieChart className="h-5 w-5 text-cyan-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Montant moyen</p>
-                  <p className="text-lg font-bold" data-testid="text-stat-avg-amount">
-                    {formatCurrency(avgTransactionAmount)} XOF
-                  </p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">Par transaction completee</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                  <Wallet className="h-5 w-5 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Volume net</p>
-                  <p className="text-lg font-bold" data-testid="text-stat-net-volume">
-                    {formatCurrency((stats?.totalDeposits || 0) - (stats?.totalWithdrawals || 0))} XOF
-                  </p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">Depots - Retraits</p>
-            </CardContent>
-          </Card>
-        </div>
-
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Repartition des transactions
+              <BarChart3 className="h-4 w-4" />
+              Statistiques et performances
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <ArrowDownLeft className="h-4 w-4 text-primary" />
-                    <span className="text-sm">Depots</span>
-                  </div>
-                  <span className="text-sm font-medium">{depositTx.length} transaction{depositTx.length !== 1 ? "s" : ""}</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${transactions && transactions.length > 0 ? (depositTx.length / transactions.length) * 100 : 0}%` }}
-                    data-testid="bar-deposits"
-                  />
+          <CardContent className="space-y-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Depots</p>
+                <div className="text-lg font-bold" data-testid="text-stat-deposits">
+                  {statsLoading ? <Skeleton className="h-6 w-16" /> : `${formatCurrency(stats?.totalDeposits || 0)}`}
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <ArrowUpRight className="h-4 w-4 text-orange-500" />
-                    <span className="text-sm">Retraits</span>
-                  </div>
-                  <span className="text-sm font-medium">{withdrawalTx.length} transaction{withdrawalTx.length !== 1 ? "s" : ""}</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-orange-500 transition-all"
-                    style={{ width: `${transactions && transactions.length > 0 ? (withdrawalTx.length / transactions.length) * 100 : 0}%` }}
-                    data-testid="bar-withdrawals"
-                  />
+              <div>
+                <p className="text-xs text-muted-foreground">Retraits</p>
+                <div className="text-lg font-bold" data-testid="text-stat-withdrawals">
+                  {statsLoading ? <Skeleton className="h-6 w-16" /> : `${formatCurrency(stats?.totalWithdrawals || 0)}`}
                 </div>
               </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Volume net</p>
+                <p className="text-lg font-bold" data-testid="text-stat-net-volume">
+                  {formatCurrency((stats?.totalDeposits || 0) - (stats?.totalWithdrawals || 0))}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Moy. / tx</p>
+                <p className="text-lg font-bold" data-testid="text-stat-avg-amount">
+                  {formatCurrency(avgTransactionAmount)}
+                </p>
+              </div>
+            </div>
 
-              <Separator />
+            <Separator />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary" data-testid="text-deposits-total">{formatCurrency(stats?.totalDeposits || 0)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Total des depots (XOF)</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Transactions</p>
+                  <p className="text-base font-semibold" data-testid="text-stat-tx-count">{stats?.transactionCount || 0}</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-orange-500" data-testid="text-withdrawals-total">{formatCurrency(stats?.totalWithdrawals || 0)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Total des retraits (XOF)</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Reussite</p>
+                  <p className="text-base font-semibold" data-testid="text-stat-success-rate">{successRate}%</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Liens actifs</p>
+                  <p className="text-base font-semibold" data-testid="text-stat-links">{stats?.paymentLinksCount || 0}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">En attente</p>
+                  <p className="text-base font-semibold">{pendingTx.length}</p>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1.5"><ArrowDownLeft className="h-3.5 w-3.5 text-primary" />Depots</span>
+                  <span className="font-medium">{depositTx.length}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${transactions && transactions.length > 0 ? (depositTx.length / transactions.length) * 100 : 0}%` }} data-testid="bar-deposits" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1.5"><ArrowUpRight className="h-3.5 w-3.5 text-orange-500" />Retraits</span>
+                  <span className="font-medium">{withdrawalTx.length}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-orange-500 transition-all" style={{ width: `${transactions && transactions.length > 0 ? (withdrawalTx.length / transactions.length) * 100 : 0}%` }} data-testid="bar-withdrawals" />
                 </div>
               </div>
             </div>
