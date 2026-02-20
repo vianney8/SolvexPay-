@@ -288,6 +288,42 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/payment-links/verify-public", async (req, res) => {
+    try {
+      const { reference } = req.body;
+      if (!reference) {
+        return res.status(400).json({ message: "Reference requise" });
+      }
+
+      const result = await sendavaPayService.verifyPayment(reference);
+      const status = result.status || "PENDING";
+
+      if (status === "SUCCESS") {
+        const transaction = await storage.getTransactionByReference(reference);
+        if (transaction && transaction.status === "pending") {
+          await storage.updateTransactionStatus(transaction.id, "completed");
+          if (transaction.type === "deposit") {
+            await storage.updateWalletBalance(
+              transaction.userId,
+              transaction.currency,
+              parseFloat(transaction.amount)
+            );
+          }
+        }
+      } else if (status === "FAILED" || status === "CANCELLED") {
+        const transaction = await storage.getTransactionByReference(reference);
+        if (transaction && transaction.status === "pending") {
+          await storage.updateTransactionStatus(transaction.id, "failed");
+        }
+      }
+
+      res.json({ success: result.success, status });
+    } catch (error: any) {
+      console.error("Public verify error:", error);
+      res.status(500).json({ message: error.message || "Erreur de verification" });
+    }
+  });
+
   app.get("/api/payment-links", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
