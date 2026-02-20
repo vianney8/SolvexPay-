@@ -106,15 +106,21 @@ class SendavaPayService {
         description: params.description || "",
         callbackUrl: params.callbackUrl || "",
       };
-      const response = await axios.post(
-        `${SENDAVAPAY_BASE_URL}/api/v1/create-payment`,
-        payload,
-        { headers: getSignedHeaders(payload) }
-      );
+      const url = `${SENDAVAPAY_BASE_URL}/api/v1/create-payment`;
+      console.log("SendavaPay createPayment request:", { url, payload: { ...payload, phoneNumber: payload.phoneNumber.substring(0, 6) + "***" } });
+      const response = await axios.post(url, payload, { headers: getSignedHeaders(payload) });
+      console.log("SendavaPay createPayment response:", response.data);
       return response.data;
     } catch (error: any) {
-      console.error("SendavaPay createPayment error:", error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || "Echec de la creation du paiement");
+      console.error("SendavaPay createPayment error:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        url: `${SENDAVAPAY_BASE_URL}/api/v1/create-payment`,
+      });
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Echec de la creation du paiement";
+      throw new Error(errorMsg);
     }
   }
 
