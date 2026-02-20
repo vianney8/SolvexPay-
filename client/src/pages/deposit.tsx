@@ -34,6 +34,19 @@ export default function DepositPage() {
     queryKey: ["/api/wallet"],
   });
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    const status = params.get("status");
+    if (ref) {
+      setPendingReference(ref);
+      setSuccess(true);
+      if (status === "completed") {
+        setPaymentStatus("completed");
+      }
+    }
+  }, []);
+
   const depositMutation = useMutation({
     mutationFn: async (data: { amount: number; currency: string; description?: string }) => {
       const res = await apiRequest("POST", "/api/transactions/deposit", data);

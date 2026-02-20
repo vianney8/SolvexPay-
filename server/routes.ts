@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
-import { sendavaPayService, isApiKeyConfigured } from "./services/sendavapay";
+import { sendavaPayService, isApiKeyConfigured, verifyWebhookSignature } from "./services/sendavapay";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -141,6 +141,9 @@ export async function registerRoutes(
       }
 
       const externalReference = generateReference();
+      const host = req.headers.host || "";
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const callbackUrl = `${protocol}://${host}/api/payment/callback`;
 
       const paymentResponse = await sendavaPayService.createPayment({
         amount,
@@ -150,6 +153,7 @@ export async function registerRoutes(
         customerEmail: customerEmail || req.user.email || "",
         description: description || "Depot SolvexPay",
         externalReference,
+        redirectUrl: callbackUrl,
       });
 
       const reference = paymentResponse.data?.reference || externalReference;
@@ -403,6 +407,9 @@ export async function registerRoutes(
       }
 
       const externalReference = generateReference();
+      const host = req.headers.host || "";
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const callbackUrl = `${protocol}://${host}/api/payment/callback`;
 
       const paymentResponse = await sendavaPayService.createPayment({
         amount: parseFloat(paymentLink.amount),
@@ -412,6 +419,7 @@ export async function registerRoutes(
         customerName,
         customerEmail,
         externalReference,
+        redirectUrl: callbackUrl,
       });
 
       const reference = paymentResponse.data?.reference || externalReference;
@@ -517,6 +525,112 @@ export async function registerRoutes(
     }
     const imageUrl = `/uploads/${req.file.filename}`;
     res.json({ imageUrl });
+  });
+
+  app.post("/api/webhooks/sendavapay", async (req, res) => {
+    try {
+      const signature = req.headers["x-sendavapay-signature"] as string;
+      const event = req.headers["x-sendavapay-event"] as string;
+
+      const webhookSecret = process.env.SENDAVAPAY_API_SECRET || "";
+
+      if (signature && webhookSecret) {
+        const isValid = verifyWebhookSignature(req.body, signature, webhookSecret);
+        if (!isValid) {
+          console.error("SendavaPay webhook: invalid signature");
+          return res.status(401).json({ error: "Invalid signature" });
+        }
+      }
+
+      const { data } = req.body;
+      console.log(`SendavaPay webhook event: ${event}`, data);
+
+      if (!data || !data.reference) {
+        return res.json({ received: true });
+      }
+
+      const transaction = await storage.getTransactionByReference(data.reference);
+
+      if (event === "payment.completed") {
+        if (transaction && transaction.status === "pending") {
+          await storage.updateTransactionStatus(transaction.id, "completed");
+          if (transaction.type === "deposit") {
+            await storage.updateWalletBalance(
+              transaction.userId,
+              transaction.currency,
+              parseFloat(transaction.amount)
+            );
+          }
+          console.log(`Webhook: deposit ${data.reference} completed, wallet credited`);
+        }
+      } else if (event === "payment.failed") {
+        if (transaction && transaction.status === "pending") {
+          await storage.updateTransactionStatus(transaction.id, "failed");
+          if (transaction.type === "withdrawal") {
+            await storage.updateWalletBalance(
+              transaction.userId,
+              transaction.currency,
+              parseFloat(transaction.amount)
+            );
+          }
+          console.log(`Webhook: transaction ${data.reference} failed`);
+        }
+      } else if (event === "credit.completed") {
+        if (transaction && transaction.status === "pending") {
+          await storage.updateTransactionStatus(transaction.id, "completed");
+          console.log(`Webhook: credit ${data.reference} completed`);
+        }
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error("Webhook processing error:", error);
+      res.status(500).json({ error: "Webhook processing failed" });
+    }
+  });
+
+  app.get("/api/payment/callback", async (req, res) => {
+    const { reference, status } = req.query;
+    console.log(`Payment callback: reference=${reference}, status=${status}`);
+
+    if (reference && typeof reference === "string") {
+      try {
+        const result = await sendavaPayService.verifyPayment(reference);
+        const paymentStatus = result.data?.status || "pending";
+
+        const transaction = await storage.getTransactionByReference(reference);
+        if (transaction && transaction.status === "pending") {
+          if (paymentStatus === "completed") {
+            await storage.updateTransactionStatus(transaction.id, "completed");
+            if (transaction.type === "deposit") {
+              await storage.updateWalletBalance(
+                transaction.userId,
+                transaction.currency,
+                parseFloat(transaction.amount)
+              );
+            }
+          } else if (paymentStatus === "failed" || paymentStatus === "cancelled") {
+            await storage.updateTransactionStatus(transaction.id, "failed");
+          }
+        }
+      } catch (error) {
+        console.error("Callback verify error:", error);
+      }
+    }
+
+    res.redirect(`/deposit?ref=${reference || ""}&status=${status || "unknown"}`);
+  });
+
+  app.get("/api/settings/webhook-urls", isAuthenticated, async (req, res) => {
+    const host = req.headers.host || "votre-app.replit.app";
+    const protocol = req.headers["x-forwarded-proto"] || "https";
+    const baseUrl = `${protocol}://${host}`;
+
+    res.json({
+      webhookUrl: `${baseUrl}/api/webhooks/sendavapay`,
+      callbackUrl: `${baseUrl}/api/payment/callback`,
+      instructions: "Configurez ces URLs dans votre tableau de bord SendavaPay (sendavapay.com/dashboard) dans les parametres webhook et callback."
+    });
   });
 
   app.use("/uploads", (await import("express")).default.static(uploadDir));
