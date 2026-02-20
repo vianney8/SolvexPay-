@@ -2,7 +2,18 @@
 
 ## Overview
 
-SolvexPay is a pan-African payment aggregation platform that enables businesses to accept Mobile Money payments across multiple African countries. The application provides a merchant dashboard for managing wallets, transactions, payment links, and API keys. It supports multiple Mobile Money providers (MTN, Orange Money, Wave, Moov, Free, Airtel) and currencies (XOF, NGN, GHS, KES).
+SolvexPay is a pan-African payment aggregation platform that enables businesses to accept Mobile Money payments across multiple African countries. The application provides a merchant dashboard for managing wallets, transactions, payment links, and API keys.
+
+### SendavaPay Integration (Feb 2026)
+- **API**: SendavaPay SDK endpoints at https://sendavapay.com/api/sdk/*
+- **Auth**: HMAC-SHA256 signatures (x-api-key + x-signature headers)
+- **Mode**: USSD direct push (no redirect) - payment prompt sent directly to customer's phone
+- **Countries**: BJ (Benin), BF (Burkina Faso), TG (Togo), CM (Cameroun), CI (Cote d'Ivoire), COD (RDC), COG (Congo Brazzaville)
+- **Operators**: MTN, Moov, Orange, TMoney, Wave, Vodacom, Airtel (varies by country)
+- **Currencies**: XOF (UEMOA), XAF (CEMAC), CDF (Congo)
+- **Statuses**: PENDING, PROCESSING, SUCCESS, FAILED, CANCELLED
+- **Secrets**: SENDAVAPAY_API_KEY, SENDAVAPAY_API_SECRET stored in Replit Secrets
+- **Polling**: Frontend polls /api/transactions/verify every 5s for pending payments
 
 ## User Preferences
 
