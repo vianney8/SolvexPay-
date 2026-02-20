@@ -16,6 +16,8 @@ import ApiKeysPage from "@/pages/api-keys";
 import KycPage from "@/pages/kyc";
 import SettingsPage from "@/pages/settings";
 import TransferPage from "@/pages/transfer";
+import DepositPage from "@/pages/deposit";
+import WithdrawPage from "@/pages/withdraw";
 import PayPage from "@/pages/pay";
 
 function AuthenticatedRoutes() {
@@ -25,6 +27,8 @@ function AuthenticatedRoutes() {
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/transactions" component={TransactionsPage} />
       <Route path="/transfer" component={TransferPage} />
+      <Route path="/deposit" component={DepositPage} />
+      <Route path="/withdraw" component={WithdrawPage} />
       <Route path="/payment-links" component={PaymentLinksPage} />
       <Route path="/api-keys" component={ApiKeysPage} />
       <Route path="/kyc" component={KycPage} />

@@ -5,23 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowDownLeft,
@@ -39,9 +22,6 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Transaction, Wallet as WalletType } from "@shared/schema";
 
 function formatCurrency(amount: string | number, currency = "XOF") {
@@ -61,21 +41,9 @@ function formatDate(date: string | Date) {
   }).format(new Date(date));
 }
 
-const providers = [
-  { id: "mtn", name: "MTN Mobile Money", color: "bg-yellow-500" },
-  { id: "orange", name: "Orange Money", color: "bg-orange-500" },
-  { id: "wave", name: "Wave", color: "bg-blue-500" },
-  { id: "moov", name: "Moov Money", color: "bg-blue-700" },
-  { id: "airtel", name: "Airtel Money", color: "bg-red-500" },
-  { id: "free", name: "Free Money", color: "bg-green-600" },
-];
-
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [balanceVisible, setBalanceVisible] = useState(true);
-  const [depositOpen, setDepositOpen] = useState(false);
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({
     queryKey: ["/api/wallet"],
@@ -93,60 +61,6 @@ export default function DashboardPage() {
   }>({
     queryKey: ["/api/stats"],
   });
-
-  const depositMutation = useMutation({
-    mutationFn: async (data: { amount: number; provider: string; phone: string; currency: string }) => {
-      return apiRequest("POST", "/api/transactions/deposit", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      setDepositOpen(false);
-      toast({ title: "Depot initie", description: "Votre depot est en cours de traitement." });
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible d'initier le depot.", variant: "destructive" });
-    },
-  });
-
-  const withdrawMutation = useMutation({
-    mutationFn: async (data: { amount: number; provider: string; phone: string; currency: string }) => {
-      return apiRequest("POST", "/api/transactions/withdraw", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      setWithdrawOpen(false);
-      toast({ title: "Retrait initie", description: "Votre retrait est en cours de traitement." });
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible d'initier le retrait.", variant: "destructive" });
-    },
-  });
-
-  const handleDeposit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    depositMutation.mutate({
-      amount: parseFloat(fd.get("amount") as string),
-      provider: fd.get("provider") as string,
-      phone: fd.get("phone") as string,
-      currency: "XOF",
-    });
-  };
-
-  const handleWithdraw = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    withdrawMutation.mutate({
-      amount: parseFloat(fd.get("amount") as string),
-      provider: fd.get("provider") as string,
-      phone: fd.get("phone") as string,
-      currency: "XOF",
-    });
-  };
 
   const recentTransactions = transactions?.slice(0, 5) || [];
   const displayName = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") : "";
@@ -197,77 +111,16 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex gap-3 mt-5 flex-wrap">
-            <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
-              <DialogTrigger asChild>
-                <Button variant="secondary" className="flex-1 bg-white/90 text-cyan-700 font-semibold" data-testid="button-deposit">
-                  Recharger
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Recharger votre compte</DialogTitle>
-                  <DialogDescription>Effectuez un depot via Mobile Money</DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleDeposit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Montant (XOF)</Label>
-                    <Input name="amount" type="number" placeholder="10000" min="100" required data-testid="input-deposit-amount" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Operateur</Label>
-                    <Select name="provider" defaultValue="mtn">
-                      <SelectTrigger data-testid="select-deposit-provider"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {providers.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Numero de telephone</Label>
-                    <Input name="phone" type="tel" placeholder="+229 97 00 00 00" required data-testid="input-deposit-phone" />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={depositMutation.isPending} data-testid="button-confirm-deposit">
-                    {depositMutation.isPending ? "Traitement..." : "Recharger"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="flex-1 bg-white/20 text-white border-white/30 font-semibold" data-testid="button-withdraw">
-                  Effectuer un retrait
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Effectuer un retrait</DialogTitle>
-                  <DialogDescription>Retirez des fonds vers Mobile Money</DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleWithdraw} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Montant (XOF)</Label>
-                    <Input name="amount" type="number" placeholder="5000" min="100" required data-testid="input-withdraw-amount" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Operateur</Label>
-                    <Select name="provider" defaultValue="mtn">
-                      <SelectTrigger data-testid="select-withdraw-provider"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {providers.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Numero de telephone</Label>
-                    <Input name="phone" type="tel" placeholder="+229 97 00 00 00" required data-testid="input-withdraw-phone" />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={withdrawMutation.isPending} data-testid="button-confirm-withdraw">
-                    {withdrawMutation.isPending ? "Traitement..." : "Retirer"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Link href="/deposit" className="flex-1">
+              <Button variant="secondary" className="w-full bg-white/90 text-cyan-700 font-semibold" data-testid="button-deposit">
+                Recharger
+              </Button>
+            </Link>
+            <Link href="/withdraw" className="flex-1">
+              <Button variant="outline" className="w-full bg-white/20 text-white border-white/30 font-semibold" data-testid="button-withdraw">
+                Effectuer un retrait
+              </Button>
+            </Link>
           </div>
         </div>
 
