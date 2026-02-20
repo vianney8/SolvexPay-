@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -6,38 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowUpRight, Wallet, Info, CheckCircle2, AlertTriangle, Loader2, Phone } from "lucide-react";
+import { ArrowUpRight, Wallet, Info, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useLocation } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
-
-const COUNTRIES = [
-  { code: "BJ", name: "Benin", currency: "XOF", dialCode: "+229", operators: ["MTN", "Moov"] },
-  { code: "BF", name: "Burkina Faso", currency: "XOF", dialCode: "+226", operators: ["Moov", "Orange"] },
-  { code: "TG", name: "Togo", currency: "XOF", dialCode: "+228", operators: ["TMoney", "Moov"] },
-  { code: "CI", name: "Cote d'Ivoire", currency: "XOF", dialCode: "+225", operators: ["Orange", "MTN", "Moov", "Wave"] },
-  { code: "CM", name: "Cameroun", currency: "XAF", dialCode: "+237", operators: ["MTN", "Orange"] },
-  { code: "COD", name: "RDC", currency: "CDF", dialCode: "+243", operators: ["Vodacom", "Airtel", "Orange"] },
-  { code: "COG", name: "Congo Brazzaville", currency: "XAF", dialCode: "+242", operators: ["Airtel", "MTN"] },
-];
-
-const OPERATOR_COLORS: Record<string, string> = {
-  MTN: "bg-yellow-500",
-  Moov: "bg-blue-700",
-  Orange: "bg-orange-500",
-  TMoney: "bg-green-600",
-  Wave: "bg-blue-500",
-  Vodacom: "bg-red-500",
-  Airtel: "bg-red-600",
-};
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("fr-FR", {
@@ -50,21 +23,10 @@ export default function WithdrawPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [amount, setAmount] = useState("");
-  const [country, setCountry] = useState("BJ");
-  const [operator, setOperator] = useState("");
   const [phone, setPhone] = useState("");
+  const [description, setDescription] = useState("");
   const [success, setSuccess] = useState(false);
-  const [pendingReference, setPendingReference] = useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<string>("PENDING");
-
-  const selectedCountry = COUNTRIES.find(c => c.code === country);
-  const availableOperators = selectedCountry?.operators || [];
-
-  useEffect(() => {
-    if (availableOperators.length > 0 && !availableOperators.includes(operator)) {
-      setOperator(availableOperators[0]);
-    }
-  }, [country]);
+  const [withdrawRef, setWithdrawRef] = useState("");
 
   const { data: wallet } = useQuery<WalletType>({
     queryKey: ["/api/wallet"],
@@ -77,7 +39,7 @@ export default function WithdrawPage() {
   const insufficientFunds = totalDeducted > balance;
 
   const withdrawMutation = useMutation({
-    mutationFn: async (data: { amount: number; phoneNumber: string; operator: string; country: string }) => {
+    mutationFn: async (data: { amount: number; phone: string; description?: string }) => {
       const res = await apiRequest("POST", "/api/transactions/withdraw", data);
       return res.json();
     },
@@ -85,99 +47,56 @@ export default function WithdrawPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      setPendingReference(data.reference);
-      setPaymentStatus(data.sendavaStatus || "PROCESSING");
+      setWithdrawRef(data.reference || data.sendavaReference || "");
       setSuccess(true);
+      toast({ title: "Retrait initie", description: "Votre retrait est en cours de traitement." });
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Impossible d'initier le retrait.", variant: "destructive" });
     },
   });
 
-  const verifyMutation = useMutation({
-    mutationFn: async (reference: string) => {
-      const res = await apiRequest("POST", "/api/transactions/verify", { reference });
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      setPaymentStatus(data.status);
-      if (data.status === "SUCCESS") {
-        queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-        toast({ title: "Retrait confirmé", description: "Les fonds ont été envoyés sur votre Mobile Money." });
-      }
-    },
-  });
-
-  useEffect(() => {
-    if (!pendingReference || paymentStatus === "SUCCESS" || paymentStatus === "FAILED" || paymentStatus === "CANCELLED") return;
-
-    const interval = setInterval(() => {
-      verifyMutation.mutate(pendingReference);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [pendingReference, paymentStatus]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !phone || !operator || !country || insufficientFunds) return;
+    if (!amount || !phone || insufficientFunds) return;
     withdrawMutation.mutate({
       amount: parseFloat(amount),
-      phoneNumber: phone,
-      operator,
-      country,
+      phone,
+      description: description || undefined,
     });
   };
 
   if (success) {
-    const statusConfig = {
-      PENDING: { icon: Loader2, color: "text-yellow-500", bg: "bg-yellow-500/10", label: "Retrait en attente", spin: true },
-      PROCESSING: { icon: Loader2, color: "text-blue-500", bg: "bg-blue-500/10", label: "Retrait en cours de traitement", spin: true },
-      SUCCESS: { icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10", label: "Retrait confirmé !", spin: false },
-      FAILED: { icon: Info, color: "text-red-500", bg: "bg-red-500/10", label: "Retrait échoué", spin: false },
-      CANCELLED: { icon: Info, color: "text-gray-500", bg: "bg-gray-500/10", label: "Retrait annulé", spin: false },
-    };
-
-    const config = statusConfig[paymentStatus as keyof typeof statusConfig] || statusConfig.PENDING;
-    const StatusIcon = config.icon;
-
     return (
       <DashboardLayout title="Retrait" breadcrumbs={[{ label: "Retrait" }]}>
         <div className="max-w-lg mx-auto mt-8">
           <Card>
             <CardContent className="pt-8 pb-8 text-center space-y-4">
-              <div className={`h-16 w-16 rounded-full ${config.bg} flex items-center justify-center mx-auto`}>
-                <StatusIcon className={`h-8 w-8 ${config.color} ${config.spin ? "animate-spin" : ""}`} />
+              <div className="h-16 w-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
               </div>
-              <h2 className="text-xl font-bold" data-testid="text-withdraw-status">{config.label}</h2>
+              <h2 className="text-xl font-bold" data-testid="text-withdraw-status">Retrait initie avec succes</h2>
               <p className="text-muted-foreground text-sm">
-                Retrait de <span className="font-semibold text-foreground">{formatCurrency(parseFloat(amount))} {selectedCountry?.currency}</span> vers{" "}
-                <span className="font-semibold text-foreground">{operator}</span>
+                Retrait de <span className="font-semibold text-foreground">{formatCurrency(parseFloat(amount))} XOF</span> vers{" "}
+                <span className="font-semibold text-foreground">{phone}</span>
               </p>
-              {(paymentStatus === "PENDING" || paymentStatus === "PROCESSING") && (
-                <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
-                  <Phone className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-muted-foreground text-left">
-                    Les fonds seront envoyés sur le numéro <span className="font-semibold">{phone}</span> dans les prochaines minutes.
-                  </p>
-                </div>
-              )}
-              {pendingReference && (
+              <div className="rounded-lg bg-muted/50 border p-4">
                 <p className="text-xs text-muted-foreground">
-                  Référence: <span className="font-mono">{pendingReference}</span>
+                  Les fonds seront credites sur votre compte SendavaPay lie au numero {phone}. Vous pourrez ensuite retirer vers votre Mobile Money depuis SendavaPay.
+                </p>
+              </div>
+              {withdrawRef && (
+                <p className="text-xs text-muted-foreground">
+                  Reference: <span className="font-mono">{withdrawRef}</span>
                 </p>
               )}
               <div className="flex gap-3 pt-2 flex-wrap">
                 <Button variant="outline" className="flex-1" onClick={() => navigate("/")} data-testid="button-back-dashboard">
                   Retour au tableau de bord
                 </Button>
-                {(paymentStatus === "SUCCESS" || paymentStatus === "FAILED" || paymentStatus === "CANCELLED") && (
-                  <Button className="flex-1" onClick={() => { setSuccess(false); setAmount(""); setPhone(""); setPendingReference(null); setPaymentStatus("PENDING"); }} data-testid="button-new-withdraw">
-                    Nouveau retrait
-                  </Button>
-                )}
+                <Button className="flex-1" onClick={() => { setSuccess(false); setAmount(""); setPhone(""); setDescription(""); setWithdrawRef(""); }} data-testid="button-new-withdraw">
+                  Nouveau retrait
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -194,7 +113,7 @@ export default function WithdrawPage() {
             <ArrowUpRight className="h-6 w-6 text-orange-500" />
             Effectuer un retrait
           </h1>
-          <p className="text-muted-foreground mt-1">Retirez vos fonds vers Mobile Money</p>
+          <p className="text-muted-foreground mt-1">Retirez vos fonds vers votre compte SendavaPay</p>
         </div>
 
         <Card className="border-primary/20 bg-primary/5">
@@ -219,7 +138,7 @@ export default function WithdrawPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="withdraw-amount">Montant ({selectedCountry?.currency || "XOF"})</Label>
+                <Label htmlFor="withdraw-amount">Montant (XOF)</Label>
                 <Input
                   id="withdraw-amount"
                   value={amount}
@@ -259,59 +178,31 @@ export default function WithdrawPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Destination du retrait</CardTitle>
-              <CardDescription>Sélectionnez le pays, l'opérateur et le numéro de réception</CardDescription>
+              <CardTitle className="text-base">Numero de telephone</CardTitle>
+              <CardDescription>Le numero lie a votre compte SendavaPay</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Pays</Label>
-                <Select value={country} onValueChange={setCountry}>
-                  <SelectTrigger data-testid="select-country">
-                    <SelectValue placeholder="Sélectionnez un pays" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COUNTRIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        {c.code} - {c.name} ({c.currency})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Opérateur</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {availableOperators.map((op) => (
-                    <button
-                      key={op}
-                      type="button"
-                      onClick={() => setOperator(op)}
-                      className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-colors ${
-                        operator === op
-                          ? "border-primary bg-primary/5 ring-1 ring-primary"
-                          : "border-border"
-                      }`}
-                      data-testid={`button-operator-${op}`}
-                    >
-                      <div className={`h-3 w-3 rounded-full ${OPERATOR_COLORS[op] || "bg-gray-500"} flex-shrink-0`} />
-                      <span className="text-sm font-medium truncate">{op}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="withdraw-phone">Numéro de téléphone</Label>
+                <Label htmlFor="withdraw-phone">Telephone</Label>
                 <Input
                   id="withdraw-phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   type="tel"
-                  placeholder={`${selectedCountry?.dialCode || "+229"} XX XX XX XX`}
+                  placeholder="+229 XX XX XX XX"
                   required
                   className="h-12"
                   data-testid="input-withdraw-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="withdraw-description">Description (optionnel)</Label>
+                <Input
+                  id="withdraw-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Ex: Retrait vers Mobile Money"
+                  data-testid="input-withdraw-description"
                 />
               </div>
             </CardContent>
@@ -322,20 +213,20 @@ export default function WithdrawPage() {
               <CardContent className="pt-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Montant du retrait</span>
-                  <span className="font-semibold">{formatCurrency(withdrawAmount)} {selectedCountry?.currency}</span>
+                  <span className="font-semibold">{formatCurrency(withdrawAmount)} XOF</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Frais (1%)</span>
-                  <span className="text-sm text-destructive font-medium">- {formatCurrency(fees)} {selectedCountry?.currency}</span>
+                  <span className="text-sm text-destructive font-medium">- {formatCurrency(fees)} XOF</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">Total débité</span>
-                  <span className="text-lg font-bold" data-testid="text-withdraw-total">{formatCurrency(totalDeducted)} {selectedCountry?.currency}</span>
+                  <span className="font-medium">Total debite</span>
+                  <span className="text-lg font-bold" data-testid="text-withdraw-total">{formatCurrency(totalDeducted)} XOF</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Vous recevrez</span>
-                  <span className="font-semibold text-primary" data-testid="text-withdraw-receive">{formatCurrency(withdrawAmount)} {selectedCountry?.currency}</span>
+                  <span className="font-semibold text-primary" data-testid="text-withdraw-receive">{formatCurrency(withdrawAmount)} XOF</span>
                 </div>
               </CardContent>
             </Card>
@@ -344,17 +235,17 @@ export default function WithdrawPage() {
           <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Les fonds seront envoyés directement sur votre compte Mobile Money. Le traitement prend généralement quelques minutes.
+              Les fonds seront credites sur votre compte SendavaPay. Vous pourrez ensuite les retirer vers votre Mobile Money (MTN, Moov, Orange, TMoney, Wave) depuis la plateforme SendavaPay. Delai: 1h a 24h.
             </p>
           </div>
 
           <Button
             type="submit"
             className="w-full h-12 text-base font-semibold"
-            disabled={withdrawMutation.isPending || !amount || !phone || !operator || insufficientFunds}
+            disabled={withdrawMutation.isPending || !amount || !phone || insufficientFunds}
             data-testid="button-confirm-withdraw"
           >
-            {withdrawMutation.isPending ? "Envoi en cours..." : `Retirer ${withdrawAmount > 0 ? formatCurrency(withdrawAmount) + " " + (selectedCountry?.currency || "XOF") : ""}`}
+            {withdrawMutation.isPending ? "Envoi en cours..." : `Retirer ${withdrawAmount > 0 ? formatCurrency(withdrawAmount) + " XOF" : ""}`}
           </Button>
         </form>
       </div>
