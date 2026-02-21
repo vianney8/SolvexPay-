@@ -140,9 +140,7 @@ export async function registerRoutes(
         wallet = await storage.createWallet(userId);
       }
 
-      const host = req.headers.host || "";
-      const protocol = req.headers["x-forwarded-proto"] || "https";
-      const redirectUrl = `${protocol}://${host}/deposit?status=callback`;
+      const redirectUrl = `https://solvexpay.site/api/payment/callback`;
 
       const paymentResponse = await sendavaPayService.createPayment({
         amount,
@@ -437,9 +435,7 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Service de paiement non configure" });
       }
 
-      const host = req.headers.host || "";
-      const protocol = req.headers["x-forwarded-proto"] || "https";
-      const redirectUrl = `${protocol}://${host}/pay/${slug}?status=callback`;
+      const redirectUrl = `https://solvexpay.site/pay/${slug}?status=callback`;
 
       const paymentResponse = await sendavaPayService.createPayment({
         amount: parseFloat(paymentLink.amount),
@@ -651,14 +647,21 @@ export async function registerRoutes(
   });
 
   app.get("/api/settings/webhook-urls", isAuthenticated, async (req, res) => {
-    const host = req.headers.host || "votre-app.replit.app";
-    const protocol = req.headers["x-forwarded-proto"] || "https";
-    const baseUrl = `${protocol}://${host}`;
+    const baseUrl = "https://solvexpay.site";
 
     res.json({
       webhookUrl: `${baseUrl}/api/webhooks/sendavapay`,
       callbackUrl: `${baseUrl}/api/payment/callback`,
-      instructions: "Configurez ces URLs dans votre tableau de bord SendavaPay (sendavapay.com/dashboard) dans les parametres webhook et callback."
+      domain: "solvexpay.site",
+      instructions: "Configurez ces URLs dans votre tableau de bord SendavaPay (sendavapay.com/dashboard) dans les parametres webhook et callback.",
+      steps: [
+        "1. Connectez-vous a votre compte SendavaPay sur sendavapay.com/dashboard",
+        "2. Allez dans Parametres > Webhooks",
+        "3. Ajoutez l'URL du webhook: https://solvexpay.site/api/webhooks/sendavapay",
+        "4. Ajoutez l'URL de callback/redirection: https://solvexpay.site/api/payment/callback",
+        "5. Copiez le secret de signature webhook et configurez-le comme SENDAVAPAY_API_SECRET",
+        "6. Activez les evenements: payment.completed, payment.failed, credit.completed"
+      ]
     });
   });
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,10 @@ import {
   Shield,
   Bell,
   Globe,
+  Webhook,
+  Copy,
+  CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 
 const countryCodes = [
@@ -50,6 +54,118 @@ function stripCountryCode(phone: string) {
     }
   }
   return phone || "";
+}
+
+function WebhookConfigCard() {
+  const { toast } = useToast();
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const { data: webhookData } = useQuery<{
+    webhookUrl: string;
+    callbackUrl: string;
+    domain: string;
+    instructions: string;
+    steps: string[];
+  }>({
+    queryKey: ["/api/settings/webhook-urls"],
+  });
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    toast({ title: "Copie !", description: "URL copiee dans le presse-papiers." });
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+            <Webhook className="h-5 w-5 text-orange-500" />
+          </div>
+          <div>
+            <CardTitle data-testid="text-webhook-title">Webhook & Callback SendavaPay</CardTitle>
+            <CardDescription>Configurez ces URLs dans votre tableau de bord SendavaPay</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-xs font-semibold uppercase text-muted-foreground">URL du Webhook</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={webhookData?.webhookUrl || "Chargement..."}
+              className="font-mono text-sm bg-muted"
+              data-testid="input-webhook-url"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => webhookData && copyToClipboard(webhookData.webhookUrl, "webhook")}
+              data-testid="button-copy-webhook"
+            >
+              {copiedField === "webhook" ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Recoit les evenements: payment.completed, payment.failed, credit.completed</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-semibold uppercase text-muted-foreground">URL de Callback (Redirection)</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={webhookData?.callbackUrl || "Chargement..."}
+              className="font-mono text-sm bg-muted"
+              data-testid="input-callback-url"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => webhookData && copyToClipboard(webhookData.callbackUrl, "callback")}
+              data-testid="button-copy-callback"
+            >
+              {copiedField === "callback" ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">URL ou le client est redirige apres le paiement</p>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-3">
+          <Label className="text-xs font-semibold uppercase text-muted-foreground">Instructions de configuration</Label>
+          {webhookData?.steps ? (
+            <ol className="space-y-2">
+              {webhookData.steps.map((step, i) => (
+                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                  <span className="h-5 w-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-medium">{i + 1}</span>
+                  <span>{step.replace(/^\d+\.\s*/, "")}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-muted-foreground">Chargement des instructions...</p>
+          )}
+        </div>
+
+        <div className="pt-2">
+          <a
+            href="https://sendavapay.com/dashboard"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+            data-testid="link-sendavapay-dashboard"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Ouvrir le tableau de bord SendavaPay
+          </a>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function SettingsPage() {
@@ -374,38 +490,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Bell className="h-5 w-5 text-blue-500" />
-              </div>
-              <div>
-                <CardTitle data-testid="text-notifications-title">Notifications</CardTitle>
-                <CardDescription>Preferences de notification</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-medium text-sm">Notifications par email</p>
-                  <p className="text-sm text-muted-foreground">Recevez des alertes pour chaque transaction</p>
-                </div>
-                <Badge variant="secondary">Bientot</Badge>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-medium text-sm">Webhooks</p>
-                  <p className="text-sm text-muted-foreground">Recevez des notifications en temps reel via webhook</p>
-                </div>
-                <Badge variant="secondary">Bientot</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <WebhookConfigCard />
 
         <Card>
           <CardHeader>
