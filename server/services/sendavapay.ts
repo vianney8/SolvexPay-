@@ -107,7 +107,9 @@ class SendavaPayService {
         callbackUrl: params.callbackUrl || "",
       };
       const url = `${SENDAVAPAY_BASE_URL}/api/v1/create-payment`;
-      console.log("SendavaPay createPayment request:", { url, payload: { ...payload, phoneNumber: payload.phoneNumber.substring(0, 6) + "***" } });
+      const keyPrefix = SENDAVAPAY_API_KEY ? SENDAVAPAY_API_KEY.substring(0, 6) + "..." : "EMPTY";
+      const secretPrefix = SENDAVAPAY_API_SECRET ? SENDAVAPAY_API_SECRET.substring(0, 6) + "..." : "EMPTY";
+      console.log("SendavaPay createPayment request:", { url, keyPrefix, secretPrefix, payload: { ...payload, phoneNumber: payload.phoneNumber.substring(0, 6) + "***" } });
       const response = await axios.post(url, payload, { headers: getSignedHeaders(payload) });
       console.log("SendavaPay createPayment response:", response.data);
       return response.data;
