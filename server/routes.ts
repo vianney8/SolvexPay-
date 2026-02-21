@@ -31,24 +31,20 @@ const upload = multer({
 });
 
 const SUPPORTED_CURRENCIES = ["XOF", "XAF", "CDF"] as const;
-const SUPPORTED_COUNTRIES = ["TG", "BJ", "BF", "CM", "CI", "COD", "COG"] as const;
-const SUPPORTED_OPERATORS = ["MTN", "Moov", "Orange", "TMoney", "Wave", "Vodacom", "Airtel"] as const;
 
 const depositSchema = z.object({
   amount: z.number().min(100, "Montant minimum: 100"),
   currency: z.enum(SUPPORTED_CURRENCIES).default("XOF"),
-  phoneNumber: z.string().min(8, "Numero de telephone invalide"),
-  operator: z.enum(SUPPORTED_OPERATORS),
-  country: z.enum(SUPPORTED_COUNTRIES),
+  customerPhone: z.string().min(8, "Numero de telephone invalide"),
   customerName: z.string().optional(),
+  customerEmail: z.string().email().optional().or(z.literal("")),
   description: z.string().optional(),
 });
 
 const withdrawSchema = z.object({
   amount: z.number().min(100, "Montant minimum: 100"),
-  phoneNumber: z.string().min(8, "Numero de telephone invalide"),
-  operator: z.enum(SUPPORTED_OPERATORS),
-  country: z.enum(SUPPORTED_COUNTRIES),
+  phone: z.string().min(8, "Numero de telephone invalide"),
+  description: z.string().optional(),
 });
 
 const createPaymentLinkSchema = z.object({
@@ -74,10 +70,9 @@ const updatePaymentLinkSchema = z.object({
 });
 
 const publicPaySchema = z.object({
-  phoneNumber: z.string().min(8, "Numero de telephone invalide"),
-  operator: z.enum(SUPPORTED_OPERATORS),
-  country: z.enum(SUPPORTED_COUNTRIES),
+  customerPhone: z.string().min(8, "Numero de telephone invalide").optional(),
   customerName: z.string().optional(),
+  customerEmail: z.string().email().optional().or(z.literal("")),
 });
 
 export async function registerRoutes(
@@ -134,7 +129,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { amount, currency, phoneNumber, operator, country, customerName, description } = validation.data;
+      const { amount, currency, customerPhone, customerName, customerEmail, description } = validation.data;
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configure" });
@@ -147,19 +142,20 @@ export async function registerRoutes(
 
       const host = req.headers.host || "";
       const protocol = req.headers["x-forwarded-proto"] || "https";
-      const callbackUrl = `${protocol}://${host}/api/payment/callback`;
+      const redirectUrl = `${protocol}://${host}/deposit?status=callback`;
 
       const paymentResponse = await sendavaPayService.createPayment({
         amount,
-        phoneNumber,
-        operator,
-        country,
+        currency,
+        customerPhone,
         customerName: customerName || req.user.firstName || "",
+        customerEmail: customerEmail || req.user.email || "",
         description: description || "Depot SolvexPay",
-        callbackUrl,
+        redirectUrl,
       });
 
-      const reference = paymentResponse.reference;
+      const reference = paymentResponse.data.reference;
+      const paymentUrl = paymentResponse.data.paymentUrl;
 
       const transaction = await storage.createTransaction({
         userId,
@@ -167,7 +163,7 @@ export async function registerRoutes(
         amount: amount.toString(),
         currency,
         provider: "sendavapay",
-        phoneNumber,
+        phoneNumber: customerPhone,
         reference,
         status: "pending",
         description: description || "Depot SolvexPay",
@@ -176,7 +172,7 @@ export async function registerRoutes(
       res.json({
         ...transaction,
         sendavaReference: reference,
-        sendavaStatus: paymentResponse.status,
+        paymentUrl,
       });
     } catch (error: any) {
       console.error("Error creating deposit:", error);
@@ -193,7 +189,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { amount, phoneNumber, operator, country } = validation.data;
+      const { amount, phone, description } = validation.data;
       const currency = "XOF";
 
       if (!isApiKeyConfigured()) {
@@ -212,14 +208,13 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Solde insuffisant" });
       }
 
-      const withdrawResponse = await sendavaPayService.createWithdraw({
+      const creditResponse = await sendavaPayService.creditAccount({
+        phone,
         amount,
-        phoneNumber,
-        operator,
-        country,
+        description: description || "Retrait SolvexPay",
       });
 
-      const reference = withdrawResponse.reference;
+      const reference = creditResponse.data.reference;
 
       const transaction = await storage.createTransaction({
         userId,
@@ -227,10 +222,10 @@ export async function registerRoutes(
         amount: amount.toString(),
         currency,
         provider: "sendavapay",
-        phoneNumber,
+        phoneNumber: phone,
         reference,
-        status: withdrawResponse.status === "SUCCESS" ? "completed" : "pending",
-        description: "Retrait SolvexPay",
+        status: creditResponse.data.status === "completed" ? "completed" : "pending",
+        description: description || "Retrait SolvexPay",
       });
 
       await storage.updateWalletBalance(userId, currency, -amount);
@@ -253,9 +248,9 @@ export async function registerRoutes(
       }
 
       const result = await sendavaPayService.verifyPayment(reference);
-      const status = result.status || "PENDING";
+      const status = result.data?.status || "pending";
 
-      if (status === "SUCCESS") {
+      if (status === "completed") {
         const transaction = await storage.getTransactionByReference(reference);
         if (transaction && transaction.status === "pending") {
           await storage.updateTransactionStatus(transaction.id, "completed");
@@ -267,7 +262,7 @@ export async function registerRoutes(
             );
           }
         }
-      } else if (status === "FAILED" || status === "CANCELLED") {
+      } else if (status === "failed" || status === "cancelled") {
         const transaction = await storage.getTransactionByReference(reference);
         if (transaction && transaction.status === "pending") {
           await storage.updateTransactionStatus(transaction.id, "failed");
@@ -281,7 +276,7 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ success: result.success, status, data: result });
+      res.json({ success: result.success, status, data: result.data });
     } catch (error: any) {
       console.error("Verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -296,9 +291,9 @@ export async function registerRoutes(
       }
 
       const result = await sendavaPayService.verifyPayment(reference);
-      const status = result.status || "PENDING";
+      const status = result.data?.status || "pending";
 
-      if (status === "SUCCESS") {
+      if (status === "completed") {
         const transaction = await storage.getTransactionByReference(reference);
         if (transaction && transaction.status === "pending") {
           await storage.updateTransactionStatus(transaction.id, "completed");
@@ -310,7 +305,7 @@ export async function registerRoutes(
             );
           }
         }
-      } else if (status === "FAILED" || status === "CANCELLED") {
+      } else if (status === "failed" || status === "cancelled") {
         const transaction = await storage.getTransactionByReference(reference);
         if (transaction && transaction.status === "pending") {
           await storage.updateTransactionStatus(transaction.id, "failed");
@@ -426,7 +421,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { phoneNumber, operator, country, customerName } = validation.data;
+      const { customerPhone, customerName, customerEmail } = validation.data;
 
       const paymentLink = await storage.getPaymentLinkBySlug(slug);
       
@@ -444,19 +439,20 @@ export async function registerRoutes(
 
       const host = req.headers.host || "";
       const protocol = req.headers["x-forwarded-proto"] || "https";
-      const callbackUrl = `${protocol}://${host}/api/payment/callback`;
+      const redirectUrl = `${protocol}://${host}/pay/${slug}?status=callback`;
 
       const paymentResponse = await sendavaPayService.createPayment({
         amount: parseFloat(paymentLink.amount),
-        phoneNumber,
-        operator,
-        country,
+        currency: paymentLink.currency,
+        customerPhone: customerPhone || "",
         customerName: customerName || "",
+        customerEmail: customerEmail || "",
         description: paymentLink.description || paymentLink.name,
-        callbackUrl,
+        redirectUrl,
       });
 
-      const reference = paymentResponse.reference;
+      const reference = paymentResponse.data.reference;
+      const paymentUrl = paymentResponse.data.paymentUrl;
 
       const transaction = await storage.createTransaction({
         userId: paymentLink.userId,
@@ -464,7 +460,7 @@ export async function registerRoutes(
         amount: paymentLink.amount,
         currency: paymentLink.currency,
         provider: "sendavapay",
-        phoneNumber,
+        phoneNumber: customerPhone || "",
         reference,
         status: "pending",
         description: `Paiement via lien: ${paymentLink.name}`,
@@ -475,7 +471,7 @@ export async function registerRoutes(
       res.json({
         ...transaction,
         sendavaReference: reference,
-        sendavaStatus: paymentResponse.status,
+        paymentUrl,
       });
     } catch (error: any) {
       console.error("Error processing payment:", error);
@@ -629,11 +625,11 @@ export async function registerRoutes(
     if (reference && typeof reference === "string") {
       try {
         const result = await sendavaPayService.verifyPayment(reference);
-        const paymentStatus = result.status || "PENDING";
+        const paymentStatus = result.data?.status || "pending";
 
         const transaction = await storage.getTransactionByReference(reference);
         if (transaction && transaction.status === "pending") {
-          if (paymentStatus === "SUCCESS") {
+          if (paymentStatus === "completed") {
             await storage.updateTransactionStatus(transaction.id, "completed");
             if (transaction.type === "deposit") {
               await storage.updateWalletBalance(
@@ -642,7 +638,7 @@ export async function registerRoutes(
                 parseFloat(transaction.amount)
               );
             }
-          } else if (paymentStatus === "FAILED" || paymentStatus === "CANCELLED") {
+          } else if (paymentStatus === "failed" || paymentStatus === "cancelled") {
             await storage.updateTransactionStatus(transaction.id, "failed");
           }
         }
@@ -651,7 +647,7 @@ export async function registerRoutes(
       }
     }
 
-    res.redirect(`/deposit?ref=${reference || ""}&status=${status || "unknown"}`);
+    res.redirect(`/deposit?status=callback`);
   });
 
   app.get("/api/settings/webhook-urls", isAuthenticated, async (req, res) => {

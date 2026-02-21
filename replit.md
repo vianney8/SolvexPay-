@@ -6,16 +6,20 @@ SolvexPay is a pan-African payment aggregation platform that enables businesses 
 
 ### SendavaPay Integration (Feb 2026)
 - **API**: SendavaPay API v1 at https://sendavapay.com/api/v1/*
-- **Auth**: Bearer token (Authorization: Bearer API_KEY) + HMAC-SHA256 signature (x-signature header). Signature = HMAC-SHA256(API_SECRET, JSON.stringify(payload))
-- **Mode**: USSD direct push (no redirect) - payment prompt sent directly to customer's phone
-- **Countries**: TG (Togo), BJ (Benin), BF (Burkina Faso), CM (Cameroun), CI (Cote d'Ivoire), COD (RDC), COG (Congo Brazzaville)
-- **Operators**: MTN, Moov, Orange, TMoney, Wave, Vodacom, Airtel (varies by country)
+- **Auth**: Simple Bearer token (Authorization: Bearer sk_live_...) - no HMAC signatures needed for API calls
+- **Mode**: Redirect-based - customer redirected to SendavaPay payment page (paymentUrl) to choose operator and pay
+- **Operators**: MTN, Moov, Orange, TMoney, Wave (SendavaPay handles operator selection on their payment page)
 - **Currencies**: XOF (UEMOA), XAF (CEMAC), CDF (Congo)
-- **Statuses**: PENDING, PROCESSING, SUCCESS, FAILED, CANCELLED
-- **Endpoints**: POST /create-payment (with phoneNumber, operator, country), POST /verify-payment, POST /credit-account (withdraw to Mobile Money), GET /balance, GET /transactions
-- **Secrets**: SENDAVAPAY_API_KEY (for x-api-key header), SENDAVAPAY_API_SECRET (for HMAC signature + webhook verification)
+- **Statuses**: `pending`, `completed`, `failed`, `cancelled` (lowercase)
+- **Response format**: All API responses wrap data in `{ success: true, data: { ... } }`
+- **Endpoints**:
+  - POST /create-payment (fields: amount, currency, customerPhone, customerName, customerEmail, description, redirectUrl) → returns `data.reference` and `data.paymentUrl`
+  - POST /verify-payment (field: reference) → returns `data.status`
+  - POST /credit-account (fields: phone, amount, description) → withdraw/credit to SendavaPay account
+  - GET /balance, GET /transactions
+- **Secrets**: SENDAVAPAY_API_KEY (Bearer token, format sk_live_...), SENDAVAPAY_API_SECRET (for webhook signature verification only)
 - **Webhook**: POST /api/webhooks/sendavapay - receives payment.completed, payment.failed, credit.completed events with X-SendavaPay-Signature HMAC-SHA256 verification
-- **Callback**: GET /api/payment/callback - fallback redirect URL after payment
+- **Callback**: GET /api/payment/callback - redirect URL after payment, redirects to /deposit?status=callback
 - **Polling**: Frontend polls /api/transactions/verify every 5s for pending payments
 - **Webhook URLs endpoint**: GET /api/settings/webhook-urls - returns configured webhook/callback URLs for SendavaPay dashboard setup
 

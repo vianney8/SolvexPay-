@@ -1,88 +1,94 @@
 import axios from "axios";
 import crypto from "crypto";
 
-const SENDAVAPAY_BASE_URL = process.env.SENDAVAPAY_BASE_URL || "https://sendavapay.com";
+const SENDAVAPAY_BASE_URL = "https://sendavapay.com";
 const SENDAVAPAY_API_KEY = process.env.SENDAVAPAY_API_KEY || "";
 const SENDAVAPAY_API_SECRET = process.env.SENDAVAPAY_API_SECRET || "";
 
 export interface CreatePaymentParams {
   amount: number;
-  phoneNumber: string;
-  operator: string;
-  country: string;
-  customerName?: string;
+  currency?: string;
   description?: string;
-  callbackUrl?: string;
-}
-
-export interface CreateWithdrawParams {
-  amount: number;
-  phoneNumber: string;
-  operator: string;
-  country: string;
+  externalReference?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  customerName?: string;
+  redirectUrl?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface PaymentResponse {
   success: boolean;
-  status: string;
-  reference: string;
-  message?: string;
+  data: {
+    reference: string;
+    amount: number;
+    currency: string;
+    status: string;
+    paymentUrl: string;
+    createdAt: string;
+  };
 }
 
 export interface VerifyResponse {
   success: boolean;
-  status: string;
-  reference: string;
-  amount?: number;
-  fee?: number;
-  phoneNumber?: string;
-  operator?: string;
-  country?: string;
-  completedAt?: string;
-  message?: string;
+  data: {
+    reference: string;
+    externalReference?: string;
+    amount: string;
+    fee?: string;
+    currency: string;
+    status: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    customerName?: string;
+    paymentMethod?: string;
+    createdAt: string;
+    completedAt?: string;
+  };
 }
 
-export interface WithdrawResponse {
+export interface CreditAccountParams {
+  phone: string;
+  amount: number;
+  description?: string;
+  externalReference?: string;
+}
+
+export interface CreditResponse {
   success: boolean;
-  status: string;
-  reference: string;
-  message?: string;
+  data: {
+    reference: string;
+    amount: number;
+    phone: string;
+    userName?: string;
+    status: string;
+    createdAt: string;
+  };
 }
 
 export interface BalanceResponse {
   success: boolean;
-  balance: number;
-  currency: string;
-  message?: string;
+  data: {
+    phone: string;
+    balance: string;
+    currency: string;
+    name: string;
+    isVerified: boolean;
+  };
 }
 
 export interface TransactionsResponse {
   success: boolean;
-  transactions: any[];
-  total: number;
-  message?: string;
-}
-
-function generateSignature(payload: any): string {
-  return crypto
-    .createHmac("sha256", SENDAVAPAY_API_SECRET)
-    .update(JSON.stringify(payload))
-    .digest("hex");
-}
-
-function getSignedHeaders(payload: any) {
-  return {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${SENDAVAPAY_API_SECRET}`,
-    "x-signature": generateSignature(payload),
+  data: {
+    transactions: any[];
+    total: number;
   };
 }
 
-function getSignedHeadersGet() {
+function getAuthHeaders() {
   return {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${SENDAVAPAY_API_SECRET}`,
-    "x-signature": generateSignature({}),
+    "Authorization": `Bearer ${SENDAVAPAY_API_KEY}`,
   };
 }
 
@@ -97,20 +103,21 @@ export function verifyWebhookSignature(payload: any, signature: string, secret: 
 class SendavaPayService {
   async createPayment(params: CreatePaymentParams): Promise<PaymentResponse> {
     try {
-      const payload = {
+      const payload: any = {
         amount: params.amount,
-        phoneNumber: params.phoneNumber,
-        operator: params.operator,
-        country: params.country,
-        customerName: params.customerName || "",
-        description: params.description || "",
-        callbackUrl: params.callbackUrl || "",
       };
+      if (params.currency) payload.currency = params.currency;
+      if (params.description) payload.description = params.description;
+      if (params.externalReference) payload.externalReference = params.externalReference;
+      if (params.customerEmail) payload.customerEmail = params.customerEmail;
+      if (params.customerPhone) payload.customerPhone = params.customerPhone;
+      if (params.customerName) payload.customerName = params.customerName;
+      if (params.redirectUrl) payload.redirectUrl = params.redirectUrl;
+      if (params.metadata) payload.metadata = params.metadata;
+
       const url = `${SENDAVAPAY_BASE_URL}/api/v1/create-payment`;
-      const keyPrefix = SENDAVAPAY_API_KEY ? SENDAVAPAY_API_KEY.substring(0, 6) + "..." : "EMPTY";
-      const secretPrefix = SENDAVAPAY_API_SECRET ? SENDAVAPAY_API_SECRET.substring(0, 6) + "..." : "EMPTY";
-      console.log("SendavaPay createPayment request:", { url, keyPrefix, secretPrefix, payload: { ...payload, phoneNumber: payload.phoneNumber.substring(0, 6) + "***" } });
-      const response = await axios.post(url, payload, { headers: getSignedHeaders(payload) });
+      console.log("SendavaPay createPayment request:", { url, payload: { ...payload, customerPhone: payload.customerPhone ? payload.customerPhone.substring(0, 6) + "***" : undefined } });
+      const response = await axios.post(url, payload, { headers: getAuthHeaders() });
       console.log("SendavaPay createPayment response:", response.data);
       return response.data;
     } catch (error: any) {
@@ -119,9 +126,8 @@ class SendavaPayService {
         statusText: error.response?.statusText,
         data: error.response?.data,
         message: error.message,
-        url: `${SENDAVAPAY_BASE_URL}/api/v1/create-payment`,
       });
-      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Echec de la creation du paiement";
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Echec de la creation du paiement";
       throw new Error(errorMsg);
     }
   }
@@ -132,45 +138,46 @@ class SendavaPayService {
       const response = await axios.post(
         `${SENDAVAPAY_BASE_URL}/api/v1/verify-payment`,
         payload,
-        { headers: getSignedHeaders(payload) }
+        { headers: getAuthHeaders() }
       );
       return response.data;
     } catch (error: any) {
       console.error("SendavaPay verifyPayment error:", error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || "Echec de la verification");
+      throw new Error(error.response?.data?.error || error.response?.data?.message || "Echec de la verification");
     }
   }
 
-  async createWithdraw(params: CreateWithdrawParams): Promise<WithdrawResponse> {
+  async creditAccount(params: CreditAccountParams): Promise<CreditResponse> {
     try {
-      const payload = {
+      const payload: any = {
+        phone: params.phone,
         amount: params.amount,
-        phoneNumber: params.phoneNumber,
-        operator: params.operator,
-        country: params.country,
       };
+      if (params.description) payload.description = params.description;
+      if (params.externalReference) payload.externalReference = params.externalReference;
+
       const response = await axios.post(
         `${SENDAVAPAY_BASE_URL}/api/v1/credit-account`,
         payload,
-        { headers: getSignedHeaders(payload) }
+        { headers: getAuthHeaders() }
       );
       return response.data;
     } catch (error: any) {
-      console.error("SendavaPay createWithdraw error:", error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || "Echec du retrait");
+      console.error("SendavaPay creditAccount error:", error.response?.data || error.message);
+      throw new Error(error.response?.data?.error || error.response?.data?.message || "Echec du retrait");
     }
   }
 
-  async getBalance(): Promise<BalanceResponse> {
+  async getBalance(phone: string): Promise<BalanceResponse> {
     try {
       const response = await axios.get(
-        `${SENDAVAPAY_BASE_URL}/api/v1/balance`,
-        { headers: getSignedHeadersGet() }
+        `${SENDAVAPAY_BASE_URL}/api/v1/balance?phone=${encodeURIComponent(phone)}`,
+        { headers: getAuthHeaders() }
       );
       return response.data;
     } catch (error: any) {
       console.error("SendavaPay getBalance error:", error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || "Echec de recuperation du solde");
+      throw new Error(error.response?.data?.error || error.response?.data?.message || "Echec de recuperation du solde");
     }
   }
 
@@ -178,30 +185,18 @@ class SendavaPayService {
     try {
       const response = await axios.get(
         `${SENDAVAPAY_BASE_URL}/api/v1/transactions`,
-        { headers: getSignedHeadersGet() }
+        { headers: getAuthHeaders() }
       );
       return response.data;
     } catch (error: any) {
       console.error("SendavaPay getTransactions error:", error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || "Echec de recuperation des transactions");
+      throw new Error(error.response?.data?.error || error.response?.data?.message || "Echec de recuperation des transactions");
     }
-  }
-
-  async waitForPayment(reference: string, timeoutMs: number = 120000, intervalMs: number = 5000): Promise<VerifyResponse> {
-    const startTime = Date.now();
-    while (Date.now() - startTime < timeoutMs) {
-      const result = await this.verifyPayment(reference);
-      if (result.status === "SUCCESS" || result.status === "FAILED" || result.status === "CANCELLED") {
-        return result;
-      }
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
-    }
-    throw new Error("Timeout: le paiement n'a pas ete confirme dans le delai imparti");
   }
 }
 
 export function isApiKeyConfigured(): boolean {
-  return !!SENDAVAPAY_API_KEY && !!SENDAVAPAY_API_SECRET;
+  return !!SENDAVAPAY_API_KEY;
 }
 
 export const sendavaPayService = new SendavaPayService();
