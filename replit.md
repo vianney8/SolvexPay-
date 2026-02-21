@@ -6,7 +6,7 @@ SolvexPay is a pan-African payment aggregation platform that enables businesses 
 
 ### SendavaPay Integration (Feb 2026)
 - **API**: SendavaPay API v1 at https://sendavapay.com/api/v1/*
-- **Auth**: HMAC-SHA256 signatures (x-api-key + x-signature headers). Signature = HMAC-SHA256(API_SECRET, JSON.stringify(payload))
+- **Auth**: Bearer token (Authorization: Bearer API_KEY) + HMAC-SHA256 signature (x-signature header). Signature = HMAC-SHA256(API_SECRET, JSON.stringify(payload))
 - **Mode**: USSD direct push (no redirect) - payment prompt sent directly to customer's phone
 - **Countries**: TG (Togo), BJ (Benin), BF (Burkina Faso), CM (Cameroun), CI (Cote d'Ivoire), COD (RDC), COG (Congo Brazzaville)
 - **Operators**: MTN, Moov, Orange, TMoney, Wave, Vodacom, Airtel (varies by country)
