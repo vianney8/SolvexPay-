@@ -73,7 +73,7 @@ function generateSignature(payload: any): string {
 function getSignedHeaders(payload: any) {
   return {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${SENDAVAPAY_API_KEY}`,
+    "Authorization": `Bearer ${SENDAVAPAY_API_SECRET}`,
     "x-signature": generateSignature(payload),
   };
 }
@@ -81,7 +81,7 @@ function getSignedHeaders(payload: any) {
 function getSignedHeadersGet() {
   return {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${SENDAVAPAY_API_KEY}`,
+    "Authorization": `Bearer ${SENDAVAPAY_API_SECRET}`,
     "x-signature": generateSignature({}),
   };
 }
