@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowUpRight, Wallet, Info, CheckCircle2, AlertTriangle, Phone } from "lucide-react";
+import { ArrowUpRight, Wallet, Info, CheckCircle2, AlertTriangle, Phone, Globe } from "lucide-react";
 import { useLocation } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
 
@@ -19,14 +20,32 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+const COUNTRIES = [
+  { code: "BJ", name: "Benin", currency: "XOF", operators: ["MTN", "Moov"] },
+  { code: "BF", name: "Burkina Faso", currency: "XOF", operators: ["Moov", "Orange"] },
+  { code: "TG", name: "Togo", currency: "XOF", operators: ["TMoney", "Moov"] },
+  { code: "CM", name: "Cameroun", currency: "XAF", operators: ["MTN", "Orange"] },
+  { code: "CI", name: "Cote d'Ivoire", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"] },
+  { code: "COD", name: "RDC", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"] },
+  { code: "COG", name: "Congo Brazzaville", currency: "XAF", operators: ["Airtel", "MTN"] },
+];
+
 export default function WithdrawPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [amount, setAmount] = useState("");
-  const [phone, setPhone] = useState("");
-  const [description, setDescription] = useState("");
+  const [country, setCountry] = useState("BJ");
+  const [operator, setOperator] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [success, setSuccess] = useState(false);
   const [withdrawRef, setWithdrawRef] = useState("");
+
+  const selectedCountry = COUNTRIES.find(c => c.code === country);
+  const availableOperators = selectedCountry?.operators || [];
+
+  useEffect(() => {
+    setOperator("");
+  }, [country]);
 
   const { data: wallet } = useQuery<WalletType>({
     queryKey: ["/api/wallet"],
@@ -37,7 +56,7 @@ export default function WithdrawPage() {
   const insufficientFunds = withdrawAmount > balance;
 
   const withdrawMutation = useMutation({
-    mutationFn: async (data: { amount: number; phone: string; description?: string }) => {
+    mutationFn: async (data: { amount: number; phoneNumber: string; operator: string; country: string }) => {
       const res = await apiRequest("POST", "/api/transactions/withdraw", data);
       return res.json();
     },
@@ -47,7 +66,7 @@ export default function WithdrawPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       setWithdrawRef(data.reference || data.sendavaReference || "");
       setSuccess(true);
-      toast({ title: "Retrait initie", description: "Les fonds seront envoyes sur votre compte SendavaPay." });
+      toast({ title: "Retrait initie", description: "Les fonds seront envoyes sur votre compte Mobile Money." });
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Impossible d'initier le retrait.", variant: "destructive" });
@@ -56,11 +75,12 @@ export default function WithdrawPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !phone || insufficientFunds) return;
+    if (!amount || !phoneNumber || !operator || !country || insufficientFunds) return;
     withdrawMutation.mutate({
       amount: parseFloat(amount),
-      phone,
-      description: description || undefined,
+      phoneNumber,
+      operator,
+      country,
     });
   };
 
@@ -76,11 +96,11 @@ export default function WithdrawPage() {
               <h2 className="text-xl font-bold" data-testid="text-withdraw-status">Retrait initie avec succes</h2>
               <p className="text-muted-foreground text-sm">
                 Retrait de <span className="font-semibold text-foreground">{formatCurrency(parseFloat(amount))} XOF</span> vers{" "}
-                <span className="font-semibold text-foreground">{phone}</span>
+                <span className="font-semibold text-foreground">{phoneNumber}</span> ({operator})
               </p>
               <div className="rounded-lg bg-muted/50 border p-4">
                 <p className="text-xs text-muted-foreground">
-                  Les fonds seront credites sur le compte SendavaPay associe a ce numero. Le delai de traitement est generalement de 1h a 24h.
+                  Les fonds seront credites sur votre compte Mobile Money. Le delai de traitement est generalement de quelques minutes a 24h.
                 </p>
               </div>
               {withdrawRef && (
@@ -92,7 +112,7 @@ export default function WithdrawPage() {
                 <Button variant="outline" className="flex-1" onClick={() => navigate("/")} data-testid="button-back-dashboard">
                   Retour au tableau de bord
                 </Button>
-                <Button className="flex-1" onClick={() => { setSuccess(false); setAmount(""); setPhone(""); setDescription(""); setWithdrawRef(""); }} data-testid="button-new-withdraw">
+                <Button className="flex-1" onClick={() => { setSuccess(false); setAmount(""); setPhoneNumber(""); setWithdrawRef(""); setOperator(""); }} data-testid="button-new-withdraw">
                   Nouveau retrait
                 </Button>
               </div>
@@ -111,7 +131,7 @@ export default function WithdrawPage() {
             <ArrowUpRight className="h-6 w-6 text-orange-500" />
             Effectuer un retrait
           </h1>
-          <p className="text-muted-foreground mt-1">Creditez un compte SendavaPay avec vos fonds</p>
+          <p className="text-muted-foreground mt-1">Envoyez des fonds vers votre compte Mobile Money</p>
         </div>
 
         <Card className="border-primary/20 bg-primary/5">
@@ -177,33 +197,67 @@ export default function WithdrawPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                Pays et operateur
+              </CardTitle>
+              <CardDescription>Selectionnez le pays et l'operateur du destinataire</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Pays</Label>
+                  <Select value={country} onValueChange={setCountry}>
+                    <SelectTrigger data-testid="select-withdraw-country">
+                      <SelectValue placeholder="Pays" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code} data-testid={`option-withdraw-country-${c.code}`}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Operateur</Label>
+                  <Select value={operator} onValueChange={setOperator}>
+                    <SelectTrigger data-testid="select-withdraw-operator">
+                      <SelectValue placeholder="Operateur" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableOperators.map((op) => (
+                        <SelectItem key={op} value={op} data-testid={`option-withdraw-operator-${op}`}>
+                          {op}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
                 <Phone className="h-4 w-4" />
                 Compte destinataire
               </CardTitle>
-              <CardDescription>Numero de telephone du compte SendavaPay a crediter</CardDescription>
+              <CardDescription>Numero de telephone Mobile Money du destinataire</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="withdraw-phone">Numero de telephone</Label>
                 <Input
                   id="withdraw-phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
                   type="tel"
                   placeholder="+22890123456"
                   required
                   className="h-12"
                   data-testid="input-withdraw-phone"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="withdraw-description">Description (optionnel)</Label>
-                <Input
-                  id="withdraw-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Ex: Retrait vers mon compte"
-                  data-testid="input-withdraw-description"
                 />
               </div>
             </CardContent>
@@ -228,14 +282,14 @@ export default function WithdrawPage() {
           <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Les fonds seront credites sur le compte SendavaPay associe au numero indique. Le delai de traitement est de 1h a 24h.
+              Les fonds seront envoyes directement sur le compte Mobile Money du numero indique. Le delai de traitement est de quelques minutes a 24h.
             </p>
           </div>
 
           <Button
             type="submit"
             className="w-full h-12 text-base font-semibold"
-            disabled={withdrawMutation.isPending || !amount || !phone || insufficientFunds}
+            disabled={withdrawMutation.isPending || !amount || !phoneNumber || !operator || !country || insufficientFunds}
             data-testid="button-confirm-withdraw"
           >
             {withdrawMutation.isPending ? "Envoi en cours..." : `Retirer ${withdrawAmount > 0 ? formatCurrency(withdrawAmount) + " XOF" : ""}`}

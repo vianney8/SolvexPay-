@@ -4,21 +4,26 @@
 
 SolvexPay is a pan-African payment aggregation platform that enables businesses to accept Mobile Money payments across multiple African countries. The application provides a merchant dashboard for managing wallets, transactions, payment links, and API keys.
 
-### SendavaPay Integration (Feb 2026)
-- **API**: SendavaPay API v1 at https://sendavapay.com/api/v1/*
-- **Auth**: Simple Bearer token (Authorization: Bearer sk_live_...) - no HMAC signatures needed for API calls
-- **Mode**: Redirect-based - customer redirected to SendavaPay payment page (paymentUrl) to choose operator and pay
-- **Operators**: MTN, Moov, Orange, TMoney, Wave (SendavaPay handles operator selection on their payment page)
+### SendavaPay SDK Integration (Feb 2026)
+- **API**: SendavaPay SDK API at https://sendavapay.com/api/sdk/*
+- **Auth**: HMAC-SHA256 signature - Headers: `x-api-key` (API key) + `x-signature` (HMAC-SHA256 of JSON payload with API secret)
+- **Mode**: USSD direct - payment prompt sent directly to customer's phone (no redirect/paymentUrl)
+- **Payment fields**: `amount`, `phoneNumber`, `operator`, `country`, `customerName`, `description`, `callbackUrl`
+- **Withdraw fields**: `amount`, `phoneNumber`, `operator`, `country`
+- **Operators**: MTN, Moov, Orange, TMoney, Wave, Vodacom, Airtel (selected by user in frontend)
+- **Countries**: BJ (Benin), BF (Burkina Faso), TG (Togo), CM (Cameroun), CI (Cote d'Ivoire), COD (RDC), COG (Congo Brazzaville)
 - **Currencies**: XOF (UEMOA), XAF (CEMAC), CDF (Congo)
-- **Statuses**: `pending`, `completed`, `failed`, `cancelled` (lowercase)
-- **Response format**: All API responses wrap data in `{ success: true, data: { ... } }`
+- **Statuses**: `PENDING`, `PROCESSING`, `SUCCESS`, `FAILED`, `CANCELLED` (UPPERCASE)
+- **Response format**: Flat JSON `{ success, status, txid, reference, amount, fee, currency, message }`
 - **Endpoints**:
-  - POST /create-payment (fields: amount, currency, customerPhone, customerName, customerEmail, description, redirectUrl) → returns `data.reference` and `data.paymentUrl`
-  - POST /verify-payment (field: reference) → returns `data.status`
-  - POST /credit-account (fields: phone, amount, description) → withdraw/credit to SendavaPay account
-  - GET /balance, GET /transactions
-- **Secrets**: SENDAVAPAY_API_KEY (Bearer token, format sk_live_...), SENDAVAPAY_API_SECRET (for webhook signature verification only)
-- **Webhook**: POST /api/webhooks/sendavapay - receives payment.completed, payment.failed, credit.completed events with X-SendavaPay-Signature HMAC-SHA256 verification
+  - POST /api/sdk/payment - Collect payment (USSD direct)
+  - POST /api/sdk/withdraw - Send money to Mobile Money
+  - POST /api/sdk/verify - Verify/confirm a payment
+  - GET /api/sdk/transaction/:id - Get single transaction
+  - GET /api/sdk/transactions - List transactions
+  - GET /api/sdk/balance - Check balance
+- **Secrets**: SENDAVAPAY_API_KEY (format pk_...), SENDAVAPAY_API_SECRET (format ps_..., used for HMAC signature)
+- **Webhook**: POST /api/webhooks/sendavapay - receives payment events with X-SendavaPay-Signature HMAC-SHA256 verification
 - **Callback**: GET /api/payment/callback - redirect URL after payment, redirects to /deposit?status=callback
 - **Polling**: Frontend polls /api/transactions/verify every 5s for pending payments
 - **Webhook URLs endpoint**: GET /api/settings/webhook-urls - returns configured webhook/callback URLs for SendavaPay dashboard setup

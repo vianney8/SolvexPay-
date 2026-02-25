@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowDownLeft, Wallet, Info, CheckCircle2, Loader2, XCircle, Phone, ExternalLink } from "lucide-react";
+import { ArrowDownLeft, Wallet, Info, CheckCircle2, Loader2, XCircle, Phone, Globe } from "lucide-react";
 import { useLocation } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
 
@@ -20,17 +20,35 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+const COUNTRIES = [
+  { code: "BJ", name: "Benin", currency: "XOF", operators: ["MTN", "Moov"] },
+  { code: "BF", name: "Burkina Faso", currency: "XOF", operators: ["Moov", "Orange"] },
+  { code: "TG", name: "Togo", currency: "XOF", operators: ["TMoney", "Moov"] },
+  { code: "CM", name: "Cameroun", currency: "XAF", operators: ["MTN", "Orange"] },
+  { code: "CI", name: "Cote d'Ivoire", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"] },
+  { code: "COD", name: "RDC", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"] },
+  { code: "COG", name: "Congo Brazzaville", currency: "XAF", operators: ["Airtel", "MTN"] },
+];
+
 export default function DepositPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("XOF");
-  const [customerPhone, setCustomerPhone] = useState("");
+  const [country, setCountry] = useState("BJ");
+  const [operator, setOperator] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [description, setDescription] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
-  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+
+  const selectedCountry = COUNTRIES.find(c => c.code === country);
+  const currency = selectedCountry?.currency || "XOF";
+  const availableOperators = selectedCountry?.operators || [];
+
+  useEffect(() => {
+    setOperator("");
+  }, [country]);
 
   const { data: wallet } = useQuery<WalletType>({
     queryKey: ["/api/wallet"],
@@ -46,17 +64,14 @@ export default function DepositPage() {
   }, []);
 
   const depositMutation = useMutation({
-    mutationFn: async (data: { amount: number; currency: string; customerPhone: string; customerName?: string; description?: string }) => {
+    mutationFn: async (data: { amount: number; currency: string; phoneNumber: string; operator: string; country: string; customerName?: string; description?: string }) => {
       const res = await apiRequest("POST", "/api/transactions/deposit", data);
       return res.json();
     },
     onSuccess: (data: any) => {
       setPendingReference(data.sendavaReference || data.reference);
-      if (data.paymentUrl) {
-        setPaymentUrl(data.paymentUrl);
-      }
       setPaymentStatus("processing");
-      toast({ title: "Paiement cree", description: "Cliquez sur le lien pour finaliser votre paiement via Mobile Money." });
+      toast({ title: "Paiement initie", description: "Un prompt USSD a ete envoye sur votre telephone. Veuillez confirmer le paiement." });
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Impossible d'initier le depot.", variant: "destructive" });
@@ -70,13 +85,13 @@ export default function DepositPage() {
     },
     onSuccess: (data: any) => {
       const status = data.status;
-      if (status === "completed") {
+      if (status === "SUCCESS") {
         setPaymentStatus("success");
         queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
         queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
         queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
         toast({ title: "Paiement confirme", description: "Votre depot a ete credite avec succes." });
-      } else if (status === "failed" || status === "cancelled") {
+      } else if (status === "FAILED" || status === "CANCELLED") {
         setPaymentStatus("error");
         toast({ title: "Paiement echoue", description: "Le paiement n'a pas abouti.", variant: "destructive" });
       }
@@ -96,11 +111,13 @@ export default function DepositPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !customerPhone) return;
+    if (!amount || !phoneNumber || !operator || !country) return;
     depositMutation.mutate({
       amount: parseFloat(amount),
       currency,
-      customerPhone,
+      phoneNumber,
+      operator,
+      country,
       customerName: customerName || undefined,
       description: description || undefined,
     });
@@ -111,17 +128,16 @@ export default function DepositPage() {
   const resetForm = () => {
     setPaymentStatus("idle");
     setAmount("");
-    setCustomerPhone("");
+    setPhoneNumber("");
     setCustomerName("");
     setDescription("");
     setPendingReference(null);
-    setPaymentUrl(null);
     window.history.replaceState({}, "", "/deposit");
   };
 
   if (paymentStatus !== "idle") {
     const statusConfig = {
-      processing: { icon: Loader2, color: "text-yellow-500", bg: "bg-yellow-500/10", label: "Paiement en cours...", sublabel: paymentUrl ? "Cliquez sur le bouton ci-dessous pour finaliser le paiement via Mobile Money." : "Verification de votre paiement en cours...", spin: true },
+      processing: { icon: Loader2, color: "text-yellow-500", bg: "bg-yellow-500/10", label: "Paiement en cours...", sublabel: "Un prompt USSD a ete envoye sur votre telephone. Veuillez confirmer le paiement pour finaliser la transaction.", spin: true },
       success: { icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10", label: "Paiement confirme !", sublabel: "Votre depot a ete credite sur votre portefeuille.", spin: false },
       error: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Paiement echoue", sublabel: "Le paiement a echoue. Veuillez reessayer.", spin: false },
     };
@@ -148,18 +164,6 @@ export default function DepositPage() {
                 <p className="text-xs text-muted-foreground">
                   Reference: <span className="font-mono">{pendingReference}</span>
                 </p>
-              )}
-              {paymentUrl && paymentStatus === "processing" && (
-                <a
-                  href={paymentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
-                  data-testid="link-payment-url"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Payer maintenant sur SendavaPay
-                </a>
               )}
               <div className="flex gap-3 pt-2 flex-wrap">
                 <Button variant="outline" className="flex-1" onClick={() => navigate("/")} data-testid="button-back-dashboard">
@@ -244,18 +248,62 @@ export default function DepositPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                Pays et operateur
+              </CardTitle>
+              <CardDescription>Selectionnez votre pays et operateur Mobile Money</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Pays</Label>
+                  <Select value={country} onValueChange={setCountry}>
+                    <SelectTrigger data-testid="select-deposit-country">
+                      <SelectValue placeholder="Pays" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code} data-testid={`option-country-${c.code}`}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Operateur</Label>
+                  <Select value={operator} onValueChange={setOperator}>
+                    <SelectTrigger data-testid="select-deposit-operator">
+                      <SelectValue placeholder="Operateur" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableOperators.map((op) => (
+                        <SelectItem key={op} value={op} data-testid={`option-operator-${op}`}>
+                          {op}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
                 <Phone className="h-4 w-4" />
                 Informations du payeur
               </CardTitle>
-              <CardDescription>Votre numero sera utilise pour le paiement Mobile Money</CardDescription>
+              <CardDescription>Votre numero sera utilise pour le paiement Mobile Money (USSD)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="deposit-phone">Numero de telephone</Label>
                 <Input
                   id="deposit-phone"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
                   type="tel"
                   placeholder="+22890123456"
                   required
@@ -312,14 +360,14 @@ export default function DepositPage() {
           <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Vous serez redirige vers SendavaPay pour choisir votre operateur Mobile Money et confirmer le paiement. Operateurs supportes : MTN, Moov, Orange, TMoney, Wave.
+              Un prompt USSD sera envoye directement sur votre telephone. Confirmez le paiement sur votre telephone pour finaliser la transaction. Operateurs supportes : MTN, Moov, Orange, TMoney, Wave, Vodacom, Airtel.
             </p>
           </div>
 
           <Button
             type="submit"
             className="w-full h-12 text-base font-semibold"
-            disabled={depositMutation.isPending || !amount || !customerPhone}
+            disabled={depositMutation.isPending || !amount || !phoneNumber || !operator || !country}
             data-testid="button-confirm-deposit"
           >
             {depositMutation.isPending ? "Creation du paiement..." : `Recharger ${amount ? formatCurrency(parseFloat(amount)) + " " + currency : ""}`}
