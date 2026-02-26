@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -15,10 +14,15 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  BarChart3,
-  CreditCard,
-  Clock,
+  TrendingUp,
+  TrendingDown,
   CheckCircle2,
+  Clock,
+  XCircle,
+  Wallet,
+  Sparkles,
+  CreditCard,
+  Code2,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -39,6 +43,13 @@ function formatDate(date: string | Date) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(date));
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Bonjour";
+  if (hour < 18) return "Bon apres-midi";
+  return "Bonsoir";
 }
 
 export default function DashboardPage() {
@@ -63,137 +74,186 @@ export default function DashboardPage() {
   });
 
   const recentTransactions = transactions?.slice(0, 5) || [];
-  const displayName = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") : "";
+  const displayName = user ? (user.firstName || "").trim() : "";
 
   const completedTx = transactions?.filter(t => t.status === "completed") || [];
   const pendingTx = transactions?.filter(t => t.status === "pending") || [];
-  const failedTx = transactions?.filter(t => t.status === "failed") || [];
-  const depositTx = transactions?.filter(t => t.type === "deposit") || [];
-  const withdrawalTx = transactions?.filter(t => t.type === "withdrawal") || [];
 
   const successRate = transactions && transactions.length > 0
     ? Math.round((completedTx.length / transactions.length) * 100)
     : 0;
 
-  const avgTransactionAmount = completedTx.length > 0
-    ? completedTx.reduce((sum, t) => sum + parseFloat(t.amount), 0) / completedTx.length
-    : 0;
+  const balance = parseFloat(String(wallet?.balanceXOF || 0));
 
   return (
     <DashboardLayout title="" breadcrumbs={[]}>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-foreground" data-testid="text-greeting">
-            Bonjour, {displayName}
-          </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Bienvenue sur votre tableau de bord</p>
-        </div>
-
-        <div className="rounded-xl bg-gradient-to-br from-cyan-400 via-cyan-500 to-teal-500 p-6 text-white" data-testid="card-balance">
-          <p className="text-sm font-medium text-white/80">Votre solde</p>
-          <div className="flex items-center gap-3 mt-2">
-            {walletLoading ? (
-              <Skeleton className="h-10 w-48 bg-white/20" />
-            ) : (
-              <span className="text-4xl font-bold tracking-tight" data-testid="text-balance-xof">
-                {balanceVisible ? formatCurrency(wallet?.balanceXOF || 0) : "****"} XOF
-              </span>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setBalanceVisible(!balanceVisible)}
-              className="text-white/70"
-              data-testid="button-toggle-balance"
-            >
-              {balanceVisible ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
-            </Button>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight" data-testid="text-greeting">
+              {getGreeting()}, {displayName}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Voici un apercu de votre activite
+            </p>
           </div>
-
-          <div className="flex gap-3 mt-5 flex-wrap">
-            <Link href="/deposit" className="flex-1">
-              <Button variant="secondary" className="w-full bg-white/90 text-cyan-700 font-semibold" data-testid="button-deposit">
+          <div className="hidden sm:flex items-center gap-2">
+            <Link href="/deposit">
+              <Button size="sm" className="gap-1.5" data-testid="button-header-deposit">
+                <ArrowDownLeft className="h-4 w-4" />
                 Recharger
               </Button>
             </Link>
-            <Link href="/withdraw" className="flex-1">
-              <Button variant="outline" className="w-full bg-white/20 text-white border-white/30 font-semibold" data-testid="button-withdraw">
-                Effectuer un retrait
-              </Button>
-            </Link>
           </div>
         </div>
 
-        <Card className="overflow-visible">
-          <CardContent className="p-5">
-            <div className="flex items-start gap-4">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <ArrowLeftRight className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-base">Transferez de l'argent</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Un envoi simple, rapide et securise vers vos proches.
-                </p>
-                <Link href="/transfer">
-                  <Button variant="outline" className="mt-3" data-testid="button-transfer">
-                    Transferez maintenant
-                  </Button>
-                </Link>
-              </div>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 p-6 sm:p-8" data-testid="card-balance">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3" />
+          <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-1">
+              <Wallet className="h-4 w-4 text-white/70" />
+              <p className="text-sm font-medium text-white/70">Solde disponible</p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-3">
+              {walletLoading ? (
+                <Skeleton className="h-12 w-56 bg-white/20" />
+              ) : (
+                <span className="text-4xl sm:text-5xl font-bold text-white tracking-tight" data-testid="text-balance-xof">
+                  {balanceVisible ? formatCurrency(balance) : "\u2022\u2022\u2022\u2022\u2022\u2022"} <span className="text-2xl font-semibold text-white/80">XOF</span>
+                </span>
+              )}
+              <button
+                onClick={() => setBalanceVisible(!balanceVisible)}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                data-testid="button-toggle-balance"
+              >
+                {balanceVisible ? <Eye className="h-4 w-4 text-white/80" /> : <EyeOff className="h-4 w-4 text-white/80" />}
+              </button>
+            </div>
 
-        <Card className="overflow-visible">
-          <CardContent className="p-5">
-            <div className="flex items-start gap-4">
-              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                <Link2 className="h-5 w-5 text-blue-500" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-base">Liens de paiement</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Creez et partagez des liens de paiement pour recevoir des fonds facilement.
-                </p>
-                <Link href="/payment-links">
-                  <Button variant="outline" className="mt-3" data-testid="button-goto-payment-links">
-                    Creer un lien
-                  </Button>
-                </Link>
-              </div>
+            <div className="flex gap-3 mt-6 flex-wrap">
+              <Link href="/deposit" className="flex-1 min-w-[140px]">
+                <Button className="w-full bg-white text-emerald-700 hover:bg-white/90 font-semibold shadow-lg shadow-emerald-900/20 gap-2" data-testid="button-deposit">
+                  <ArrowDownLeft className="h-4 w-4" />
+                  Recharger
+                </Button>
+              </Link>
+              <Link href="/withdraw" className="flex-1 min-w-[140px]">
+                <Button variant="outline" className="w-full bg-white/10 text-white border-white/20 hover:bg-white/20 font-semibold gap-2" data-testid="button-withdraw">
+                  <ArrowUpRight className="h-4 w-4" />
+                  Retirer
+                </Button>
+              </Link>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="overflow-visible">
-          <CardContent className="p-5">
-            <div className="flex items-start gap-4">
-              <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-                <Activity className="h-5 w-5 text-purple-500" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Card className="border-0 bg-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-base">Integration API</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Integrez SolvexPay dans votre application pour accepter les paiements Mobile Money.
-                </p>
-                <Link href="/api-keys">
-                  <Button variant="outline" className="mt-3" data-testid="button-goto-api-keys">
-                    Gerer les cles API
-                  </Button>
-                </Link>
+              <p className="text-xs text-muted-foreground">Depots</p>
+              <p className="text-lg font-bold mt-0.5" data-testid="text-stat-deposits">
+                {statsLoading ? <Skeleton className="h-6 w-16" /> : formatCurrency(stats?.totalDeposits || 0)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 bg-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <TrendingDown className="h-4 w-4 text-orange-500" />
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+              <p className="text-xs text-muted-foreground">Retraits</p>
+              <p className="text-lg font-bold mt-0.5" data-testid="text-stat-withdrawals">
+                {statsLoading ? <Skeleton className="h-6 w-16" /> : formatCurrency(stats?.totalWithdrawals || 0)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 bg-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Taux de reussite</p>
+              <p className="text-lg font-bold mt-0.5" data-testid="text-stat-success-rate">
+                {successRate}%
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 bg-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <Clock className="h-4 w-4 text-amber-500" />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">En attente</p>
+              <p className="text-lg font-bold mt-0.5">{pendingTx.length}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Link href="/transfer">
+            <Card className="group cursor-pointer h-full" data-testid="card-transfer">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <ArrowLeftRight className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm">Transferer</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">Envoyez de l'argent</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/payment-links">
+            <Card className="group cursor-pointer h-full" data-testid="card-payment-links">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="h-11 w-11 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                  <Link2 className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm">Liens de paiement</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">Creez et partagez</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/api-keys">
+            <Card className="group cursor-pointer h-full" data-testid="card-api-keys">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="h-11 w-11 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                  <Code2 className="h-5 w-5 text-purple-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm">API</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">Integrez vos paiements</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1">
-            <CardTitle className="text-base">Transactions recentes</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-4">
+            <CardTitle className="text-base font-semibold">Transactions recentes</CardTitle>
             <Link href="/transactions">
-              <Button variant="ghost" size="sm" className="gap-1" data-testid="link-view-all-transactions">
-                Voir tout
-                <ArrowRight className="h-4 w-4" />
+              <Button variant="ghost" size="sm" className="gap-1 text-xs" data-testid="link-view-all-transactions">
+                Tout voir
+                <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             </Link>
           </CardHeader>
@@ -212,138 +272,54 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : recentTransactions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Activity className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>Aucune transaction recente</p>
+              <div className="text-center py-12">
+                <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="font-medium text-sm">Aucune transaction</p>
+                <p className="text-xs text-muted-foreground mt-1">Vos transactions apparaitront ici</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {recentTransactions.map((tx) => (
-                  <div key={tx.id} className="flex items-center gap-4" data-testid={`transaction-item-${tx.id}`}>
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                      tx.type === "deposit" ? "bg-primary/10" : "bg-orange-500/10"
-                    }`}>
-                      {tx.type === "deposit" ? (
-                        <ArrowDownLeft className="h-5 w-5 text-primary" />
-                      ) : (
-                        <ArrowUpRight className="h-5 w-5 text-orange-500" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {tx.type === "deposit" ? "Depot" : "Retrait"} - {tx.provider}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {tx.createdAt && formatDate(tx.createdAt)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-semibold text-sm ${
-                        tx.type === "deposit" ? "text-primary" : ""
+              <div className="space-y-1">
+                {recentTransactions.map((tx) => {
+                  const isDeposit = tx.type === "deposit";
+                  const statusIcon = tx.status === "completed" ? CheckCircle2 : tx.status === "pending" ? Clock : XCircle;
+                  const StatusIcon = statusIcon;
+                  const statusColor = tx.status === "completed" ? "text-emerald-500" : tx.status === "pending" ? "text-amber-500" : "text-red-500";
+
+                  return (
+                    <div key={tx.id} className="flex items-center gap-3 py-3 px-2 rounded-lg hover:bg-accent/30 transition-colors" data-testid={`transaction-item-${tx.id}`}>
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        isDeposit ? "bg-emerald-500/10" : "bg-orange-500/10"
                       }`}>
-                        {tx.type === "deposit" ? "+" : "-"}{formatCurrency(tx.amount, tx.currency)} {tx.currency}
-                      </p>
-                      <Badge variant={tx.status === "completed" ? "default" : tx.status === "pending" ? "secondary" : "destructive"} className="text-xs">
-                        {tx.status === "completed" ? "Termine" : tx.status === "pending" ? "En cours" : "Echoue"}
-                      </Badge>
+                        {isDeposit ? (
+                          <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <ArrowUpRight className="h-4 w-4 text-orange-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">
+                          {isDeposit ? "Depot" : "Retrait"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {tx.createdAt && formatDate(tx.createdAt)}
+                        </p>
+                      </div>
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className={`font-semibold text-sm tabular-nums ${isDeposit ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
+                            {isDeposit ? "+" : "-"}{formatCurrency(tx.amount)} 
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">{tx.currency}</p>
+                        </div>
+                        <StatusIcon className={`h-4 w-4 ${statusColor} flex-shrink-0`} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Statistiques et performances
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Depots</p>
-                <div className="text-lg font-bold" data-testid="text-stat-deposits">
-                  {statsLoading ? <Skeleton className="h-6 w-16" /> : `${formatCurrency(stats?.totalDeposits || 0)}`}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Retraits</p>
-                <div className="text-lg font-bold" data-testid="text-stat-withdrawals">
-                  {statsLoading ? <Skeleton className="h-6 w-16" /> : `${formatCurrency(stats?.totalWithdrawals || 0)}`}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Volume net</p>
-                <p className="text-lg font-bold" data-testid="text-stat-net-volume">
-                  {formatCurrency((stats?.totalDeposits || 0) - (stats?.totalWithdrawals || 0))}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Moy. / tx</p>
-                <p className="text-lg font-bold" data-testid="text-stat-avg-amount">
-                  {formatCurrency(avgTransactionAmount)}
-                </p>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Transactions</p>
-                  <p className="text-base font-semibold" data-testid="text-stat-tx-count">{stats?.transactionCount || 0}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Reussite</p>
-                  <p className="text-base font-semibold" data-testid="text-stat-success-rate">{successRate}%</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link2 className="h-4 w-4 text-purple-500 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Liens actifs</p>
-                  <p className="text-base font-semibold" data-testid="text-stat-links">{stats?.paymentLinksCount || 0}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">En attente</p>
-                  <p className="text-base font-semibold">{pendingTx.length}</p>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5"><ArrowDownLeft className="h-3.5 w-3.5 text-primary" />Depots</span>
-                  <span className="font-medium">{depositTx.length}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${transactions && transactions.length > 0 ? (depositTx.length / transactions.length) * 100 : 0}%` }} data-testid="bar-deposits" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5"><ArrowUpRight className="h-3.5 w-3.5 text-orange-500" />Retraits</span>
-                  <span className="font-medium">{withdrawalTx.length}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-orange-500 transition-all" style={{ width: `${transactions && transactions.length > 0 ? (withdrawalTx.length / transactions.length) * 100 : 0}%` }} data-testid="bar-withdrawals" />
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

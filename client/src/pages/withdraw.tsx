@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowUpRight, Wallet, Info, CheckCircle2, AlertTriangle, Phone, Globe } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, AlertTriangle, Phone, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
 
@@ -66,7 +66,7 @@ export default function WithdrawPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       setWithdrawRef(data.reference || data.sendavaReference || "");
       setSuccess(true);
-      toast({ title: "Retrait initie", description: "Les fonds seront envoyes sur votre compte Mobile Money." });
+      toast({ title: "Retrait initie", description: "Les fonds seront envoyes sur votre Mobile Money." });
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Impossible d'initier le retrait.", variant: "destructive" });
@@ -76,41 +76,30 @@ export default function WithdrawPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !phoneNumber || !operator || !country || insufficientFunds) return;
-    withdrawMutation.mutate({
-      amount: parseFloat(amount),
-      phoneNumber,
-      operator,
-      country,
-    });
+    withdrawMutation.mutate({ amount: parseFloat(amount), phoneNumber, operator, country });
   };
 
   if (success) {
     return (
       <DashboardLayout title="Retrait" breadcrumbs={[{ label: "Retrait" }]}>
-        <div className="max-w-lg mx-auto mt-8">
-          <Card>
-            <CardContent className="pt-8 pb-8 text-center space-y-4">
-              <div className="h-16 w-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="h-8 w-8 text-green-500" />
+        <div className="max-w-md mx-auto mt-12">
+          <Card className="border-0 shadow-none">
+            <CardContent className="pt-10 pb-10 text-center space-y-5">
+              <div className="h-20 w-20 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-10 w-10 text-emerald-500" />
               </div>
-              <h2 className="text-xl font-bold" data-testid="text-withdraw-status">Retrait initie avec succes</h2>
-              <p className="text-muted-foreground text-sm">
-                Retrait de <span className="font-semibold text-foreground">{formatCurrency(parseFloat(amount))} XOF</span> vers{" "}
-                <span className="font-semibold text-foreground">{phoneNumber}</span> ({operator})
-              </p>
-              <div className="rounded-lg bg-muted/50 border p-4">
-                <p className="text-xs text-muted-foreground">
-                  Les fonds seront credites sur votre compte Mobile Money. Le delai de traitement est generalement de quelques minutes a 24h.
+              <div>
+                <h2 className="text-xl font-bold" data-testid="text-withdraw-status">Retrait initie</h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  <span className="font-semibold">{formatCurrency(parseFloat(amount))} XOF</span> vers <span className="font-semibold">{phoneNumber}</span> ({operator})
                 </p>
               </div>
               {withdrawRef && (
-                <p className="text-xs text-muted-foreground">
-                  Reference: <span className="font-mono">{withdrawRef}</span>
-                </p>
+                <p className="text-xs text-muted-foreground font-mono">{withdrawRef}</p>
               )}
-              <div className="flex gap-3 pt-2 flex-wrap">
+              <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1" onClick={() => navigate("/")} data-testid="button-back-dashboard">
-                  Retour au tableau de bord
+                  Tableau de bord
                 </Button>
                 <Button className="flex-1" onClick={() => { setSuccess(false); setAmount(""); setPhoneNumber(""); setWithdrawRef(""); setOperator(""); }} data-testid="button-new-withdraw">
                   Nouveau retrait
@@ -125,90 +114,63 @@ export default function WithdrawPage() {
 
   return (
     <DashboardLayout title="Retrait" breadcrumbs={[{ label: "Retrait" }]}>
-      <div className="max-w-lg mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-withdraw-title">
-            <ArrowUpRight className="h-6 w-6 text-orange-500" />
-            Effectuer un retrait
-          </h1>
-          <p className="text-muted-foreground mt-1">Envoyez des fonds vers votre compte Mobile Money</p>
+      <div className="max-w-md mx-auto space-y-6">
+        <div className="text-center space-y-2">
+          <div className="h-14 w-14 rounded-2xl bg-orange-500/10 flex items-center justify-center mx-auto">
+            <ArrowUpRight className="h-7 w-7 text-orange-500" />
+          </div>
+          <h1 className="text-2xl font-bold" data-testid="text-withdraw-title">Retrait</h1>
+          <p className="text-sm text-muted-foreground">
+            Disponible : <span className="font-semibold">{formatCurrency(balance)} XOF</span>
+          </p>
         </div>
 
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <Wallet className="h-5 w-5 text-primary flex-shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Solde disponible</p>
-                <p className="text-lg font-bold" data-testid="text-current-balance">
-                  {formatCurrency(balance)} XOF
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Montant du retrait</CardTitle>
-              <CardDescription>Saisissez le montant que vous souhaitez retirer</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <Card className="border-0 shadow-none bg-muted/30">
+            <CardContent className="p-5 space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="withdraw-amount">Montant (XOF)</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Montant (XOF)</Label>
                 <Input
-                  id="withdraw-amount"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   type="number"
-                  placeholder="Saisissez le montant"
+                  placeholder="0"
                   min="100"
                   max={balance}
                   required
-                  className="text-lg h-12"
+                  className="text-3xl h-16 text-center font-bold border-0 bg-transparent focus-visible:ring-0 placeholder:text-muted-foreground/30"
                   data-testid="input-withdraw-amount"
                 />
-                {balance > 0 && (
-                  <Button
+              </div>
+              {balance > 0 && (
+                <div className="flex justify-center">
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-primary"
                     onClick={() => setAmount(String(Math.floor(balance)))}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium bg-muted hover:bg-accent text-muted-foreground transition-colors"
                     data-testid="button-max-amount"
                   >
-                    Retirer le maximum
-                  </Button>
-                )}
-              </div>
-
+                    Retirer tout ({formatCurrency(Math.floor(balance))})
+                  </button>
+                </div>
+              )}
               {insufficientFunds && withdrawAmount > 0 && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-destructive">
-                    Fonds insuffisants. Votre solde est de {formatCurrency(balance)} XOF.
-                  </p>
+                <div className="flex items-center gap-2 justify-center text-sm text-red-500">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  <span>Solde insuffisant</span>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                Pays et operateur
-              </CardTitle>
-              <CardDescription>Selectionnez le pays et l'operateur du destinataire</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Pays</Label>
+          <Card className="border-0 shadow-none bg-muted/30">
+            <CardContent className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold uppercase text-muted-foreground">Pays</Label>
                   <Select value={country} onValueChange={setCountry}>
-                    <SelectTrigger data-testid="select-withdraw-country">
-                      <SelectValue placeholder="Pays" />
+                    <SelectTrigger className="h-11" data-testid="select-withdraw-country">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {COUNTRIES.map((c) => (
@@ -219,11 +181,11 @@ export default function WithdrawPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Operateur</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold uppercase text-muted-foreground">Operateur</Label>
                   <Select value={operator} onValueChange={setOperator}>
-                    <SelectTrigger data-testid="select-withdraw-operator">
-                      <SelectValue placeholder="Operateur" />
+                    <SelectTrigger className="h-11" data-testid="select-withdraw-operator">
+                      <SelectValue placeholder="Choisir" />
                     </SelectTrigger>
                     <SelectContent>
                       {availableOperators.map((op) => (
@@ -235,65 +197,58 @@ export default function WithdrawPage() {
                   </Select>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                Compte destinataire
-              </CardTitle>
-              <CardDescription>Numero de telephone Mobile Money du destinataire</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="withdraw-phone">Numero de telephone</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                  <Phone className="h-3 w-3" />
+                  Numero du destinataire
+                </Label>
                 <Input
-                  id="withdraw-phone"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   type="tel"
                   placeholder="+22890123456"
                   required
-                  className="h-12"
+                  className="h-11"
                   data-testid="input-withdraw-phone"
                 />
               </div>
             </CardContent>
           </Card>
 
-          {withdrawAmount > 0 && (
-            <Card>
-              <CardContent className="pt-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Montant du retrait</span>
-                  <span className="font-semibold">{formatCurrency(withdrawAmount)} XOF</span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Total debite</span>
-                  <span className="text-lg font-bold" data-testid="text-withdraw-total">{formatCurrency(withdrawAmount)} XOF</span>
-                </div>
-              </CardContent>
-            </Card>
+          {withdrawAmount >= 100 && !insufficientFunds && (
+            <div className="px-1 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Montant</span>
+                <span className="font-medium">{formatCurrency(withdrawAmount)} XOF</span>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Total debite</span>
+                <span className="text-xl font-bold" data-testid="text-withdraw-total">{formatCurrency(withdrawAmount)} XOF</span>
+              </div>
+            </div>
           )}
-
-          <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
-            <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-muted-foreground">
-              Les fonds seront envoyes directement sur le compte Mobile Money du numero indique. Le delai de traitement est de quelques minutes a 24h.
-            </p>
-          </div>
 
           <Button
             type="submit"
-            className="w-full h-12 text-base font-semibold"
-            disabled={withdrawMutation.isPending || !amount || !phoneNumber || !operator || !country || insufficientFunds}
+            className="w-full h-12 text-base font-semibold rounded-xl"
+            disabled={withdrawMutation.isPending || !amount || parseFloat(amount) < 100 || !phoneNumber || !operator || insufficientFunds}
             data-testid="button-confirm-withdraw"
           >
-            {withdrawMutation.isPending ? "Envoi en cours..." : `Retirer ${withdrawAmount > 0 ? formatCurrency(withdrawAmount) + " XOF" : ""}`}
+            {withdrawMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Envoi en cours...
+              </>
+            ) : (
+              `Retirer${withdrawAmount >= 100 ? " " + formatCurrency(withdrawAmount) + " XOF" : ""}`
+            )}
           </Button>
+
+          <p className="text-[11px] text-center text-muted-foreground">
+            Les fonds seront envoyes directement sur le compte Mobile Money indique.
+          </p>
         </form>
       </div>
     </DashboardLayout>

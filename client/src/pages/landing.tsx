@@ -1,8 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
+import {
   CheckCircle2,
   ChevronRight,
   LinkIcon,
@@ -11,7 +10,9 @@ import {
   ArrowRight,
   Shield,
   Zap,
-  Globe
+  Globe,
+  Users,
+  TrendingUp,
 } from "lucide-react";
 
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
@@ -26,28 +27,60 @@ import flagSenegal from "../assets/images/flag-senegal.png";
 import flagTogo from "../assets/images/flag-togo.png";
 
 const countries = [
-  { name: "Bénin", flag: flagBenin },
+  { name: "Benin", flag: flagBenin },
   { name: "Burkina Faso", flag: flagBurkina },
-  { name: "Côte d'Ivoire", flag: flagCotedivoire },
-  { name: "Sénégal", flag: flagSenegal },
+  { name: "Cote d'Ivoire", flag: flagCotedivoire },
+  { name: "Senegal", flag: flagSenegal },
   { name: "Togo", flag: flagTogo },
+];
+
+const stats = [
+  { label: "Pays couverts", value: "7+", icon: Globe },
+  { label: "Operateurs", value: "8+", icon: Smartphone },
+  { label: "Utilisateurs", value: "1K+", icon: Users },
+  { label: "Transactions", value: "10K+", icon: TrendingUp },
+];
+
+const features = [
+  {
+    icon: LinkIcon,
+    title: "Liens de Paiement",
+    description: "Creez des liens personnalises et partagez-les par SMS, WhatsApp ou email. Recevez des paiements sans site web.",
+    image: paymentLinksImg,
+  },
+  {
+    icon: Smartphone,
+    title: "Mobile Money",
+    description: "Acceptez MTN, Orange, Wave, Moov, Airtel, TMoney, Vodacom dans 7 pays africains. Paiement USSD direct.",
+    image: mobileMoneyImg,
+  },
+  {
+    icon: Code2,
+    title: "API & SDK",
+    description: "Integrez les paiements dans votre application en quelques lignes de code. Documentation complete et support technique.",
+    image: apiGatewayImg,
+  },
 ];
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-background/80 border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-background/70 border-b border-border/50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16 gap-4">
-            <div className="flex items-center gap-2">
-              <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-md object-cover" />
-              <span className="font-bold text-xl" data-testid="text-logo">SolvexPay</span>
+            <div className="flex items-center gap-2.5">
+              <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-lg object-cover" />
+              <span className="font-bold text-lg tracking-tight" data-testid="text-logo">SolvexPay</span>
             </div>
-            
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Link href="/login" data-testid="link-login">
-                <Button variant="outline" data-testid="button-login">
-                  Se connecter
+                <Button variant="ghost" size="sm" data-testid="button-login">
+                  Connexion
+                </Button>
+              </Link>
+              <Link href="/register">
+                <Button size="sm" data-testid="button-register">
+                  Commencer
                 </Button>
               </Link>
             </div>
@@ -55,69 +88,58 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <section className="relative pt-32 pb-20 px-4 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
-        <div className="max-w-7xl mx-auto relative">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <section className="relative pt-28 pb-20 px-4 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/8 via-transparent to-transparent" />
+        <div className="max-w-6xl mx-auto relative">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="space-y-8">
-              <div className="overflow-hidden max-w-xs" data-testid="flags-marquee">
-                <div className="flex animate-marquee gap-3">
-                  {[...countries, ...countries].map((country, i) => (
-                    <div
-                      key={`${country.name}-${i}`}
-                      className="flex-shrink-0 rounded-md border border-border bg-card p-1.5"
-                    >
-                      <img src={country.flag} alt={country.name} className="w-10 h-7 rounded-sm object-cover" />
-                    </div>
-                  ))}
-                </div>
+              <div className="flex gap-2" data-testid="flags-marquee">
+                {countries.map((c) => (
+                  <div key={c.name} className="rounded-lg border border-border/50 bg-card/50 p-1.5 backdrop-blur-sm">
+                    <img src={c.flag} alt={c.name} className="w-9 h-6 rounded object-cover" />
+                  </div>
+                ))}
               </div>
-              
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight" data-testid="text-hero-title">
-                Simplifiez vos{" "}
-                <span className="text-primary">paiements</span>{" "}
-                à travers l'Afrique
-              </h1>
-              
-              <p className="text-lg text-muted-foreground max-w-xl" data-testid="text-hero-description">
-                Acceptez les paiements Mobile Money de MTN, Orange, Wave et bien plus. 
-                Créez des liens de paiement, gérez vos transactions et intégrez notre API 
-                en quelques minutes.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4">
+
+              <div className="space-y-4">
+                <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold leading-[1.1] tracking-tight" data-testid="text-hero-title">
+                  Paiements Mobile Money{" "}
+                  <span className="bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
+                    simplifes
+                  </span>{" "}
+                  pour l'Afrique
+                </h1>
+                <p className="text-lg text-muted-foreground max-w-lg leading-relaxed" data-testid="text-hero-description">
+                  Acceptez les paiements de MTN, Orange, Wave et 5 autres operateurs dans 7 pays. Integration en quelques minutes.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Link href="/register">
-                  <Button size="lg" className="w-full sm:w-auto" data-testid="button-cta-primary">
-                    Créer un compte gratuit
-                    <ChevronRight className="ml-2 h-5 w-5" />
+                  <Button size="lg" className="w-full sm:w-auto gap-2 h-12 px-6 text-base" data-testid="button-cta-primary">
+                    Creer un compte gratuit
+                    <ChevronRight className="h-4 w-4" />
                   </Button>
                 </Link>
               </div>
-              
-              <div className="flex flex-wrap items-center gap-6 pt-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                  <span>Gratuit pour commencer</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                  <span>Sans carte bancaire</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                  <span>Inscription en 30 secondes</span>
-                </div>
+
+              <div className="flex flex-wrap items-center gap-5">
+                {["Gratuit pour commencer", "Sans carte bancaire", "Inscription en 30s"].map((text) => (
+                  <div key={text} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                    <span>{text}</span>
+                  </div>
+                ))}
               </div>
             </div>
-            
+
             <div className="relative hidden lg:block">
-              <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
-              <img 
-                src={heroBanner} 
-                alt="SolvexPay - Plateforme de paiement africaine" 
-                className="relative rounded-2xl w-full object-cover"
+              <div className="absolute -inset-4 bg-gradient-to-tr from-emerald-500/20 to-teal-500/10 rounded-3xl blur-3xl" />
+              <img
+                src={heroBanner}
+                alt="SolvexPay"
+                className="relative rounded-2xl w-full object-cover shadow-2xl shadow-emerald-500/10"
                 loading="eager"
-                decoding="async"
                 data-testid="img-hero-banner"
               />
             </div>
@@ -125,126 +147,124 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="py-16 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 space-y-4">
-            <Badge variant="secondary" className="px-4 py-1.5">Nos Solutions</Badge>
-            <h2 className="text-3xl sm:text-4xl font-bold" data-testid="text-solutions-title">
-              Tout ce dont vous avez besoin pour{" "}
-              <span className="text-primary">accepter les paiements</span>
+      <section className="py-4 px-4 border-y border-border/50 bg-muted/20">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+            {stats.map((stat) => (
+              <div key={stat.label} className="text-center py-4">
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight">{stat.value}</p>
+                <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16 space-y-3">
+            <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Solutions</p>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight" data-testid="text-solutions-title">
+              Tout pour accepter les paiements
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              Des outils puissants et simples pour gérer vos paiements Mobile Money en Afrique.
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Des outils modernes pour gerer vos paiements Mobile Money a travers l'Afrique.
             </p>
           </div>
 
-          <div className="space-y-8">
-            <Card className="overflow-hidden" data-testid="card-payment-links">
-              <div className="relative">
-                <img 
-                  src={paymentLinksImg} 
-                  alt="Liens de Paiement SolvexPay" 
-                  className="w-full h-64 sm:h-80 object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div className="p-6 space-y-3">
-                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                  <LinkIcon className="w-5 h-5 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold" data-testid="text-feature-payment-links">Liens de Paiement</h3>
-                <p className="text-muted-foreground">
-                  Créez des liens personnalisés pour vos produits et services. 
-                  Partagez-les facilement avec vos clients par SMS, WhatsApp ou email.
-                </p>
-              </div>
-            </Card>
+          <div className="space-y-6">
+            {features.map((feature, i) => {
+              const FeatureIcon = feature.icon;
+              const isReversed = i % 2 === 1;
 
-            <Card className="overflow-hidden" data-testid="card-mobile-money">
-              <div className="grid md:grid-cols-2">
-                <div className="relative">
-                  <img 
-                    src={mobileMoneyImg} 
-                    alt="Paiements Mobile Money SolvexPay" 
-                    className="w-full h-48 md:h-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-                <div className="p-6 space-y-3 flex flex-col justify-center">
-                  <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                    <Smartphone className="w-5 h-5 text-primary" />
+              return (
+                <Card key={feature.title} className="overflow-hidden border-border/50" data-testid={`card-feature-${i}`}>
+                  <div className={`grid md:grid-cols-2 ${isReversed ? "md:grid-flow-dense" : ""}`}>
+                    <div className={`relative ${isReversed ? "md:col-start-2" : ""}`}>
+                      <img
+                        src={feature.image}
+                        alt={feature.title}
+                        className="w-full h-52 md:h-full object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent md:hidden" />
+                    </div>
+                    <div className="p-8 sm:p-10 flex flex-col justify-center space-y-4">
+                      <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <FeatureIcon className="h-5 w-5 text-primary" />
+                      </div>
+                      <h3 className="text-xl font-bold">{feature.title}</h3>
+                      <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+                      <Link href="/register">
+                        <Button variant="outline" size="sm" className="gap-1.5 w-fit mt-2" data-testid={`button-feature-learn-more-${i}`}>
+                          En savoir plus
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold" data-testid="text-feature-mobile-money">Mobile Money</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Acceptez les paiements via tous les opérateurs d'Afrique : 
-                    Orange, MTN, Wave, Moov, Airtel, Free et plus encore.
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="overflow-hidden" data-testid="card-api-gateway">
-              <div className="relative">
-                <img 
-                  src={apiGatewayImg} 
-                  alt="API Gateway SolvexPay" 
-                  className="w-full h-64 sm:h-80 object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div className="p-6 space-y-3">
-                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                  <Code2 className="w-5 h-5 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold" data-testid="text-feature-api">API Gateway</h3>
-                <p className="text-muted-foreground">
-                  Intégrez les paiements directement dans votre site web ou 
-                  application avec notre API sécurisée et documentée.
-                </p>
-              </div>
-            </Card>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      <section className="py-12 px-4 bg-muted/30">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 flex-wrap">
-            <div className="flex items-center gap-8 flex-wrap">
-              <div className="flex items-center gap-2" data-testid="text-advantage-security">
-                <Shield className="w-5 h-5 text-primary" />
-                <span className="text-sm font-medium">Transactions sécurisées</span>
+      <section className="py-20 px-4 bg-muted/20">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12 space-y-3">
+            <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Avantages</p>
+            <h2 className="text-3xl font-bold tracking-tight">Pourquoi SolvexPay ?</h2>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-6">
+            <div className="text-center space-y-3 p-6">
+              <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto">
+                <Shield className="h-6 w-6 text-emerald-500" />
               </div>
-              <div className="flex items-center gap-2" data-testid="text-advantage-speed">
-                <Zap className="w-5 h-5 text-primary" />
-                <span className="text-sm font-medium">Paiements instantanés</span>
-              </div>
-              <div className="flex items-center gap-2" data-testid="text-advantage-coverage">
-                <Globe className="w-5 h-5 text-primary" />
-                <span className="text-sm font-medium">Couverture pan-africaine</span>
-              </div>
+              <h3 className="font-semibold">Securise</h3>
+              <p className="text-sm text-muted-foreground">Signature HMAC-SHA256 sur chaque transaction. Vos fonds sont proteges.</p>
             </div>
-            <Link href="/register">
-              <Button data-testid="button-cta-bottom">
-                Commencer maintenant
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
+            <div className="text-center space-y-3 p-6">
+              <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto">
+                <Zap className="h-6 w-6 text-blue-500" />
+              </div>
+              <h3 className="font-semibold">Instantane</h3>
+              <p className="text-sm text-muted-foreground">Paiements USSD directs. Le client confirme sur son telephone en secondes.</p>
+            </div>
+            <div className="text-center space-y-3 p-6">
+              <div className="h-12 w-12 rounded-2xl bg-purple-500/10 flex items-center justify-center mx-auto">
+                <Globe className="h-6 w-6 text-purple-500" />
+              </div>
+              <h3 className="font-semibold">Pan-Africain</h3>
+              <p className="text-sm text-muted-foreground">7 pays, 8 operateurs, 3 devises. Une seule integration pour toute l'Afrique.</p>
+            </div>
           </div>
         </div>
       </section>
 
-      <footer className="py-6 px-4 border-t border-border">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 flex-wrap">
+      <section className="py-20 px-4">
+        <div className="max-w-2xl mx-auto text-center space-y-6">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Pret a commencer ?</h2>
+          <p className="text-muted-foreground text-lg">
+            Creez votre compte gratuitement et commencez a accepter les paiements Mobile Money en quelques minutes.
+          </p>
+          <Link href="/register">
+            <Button size="lg" className="gap-2 h-12 px-8 text-base" data-testid="button-cta-bottom">
+              Creer un compte gratuit
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
+      </section>
+
+      <footer className="py-8 px-4 border-t border-border/50">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <img src={solvexpayLogo} alt="SolvexPay" className="w-6 h-6 rounded-md object-cover" />
             <span className="font-bold text-sm">SolvexPay</span>
           </div>
           <p className="text-xs text-muted-foreground" data-testid="text-copyright">
-            &copy; 2025 SolvexPay. Tous droits réservés.
+            &copy; 2026 SolvexPay. Tous droits reserves.
           </p>
         </div>
       </footer>
