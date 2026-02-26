@@ -157,10 +157,10 @@ export default function DashboardPage() {
                   <TrendingUp className="h-4 w-4 text-emerald-500" />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Depots</p>
-              <p className="text-lg font-bold mt-0.5" data-testid="text-stat-deposits">
+              <div className="text-xs text-muted-foreground">Depots</div>
+              <div className="text-lg font-bold mt-0.5" data-testid="text-stat-deposits">
                 {statsLoading ? <Skeleton className="h-6 w-16" /> : formatCurrency(stats?.totalDeposits || 0)}
-              </p>
+              </div>
             </CardContent>
           </Card>
           <Card className="border-0 bg-card">
@@ -170,10 +170,10 @@ export default function DashboardPage() {
                   <TrendingDown className="h-4 w-4 text-orange-500" />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Retraits</p>
-              <p className="text-lg font-bold mt-0.5" data-testid="text-stat-withdrawals">
+              <div className="text-xs text-muted-foreground">Retraits</div>
+              <div className="text-lg font-bold mt-0.5" data-testid="text-stat-withdrawals">
                 {statsLoading ? <Skeleton className="h-6 w-16" /> : formatCurrency(stats?.totalWithdrawals || 0)}
-              </p>
+              </div>
             </CardContent>
           </Card>
           <Card className="border-0 bg-card">
@@ -183,10 +183,10 @@ export default function DashboardPage() {
                   <CheckCircle2 className="h-4 w-4 text-blue-500" />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Taux de reussite</p>
-              <p className="text-lg font-bold mt-0.5" data-testid="text-stat-success-rate">
+              <div className="text-xs text-muted-foreground">Taux de reussite</div>
+              <div className="text-lg font-bold mt-0.5" data-testid="text-stat-success-rate">
                 {successRate}%
-              </p>
+              </div>
             </CardContent>
           </Card>
           <Card className="border-0 bg-card">
@@ -196,8 +196,8 @@ export default function DashboardPage() {
                   <Clock className="h-4 w-4 text-amber-500" />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">En attente</p>
-              <p className="text-lg font-bold mt-0.5">{pendingTx.length}</p>
+              <div className="text-xs text-muted-foreground">En attente</div>
+              <div className="text-lg font-bold mt-0.5">{pendingTx.length}</div>
             </CardContent>
           </Card>
         </div>
