@@ -41,6 +41,7 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
         <SidebarInset className="flex flex-col flex-1">
           <header className="flex h-14 items-center gap-3 border-b border-border/60 bg-background/95 backdrop-blur-sm px-4 lg:px-6 sticky top-0 z-50 shadow-sm">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0" data-testid="button-sidebar-toggle" />
+            <span className="font-bold text-sm bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
             <Separator orientation="vertical" className="h-5 flex-shrink-0" />
 
             {showBackButton && (
@@ -77,9 +78,8 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
               </Breadcrumb>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0" data-testid="header-logo">
+            <div className="flex-shrink-0" data-testid="header-logo">
               <img src={solvexpayLogo} alt="SolvexPay" className="w-7 h-7 rounded-lg object-cover ring-1 ring-primary/20" />
-              <span className="font-bold text-sm hidden sm:inline bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
             </div>
           </header>
 

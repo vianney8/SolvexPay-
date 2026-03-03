@@ -64,8 +64,8 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="border-r border-gray-200/80">
-      <div className="flex flex-col h-full bg-gray-50/80">
+    <Sidebar className="border-r-0">
+      <div className="flex flex-col h-full" style={{ background: "linear-gradient(180deg, hsl(262 60% 97%) 0%, hsl(262 40% 95%) 100%)" }}>
 
         <SidebarHeader className="px-4 py-5 flex-shrink-0">
           <Link href="/dashboard">
@@ -146,7 +146,7 @@ export function AppSidebar() {
           )}
         </SidebarContent>
 
-        <SidebarFooter className="p-3 border-t border-gray-200/80 flex-shrink-0 bg-white/60">
+        <SidebarFooter className="p-3 border-t border-violet-200/60 flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
