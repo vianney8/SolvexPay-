@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
-import { sendavaPayService, isApiKeyConfigured, verifyWebhookSignature } from "./services/sendavapay";
+import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, type OmniPayCallbackPayload } from "./services/omnipay";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -42,6 +42,9 @@ const depositSchema = z.object({
   operator: z.string().min(1, "Operateur requis"),
   country: z.string().min(2, "Pays requis"),
   customerName: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  otp: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -135,7 +138,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { amount, currency, phoneNumber, operator, country, customerName, description } = validation.data;
+      const { amount, currency, phoneNumber, operator, country, customerName, firstName, lastName, otp, description } = validation.data;
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configure" });
@@ -146,26 +149,32 @@ export async function registerRoutes(
         wallet = await storage.createWallet(userId);
       }
 
-      const callbackUrl = `https://solvexpay.site/api/payment/callback`;
+      const fullName = customerName || req.user?.name || req.user?.firstName || "Client";
+      const nameParts = fullName.trim().split(" ");
+      const resolvedFirstName = firstName || nameParts[0] || "Client";
+      const resolvedLastName = lastName || nameParts.slice(1).join(" ") || "SolvexPay";
 
-      const paymentResponse = await sendavaPayService.createPayment({
+      const reference = generateReference();
+      const isWave = operator.toLowerCase() === "wave";
+      const returnUrl = isWave ? `https://solvexpay.site/api/payment/callback?reference=${reference}` : undefined;
+
+      const depositResponse = await omniPayService.deposit({
+        msisdn: phoneNumber,
         amount,
-        phoneNumber,
-        operator,
-        country,
-        customerName: customerName || req.user.firstName || "",
-        description: description || "Depot SolvexPay",
-        callbackUrl,
+        reference,
+        firstName: resolvedFirstName,
+        lastName: resolvedLastName,
+        otp,
+        operator: isWave || operator.toLowerCase() === "mixx" ? operator : undefined,
+        returnUrl,
       });
-
-      const reference = paymentResponse.reference;
 
       const transaction = await storage.createTransaction({
         userId,
         type: "deposit",
         amount: amount.toString(),
         currency,
-        provider: "sendavapay",
+        provider: "omnipay",
         phoneNumber,
         reference,
         status: "pending",
@@ -174,8 +183,8 @@ export async function registerRoutes(
 
       res.json({
         ...transaction,
-        sendavaReference: reference,
-        sendavaStatus: paymentResponse.status,
+        omnipayId: depositResponse.id,
+        paymentUrl: depositResponse.payment_url,
       });
     } catch (error: any) {
       console.error("Error creating deposit:", error);
@@ -205,30 +214,37 @@ export async function registerRoutes(
       }
 
       const balanceKey = `balance${currency}` as keyof typeof wallet;
-      const currentBalance = parseFloat(wallet[balanceKey] as string || "0");
-      
+      const currentBalance = parseFloat((wallet[balanceKey] as string) || "0");
       if (currentBalance < amount) {
         return res.status(400).json({ message: "Solde insuffisant" });
       }
 
-      const withdrawResponse = await sendavaPayService.createWithdraw({
-        amount,
-        phoneNumber,
-        operator,
-        country,
-      });
+      const fullName = req.user?.name || req.user?.firstName || "Client";
+      const nameParts = fullName.trim().split(" ");
+      const resolvedFirstName = nameParts[0] || "Client";
+      const resolvedLastName = nameParts.slice(1).join(" ") || "SolvexPay";
 
-      const reference = withdrawResponse.reference;
+      const reference = generateReference();
+      const isWave = operator.toLowerCase() === "wave";
+
+      const transferResponse = await omniPayService.transfer({
+        msisdn: phoneNumber,
+        amount,
+        reference,
+        firstName: resolvedFirstName,
+        lastName: resolvedLastName,
+        operator: isWave ? operator : undefined,
+      });
 
       const transaction = await storage.createTransaction({
         userId,
         type: "withdrawal",
         amount: amount.toString(),
         currency,
-        provider: "sendavapay",
+        provider: "omnipay",
         phoneNumber,
         reference,
-        status: withdrawResponse.status === "SUCCESS" ? "completed" : "pending",
+        status: "pending",
         description: `Retrait vers ${phoneNumber}`,
       });
 
@@ -236,7 +252,7 @@ export async function registerRoutes(
 
       res.json({
         ...transaction,
-        sendavaReference: reference,
+        omnipayId: transferResponse.id,
       });
     } catch (error: any) {
       console.error("Error creating withdrawal:", error);
@@ -251,12 +267,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Reference requise" });
       }
 
-      const result = await sendavaPayService.verifyPayment(reference);
-      const status = result.status || "PENDING";
+      const result = await omniPayService.getStatus(reference);
+      const statusStr = omnipayStatusToString(result.status ?? 0);
 
-      if (status === "SUCCESS") {
-        const transaction = await storage.getTransactionByReference(reference);
-        if (transaction && transaction.status === "pending") {
+      const transaction = await storage.getTransactionByReference(reference);
+      if (transaction && transaction.status === "pending") {
+        if (statusStr === "completed") {
           await storage.updateTransactionStatus(transaction.id, "completed");
           if (transaction.type === "deposit") {
             await storage.updateWalletBalance(
@@ -265,10 +281,7 @@ export async function registerRoutes(
               parseFloat(transaction.amount)
             );
           }
-        }
-      } else if (status === "FAILED" || status === "CANCELLED") {
-        const transaction = await storage.getTransactionByReference(reference);
-        if (transaction && transaction.status === "pending") {
+        } else if (statusStr === "failed") {
           await storage.updateTransactionStatus(transaction.id, "failed");
           if (transaction.type === "withdrawal") {
             await storage.updateWalletBalance(
@@ -280,7 +293,7 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ success: result.success, status });
+      res.json({ success: result.success, status: statusStr, omnipayStatus: result.status });
     } catch (error: any) {
       console.error("Verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -294,12 +307,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Reference requise" });
       }
 
-      const result = await sendavaPayService.verifyPayment(reference);
-      const status = result.status || "PENDING";
+      const result = await omniPayService.getStatus(reference);
+      const statusStr = omnipayStatusToString(result.status ?? 0);
 
-      if (status === "SUCCESS") {
-        const transaction = await storage.getTransactionByReference(reference);
-        if (transaction && transaction.status === "pending") {
+      const transaction = await storage.getTransactionByReference(reference);
+      if (transaction && transaction.status === "pending") {
+        if (statusStr === "completed") {
           await storage.updateTransactionStatus(transaction.id, "completed");
           if (transaction.type === "deposit") {
             await storage.updateWalletBalance(
@@ -308,15 +321,12 @@ export async function registerRoutes(
               parseFloat(transaction.amount)
             );
           }
-        }
-      } else if (status === "FAILED" || status === "CANCELLED") {
-        const transaction = await storage.getTransactionByReference(reference);
-        if (transaction && transaction.status === "pending") {
+        } else if (statusStr === "failed") {
           await storage.updateTransactionStatus(transaction.id, "failed");
         }
       }
 
-      res.json({ success: result.success, status });
+      res.json({ success: result.success, status: statusStr });
     } catch (error: any) {
       console.error("Public verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -441,26 +451,32 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Service de paiement non configure" });
       }
 
-      const callbackUrl = `https://solvexpay.site/pay/${slug}?status=callback`;
+      const reference = generateReference();
+      const fullName = customerName || "Client";
+      const nameParts = fullName.trim().split(" ");
+      const resolvedFirstName = nameParts[0] || "Client";
+      const resolvedLastName = nameParts.slice(1).join(" ") || "SolvexPay";
+      const isWave = operator.toLowerCase() === "wave";
+      const returnUrl = isWave
+        ? `https://solvexpay.site/pay/${slug}?status=callback&reference=${reference}`
+        : undefined;
 
-      const paymentResponse = await sendavaPayService.createPayment({
+      const depositResponse = await omniPayService.deposit({
+        msisdn: phoneNumber,
         amount: parseFloat(paymentLink.amount),
-        phoneNumber,
-        operator,
-        country,
-        customerName: customerName || "",
-        description: paymentLink.description || paymentLink.name,
-        callbackUrl,
+        reference,
+        firstName: resolvedFirstName,
+        lastName: resolvedLastName,
+        operator: isWave || operator.toLowerCase() === "mixx" ? operator : undefined,
+        returnUrl,
       });
-
-      const reference = paymentResponse.reference;
 
       const transaction = await storage.createTransaction({
         userId: paymentLink.userId,
         type: "deposit",
         amount: paymentLink.amount,
         currency: paymentLink.currency,
-        provider: "sendavapay",
+        provider: "omnipay",
         phoneNumber,
         reference,
         status: "pending",
@@ -471,8 +487,8 @@ export async function registerRoutes(
 
       res.json({
         ...transaction,
-        sendavaReference: reference,
-        sendavaStatus: paymentResponse.status,
+        omnipayId: depositResponse.id,
+        paymentUrl: depositResponse.payment_url,
       });
     } catch (error: any) {
       console.error("Error processing payment:", error);
@@ -557,81 +573,76 @@ export async function registerRoutes(
     res.json({ imageUrl });
   });
 
-  app.post("/api/webhooks/sendavapay", async (req, res) => {
+  app.post("/api/webhooks/omnipay", async (req, res) => {
     try {
-      const signature = req.headers["x-sendavapay-signature"] as string;
-      const event = req.headers["x-sendavapay-event"] as string;
+      const payload = req.body as OmniPayCallbackPayload;
+      console.log("OmniPay callback received:", payload);
 
-      const webhookSecret = process.env.SENDAVAPAY_API_SECRET || "";
-
-      if (signature && webhookSecret) {
-        const isValid = verifyWebhookSignature(req.body, signature, webhookSecret);
+      const callbackKey = omniPayService.getCallbackKey();
+      if (callbackKey && payload.signature) {
+        const isValid = verifyCallbackSignature(payload, callbackKey);
         if (!isValid) {
-          console.error("SendavaPay webhook: invalid signature");
+          console.error("OmniPay callback: invalid signature");
           return res.status(401).json({ error: "Invalid signature" });
         }
       }
 
-      const body = req.body;
-      console.log(`SendavaPay webhook event: ${event}`, body);
-
-      const reference = body.reference || body.data?.reference;
+      const { reference, status: statusCode, type } = payload;
       if (!reference) {
         return res.json({ received: true });
       }
 
+      const statusStr = omnipayStatusToString(Number(statusCode));
       const transaction = await storage.getTransactionByReference(reference);
 
-      if (event === "payment.completed") {
-        if (transaction && transaction.status === "pending") {
-          await storage.updateTransactionStatus(transaction.id, "completed");
-          if (transaction.type === "deposit") {
-            await storage.updateWalletBalance(
-              transaction.userId,
-              transaction.currency,
-              parseFloat(transaction.amount)
-            );
-          }
-          console.log(`Webhook: deposit ${reference} completed, wallet credited`);
+      if (!transaction || transaction.status !== "pending") {
+        return res.json({ received: true });
+      }
+
+      if (statusStr === "completed") {
+        await storage.updateTransactionStatus(transaction.id, "completed");
+        if (transaction.type === "deposit") {
+          await storage.updateWalletBalance(
+            transaction.userId,
+            transaction.currency,
+            parseFloat(transaction.amount)
+          );
+          console.log(`OmniPay callback: deposit ${reference} completed, wallet credited`);
+        } else if (transaction.type === "withdrawal") {
+          console.log(`OmniPay callback: transfer ${reference} completed`);
         }
-      } else if (event === "payment.failed") {
-        if (transaction && transaction.status === "pending") {
-          await storage.updateTransactionStatus(transaction.id, "failed");
-          if (transaction.type === "withdrawal") {
-            await storage.updateWalletBalance(
-              transaction.userId,
-              transaction.currency,
-              parseFloat(transaction.amount)
-            );
-          }
-          console.log(`Webhook: transaction ${reference} failed`);
-        }
-      } else if (event === "credit.completed") {
-        if (transaction && transaction.status === "pending") {
-          await storage.updateTransactionStatus(transaction.id, "completed");
-          console.log(`Webhook: credit ${reference} completed`);
+      } else if (statusStr === "failed") {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        if (transaction.type === "withdrawal") {
+          await storage.updateWalletBalance(
+            transaction.userId,
+            transaction.currency,
+            parseFloat(transaction.amount)
+          );
+          console.log(`OmniPay callback: transfer ${reference} failed, balance refunded`);
+        } else {
+          console.log(`OmniPay callback: payment ${reference} failed`);
         }
       }
 
       res.json({ received: true });
     } catch (error: any) {
-      console.error("Webhook processing error:", error);
-      res.status(500).json({ error: "Webhook processing failed" });
+      console.error("OmniPay callback processing error:", error);
+      res.status(500).json({ error: "Callback processing failed" });
     }
   });
 
   app.get("/api/payment/callback", async (req, res) => {
-    const { reference, status } = req.query;
-    console.log(`Payment callback: reference=${reference}, status=${status}`);
+    const { reference } = req.query;
+    console.log(`OmniPay payment redirect callback: reference=${reference}`);
 
     if (reference && typeof reference === "string") {
       try {
-        const result = await sendavaPayService.verifyPayment(reference);
-        const paymentStatus = result.status || "PENDING";
-
+        const result = await omniPayService.getStatus(reference);
+        const statusStr = omnipayStatusToString(result.status ?? 0);
         const transaction = await storage.getTransactionByReference(reference);
         if (transaction && transaction.status === "pending") {
-          if (paymentStatus === "SUCCESS") {
+          if (statusStr === "completed") {
             await storage.updateTransactionStatus(transaction.id, "completed");
             if (transaction.type === "deposit") {
               await storage.updateWalletBalance(
@@ -640,7 +651,7 @@ export async function registerRoutes(
                 parseFloat(transaction.amount)
               );
             }
-          } else if (paymentStatus === "FAILED" || paymentStatus === "CANCELLED") {
+          } else if (statusStr === "failed") {
             await storage.updateTransactionStatus(transaction.id, "failed");
           }
         }
@@ -656,17 +667,16 @@ export async function registerRoutes(
     const baseUrl = "https://solvexpay.site";
 
     res.json({
-      webhookUrl: `${baseUrl}/api/webhooks/sendavapay`,
-      callbackUrl: `${baseUrl}/api/payment/callback`,
+      callbackUrl: `${baseUrl}/api/webhooks/omnipay`,
+      returnUrl: `${baseUrl}/api/payment/callback`,
       domain: "solvexpay.site",
-      instructions: "Configurez ces URLs dans votre tableau de bord SendavaPay (sendavapay.com/dashboard) dans les parametres webhook et callback.",
+      instructions: "Configurez ces URLs dans votre tableau de bord OmniPay dans Mon Compte > URL de Callback.",
       steps: [
-        "1. Connectez-vous a votre compte SendavaPay sur sendavapay.com/dashboard",
-        "2. Allez dans Parametres > Webhooks",
-        "3. Ajoutez l'URL du webhook: https://solvexpay.site/api/webhooks/sendavapay",
-        "4. Ajoutez l'URL de callback/redirection: https://solvexpay.site/api/payment/callback",
-        "5. Copiez le secret de signature webhook et configurez-le comme SENDAVAPAY_API_SECRET",
-        "6. Activez les evenements: payment.completed, payment.failed, credit.completed"
+        "1. Connectez-vous a votre compte OmniPay sur omnipay.webtechci.com",
+        "2. Allez dans Mon Compte > URL de Callback",
+        "3. Configurez l'URL de callback: https://solvexpay.site/api/webhooks/omnipay",
+        "4. Copiez la cle de callback et configurez-la comme OMNIPAY_CALLBACK_KEY",
+        "5. Configurez votre cle API comme OMNIPAY_API_KEY"
       ]
     });
   });
