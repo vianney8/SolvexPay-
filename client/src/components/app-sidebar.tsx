@@ -36,18 +36,19 @@ import {
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
-const mainMenuItems = [
-  { title: "Transactions", url: "/transactions", icon: ArrowDownUp, color: "text-emerald-300" },
-  { title: "Transfert", url: "/transfer", icon: Send, color: "text-cyan-300" },
-  { title: "Portefeuille", url: "/wallet", icon: Wallet, color: "text-amber-300" },
-  { title: "Liens de paiement", url: "/payment-links", icon: Link2, color: "text-pink-300" },
-  { title: "Clés API", url: "/api-keys", icon: Key, color: "text-orange-300" },
-  { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck, color: "text-blue-300" },
-  { title: "Paramètres", url: "/settings", icon: Settings, color: "text-slate-300" },
+const menuItems = [
+  { title: "Accueil", url: "/dashboard", icon: LayoutDashboard, color: "text-violet-600" },
+  { title: "Transactions", url: "/transactions", icon: ArrowDownUp, color: "text-emerald-600" },
+  { title: "Transfert", url: "/transfer", icon: Send, color: "text-cyan-600" },
+  { title: "Portefeuille", url: "/wallet", icon: Wallet, color: "text-amber-600" },
+  { title: "Liens de paiement", url: "/payment-links", icon: Link2, color: "text-pink-600" },
+  { title: "Clés API", url: "/api-keys", icon: Key, color: "text-orange-600" },
+  { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck, color: "text-blue-600" },
+  { title: "Paramètres", url: "/settings", icon: Settings, color: "text-slate-600" },
 ];
 
 const adminMenuItems = [
-  { title: "Administration", url: "/admin", icon: Shield, color: "text-red-400" },
+  { title: "Administration", url: "/admin", icon: Shield, color: "text-red-600" },
 ];
 
 export function AppSidebar() {
@@ -66,68 +67,51 @@ export function AppSidebar() {
     return user?.email || "Utilisateur";
   };
 
-  const isDashboard = location === "/dashboard" || location === "/";
-
   return (
-    <Sidebar className="border-r-0">
-      <div className="flex flex-col h-full" style={{ background: "linear-gradient(180deg, hsl(262 60% 10%) 0%, hsl(262 55% 8%) 60%, hsl(240 40% 6%) 100%)" }}>
-        <SidebarHeader className="p-5 pb-3 flex-shrink-0">
+    <Sidebar className="border-r border-gray-200">
+      <div className="flex flex-col h-full bg-white">
+        <SidebarHeader className="p-5 pb-4 flex-shrink-0 border-b border-gray-100">
           <Link href="/dashboard">
             <div className="flex items-center gap-3 cursor-pointer group" data-testid="link-logo">
               <div className="relative">
-                <div className="absolute inset-0 rounded-xl bg-violet-500/30 blur-md group-hover:bg-violet-500/50 transition-all" />
-                <img src={solvexpayLogo} alt="SolvexPay" className="relative w-9 h-9 rounded-xl object-cover ring-2 ring-white/10" />
+                <div className="absolute inset-0 rounded-xl bg-violet-500/20 blur-md group-hover:bg-violet-500/40 transition-all" />
+                <img src={solvexpayLogo} alt="SolvexPay" className="relative w-9 h-9 rounded-xl object-cover ring-2 ring-violet-100" />
               </div>
               <div>
-                <span className="font-bold text-lg text-white tracking-tight">SolvexPay</span>
+                <span className="font-bold text-lg text-gray-900 tracking-tight">SolvexPay</span>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs text-emerald-400/80 font-medium">Système actif</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs text-emerald-600 font-medium">Système actif</span>
                 </div>
               </div>
             </div>
           </Link>
         </SidebarHeader>
 
-        <div className="px-3 pb-1 flex-shrink-0">
-          <Link href="/dashboard" data-testid="link-dashboard">
-            <div className={`flex items-center gap-3 px-3 h-10 rounded-lg transition-all duration-150 cursor-pointer ${
-              isDashboard
-                ? "bg-white/12 text-white shadow-lg"
-                : "text-white/60 hover:text-white hover:bg-white/7"
-            }`}>
-              <LayoutDashboard className={`w-4 h-4 flex-shrink-0 transition-colors ${isDashboard ? "text-white" : "text-violet-300"}`} />
-              <span className="text-sm font-semibold">Accueil</span>
-              {isDashboard && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-400" />}
-            </div>
-          </Link>
-          <div className="my-2 h-px bg-white/8 mx-2" />
-        </div>
-
-        <SidebarContent className="flex-1 px-3 pb-2 overflow-y-auto">
+        <SidebarContent className="flex-1 px-3 py-3 overflow-y-auto">
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-semibold text-white/30 uppercase tracking-widest px-2 mb-1">
+            <SidebarGroupLabel className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-2 mb-1">
               Navigation
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="space-y-0.5">
-                {mainMenuItems.map((item) => {
-                  const isActive = location === item.url;
+                {menuItems.map((item) => {
+                  const isActive = location === item.url || (item.url === "/dashboard" && location === "/");
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         asChild
                         isActive={isActive}
-                        className={`h-9 rounded-lg transition-all duration-150 group/item ${
+                        className={`h-10 rounded-xl transition-all duration-150 ${
                           isActive
-                            ? "bg-white/12 text-white shadow-lg"
-                            : "text-white/60 hover:text-white hover:bg-white/7"
+                            ? "bg-violet-50 text-violet-700 shadow-sm"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                         }`}
                       >
                         <Link href={item.url} data-testid={`link-${item.url.replace("/", "")}`} className="flex items-center gap-3 px-3">
-                          <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-white" : item.color} transition-colors`} />
-                          <span className="text-sm font-medium">{item.title}</span>
-                          {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-400" />}
+                          <item.icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? "text-violet-600" : item.color}`} />
+                          <span className={`text-sm font-medium ${isActive ? "text-violet-700 font-semibold" : ""}`}>{item.title}</span>
+                          {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-500" />}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -139,7 +123,7 @@ export function AppSidebar() {
 
           {(user as any)?.isAdmin && (
             <SidebarGroup className="mt-4">
-              <SidebarGroupLabel className="text-xs font-semibold text-red-400/50 uppercase tracking-widest px-2 mb-1">
+              <SidebarGroupLabel className="text-xs font-semibold text-red-400 uppercase tracking-widest px-2 mb-1">
                 Admin
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -151,7 +135,7 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           asChild
                           isActive={isActive}
-                          className={`h-9 rounded-lg ${isActive ? "bg-red-500/15 text-red-300" : "text-red-400/70 hover:text-red-300 hover:bg-red-500/10"}`}
+                          className={`h-10 rounded-xl ${isActive ? "bg-red-50 text-red-700" : "text-red-500 hover:text-red-700 hover:bg-red-50"}`}
                         >
                           <Link href={item.url} data-testid={`link-${item.url.replace("/", "")}`} className="flex items-center gap-3 px-3">
                             <item.icon className="w-4 h-4 flex-shrink-0" />
@@ -167,25 +151,25 @@ export function AppSidebar() {
           )}
         </SidebarContent>
 
-        <SidebarFooter className="p-3 border-t border-white/8 flex-shrink-0">
+        <SidebarFooter className="p-3 border-t border-gray-100 flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 px-3 h-14 rounded-xl bg-white/6 hover:bg-white/10 border border-white/8 text-white group"
+                className="w-full justify-start gap-3 px-3 h-14 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-900 group"
                 data-testid="button-user-menu"
               >
-                <Avatar className="h-8 w-8 ring-2 ring-violet-500/40">
+                <Avatar className="h-8 w-8 ring-2 ring-violet-200">
                   <AvatarImage src={user?.profileImageUrl || undefined} />
                   <AvatarFallback className="text-xs font-bold" style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(160 84% 44%))", color: "white" }}>
                     {getInitials()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 text-left min-w-0">
-                  <p className="text-sm font-semibold text-white truncate" data-testid="text-user-name">{getDisplayName()}</p>
-                  <p className="text-xs text-white/40 truncate">{user?.email}</p>
+                  <p className="text-sm font-semibold text-gray-900 truncate" data-testid="text-user-name">{getDisplayName()}</p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                 </div>
-                <ChevronUp className="h-4 w-4 text-white/30 group-hover:text-white/60 transition-colors" />
+                <ChevronUp className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 shadow-xl">
