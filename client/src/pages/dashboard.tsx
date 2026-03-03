@@ -19,6 +19,7 @@ import {
   Wallet,
   Send,
   Plus,
+  ShieldCheck,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -64,14 +65,14 @@ export default function DashboardPage() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground font-medium">Bonjour,</p>
-            <h2 className="text-4xl font-black tracking-tight text-foreground leading-none mt-1" data-testid="text-greeting">
+            <h2 className="text-4xl font-black tracking-tight text-foreground leading-none mt-1 uppercase" data-testid="text-greeting">
               {firstName}
             </h2>
           </div>
-          <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-semibold mb-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse inline-block" />
-            Compte actif
-          </Badge>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-600 text-white text-xs font-bold shadow-md shadow-violet-500/30 mb-1">
+            <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
+            Certifié
+          </div>
         </div>
 
         <div

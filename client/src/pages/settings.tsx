@@ -246,7 +246,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="profile" className="space-y-5">
-          <TabsList className="h-11 w-full grid grid-cols-3 bg-muted/50 rounded-xl border border-border/60 p-1">
+          <TabsList className="h-11 w-full grid grid-cols-2 bg-muted/50 rounded-xl border border-border/60 p-1">
             <TabsTrigger value="profile" className="rounded-lg font-semibold text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground">
               <User className="h-3.5 w-3.5 mr-1.5" />
               Profil
@@ -254,10 +254,6 @@ export default function SettingsPage() {
             <TabsTrigger value="security" className="rounded-lg font-semibold text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground">
               <Shield className="h-3.5 w-3.5 mr-1.5" />
               Sécurité
-            </TabsTrigger>
-            <TabsTrigger value="integrations" className="rounded-lg font-semibold text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground">
-              <Webhook className="h-3.5 w-3.5 mr-1.5" />
-              Intégrations
             </TabsTrigger>
           </TabsList>
 
@@ -412,9 +408,6 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="integrations">
-            <WebhookCard />
-          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>

@@ -28,7 +28,6 @@ import {
   ShieldCheck,
   Send,
   Shield,
-  Wallet,
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
@@ -36,7 +35,6 @@ const menuItems = [
   { title: "Accueil", url: "/dashboard", icon: LayoutDashboard, bg: "bg-violet-100", iconColor: "text-violet-600" },
   { title: "Transactions", url: "/transactions", icon: ArrowDownUp, bg: "bg-emerald-100", iconColor: "text-emerald-600" },
   { title: "Transfert", url: "/transfer", icon: Send, bg: "bg-cyan-100", iconColor: "text-cyan-600" },
-  { title: "Portefeuille", url: "/wallet", icon: Wallet, bg: "bg-amber-100", iconColor: "text-amber-600" },
   { title: "Liens de paiement", url: "/payment-links", icon: Link2, bg: "bg-pink-100", iconColor: "text-pink-600" },
   { title: "Clés API", url: "/api-keys", icon: Key, bg: "bg-orange-100", iconColor: "text-orange-600" },
   { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck, bg: "bg-blue-100", iconColor: "text-blue-600" },

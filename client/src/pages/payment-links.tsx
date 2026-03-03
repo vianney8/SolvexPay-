@@ -114,7 +114,7 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <DashboardLayout title="" breadcrumbs={[{ label: "Liens de paiement", href: "/payment-links" }, { label: editLink ? "Modifier" : "Nouveau lien" }]}>
+    <DashboardLayout title="" breadcrumbs={[{ label: "Liens de paiement" }]}>
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="h-9 w-9 rounded-xl border border-border/70 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors" data-testid="button-back-links">

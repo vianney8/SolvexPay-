@@ -30,7 +30,6 @@ const COUNTRIES = [
   { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"] },
 ];
 
-const QUICK_AMOUNTS = [5000, 10000, 25000, 50000, 100000];
 
 export default function DepositPage() {
   const { toast } = useToast();
@@ -296,23 +295,6 @@ export default function DepositPage() {
                   className="text-xl font-bold h-14 border-border/70 text-center tracking-wide"
                   data-testid="input-deposit-amount"
                 />
-                <div className="flex flex-wrap gap-2">
-                  {QUICK_AMOUNTS.map((qa) => (
-                    <button
-                      key={qa}
-                      type="button"
-                      onClick={() => setAmount(String(qa))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                        amount === String(qa)
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border/60 text-muted-foreground hover:border-border hover:bg-muted/30"
-                      }`}
-                      data-testid={`button-quick-amount-${qa}`}
-                    >
-                      {formatCurrency(qa)} XOF
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div className="space-y-2">
