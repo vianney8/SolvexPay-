@@ -20,6 +20,10 @@ import {
   Send,
   Plus,
   ShieldCheck,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Zap,
+  QrCode,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -35,10 +39,10 @@ function formatDate(date: string | Date) {
 }
 
 const quickActions = [
-  { label: "Dépôt", icon: Plus, href: "/deposit" },
-  { label: "Retrait", icon: ArrowUpRight, href: "/withdraw" },
-  { label: "Envoi", icon: Send, href: "/transfer" },
-  { label: "Liens", icon: Link2, href: "/payment-links" },
+  { label: "Dépôt", icon: ArrowDownToLine, href: "/deposit", gradient: "from-emerald-400/30 to-emerald-300/20" },
+  { label: "Retrait", icon: ArrowUpFromLine, href: "/withdraw", gradient: "from-orange-400/30 to-orange-300/20" },
+  { label: "Envoi", icon: Zap, href: "/transfer", gradient: "from-cyan-400/30 to-cyan-300/20" },
+  { label: "Liens", icon: QrCode, href: "/payment-links", gradient: "from-pink-400/30 to-pink-300/20" },
 ];
 
 export default function DashboardPage() {
@@ -69,10 +73,17 @@ export default function DashboardPage() {
               {firstName}
             </h2>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-600 text-white text-xs font-bold shadow-md shadow-violet-500/30 mb-1">
-            <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
-            Certifié
-          </div>
+          {(user as any)?.kycStatus === "verified" ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-500/30 mb-1" data-testid="badge-kyc-status">
+              <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
+              Vérifié
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-400 text-white text-xs font-bold shadow-md shadow-slate-400/30 mb-1" data-testid="badge-kyc-status">
+              <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
+              Non vérifié
+            </div>
+          )}
         </div>
 
         <div
@@ -116,13 +127,13 @@ export default function DashboardPage() {
               {quickActions.map((action) => (
                 <Link key={action.label} href={action.href}>
                   <button
-                    className="w-full flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl bg-white/15 hover:bg-white/25 transition-all duration-200 active:scale-95"
+                    className="w-full flex flex-col items-center gap-2 py-3.5 px-1 rounded-2xl bg-white/10 hover:bg-white/20 transition-all duration-200 active:scale-95 border border-white/15"
                     data-testid={`button-${action.label.toLowerCase()}`}
                   >
-                    <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center">
-                      <action.icon className="h-4 w-4 text-white" />
+                    <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center border border-white/20`}>
+                      <action.icon className="h-5 w-5 text-white drop-shadow-sm" />
                     </div>
-                    <span className="text-[11px] font-bold text-white/95 text-center leading-none">{action.label}</span>
+                    <span className="text-[11px] font-bold text-white text-center leading-none tracking-wide">{action.label}</span>
                   </button>
                 </Link>
               ))}

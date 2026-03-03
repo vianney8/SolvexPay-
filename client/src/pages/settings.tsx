@@ -233,11 +233,23 @@ export default function SettingsPage() {
             <div className="h-14 w-14 rounded-2xl bg-white/15 flex items-center justify-center flex-shrink-0 text-2xl font-black">
               {getInitials()}
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="font-bold text-xl">{[firstName, lastName].filter(Boolean).join(" ") || "Mon compte"}</p>
               <p className="text-white/70 text-sm">{email}</p>
+              <div className="flex flex-wrap gap-3 mt-1.5">
+                {user?.id && (
+                  <span className="text-white/60 text-xs font-mono bg-white/10 px-2 py-0.5 rounded-md" data-testid="text-user-id">
+                    ID : {String(user.id).slice(0, 8).toUpperCase()}
+                  </span>
+                )}
+                {(user as any)?.createdAt && (
+                  <span className="text-white/60 text-xs bg-white/10 px-2 py-0.5 rounded-md" data-testid="text-user-created">
+                    Inscrit le {new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date((user as any).createdAt))}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex-shrink-0">
               <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
                 <Settings className="h-5 w-5 text-white" />
               </div>

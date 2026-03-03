@@ -1,99 +1,83 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { CreditCard, Smartphone, CheckCircle2, XCircle, Loader2, Phone, Globe } from "lucide-react";
+import { OperatorLogo } from "@/components/operator-logo";
+import { CheckCircle2, XCircle, Loader2, ChevronDown, Shield, ArrowLeft } from "lucide-react";
+import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 import type { PaymentLink } from "@shared/schema";
 
-function formatCurrency(amount: string | number, currency = "XOF") {
+function formatAmount(amount: string | number) {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
+  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
 }
 
 const COUNTRIES = [
-  { code: "BJ", name: "Benin", currency: "XOF", operators: ["MTN", "Moov"] },
-  { code: "BF", name: "Burkina Faso", currency: "XOF", operators: ["Moov", "Orange"] },
-  { code: "TG", name: "Togo", currency: "XOF", operators: ["TMoney", "Moov"] },
-  { code: "CM", name: "Cameroun", currency: "XAF", operators: ["MTN", "Orange"] },
-  { code: "CI", name: "Cote d'Ivoire", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"] },
-  { code: "COD", name: "RDC", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"] },
-  { code: "COG", name: "Congo Brazzaville", currency: "XAF", operators: ["Airtel", "MTN"] },
+  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"] },
+  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"] },
+  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"] },
+  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"] },
+  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"] },
+  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"] },
+  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"] },
+  { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"] },
 ];
+
+const OPERATOR_LABEL: Record<string, string> = {
+  MTN: "MTN Money", Orange: "Orange Money", Moov: "Moov Money", Wave: "Wave",
+  TMoney: "T-Money", Vodacom: "Vodacom M-Pesa", Airtel: "Airtel Money", Free: "Free Money",
+};
 
 export default function PayPage() {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
+
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [verifyStatus, setVerifyStatus] = useState<string>("PENDING");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [country, setCountry] = useState("BJ");
   const [operator, setOperator] = useState("");
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
 
-  const selectedCountry = COUNTRIES.find(c => c.code === country);
-  const availableOperators = selectedCountry?.operators || [];
+  const selectedCountry = COUNTRIES.find(c => c.code === country)!;
 
-  useEffect(() => {
-    setOperator("");
-  }, [country]);
-
-  const searchParams = new URLSearchParams(window.location.search);
-  const callbackStatus = searchParams.get("status");
+  useEffect(() => { setOperator(""); }, [country]);
 
   const { data: paymentLink, isLoading, error } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", slug],
     queryFn: async () => {
-      const response = await fetch(`/api/payment-links/public/${slug}`);
-      if (!response.ok) {
-        throw new Error("Payment link not found");
-      }
-      return response.json();
+      const res = await fetch(`/api/payment-links/public/${slug}`);
+      if (!res.ok) throw new Error("not found");
+      return res.json();
     },
   });
 
-  useEffect(() => {
-    if (callbackStatus === "callback") {
-      setPaymentStatus("processing");
-      toast({ title: "Verification en cours", description: "Nous verifions votre paiement..." });
-    }
-  }, [callbackStatus]);
-
   const payMutation = useMutation({
     mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName?: string }) => {
-      const response = await apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
-      return response.json();
+      const res = await apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
+      return res.json();
     },
     onSuccess: (data: any) => {
       setPendingReference(data.sendavaReference || data.reference);
       setPaymentStatus("processing");
-      toast({ title: "Paiement initie", description: "Un prompt USSD a ete envoye sur votre telephone. Confirmez le paiement." });
+      toast({ title: "Paiement initié", description: "Confirmez le paiement sur votre téléphone." });
     },
     onError: () => {
       setPaymentStatus("error");
-      toast({
-        title: "Erreur",
-        description: "Le paiement n'a pas pu etre initie. Veuillez reessayer.",
-        variant: "destructive",
-      });
+      toast({ title: "Erreur", description: "Le paiement n'a pas pu être initié.", variant: "destructive" });
     },
   });
 
   useEffect(() => {
-    if (!pendingReference || verifyStatus === "SUCCESS" || verifyStatus === "FAILED" || verifyStatus === "CANCELLED") return;
-
+    if (!pendingReference || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
     const interval = setInterval(async () => {
       try {
         const res = await fetch("/api/payment-links/verify-public", {
@@ -107,231 +91,264 @@ export default function PayPage() {
         }
       } catch {}
     }, 5000);
-
     return () => clearInterval(interval);
   }, [pendingReference, verifyStatus]);
 
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneNumber || !operator || !country) return;
-    setPaymentStatus("processing");
-    payMutation.mutate({
-      phoneNumber,
-      operator,
-      country,
-      customerName: customerName || undefined,
-    });
+    if (!phone || !operator || !country) return;
+    const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
+    payMutation.mutate({ phoneNumber: fullPhone, operator, country, customerName: customerName || undefined });
   };
+
+  const PageWrapper = ({ children }: { children: React.ReactNode }) => (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-2">
+          <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-xl object-cover" />
+          <span className="font-black text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+        </div>
+        <Badge variant="outline" className="text-xs font-mono border-gray-300 text-gray-500">XOF</Badge>
+      </header>
+      <div className="flex-1 flex items-start justify-center p-4 pt-6">
+        <div className="w-full max-w-md">
+          {children}
+        </div>
+      </div>
+      <footer className="text-center py-5 border-t border-gray-200 bg-white">
+        <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400">
+          <Shield className="h-3.5 w-3.5" />
+          <span>Paiement sécurisé par <a href="/" className="text-violet-600 font-semibold hover:underline">SolvexPay</a></span>
+        </div>
+      </footer>
+    </div>
+  );
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <Skeleton className="h-8 w-48 mx-auto mb-2" />
-            <Skeleton className="h-4 w-64 mx-auto" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
-        </Card>
-      </div>
+      <PageWrapper>
+        <div className="bg-white rounded-3xl shadow-lg p-6 space-y-5">
+          <Skeleton className="h-32 w-full rounded-2xl" />
+          <Skeleton className="h-6 w-40 mx-auto" />
+          <Skeleton className="h-14 w-48 mx-auto" />
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-2xl" />
+        </div>
+      </PageWrapper>
     );
   }
 
   if (error || !paymentLink) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardContent className="pt-8 pb-8">
-            <XCircle className="h-16 w-16 mx-auto mb-4 text-destructive" />
-            <h1 className="text-2xl font-bold mb-2">Lien non trouve</h1>
-            <p className="text-muted-foreground">
-              Ce lien de paiement n'existe pas ou a ete desactive.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <PageWrapper>
+        <div className="bg-white rounded-3xl shadow-lg p-10 text-center space-y-4">
+          <div className="h-16 w-16 rounded-2xl bg-red-100 flex items-center justify-center mx-auto">
+            <XCircle className="h-8 w-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold">Lien non trouvé</h2>
+          <p className="text-sm text-gray-500">Ce lien de paiement n'existe pas ou a été désactivé.</p>
+        </div>
+      </PageWrapper>
     );
   }
 
   if (!paymentLink.isActive) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardContent className="pt-8 pb-8">
-            <XCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h1 className="text-2xl font-bold mb-2">Lien desactive</h1>
-            <p className="text-muted-foreground">
-              Ce lien de paiement a ete desactive par le marchand.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <PageWrapper>
+        <div className="bg-white rounded-3xl shadow-lg p-10 text-center space-y-4">
+          <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto">
+            <XCircle className="h-8 w-8 text-gray-400" />
+          </div>
+          <h2 className="text-xl font-bold">Lien désactivé</h2>
+          <p className="text-sm text-gray-500">Ce lien de paiement a été désactivé par le marchand.</p>
+        </div>
+      </PageWrapper>
     );
   }
 
   if (paymentStatus === "processing" || paymentStatus === "success" || paymentStatus === "error") {
-    const statusConfig: Record<string, { icon: any; color: string; bg: string; label: string; sublabel: string; spin: boolean }> = {
-      PENDING: { icon: Loader2, color: "text-yellow-500", bg: "bg-yellow-500/10", label: "En attente...", sublabel: "Un prompt USSD a ete envoye. Confirmez le paiement sur votre telephone.", spin: true },
-      PROCESSING: { icon: Loader2, color: "text-yellow-500", bg: "bg-yellow-500/10", label: "Traitement en cours...", sublabel: "Votre paiement est en cours de traitement.", spin: true },
-      SUCCESS: { icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10", label: "Paiement confirme !", sublabel: "Votre paiement a ete effectue avec succes. Merci !", spin: false },
-      FAILED: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", label: "Paiement echoue", sublabel: "Le paiement n'a pas abouti. Veuillez reessayer.", spin: false },
-      CANCELLED: { icon: XCircle, color: "text-gray-500", bg: "bg-gray-500/10", label: "Paiement annule", sublabel: "Le paiement a ete annule.", spin: false },
+    const statusConfig: Record<string, { icon: any; color: string; bg: string; label: string; sub: string; spin: boolean }> = {
+      PENDING: { icon: Loader2, color: "text-amber-500", bg: "bg-amber-50", label: "En attente de confirmation", sub: "Un prompt USSD a été envoyé sur votre téléphone. Confirmez le paiement.", spin: true },
+      PROCESSING: { icon: Loader2, color: "text-blue-500", bg: "bg-blue-50", label: "Traitement en cours...", sub: "Votre paiement est en cours de traitement.", spin: true },
+      SUCCESS: { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-50", label: "Paiement confirmé !", sub: "Votre paiement a été effectué avec succès. Merci !", spin: false },
+      FAILED: { icon: XCircle, color: "text-red-500", bg: "bg-red-50", label: "Paiement échoué", sub: "Le paiement n'a pas abouti. Veuillez réessayer.", spin: false },
+      CANCELLED: { icon: XCircle, color: "text-gray-400", bg: "bg-gray-50", label: "Paiement annulé", sub: "Le paiement a été annulé.", spin: false },
     };
-
-    const config = statusConfig[verifyStatus] || statusConfig.PENDING;
-    const StatusIcon = config.icon;
-
+    const cfg = statusConfig[verifyStatus] || statusConfig.PENDING;
+    const StatusIcon = cfg.icon;
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardContent className="pt-8 pb-8 space-y-4">
-            <div className={`h-16 w-16 rounded-full ${config.bg} flex items-center justify-center mx-auto`}>
-              <StatusIcon className={`h-8 w-8 ${config.color} ${config.spin ? "animate-spin" : ""}`} />
-            </div>
-            <h1 className="text-2xl font-bold" data-testid="text-payment-status">{config.label}</h1>
-            <p className="text-muted-foreground text-sm">{config.sublabel}</p>
-            <p className="font-semibold text-lg">
-              {formatCurrency(paymentLink.amount, paymentLink.currency)}
-            </p>
-            {pendingReference && (
-              <p className="text-xs text-muted-foreground">
-                Reference: <span className="font-mono">{pendingReference}</span>
-              </p>
-            )}
-            {(verifyStatus === "FAILED" || verifyStatus === "CANCELLED") && (
-              <Button
-                className="w-full"
-                onClick={() => { setPaymentStatus("idle"); setPendingReference(null); setVerifyStatus("PENDING"); }}
-                data-testid="button-retry-payment"
-              >
-                Reessayer
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <PageWrapper>
+        <div className="bg-white rounded-3xl shadow-lg p-8 text-center space-y-5">
+          <div className={`h-20 w-20 rounded-3xl ${cfg.bg} flex items-center justify-center mx-auto`}>
+            <StatusIcon className={`h-10 w-10 ${cfg.color} ${cfg.spin ? "animate-spin" : ""}`} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold" data-testid="text-payment-status">{cfg.label}</h2>
+            <p className="text-sm text-gray-500 mt-1">{cfg.sub}</p>
+          </div>
+          <div className="bg-gray-50 rounded-2xl p-4">
+            <p className="text-sm text-gray-500">Montant</p>
+            <p className="text-3xl font-black text-gray-900">{formatAmount(paymentLink.amount)} <span className="text-lg font-bold text-gray-400">{paymentLink.currency}</span></p>
+            <p className="text-sm font-medium text-gray-700 mt-1">{paymentLink.name}</p>
+          </div>
+          {pendingReference && <p className="text-xs text-gray-400 font-mono">Réf : {pendingReference}</p>}
+          {["FAILED", "CANCELLED"].includes(verifyStatus) && (
+            <Button
+              className="w-full h-12 font-bold rounded-2xl"
+              onClick={() => { setPaymentStatus("idle"); setPendingReference(null); setVerifyStatus("PENDING"); }}
+              data-testid="button-retry-payment"
+            >
+              Réessayer
+            </Button>
+          )}
+        </div>
+      </PageWrapper>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          {paymentLink.imageUrl && (
-            <div className="w-full h-32 mb-4 rounded-lg overflow-hidden">
-              <img src={paymentLink.imageUrl} alt={paymentLink.name} className="w-full h-full object-cover" />
-            </div>
-          )}
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-            <CreditCard className="h-6 w-6 text-primary" />
+    <PageWrapper>
+      <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
+        {paymentLink.imageUrl && (
+          <div className="w-full h-44 overflow-hidden">
+            <img src={paymentLink.imageUrl} alt={paymentLink.name} className="w-full h-full object-cover" data-testid="img-payment-product" />
           </div>
-          <CardTitle className="text-2xl" data-testid="text-payment-name">{paymentLink.name}</CardTitle>
-          {paymentLink.description && (
-            <CardDescription>{paymentLink.description}</CardDescription>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="text-center mb-6">
-            <p className="text-sm text-muted-foreground">Montant a payer</p>
-            <p className="text-4xl font-bold text-primary" data-testid="text-payment-amount">
-              {formatCurrency(paymentLink.amount, paymentLink.currency)}
+        )}
+
+        <div className="p-6 space-y-5">
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+            data-testid="button-pay-back"
+          >
+            <ArrowLeft className="h-4 w-4" /> Retour
+          </button>
+
+          <div className="text-center py-2">
+            {paymentLink.description && <p className="text-sm text-gray-500 mb-2">{paymentLink.description}</p>}
+            <p className="text-sm text-gray-500 font-medium">Total à payer</p>
+            <p className="text-5xl font-black text-blue-600 mt-1 tracking-tight" data-testid="text-payment-amount">
+              {formatAmount(paymentLink.amount)} <span className="text-2xl font-bold text-blue-400">{paymentLink.currency}</span>
             </p>
+            <p className="text-sm font-semibold text-gray-700 mt-1" data-testid="text-payment-name">{paymentLink.name}</p>
           </div>
 
           <form onSubmit={handlePay} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="customerName">Votre nom (optionnel)</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Pays</Label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowCountryPicker(!showCountryPicker)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-left"
+                  data-testid="button-pay-country"
+                >
+                  <span className="text-xl">{selectedCountry.flag}</span>
+                  <span className="flex-1 font-semibold text-sm text-gray-800">{selectedCountry.name}</span>
+                  <span className="text-xs text-gray-400 font-mono">({selectedCountry.currency})</span>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showCountryPicker ? "rotate-180" : ""}`} />
+                </button>
+                {showCountryPicker && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                    {COUNTRIES.map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => { setCountry(c.code); setShowCountryPicker(false); }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${country === c.code ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700"}`}
+                        data-testid={`option-pay-country-${c.code}`}
+                      >
+                        <span className="text-lg">{c.flag}</span>
+                        <span className="flex-1 text-left">{c.name}</span>
+                        <span className="text-xs text-gray-400 font-mono">{c.prefix}</span>
+                        {country === c.code && <CheckCircle2 className="h-4 w-4 text-blue-600 flex-shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Opérateur Mobile Money</Label>
+              <div className={`grid gap-2 ${selectedCountry.operators.length <= 2 ? "grid-cols-2" : selectedCountry.operators.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
+                {selectedCountry.operators.map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    onClick={() => setOperator(op)}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
+                      operator === op
+                        ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-100"
+                        : "border-gray-200 hover:border-gray-300 bg-white"
+                    }`}
+                    data-testid={`option-pay-operator-${op}`}
+                  >
+                    <div className={`rounded-2xl overflow-hidden transition-transform ${operator === op ? "scale-110" : ""}`}>
+                      <OperatorLogo operator={op} size={52} />
+                    </div>
+                    <span className={`text-[11px] font-bold text-center leading-tight ${operator === op ? "text-blue-700" : "text-gray-500"}`}>
+                      {OPERATOR_LABEL[op] || op}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                Numéro de téléphone {operator ? OPERATOR_LABEL[operator] || operator : ""}
+              </Label>
+              <div className="flex gap-0 rounded-xl border border-gray-200 overflow-hidden focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                <div className="flex items-center gap-2 px-3 bg-gray-50 border-r border-gray-200 flex-shrink-0">
+                  <span className="text-base">{selectedCountry.flag}</span>
+                  <span className="text-sm font-semibold text-gray-500">{selectedCountry.prefix}</span>
+                </div>
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/[^0-9\s]/g, ""))}
+                  type="tel"
+                  placeholder="90123456"
+                  required
+                  className="flex-1 h-12 border-0 rounded-none focus-visible:ring-0 bg-white"
+                  data-testid="input-pay-phone"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Votre nom (optionnel)</Label>
               <Input
-                id="customerName"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                type="text"
                 placeholder="Jean Dupont"
+                className="h-11 border-gray-200 rounded-xl"
                 data-testid="input-pay-name"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1">
-                  <Globe className="h-3 w-3" />
-                  Pays
-                </Label>
-                <Select value={country} onValueChange={setCountry}>
-                  <SelectTrigger data-testid="select-pay-country">
-                    <SelectValue placeholder="Pays" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COUNTRIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code} data-testid={`option-pay-country-${c.code}`}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Operateur</Label>
-                <Select value={operator} onValueChange={setOperator}>
-                  <SelectTrigger data-testid="select-pay-operator">
-                    <SelectValue placeholder="Operateur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableOperators.map((op) => (
-                      <SelectItem key={op} value={op} data-testid={`option-pay-operator-${op}`}>
-                        {op}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber" className="flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                Numero de telephone
-              </Label>
-              <Input
-                id="phoneNumber"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                type="tel"
-                placeholder="+22890123456"
-                required
-                data-testid="input-pay-phone"
               />
             </div>
 
             <Button
               type="submit"
-              className="w-full gap-2"
-              disabled={payMutation.isPending || !phoneNumber || !operator || !country}
+              className="w-full h-14 text-base font-black rounded-2xl shadow-lg gap-2"
+              style={{ background: !phone || !operator ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
+              disabled={payMutation.isPending || !phone || !operator || !country}
               data-testid="button-confirm-pay"
             >
               {payMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Creation du paiement...
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
               ) : (
-                <>
-                  <Smartphone className="h-4 w-4" />
-                  Payer {formatCurrency(paymentLink.amount, paymentLink.currency)}
-                </>
+                `Payer ${formatAmount(paymentLink.amount)} ${paymentLink.currency}`
               )}
             </Button>
-          </form>
 
-          <p className="text-center text-xs text-muted-foreground mt-6">
-            Paiement securise par SolvexPay via SendavaPay Mobile Money
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+            <p className="text-center text-xs text-gray-400 leading-relaxed">
+              En continuant, vous acceptez les conditions générales de SolvexPay.
+            </p>
+          </form>
+        </div>
+      </div>
+    </PageWrapper>
   );
 }

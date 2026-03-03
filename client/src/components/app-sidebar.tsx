@@ -75,8 +75,17 @@ export function AppSidebar() {
               <div>
                 <p className="font-bold text-base text-gray-900 leading-none">SolvexPay</p>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                  <span className="text-xs text-emerald-600 font-medium">Actif</span>
+                  {(user as any)?.kycStatus === "verified" ? (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                      <span className="text-xs text-emerald-600 font-medium">Vérifié</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+                      <span className="text-xs text-slate-400 font-medium">Non vérifié</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
