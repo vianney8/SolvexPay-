@@ -54,13 +54,14 @@ const countries = [
   { code: "EG", name: "Egypte", prefix: "+20", currency: "XOF" },
 ];
 
-const providers = [
+const operators = [
   { id: "mtn", name: "MTN Mobile Money" },
   { id: "orange", name: "Orange Money" },
   { id: "wave", name: "Wave" },
   { id: "moov", name: "Moov Money" },
   { id: "free", name: "Free Money" },
   { id: "airtel", name: "Airtel Money" },
+  { id: "tmoney", name: "T-Money" },
 ];
 
 function formatCurrency(amount: number, currency = "XOF") {
@@ -73,7 +74,7 @@ function formatCurrency(amount: number, currency = "XOF") {
 export default function TransferPage() {
   const { toast } = useToast();
   const [destinationCountry, setDestinationCountry] = useState("BJ");
-  const [provider, setProvider] = useState("mtn");
+  const [operator, setOperator] = useState("mtn");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [amount, setAmount] = useState("");
@@ -84,15 +85,22 @@ export default function TransferPage() {
   });
 
   const transferMutation = useMutation({
-    mutationFn: async (data: { amount: number; currency: string; provider: string; phoneNumber: string }) => {
-      return apiRequest("POST", "/api/transactions/withdraw", data);
+    mutationFn: async (data: {
+      amount: number;
+      phoneNumber: string;
+      operator: string;
+      country: string;
+      firstName: string;
+      lastName: string;
+    }) => {
+      return apiRequest("POST", "/api/transactions/transfer", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       toast({
         title: "Transfert initie",
-        description: "Votre transfert a ete envoye avec succes.",
+        description: "Votre transfert a ete envoye avec succes vers le portefeuille du destinataire.",
       });
       setStep("form");
       setAmount("");
@@ -132,11 +140,17 @@ export default function TransferPage() {
   };
 
   const handleConfirm = () => {
+    const nameParts = recipientName.trim().split(" ");
+    const firstName = nameParts[0] || recipientName;
+    const lastName = nameParts.slice(1).join(" ") || ".";
+
     transferMutation.mutate({
       amount: parsedAmount,
-      currency: selectedCountry?.currency || "XOF",
-      provider,
-      phoneNumber: `${selectedCountry?.prefix}${phoneNumber}`,
+      phoneNumber: `${selectedCountry?.prefix}${phoneNumber}`.replace("+", ""),
+      operator,
+      country: destinationCountry,
+      firstName,
+      lastName,
     });
   };
 
@@ -187,12 +201,12 @@ export default function TransferPage() {
 
                 <div className="space-y-2">
                   <Label>Operateur Mobile Money</Label>
-                  <Select value={provider} onValueChange={setProvider}>
-                    <SelectTrigger data-testid="select-transfer-provider">
+                  <Select value={operator} onValueChange={setOperator}>
+                    <SelectTrigger data-testid="select-transfer-operator">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {providers.map((p) => (
+                      {operators.map((p) => (
                         <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -318,7 +332,7 @@ export default function TransferPage() {
                   </div>
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <span className="text-sm text-muted-foreground">Operateur</span>
-                    <span className="font-medium">{providers.find(p => p.id === provider)?.name}</span>
+                    <span className="font-medium">{operators.find(p => p.id === operator)?.name}</span>
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between gap-4 flex-wrap">

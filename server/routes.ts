@@ -55,6 +55,15 @@ const withdrawSchema = z.object({
   country: z.string().min(2, "Pays requis"),
 });
 
+const transferSchema = z.object({
+  amount: z.number().min(500, "Montant minimum: 500"),
+  phoneNumber: z.string().min(8, "Numero de telephone invalide"),
+  operator: z.string().min(1, "Operateur requis"),
+  country: z.string().min(2, "Pays requis"),
+  firstName: z.string().min(1, "Prenom du destinataire requis"),
+  lastName: z.string().min(1, "Nom du destinataire requis"),
+});
+
 const createPaymentLinkSchema = z.object({
   name: z.string().min(1, "Nom requis"),
   amount: z.number().min(100, "Montant minimum: 100"),
@@ -257,6 +266,68 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Error creating withdrawal:", error);
       res.status(500).json({ message: error.message || "Echec du retrait" });
+    }
+  });
+
+  app.post("/api/transactions/transfer", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+
+      const validation = transferSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
+      }
+
+      const { amount, phoneNumber, operator, country, firstName, lastName } = validation.data;
+      const currency = "XOF";
+
+      if (!isApiKeyConfigured()) {
+        return res.status(503).json({ message: "Service de paiement non configure" });
+      }
+
+      const wallet = await storage.getWallet(userId);
+      if (!wallet) {
+        return res.status(400).json({ message: "Aucun portefeuille trouve" });
+      }
+
+      const currentBalance = parseFloat((wallet.balanceXOF as string) || "0");
+      if (currentBalance < amount) {
+        return res.status(400).json({ message: "Solde insuffisant" });
+      }
+
+      const reference = generateReference();
+      const isWave = operator.toLowerCase() === "wave";
+
+      const transferResponse = await omniPayService.transfer({
+        msisdn: phoneNumber,
+        amount,
+        reference,
+        firstName,
+        lastName,
+        operator: isWave ? operator : undefined,
+      });
+
+      const transaction = await storage.createTransaction({
+        userId,
+        type: "transfer",
+        amount: amount.toString(),
+        currency,
+        provider: "omnipay",
+        phoneNumber,
+        reference,
+        status: "pending",
+        description: `Transfert vers ${firstName} ${lastName} (${phoneNumber})`,
+      });
+
+      await storage.updateWalletBalance(userId, currency, -amount);
+
+      res.json({
+        ...transaction,
+        omnipayId: transferResponse.id,
+      });
+    } catch (error: any) {
+      console.error("Error creating transfer:", error);
+      res.status(500).json({ message: error.message || "Echec du transfert" });
     }
   });
 
