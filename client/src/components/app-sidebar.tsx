@@ -2,7 +2,6 @@ import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -37,8 +36,7 @@ import {
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
-const menuItems = [
-  { title: "Tableau de bord", url: "/dashboard", icon: LayoutDashboard, color: "text-violet-300" },
+const mainMenuItems = [
   { title: "Transactions", url: "/transactions", icon: ArrowDownUp, color: "text-emerald-300" },
   { title: "Transfert", url: "/transfer", icon: Send, color: "text-cyan-300" },
   { title: "Portefeuille", url: "/wallet", icon: Wallet, color: "text-amber-300" },
@@ -68,10 +66,12 @@ export function AppSidebar() {
     return user?.email || "Utilisateur";
   };
 
+  const isDashboard = location === "/dashboard" || location === "/";
+
   return (
     <Sidebar className="border-r-0">
       <div className="flex flex-col h-full" style={{ background: "linear-gradient(180deg, hsl(262 60% 10%) 0%, hsl(262 55% 8%) 60%, hsl(240 40% 6%) 100%)" }}>
-        <SidebarHeader className="p-5 pb-3">
+        <SidebarHeader className="p-5 pb-3 flex-shrink-0">
           <Link href="/dashboard">
             <div className="flex items-center gap-3 cursor-pointer group" data-testid="link-logo">
               <div className="relative">
@@ -89,15 +89,30 @@ export function AppSidebar() {
           </Link>
         </SidebarHeader>
 
-        <SidebarContent className="flex-1 px-3 pb-2">
+        <div className="px-3 pb-1 flex-shrink-0">
+          <Link href="/dashboard" data-testid="link-dashboard">
+            <div className={`flex items-center gap-3 px-3 h-10 rounded-lg transition-all duration-150 cursor-pointer ${
+              isDashboard
+                ? "bg-white/12 text-white shadow-lg"
+                : "text-white/60 hover:text-white hover:bg-white/7"
+            }`}>
+              <LayoutDashboard className={`w-4 h-4 flex-shrink-0 transition-colors ${isDashboard ? "text-white" : "text-violet-300"}`} />
+              <span className="text-sm font-semibold">Accueil</span>
+              {isDashboard && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-400" />}
+            </div>
+          </Link>
+          <div className="my-2 h-px bg-white/8 mx-2" />
+        </div>
+
+        <SidebarContent className="flex-1 px-3 pb-2 overflow-y-auto">
           <SidebarGroup>
             <SidebarGroupLabel className="text-xs font-semibold text-white/30 uppercase tracking-widest px-2 mb-1">
               Navigation
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="space-y-0.5">
-                {menuItems.map((item) => {
-                  const isActive = location === item.url || (item.url === "/dashboard" && location === "/");
+                {mainMenuItems.map((item) => {
+                  const isActive = location === item.url;
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
@@ -112,9 +127,7 @@ export function AppSidebar() {
                         <Link href={item.url} data-testid={`link-${item.url.replace("/", "")}`} className="flex items-center gap-3 px-3">
                           <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-white" : item.color} transition-colors`} />
                           <span className="text-sm font-medium">{item.title}</span>
-                          {isActive && (
-                            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-400" />
-                          )}
+                          {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-400" />}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -154,7 +167,7 @@ export function AppSidebar() {
           )}
         </SidebarContent>
 
-        <SidebarFooter className="p-3 border-t border-white/8">
+        <SidebarFooter className="p-3 border-t border-white/8 flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
