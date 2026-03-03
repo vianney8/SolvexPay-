@@ -16,6 +16,11 @@ export const transactions = pgTable("transactions", {
   phoneNumber: text("phone_number"),
   reference: text("reference").notNull(),
   description: text("description"),
+  fees: decimal("fees", { precision: 12, scale: 2 }),
+  payerName: text("payer_name"),
+  payerEmail: text("payer_email"),
+  payerCountry: text("payer_country"),
+  payerOperator: text("payer_operator"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [index("idx_transactions_user").on(table.userId)]);
 

@@ -91,6 +91,7 @@ const publicPaySchema = z.object({
   operator: z.string().min(1, "Operateur requis"),
   country: z.string().min(2, "Pays requis"),
   customerName: z.string().optional(),
+  customerEmail: z.string().email().optional().or(z.literal("")),
 });
 
 export async function registerRoutes(
@@ -506,7 +507,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { phoneNumber, operator, country, customerName } = validation.data;
+      const { phoneNumber, operator, country, customerName, customerEmail } = validation.data;
 
       const paymentLink = await storage.getPaymentLinkBySlug(slug);
       
@@ -532,9 +533,13 @@ export async function registerRoutes(
         ? `https://solvexpay.site/pay/${slug}?status=callback&reference=${reference}`
         : undefined;
 
+      const linkAmount = parseFloat(paymentLink.amount);
+      const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
+      const feesAmount = Math.round(linkAmount * feeRate);
+
       const depositResponse = await omniPayService.deposit({
         msisdn: phoneNumber,
-        amount: parseFloat(paymentLink.amount),
+        amount: linkAmount,
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
@@ -547,12 +552,17 @@ export async function registerRoutes(
         type: "deposit",
         amount: paymentLink.amount,
         currency: paymentLink.currency,
-        provider: "omnipay",
+        provider: operator,
         phoneNumber,
         reference,
         status: "pending",
         description: `Paiement via lien: ${paymentLink.name}`,
-      });
+        fees: String(feesAmount),
+        payerName: customerName || undefined,
+        payerEmail: customerEmail || undefined,
+        payerCountry: country,
+        payerOperator: operator,
+      } as any);
 
       await storage.incrementPaymentLinkUsage(paymentLink.id);
 

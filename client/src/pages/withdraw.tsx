@@ -16,8 +16,13 @@ import {
 import { Link } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+function formatCurrency(amount: number | string) {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
+}
+
+function formatDate(date: string | Date) {
+  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(date));
 }
 
 const COUNTRIES = [
@@ -51,11 +56,17 @@ export default function WithdrawPage() {
   useEffect(() => { setOperator(""); }, [country]);
 
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
+  const { data: allTransactions } = useQuery<any[]>({ queryKey: ["/api/transactions"] });
   const balance = parseFloat(String(wallet?.balanceXOF || 0));
   const withdrawAmount = parseFloat(amount) || 0;
-  const fees = withdrawAmount * 0.01;
+  const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
+  const fees = Math.round(withdrawAmount * feeRate);
   const totalDebit = withdrawAmount + fees;
   const insufficientFunds = totalDebit > balance && withdrawAmount > 0;
+
+  const recentWithdrawals = allTransactions
+    ?.filter((t: any) => t.type === "withdrawal")
+    .slice(0, 5) || [];
 
   const withdrawMutation = useMutation({
     mutationFn: async (data: { amount: number; phoneNumber: string; operator: string; country: string }) => {
@@ -269,7 +280,7 @@ export default function WithdrawPage() {
                   <span className="font-semibold">{formatCurrency(withdrawAmount)} {currency}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Frais (1%)</span>
+                  <span className="text-muted-foreground">Frais ({feeRate * 100}%)</span>
                   <span className="text-destructive font-medium">+ {formatCurrency(fees)} {currency}</span>
                 </div>
                 <Separator />
@@ -284,7 +295,7 @@ export default function WithdrawPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-500/5 border border-orange-500/20">
             <Info className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Frais de <strong>1%</strong> appliqués. Les fonds arrivent en quelques minutes (max 24h selon l'opérateur).
+              Frais de <strong>{feeRate * 100}%</strong> appliqués{["BF", "COG"].includes(country) ? " (taux spécial Burkina/Congo)" : ""}. Les fonds arrivent en quelques minutes (max 24h selon l'opérateur).
             </p>
           </div>
 
@@ -303,6 +314,42 @@ export default function WithdrawPage() {
             )}
           </Button>
         </form>
+
+        {recentWithdrawals.length > 0 && (
+          <div className="space-y-3 pt-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Derniers retraits</p>
+            <Card className="border-border/60">
+              <CardContent className="p-0 divide-y divide-border/40">
+                {recentWithdrawals.map((tx: any, i: number) => {
+                  const statusColors: Record<string, string> = {
+                    completed: "text-emerald-600 dark:text-emerald-400",
+                    pending: "text-amber-600 dark:text-amber-400",
+                    failed: "text-red-500",
+                  };
+                  const statusLabels: Record<string, string> = { completed: "Terminé", pending: "En cours", failed: "Échoué" };
+                  return (
+                    <div key={tx.id || i} className="flex items-center gap-3 px-4 py-3" data-testid={`withdraw-history-row-${i}`}>
+                      <div className="h-9 w-9 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                        <ArrowUpRight className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {tx.provider && tx.provider.toLowerCase() !== "omnipay" ? tx.provider : "Retrait"}
+                          {tx.phoneNumber && <span className="ml-2 text-xs font-normal text-muted-foreground">{tx.phoneNumber}</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{tx.createdAt ? formatDate(tx.createdAt) : ""}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-foreground">-{formatCurrency(tx.amount)} {tx.currency || "XOF"}</p>
+                        <p className={`text-xs font-semibold ${statusColors[tx.status] || "text-muted-foreground"}`}>{statusLabels[tx.status] || tx.status}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { OperatorLogo } from "@/components/operator-logo";
-import { CheckCircle2, XCircle, Loader2, ChevronDown, Shield, ArrowLeft } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, ChevronDown, Shield, ChevronUp } from "lucide-react";
 import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 import type { PaymentLink } from "@shared/schema";
 
@@ -43,9 +43,11 @@ export default function PayPage() {
   const [verifyStatus, setVerifyStatus] = useState<string>("PENDING");
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [country, setCountry] = useState("BJ");
   const [operator, setOperator] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
 
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
 
@@ -61,13 +63,16 @@ export default function PayPage() {
   });
 
   const payMutation = useMutation({
-    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName?: string }) => {
+    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName?: string; customerEmail?: string }) => {
       const res = await apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
       return res.json();
     },
     onSuccess: (data: any) => {
       setPendingReference(data.sendavaReference || data.reference);
       setPaymentStatus("processing");
+      if (data.paymentUrl) {
+        window.open(data.paymentUrl, "_blank");
+      }
       toast({ title: "Paiement initié", description: "Confirmez le paiement sur votre téléphone." });
     },
     onError: () => {
@@ -98,17 +103,23 @@ export default function PayPage() {
     e.preventDefault();
     if (!phone || !operator || !country) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
-    payMutation.mutate({ phoneNumber: fullPhone, operator, country, customerName: customerName || undefined });
+    payMutation.mutate({
+      phoneNumber: fullPhone,
+      operator,
+      country,
+      customerName: customerName || undefined,
+      customerEmail: customerEmail || undefined,
+    });
   };
 
   const PageWrapper = ({ children }: { children: React.ReactNode }) => (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2">
+        <a href="https://solvexpay.site" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-xl object-cover" />
           <span className="font-black text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
-        </div>
-        <Badge variant="outline" className="text-xs font-mono border-gray-300 text-gray-500">XOF</Badge>
+        </a>
+        <Badge variant="outline" className="text-xs font-mono border-gray-300 text-gray-500">Paiement sécurisé</Badge>
       </header>
       <div className="flex-1 flex items-start justify-center p-4 pt-6">
         <div className="w-full max-w-md">
@@ -118,7 +129,9 @@ export default function PayPage() {
       <footer className="text-center py-5 border-t border-gray-200 bg-white">
         <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400">
           <Shield className="h-3.5 w-3.5" />
-          <span>Paiement sécurisé par <a href="/" className="text-violet-600 font-semibold hover:underline">SolvexPay</a></span>
+          <span>Paiement sécurisé par{" "}
+            <a href="https://solvexpay.site" target="_blank" rel="noopener noreferrer" className="text-violet-600 font-semibold hover:underline">SolvexPay</a>
+          </span>
         </div>
       </footer>
     </div>
@@ -128,7 +141,7 @@ export default function PayPage() {
     return (
       <PageWrapper>
         <div className="bg-white rounded-3xl shadow-lg p-6 space-y-5">
-          <Skeleton className="h-32 w-full rounded-2xl" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
           <Skeleton className="h-6 w-40 mx-auto" />
           <Skeleton className="h-14 w-48 mx-auto" />
           <Skeleton className="h-12 w-full rounded-xl" />
@@ -207,33 +220,45 @@ export default function PayPage() {
     );
   }
 
+  const descriptionText = paymentLink.description || "";
+  const truncatedDesc = descriptionText.length > 600 ? descriptionText.slice(0, 600) + "..." : descriptionText;
+
   return (
     <PageWrapper>
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
         {paymentLink.imageUrl && (
-          <div className="w-full h-44 overflow-hidden">
+          <div className="w-full h-52 overflow-hidden">
             <img src={paymentLink.imageUrl} alt={paymentLink.name} className="w-full h-full object-cover" data-testid="img-payment-product" />
           </div>
         )}
 
         <div className="p-6 space-y-5">
-          <button
-            type="button"
-            onClick={() => window.history.back()}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-            data-testid="button-pay-back"
-          >
-            <ArrowLeft className="h-4 w-4" /> Retour
-          </button>
-
-          <div className="text-center py-2">
-            {paymentLink.description && <p className="text-sm text-gray-500 mb-2">{paymentLink.description}</p>}
-            <p className="text-sm text-gray-500 font-medium">Total à payer</p>
-            <p className="text-5xl font-black text-blue-600 mt-1 tracking-tight" data-testid="text-payment-amount">
+          <div className="text-center">
+            <p className="text-sm text-gray-400 font-medium mb-1">Total à payer</p>
+            <p className="text-5xl font-black text-blue-600 tracking-tight" data-testid="text-payment-amount">
               {formatAmount(paymentLink.amount)} <span className="text-2xl font-bold text-blue-400">{paymentLink.currency}</span>
             </p>
-            <p className="text-sm font-semibold text-gray-700 mt-1" data-testid="text-payment-name">{paymentLink.name}</p>
+            <p className="text-base font-bold text-gray-800 mt-2" data-testid="text-payment-name">{paymentLink.name}</p>
           </div>
+
+          {descriptionText && (
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowDescription(!showDescription)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
+                data-testid="button-toggle-description"
+              >
+                <span>Voir la description</span>
+                {showDescription ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              {showDescription && (
+                <div className="px-4 pb-4">
+                  <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{truncatedDesc}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           <form onSubmit={handlePay} className="space-y-4">
             <div className="space-y-1.5">
@@ -299,7 +324,7 @@ export default function PayPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                Numéro de téléphone {operator ? OPERATOR_LABEL[operator] || operator : ""}
+                Numéro {operator ? OPERATOR_LABEL[operator] || operator : "Mobile Money"}
               </Label>
               <div className="flex gap-0 rounded-xl border border-gray-200 overflow-hidden focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                 <div className="flex items-center gap-2 px-3 bg-gray-50 border-r border-gray-200 flex-shrink-0">
@@ -310,7 +335,7 @@ export default function PayPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/[^0-9\s]/g, ""))}
                   type="tel"
-                  placeholder="90123456"
+                  placeholder="90 12 34 56"
                   required
                   className="flex-1 h-12 border-0 rounded-none focus-visible:ring-0 bg-white"
                   data-testid="input-pay-phone"
@@ -326,6 +351,18 @@ export default function PayPage() {
                 placeholder="Jean Dupont"
                 className="h-11 border-gray-200 rounded-xl"
                 data-testid="input-pay-name"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Email (optionnel)</Label>
+              <Input
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                type="email"
+                placeholder="jean@exemple.com"
+                className="h-11 border-gray-200 rounded-xl"
+                data-testid="input-pay-email"
               />
             </div>
 
