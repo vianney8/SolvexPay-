@@ -20,10 +20,12 @@ import {
   Send,
   Plus,
   ShieldCheck,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Zap,
-  QrCode,
+  Banknote,
+  Landmark,
+  Share2,
+  TrendingUp,
+  TrendingDown,
+  CalendarDays,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -39,11 +41,18 @@ function formatDate(date: string | Date) {
 }
 
 const quickActions = [
-  { label: "Dépôt", icon: ArrowDownToLine, href: "/deposit", gradient: "from-emerald-400/30 to-emerald-300/20" },
-  { label: "Retrait", icon: ArrowUpFromLine, href: "/withdraw", gradient: "from-orange-400/30 to-orange-300/20" },
-  { label: "Envoi", icon: Zap, href: "/transfer", gradient: "from-cyan-400/30 to-cyan-300/20" },
-  { label: "Liens", icon: QrCode, href: "/payment-links", gradient: "from-pink-400/30 to-pink-300/20" },
+  { label: "Dépôt", icon: Banknote, href: "/deposit", gradient: "from-emerald-400/40 to-teal-400/30", ring: "border-emerald-300/30" },
+  { label: "Retrait", icon: Landmark, href: "/withdraw", gradient: "from-orange-400/40 to-amber-400/30", ring: "border-orange-300/30" },
+  { label: "Envoi", icon: Send, href: "/transfer", gradient: "from-sky-400/40 to-blue-400/30", ring: "border-sky-300/30" },
+  { label: "Liens", icon: Share2, href: "/payment-links", gradient: "from-fuchsia-400/40 to-pink-400/30", ring: "border-fuchsia-300/30" },
 ];
+
+function isExpiredPending(tx: Transaction): boolean {
+  if (tx.status !== "pending") return false;
+  if (!tx.createdAt) return false;
+  const age = Date.now() - new Date(tx.createdAt).getTime();
+  return age > 12 * 60 * 1000;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -61,6 +70,25 @@ export default function DashboardPage() {
   const depositTx = transactions?.filter(t => t.type === "deposit") || [];
   const withdrawalTx = transactions?.filter(t => t.type === "withdrawal") || [];
   const pendingTx = transactions?.filter(t => t.status === "pending") || [];
+
+  const now = new Date();
+  const curMonth = now.getMonth();
+  const curYear = now.getFullYear();
+  const prevMonth = curMonth === 0 ? 11 : curMonth - 1;
+  const prevMonthYear = curMonth === 0 ? curYear - 1 : curYear;
+
+  const completedDeposits = transactions?.filter(t => t.type === "deposit" && t.status === "completed") || [];
+  const thisMonthReceived = completedDeposits
+    .filter(t => { const d = new Date(t.createdAt!); return d.getMonth() === curMonth && d.getFullYear() === curYear; })
+    .reduce((s, t) => s + parseFloat(t.amount), 0);
+  const lastMonthReceived = completedDeposits
+    .filter(t => { const d = new Date(t.createdAt!); return d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear; })
+    .reduce((s, t) => s + parseFloat(t.amount), 0);
+
+  const thisMonthTx = transactions?.filter(t => { const d = new Date(t.createdAt!); return d.getMonth() === curMonth && d.getFullYear() === curYear; }) || [];
+  const thisMonthWithdrawals = thisMonthTx.filter(t => t.type === "withdrawal" || t.type === "transfer").reduce((s, t) => s + parseFloat(t.amount), 0);
+  const avgTicket = completedDeposits.length > 0 ? Math.round(completedDeposits.reduce((s, t) => s + parseFloat(t.amount), 0) / completedDeposits.length) : 0;
+  const growthPct = lastMonthReceived > 0 ? Math.round(((thisMonthReceived - lastMonthReceived) / lastMonthReceived) * 100) : null;
 
   return (
     <DashboardLayout title="" breadcrumbs={[]}>
@@ -127,11 +155,11 @@ export default function DashboardPage() {
               {quickActions.map((action) => (
                 <Link key={action.label} href={action.href}>
                   <button
-                    className="w-full flex flex-col items-center gap-2 py-3.5 px-1 rounded-2xl bg-white/10 hover:bg-white/20 transition-all duration-200 active:scale-95 border border-white/15"
+                    className="w-full flex flex-col items-center gap-2.5 py-4 px-1 rounded-2xl bg-white/10 hover:bg-white/20 transition-all duration-200 active:scale-95 border border-white/15"
                     data-testid={`button-${action.label.toLowerCase()}`}
                   >
-                    <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center border border-white/20`}>
-                      <action.icon className="h-5 w-5 text-white drop-shadow-sm" />
+                    <div className={`h-11 w-11 rounded-2xl bg-gradient-to-br ${action.gradient} flex items-center justify-center border ${action.ring} shadow-lg`}>
+                      <action.icon className="h-5 w-5 text-white drop-shadow" strokeWidth={1.8} />
                     </div>
                     <span className="text-[11px] font-bold text-white text-center leading-none tracking-wide">{action.label}</span>
                   </button>
@@ -202,9 +230,15 @@ export default function DashboardPage() {
                             <p className={`font-bold text-sm ${tx.type === "deposit" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
                               {tx.type === "deposit" ? "+" : "-"}{formatCurrency(tx.amount)} XOF
                             </p>
-                            <span className={`text-xs font-semibold ${tx.status === "completed" ? "text-emerald-600 dark:text-emerald-400" : tx.status === "pending" ? "text-amber-600" : "text-red-500"}`}>
-                              {tx.status === "completed" ? "Terminé" : tx.status === "pending" ? "En cours" : "Échoué"}
-                            </span>
+                            {(() => {
+                              const expired = isExpiredPending(tx);
+                              const effectiveStatus = expired ? "failed" : tx.status;
+                              return (
+                                <span className={`text-xs font-semibold ${effectiveStatus === "completed" ? "text-emerald-600 dark:text-emerald-400" : effectiveStatus === "pending" ? "text-amber-600" : "text-red-500"}`}>
+                                  {effectiveStatus === "completed" ? "Terminé" : effectiveStatus === "pending" ? "En cours" : "Échoué"}
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
                       );
@@ -283,14 +317,15 @@ export default function DashboardPage() {
             </Link>
 
             <Card className="border-border/60">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 mb-4">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
                     <BarChart3 className="h-4 w-4 text-violet-600" />
                   </div>
                   <p className="text-sm font-bold">Performance</p>
                 </div>
-                <div className="space-y-3">
+
+                <div className="space-y-2.5">
                   {[
                     { label: "Taux de succès", value: transactions && transactions.length > 0 ? Math.round((transactions.filter(t => t.status === "completed").length / transactions.length) * 100) : 0, suffix: "%" },
                     { label: "Total transactions", value: transactions?.length || 0, suffix: "" },
@@ -301,13 +336,49 @@ export default function DashboardPage() {
                       <span className="text-sm font-black text-foreground">{item.value}{item.suffix}</span>
                     </div>
                   ))}
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-muted-foreground">Volume total entrant</span>
+                </div>
+
+                <div className="border-t border-border/40 pt-3 space-y-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Montants reçus</span>
+                  </div>
+                  <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/15 p-3">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <p className="text-xs text-muted-foreground">Ce mois-ci</p>
+                      <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
                     </div>
-                    <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">
-                      {formatCurrency(stats?.totalDeposits || 0)} <span className="text-sm font-semibold text-muted-foreground">XOF</span>
+                    <p className="text-lg font-black text-emerald-600 dark:text-emerald-400" data-testid="text-this-month-received">
+                      {formatCurrency(thisMonthReceived)} <span className="text-xs font-semibold text-muted-foreground">XOF</span>
                     </p>
+                  </div>
+                  <div className="rounded-xl bg-muted/50 border border-border/40 p-3">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <p className="text-xs text-muted-foreground">Mois dernier</p>
+                      {growthPct !== null && (
+                        <span className={`text-xs font-bold ${growthPct >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                          {growthPct >= 0 ? "+" : ""}{growthPct}%
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-base font-black text-foreground" data-testid="text-last-month-received">
+                      {formatCurrency(lastMonthReceived)} <span className="text-xs font-semibold text-muted-foreground">XOF</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t border-border/40 pt-3 space-y-2.5">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Métriques avancées</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Volume sortant (mois)</span>
+                    <span className="text-sm font-black text-orange-600 dark:text-orange-400">{formatCurrency(thisMonthWithdrawals)} XOF</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Ticket moyen (dépôts)</span>
+                    <span className="text-sm font-black text-foreground">{avgTicket > 0 ? `${formatCurrency(avgTicket)} XOF` : "—"}</span>
                   </div>
                 </div>
               </CardContent>

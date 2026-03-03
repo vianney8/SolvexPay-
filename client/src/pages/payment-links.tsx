@@ -321,13 +321,14 @@ export default function PaymentLinksPage() {
                 <p className="text-white/70 text-xs">Recevez des paiements partout en Afrique</p>
               </div>
             </div>
-            <Button
+            <button
+              type="button"
               onClick={() => setShowCreate(true)}
-              className="h-9 px-4 bg-white/20 hover:bg-white/30 text-white border-0 font-semibold gap-1.5 text-sm flex-shrink-0"
+              className="flex items-center gap-1.5 h-9 px-4 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold text-sm flex-shrink-0 transition-colors"
               data-testid="button-create-link"
             >
               <Plus className="h-4 w-4" /> Créer
-            </Button>
+            </button>
           </div>
           <div className="relative grid grid-cols-3 gap-3">
             <div className="bg-white/10 rounded-2xl p-3 backdrop-blur-sm">

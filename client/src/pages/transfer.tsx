@@ -64,7 +64,8 @@ export default function TransferPage() {
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const balance = parseFloat(String(wallet?.balanceXOF || 0));
   const transferAmount = parseFloat(amount) || 0;
-  const fees = transferAmount * 0.01;
+  const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
+  const fees = Math.round(transferAmount * feeRate);
   const totalDebit = transferAmount + fees;
   const insufficientFunds = totalDebit > balance && transferAmount > 0;
 
@@ -297,7 +298,7 @@ export default function TransferPage() {
                   <span className="font-semibold">{formatCurrency(transferAmount)} XOF</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Frais (1%)</span>
+                  <span className="text-muted-foreground">Frais ({feeRate * 100}%{["BF", "COG"].includes(country) ? " — taux spécial" : ""})</span>
                   <span className="text-destructive font-medium">+ {formatCurrency(fees)} XOF</span>
                 </div>
                 <Separator />
@@ -312,7 +313,7 @@ export default function TransferPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20">
             <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Frais de <strong>1%</strong> appliqués. Le bénéficiaire reçoit les fonds instantanément.
+              Frais de <strong>{feeRate * 100}%</strong> appliqués{["BF", "COG"].includes(country) ? " (taux spécial Burkina/Congo)" : ""}. Le bénéficiaire reçoit les fonds instantanément.
             </p>
           </div>
 
