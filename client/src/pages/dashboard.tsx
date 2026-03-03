@@ -65,7 +65,7 @@ export default function DashboardPage() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground font-medium">Bonjour,</p>
-            <h2 className="text-2xl font-black tracking-tight text-foreground leading-none mt-1 uppercase" data-testid="text-greeting">
+            <h2 className="text-xl font-black tracking-tight text-foreground leading-none mt-1 uppercase" data-testid="text-greeting">
               {firstName}
             </h2>
           </div>
