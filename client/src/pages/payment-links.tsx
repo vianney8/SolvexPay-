@@ -115,14 +115,30 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
 
   return (
     <DashboardLayout title="" breadcrumbs={[{ label: "Liens de paiement" }]}>
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="h-9 w-9 rounded-xl border border-border/70 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors" data-testid="button-back-links">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div>
-            <h2 className="text-xl font-bold">{editLink ? "Modifier le lien" : "Nouveau lien de paiement"}</h2>
-            <p className="text-sm text-muted-foreground">{editLink ? "Modifiez les informations" : "Créez un lien pour recevoir des paiements"}</p>
+      <div className="max-w-2xl mx-auto space-y-5">
+        <div
+          className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
+          style={{ background: "linear-gradient(135deg, hsl(262 83% 52%) 0%, hsl(300 70% 56%) 60%, hsl(330 80% 52%) 100%)" }}
+        >
+          <div className="absolute top-0 right-0 w-36 h-36 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onBack}
+                className="h-10 w-10 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors flex-shrink-0"
+                data-testid="button-back-links"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div>
+                <p className="font-bold text-base leading-tight">{editLink ? "Modifier le lien" : "Nouveau lien de paiement"}</p>
+                <p className="text-white/70 text-xs">{editLink ? "Modifiez les informations" : "Créez un lien pour recevoir des paiements"}</p>
+              </div>
+            </div>
+            <div className="h-11 w-11 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+              <Link2 className="h-5 w-5" />
+            </div>
           </div>
         </div>
 

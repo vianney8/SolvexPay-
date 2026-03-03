@@ -226,19 +226,20 @@ export default function PayPage() {
   return (
     <PageWrapper>
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
-        {paymentLink.imageUrl && (
-          <div className="w-full h-52 overflow-hidden">
-            <img src={paymentLink.imageUrl} alt={paymentLink.name} className="w-full h-full object-cover" data-testid="img-payment-product" />
-          </div>
-        )}
-
         <div className="p-6 space-y-5">
-          <div className="text-center">
-            <p className="text-sm text-gray-400 font-medium mb-1">Total à payer</p>
-            <p className="text-5xl font-black text-blue-600 tracking-tight" data-testid="text-payment-amount">
-              {formatAmount(paymentLink.amount)} <span className="text-2xl font-bold text-blue-400">{paymentLink.currency}</span>
-            </p>
-            <p className="text-base font-bold text-gray-800 mt-2" data-testid="text-payment-name">{paymentLink.name}</p>
+          <div className="flex items-center gap-4">
+            {paymentLink.imageUrl && (
+              <div className="h-16 w-16 rounded-2xl overflow-hidden flex-shrink-0 shadow-md ring-1 ring-gray-100">
+                <img src={paymentLink.imageUrl} alt={paymentLink.name} className="w-full h-full object-cover" data-testid="img-payment-product-thumb" />
+              </div>
+            )}
+            <div className={paymentLink.imageUrl ? "flex-1 min-w-0" : "flex-1 text-center"}>
+              <p className="text-xs text-gray-400 font-medium mb-0.5">Total à payer</p>
+              <p className="text-4xl font-black text-blue-600 tracking-tight leading-none" data-testid="text-payment-amount">
+                {formatAmount(paymentLink.amount)} <span className="text-xl font-bold text-blue-400">{paymentLink.currency}</span>
+              </p>
+              <p className="text-sm font-bold text-gray-700 mt-1 truncate" data-testid="text-payment-name">{paymentLink.name}</p>
+            </div>
           </div>
 
           {descriptionText && (
@@ -262,7 +263,7 @@ export default function PayPage() {
 
           <form onSubmit={handlePay} className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Pays</Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Pays Mobile Money</Label>
               <div className="relative">
                 <button
                   type="button"
@@ -344,17 +345,6 @@ export default function PayPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Votre nom (optionnel)</Label>
-              <Input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Jean Dupont"
-                className="h-11 border-gray-200 rounded-xl"
-                data-testid="input-pay-name"
-              />
-            </div>
-
-            <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Email (optionnel)</Label>
               <Input
                 value={customerEmail}
@@ -380,9 +370,6 @@ export default function PayPage() {
               )}
             </Button>
 
-            <p className="text-center text-xs text-gray-400 leading-relaxed">
-              En continuant, vous acceptez les conditions générales de SolvexPay.
-            </p>
           </form>
         </div>
       </div>

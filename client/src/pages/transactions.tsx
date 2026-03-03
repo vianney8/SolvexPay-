@@ -188,35 +188,41 @@ export default function TransactionsPage() {
 
   return (
     <DashboardLayout title="Transactions" breadcrumbs={[{ label: "Transactions" }]}>
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {summaryCards.map((card) => (
-            <Card key={card.label} className="border-border/60 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{card.label}</p>
-                  <div className={`h-8 w-8 rounded-lg ${card.color.split(" ").slice(0, 1).join(" ")} flex items-center justify-center`}>
-                    <card.icon className={`h-4 w-4 ${card.color.split(" ").slice(1).join(" ")}`} />
-                  </div>
-                </div>
-                {isLoading ? <Skeleton className="h-7 w-16" /> : (
-                  <p className="text-2xl font-bold text-foreground">{card.value}</p>
+      <div className="space-y-5">
+        <div
+          className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
+          style={{ background: "linear-gradient(135deg, hsl(262 83% 46%) 0%, hsl(250 80% 55%) 60%, hsl(240 78% 52%) 100%)" }}
+        >
+          <div className="absolute top-0 right-0 w-36 h-36 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                <Activity className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-base">Historique des transactions</p>
+                <p className="text-white/70 text-xs">Toutes vos opérations financières</p>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-white/60 text-xs">Total</p>
+              <p className="font-black text-2xl">{isLoading ? "—" : transactions?.length || 0}</p>
+            </div>
+          </div>
+          <div className="relative mt-4 grid grid-cols-3 gap-3">
+            {summaryCards.slice(1).map((card) => (
+              <div key={card.label} className="bg-white/10 rounded-2xl p-3 backdrop-blur-sm">
+                <p className="text-white/60 text-xs font-medium mb-1">{card.label}</p>
+                {isLoading ? <div className="h-6 w-10 bg-white/20 rounded animate-pulse" /> : (
+                  <p className="text-white font-black text-xl leading-none">{card.value}</p>
                 )}
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
 
         <Card className="border-border/60">
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Activity className="h-4 w-4 text-primary" />
-              </div>
-              <CardTitle className="text-base font-bold">Historique des transactions</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-5">
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

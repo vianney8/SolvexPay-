@@ -209,7 +209,9 @@ export async function registerRoutes(
   app.post("/api/transactions/withdraw", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      
+      if (req.user.kycStatus !== "verified") {
+        return res.status(403).json({ message: "Vérification KYC requise pour effectuer un retrait", kycRequired: true });
+      }
       const validation = withdrawSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ message: validation.error.errors[0].message });
@@ -277,7 +279,9 @@ export async function registerRoutes(
   app.post("/api/transactions/transfer", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-
+      if (req.user.kycStatus !== "verified") {
+        return res.status(403).json({ message: "Vérification KYC requise pour effectuer un transfert", kycRequired: true });
+      }
       const validation = transferSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ message: validation.error.errors[0].message });
@@ -601,7 +605,9 @@ export async function registerRoutes(
   app.post("/api/api-keys", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      
+      if (req.user.kycStatus !== "verified") {
+        return res.status(403).json({ message: "Vérification KYC requise pour créer une clé API", kycRequired: true });
+      }
       const validation = createApiKeySchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ message: validation.error.errors[0].message });
@@ -927,6 +933,26 @@ export async function registerRoutes(
       res.json(safeUser);
     } catch (error) {
       console.error("Admin toggle admin error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/kyc", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { kycStatus } = req.body;
+      if (!["not_started", "pending", "verified", "rejected"].includes(kycStatus)) {
+        return res.status(400).json({ message: "Statut KYC invalide" });
+      }
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await db.update(usersTable).set({ kycStatus, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
+      const { passwordHash: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Admin KYC update error:", error);
       res.status(500).json({ message: "Erreur serveur" });
     }
   });

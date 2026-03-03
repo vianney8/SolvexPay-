@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   ShieldCheck,
   Upload,
@@ -30,13 +33,27 @@ type KycStatus = "not_started" | "pending" | "verified" | "rejected";
 
 export default function KycPage() {
   const { toast } = useToast();
-  const [kycStatus] = useState<KycStatus>("not_started");
-  const [submitting, setSubmitting] = useState(false);
+  const { user } = useAuth();
+  const kycStatus = ((user as any)?.kycStatus as KycStatus) || "not_started";
+
   const [docType, setDocType] = useState("cni");
   const [idNumber, setIdNumber] = useState("");
   const [docFront, setDocFront] = useState<File | null>(null);
   const [docBack, setDocBack] = useState<File | null>(null);
   const [selfie, setSelfie] = useState<File | null>(null);
+
+  const submitMutation = useMutation({
+    mutationFn: async (data: { docType: string; idNumber: string }) => {
+      const res = await apiRequest("POST", "/api/kyc/submit", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/auth/user"], data.user || data);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Documents soumis", description: "Votre vérification est en cours. Vous serez notifié par email." });
+    },
+    onError: () => toast({ title: "Erreur", description: "Impossible de soumettre votre dossier.", variant: "destructive" }),
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,15 +61,11 @@ export default function KycPage() {
       toast({ title: "Erreur", description: "Veuillez saisir le numéro du document", variant: "destructive" });
       return;
     }
-    setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      toast({ title: "Documents soumis", description: "Votre vérification est en cours. Vous serez notifié par email." });
-    }, 2000);
+    submitMutation.mutate({ docType, idNumber });
   };
 
   const statusBg: Record<KycStatus, string> = {
-    not_started: "from-slate-500 to-slate-700",
+    not_started: "from-orange-500 to-amber-600",
     pending: "from-amber-500 to-orange-600",
     verified: "from-emerald-500 to-teal-600",
     rejected: "from-red-500 to-rose-700",
@@ -262,10 +275,10 @@ export default function KycPage() {
               <Button
                 type="submit"
                 className="w-full h-12 font-bold gap-2 shadow-xl shadow-primary/20"
-                disabled={submitting}
+                disabled={submitMutation.isPending}
                 data-testid="button-submit-kyc"
               >
-                {submitting ? (
+                {submitMutation.isPending ? (
                   <><Loader2 className="h-4 w-4 animate-spin" /> Envoi en cours...</>
                 ) : (
                   <><ShieldCheck className="h-4 w-4" /> Soumettre pour vérification</>

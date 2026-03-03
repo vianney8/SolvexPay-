@@ -11,6 +11,12 @@ const updateProfileSchema = z.object({
   phone: z.string().optional(),
 });
 
+const updateWithdrawalAccountSchema = z.object({
+  country: z.string().min(2, "Pays requis"),
+  operator: z.string().min(1, "Opérateur requis"),
+  phone: z.string().min(8, "Numéro de téléphone invalide"),
+});
+
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Mot de passe actuel requis"),
   newPassword: z.string().min(6, "Le mot de passe doit contenir au moins 6 caracteres"),
@@ -55,6 +61,44 @@ export function registerAuthRoutes(app: Express): void {
     } catch (error) {
       console.error("Error updating profile:", error);
       res.status(500).json({ message: "Erreur lors de la mise a jour du profil" });
+    }
+  });
+
+  app.patch("/api/auth/withdrawal-account", isAuthenticated, async (req: any, res) => {
+    try {
+      const validation = updateWithdrawalAccountSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
+      }
+      const userId = req.user.id;
+      const user = await authStorage.upsertUser({
+        id: userId,
+        withdrawalCountry: validation.data.country,
+        withdrawalOperator: validation.data.operator,
+        withdrawalPhone: validation.data.phone,
+      } as any);
+      const { passwordHash: _, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Error updating withdrawal account:", error);
+      res.status(500).json({ message: "Erreur lors de la mise à jour du compte de retrait" });
+    }
+  });
+
+  app.post("/api/kyc/submit", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await authStorage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "Utilisateur introuvable" });
+      if (user.kycStatus === "verified") {
+        return res.status(400).json({ message: "Votre identité est déjà vérifiée" });
+      }
+      const updated = await authStorage.upsertUser({ id: userId, kycStatus: "pending" } as any);
+      const { passwordHash: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Error submitting KYC:", error);
+      res.status(500).json({ message: "Erreur lors de la soumission KYC" });
     }
   });
 

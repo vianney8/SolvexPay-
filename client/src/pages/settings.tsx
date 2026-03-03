@@ -34,6 +34,8 @@ import {
   CheckCircle2,
   ExternalLink,
   Settings,
+  Smartphone,
+  MapPin,
 } from "lucide-react";
 
 const countryCodes = [
@@ -42,6 +44,18 @@ const countryCodes = [
   { code: "+226", country: "Burkina Faso", label: "BF +226" },
   { code: "+228", country: "Togo", label: "TG +228" },
   { code: "+221", country: "Sénégal", label: "SN +221" },
+];
+
+const WITHDRAWAL_COUNTRIES = [
+  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", operators: ["MTN", "Moov"] },
+  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", operators: ["Orange", "MTN", "Moov", "Wave"] },
+  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", operators: ["Moov", "Orange"] },
+  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", operators: ["TMoney", "Moov"] },
+  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", operators: ["Orange", "Wave", "Free"] },
+  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", operators: ["Orange", "Moov"] },
+  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", operators: ["MTN", "Orange"] },
+  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", operators: ["Vodacom", "Airtel", "Orange"] },
+  { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", operators: ["Airtel", "MTN"] },
 ];
 
 function detectCountryCode(phone: string) {
@@ -154,6 +168,12 @@ export default function SettingsPage() {
   const [selectedCode, setSelectedCode] = useState("+229");
   const [phoneNumber, setPhoneNumber] = useState("");
 
+  const [wCountry, setWCountry] = useState("BJ");
+  const [wOperator, setWOperator] = useState("");
+  const [wPhone, setWPhone] = useState("");
+
+  const wSelectedCountry = WITHDRAWAL_COUNTRIES.find(c => c.code === wCountry) || WITHDRAWAL_COUNTRIES[0];
+
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName || "");
@@ -161,6 +181,9 @@ export default function SettingsPage() {
       setEmail(user.email || "");
       setSelectedCode(detectCountryCode(user.phone || ""));
       setPhoneNumber(stripCountryCode(user.phone || ""));
+      setWCountry((user as any).withdrawalCountry || "BJ");
+      setWOperator((user as any).withdrawalOperator || "");
+      setWPhone((user as any).withdrawalPhone || "");
     }
   }, [user]);
 
@@ -201,6 +224,18 @@ export default function SettingsPage() {
     e.preventDefault();
     profileMutation.mutate({ firstName, lastName, email, phone: `${selectedCode}${phoneNumber}` });
   };
+
+  const withdrawalAccountMutation = useMutation({
+    mutationFn: async (data: { country: string; operator: string; phone: string }) => {
+      const res = await apiRequest("PATCH", "/api/auth/withdrawal-account", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/auth/user"], data);
+      toast({ title: "Compte de retrait mis à jour", description: "Vos préférences de retrait ont été enregistrées." });
+    },
+    onError: () => toast({ title: "Erreur", description: "Impossible de mettre à jour le compte de retrait.", variant: "destructive" }),
+  });
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,6 +384,82 @@ export default function SettingsPage() {
                   </div>
                   <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">XOF (FCFA)</Badge>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60 mt-5">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                    <Smartphone className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold" data-testid="text-withdrawal-account-title">Compte de retrait par défaut</CardTitle>
+                    <CardDescription className="text-xs">Pré-remplit le formulaire de retrait automatiquement</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!wOperator || !wPhone) {
+                      toast({ title: "Erreur", description: "Veuillez remplir tous les champs", variant: "destructive" });
+                      return;
+                    }
+                    withdrawalAccountMutation.mutate({ country: wCountry, operator: wOperator, phone: wPhone });
+                  }}
+                  className="space-y-5"
+                >
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Pays Mobile Money</Label>
+                    <Select value={wCountry} onValueChange={(v) => { setWCountry(v); setWOperator(""); }}>
+                      <SelectTrigger className="h-11 border-border/70" data-testid="select-withdrawal-country">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WITHDRAWAL_COUNTRIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code} data-testid={`option-w-country-${c.code}`}>
+                            {c.flag} {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Opérateur</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {wSelectedCountry.operators.map((op) => (
+                        <button
+                          key={op}
+                          type="button"
+                          onClick={() => setWOperator(op)}
+                          className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${wOperator === op ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400" : "border-border/70 bg-background text-muted-foreground hover:border-orange-400 hover:text-orange-600"}`}
+                          data-testid={`button-w-operator-${op}`}
+                        >
+                          {op}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro Mobile Money</Label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      <Input
+                        value={wPhone}
+                        onChange={(e) => setWPhone(e.target.value.replace(/[^0-9+\s]/g, ""))}
+                        placeholder={`Ex: ${wSelectedCountry.prefix} 97 00 00 00`}
+                        className="pl-10 h-11 border-border/70"
+                        data-testid="input-withdrawal-phone"
+                      />
+                    </div>
+                  </div>
+                  <Button type="submit" className="gap-2 h-11 font-semibold bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20" disabled={withdrawalAccountMutation.isPending} data-testid="button-save-withdrawal-account">
+                    {withdrawalAccountMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Enregistrer le compte de retrait
+                  </Button>
+                </form>
               </CardContent>
             </Card>
           </TabsContent>

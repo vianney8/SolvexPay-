@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { OperatorLogo } from "@/components/operator-logo";
 import {
-  ArrowUpRight, Info, CheckCircle2, AlertTriangle, Loader2, ChevronDown, ArrowLeft, Send,
+  ArrowUpRight, Info, CheckCircle2, AlertTriangle, Loader2, ChevronDown, ArrowLeft, Send, ShieldAlert,
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
@@ -42,15 +43,16 @@ const OPERATOR_LABEL: Record<string, string> = {
 
 export default function WithdrawPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [amount, setAmount] = useState("");
-  const [country, setCountry] = useState("BJ");
-  const [operator, setOperator] = useState("");
-  const [phone, setPhone] = useState("");
+  const [country, setCountry] = useState((user as any)?.withdrawalCountry || "BJ");
+  const [operator, setOperator] = useState((user as any)?.withdrawalOperator || "");
+  const [phone, setPhone] = useState((user as any)?.withdrawalPhone || "");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [success, setSuccess] = useState(false);
   const [withdrawRef, setWithdrawRef] = useState("");
 
-  const selectedCountry = COUNTRIES.find(c => c.code === country)!;
+  const selectedCountry = COUNTRIES.find(c => c.code === country) || COUNTRIES[0];
   const currency = selectedCountry.currency;
 
   useEffect(() => { setOperator(""); }, [country]);
@@ -92,6 +94,43 @@ export default function WithdrawPage() {
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
     withdrawMutation.mutate({ amount: withdrawAmount, phoneNumber: fullPhone, operator, country });
   };
+
+  if (user && (user as any).kycStatus !== "verified") {
+    return (
+      <DashboardLayout title="" breadcrumbs={[{ label: "Retrait" }]}>
+        <div className="max-w-md mx-auto mt-6">
+          <Card className="border-border/60 overflow-hidden">
+            <div className="h-1.5 bg-gradient-to-r from-orange-400 to-amber-500" />
+            <CardContent className="pt-10 pb-10 text-center space-y-5">
+              <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mx-auto shadow-xl">
+                <ShieldAlert className="h-10 w-10 text-white" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold">Vérification requise</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
+                  La vérification d'identité (KYC) est obligatoire pour effectuer des retraits.
+                </p>
+              </div>
+              <div className="bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 text-sm text-left space-y-1">
+                <p className="font-semibold text-orange-700 dark:text-orange-400">Statut actuel : {
+                  (user as any).kycStatus === "pending" ? "En cours d'examen" :
+                  (user as any).kycStatus === "rejected" ? "Rejeté" : "Non soumis"
+                }</p>
+                {(user as any).kycStatus === "pending" && (
+                  <p className="text-muted-foreground text-xs">Nos équipes examinent votre dossier. Délai : 24 à 48h.</p>
+                )}
+              </div>
+              <Link href="/kyc">
+                <Button className="w-full h-11 font-bold gap-2 bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20" data-testid="button-go-kyc-withdraw">
+                  <ShieldAlert className="h-4 w-4" /> Vérifier mon identité
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (success) {
     return (

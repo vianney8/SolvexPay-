@@ -24,6 +24,10 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash"),
   profileImageUrl: varchar("profile_image_url"),
   isAdmin: boolean("is_admin").notNull().default(false),
+  kycStatus: varchar("kyc_status").default("not_started"),
+  withdrawalCountry: varchar("withdrawal_country"),
+  withdrawalOperator: varchar("withdrawal_operator"),
+  withdrawalPhone: varchar("withdrawal_phone"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
