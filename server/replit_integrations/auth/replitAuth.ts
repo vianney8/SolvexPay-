@@ -125,3 +125,23 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   (req as any).user = user;
   next();
 };
+
+export const isAdmin: RequestHandler = async (req, res, next) => {
+  const userId = (req.session as any)?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const user = await authStorage.getUser(userId);
+  if (!user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  if (!user.isAdmin) {
+    return res.status(403).json({ message: "Acces refuse - Administrateur requis" });
+  }
+
+  (req as any).user = user;
+  next();
+};

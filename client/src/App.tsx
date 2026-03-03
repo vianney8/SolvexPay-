@@ -19,6 +19,7 @@ import TransferPage from "@/pages/transfer";
 import DepositPage from "@/pages/deposit";
 import WithdrawPage from "@/pages/withdraw";
 import PayPage from "@/pages/pay";
+import AdminPage from "@/pages/admin";
 
 function AuthenticatedRoutes() {
   return (
@@ -33,6 +34,7 @@ function AuthenticatedRoutes() {
       <Route path="/api-keys" component={ApiKeysPage} />
       <Route path="/kyc" component={KycPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -31,6 +31,7 @@ import {
   ChevronUp,
   ShieldCheck,
   Send,
+  Shield,
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
@@ -42,6 +43,10 @@ const menuItems = [
   { title: "Clés API", url: "/api-keys", icon: Key },
   { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck },
   { title: "Paramètres", url: "/settings", icon: Settings },
+];
+
+const adminMenuItems = [
+  { title: "Administration", url: "/admin", icon: Shield },
 ];
 
 export function AppSidebar() {
@@ -97,6 +102,26 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {(user as any)?.isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminMenuItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url} className="text-red-600 dark:text-red-400">
+                      <Link href={item.url} data-testid={`link-${item.url.replace("/", "")}`}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       
       <SidebarFooter className="p-4">

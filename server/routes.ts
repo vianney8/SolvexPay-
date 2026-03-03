@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
-import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
+import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
 import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, type OmniPayCallbackPayload } from "./services/omnipay";
 import { z } from "zod";
 import multer from "multer";
@@ -751,6 +751,164 @@ export async function registerRoutes(
       ]
     });
   });
+
+  // ─── ADMIN ROUTES ─────────────────────────────────────────────────────────
+
+  app.get("/api/admin/users", isAdmin, async (_req, res) => {
+    try {
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { desc } = await import("drizzle-orm");
+      const allUsers = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
+      const usersWithWallets = await Promise.all(
+        allUsers.map(async (u) => {
+          const wallet = await storage.getWallet(u.id);
+          const { passwordHash: _, ...safeUser } = u;
+          return { ...safeUser, wallet };
+        })
+      );
+      res.json(usersWithWallets);
+    } catch (error) {
+      console.error("Admin users error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/stats", isAdmin, async (_req, res) => {
+    try {
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { count, sum, eq } = await import("drizzle-orm");
+      const { transactions: txTable, wallets: walletsTable } = await import("@shared/schema");
+
+      const [userCount] = await db.select({ count: count() }).from(usersTable);
+      const [txCount] = await db.select({ count: count() }).from(txTable);
+      const [depositSum] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.type, "deposit"));
+      const [withdrawalSum] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.type, "withdrawal"));
+      const [transferSum] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.type, "transfer"));
+      const [pendingCount] = await db.select({ count: count() }).from(txTable).where(eq(txTable.status, "pending"));
+      const [completedCount] = await db.select({ count: count() }).from(txTable).where(eq(txTable.status, "completed"));
+      const [failedCount] = await db.select({ count: count() }).from(txTable).where(eq(txTable.status, "failed"));
+      const [walletTotal] = await db.select({ total: sum(walletsTable.balanceXOF) }).from(walletsTable);
+
+      res.json({
+        userCount: userCount.count,
+        transactionCount: txCount.count,
+        totalDeposits: parseFloat(depositSum.total || "0"),
+        totalWithdrawals: parseFloat(withdrawalSum.total || "0"),
+        totalTransfers: parseFloat(transferSum.total || "0"),
+        pendingTransactions: pendingCount.count,
+        completedTransactions: completedCount.count,
+        failedTransactions: failedCount.count,
+        totalWalletBalance: parseFloat(walletTotal.total || "0"),
+      });
+    } catch (error) {
+      console.error("Admin stats error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/transactions", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { desc } = await import("drizzle-orm");
+      const { transactions: txTable } = await import("@shared/schema");
+      const limit = parseInt(req.query.limit as string) || 100;
+      const allTx = await db.select().from(txTable).orderBy(desc(txTable.createdAt)).limit(limit);
+      res.json(allTx);
+    } catch (error) {
+      console.error("Admin transactions error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/transactions/:id/status", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      if (!["pending", "completed", "failed"].includes(status)) {
+        return res.status(400).json({ message: "Statut invalide" });
+      }
+      const tx = await storage.updateTransactionStatus(id, status);
+      res.json(tx);
+    } catch (error) {
+      console.error("Admin update tx status error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/password", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+      if (!password || password.length < 6) {
+        return res.status(400).json({ message: "Le mot de passe doit contenir au moins 6 caractères" });
+      }
+      const bcrypt = await import("bcryptjs");
+      const passwordHash = await bcrypt.default.hash(password, 10);
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      await db.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin change password error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/balance", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { amount, motif } = req.body;
+      if (typeof amount !== "number") {
+        return res.status(400).json({ message: "Montant invalide" });
+      }
+      if (!motif || motif.trim().length < 3) {
+        return res.status(400).json({ message: "Motif requis (min 3 caractères)" });
+      }
+      let wallet = await storage.getWallet(id);
+      if (!wallet) wallet = await storage.createWallet(id);
+      const updatedWallet = await storage.updateWalletBalance(id, "XOF", amount);
+      await storage.createTransaction({
+        userId: id,
+        type: amount >= 0 ? "deposit" : "withdrawal",
+        amount: Math.abs(amount).toString(),
+        currency: "XOF",
+        provider: "admin",
+        phoneNumber: "",
+        reference: generateReference(),
+        status: "completed",
+        description: `Ajustement admin: ${motif}`,
+      });
+      res.json(updatedWallet);
+    } catch (error) {
+      console.error("Admin balance adjustment error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/toggle-admin", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isAdmin: adminVal } = req.body;
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await db
+        .update(usersTable)
+        .set({ isAdmin: !!adminVal, updatedAt: new Date() })
+        .where(eq(usersTable.id, id))
+        .returning();
+      const { passwordHash: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Admin toggle admin error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // ─── END ADMIN ROUTES ──────────────────────────────────────────────────────
 
   app.use("/uploads", (await import("express")).default.static(uploadDir));
 
