@@ -63,18 +63,13 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
             <div className="flex-1 min-w-0">
               <Breadcrumb>
                 <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href="/dashboard" className="text-muted-foreground hover:text-foreground text-sm transition-colors">
-                      Accueil
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
                   {breadcrumbs?.map((crumb, index) => [
-                    <BreadcrumbSeparator key={`sep-${index}`} />,
+                    index > 0 && <BreadcrumbSeparator key={`sep-${index}`} />,
                     <BreadcrumbItem key={`item-${index}`}>
                       {crumb.href ? (
                         <BreadcrumbLink href={crumb.href} className="text-sm">{crumb.label}</BreadcrumbLink>
                       ) : (
-                        <BreadcrumbPage className="text-sm font-medium">{crumb.label}</BreadcrumbPage>
+                        <BreadcrumbPage className="text-sm font-semibold">{crumb.label}</BreadcrumbPage>
                       )}
                     </BreadcrumbItem>,
                   ])}

@@ -6,12 +6,8 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
@@ -28,7 +24,7 @@ import {
   Key,
   Settings,
   LogOut,
-  ChevronUp,
+  ChevronDown,
   ShieldCheck,
   Send,
   Shield,
@@ -37,18 +33,18 @@ import {
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
 const menuItems = [
-  { title: "Accueil", url: "/dashboard", icon: LayoutDashboard, color: "text-violet-600" },
-  { title: "Transactions", url: "/transactions", icon: ArrowDownUp, color: "text-emerald-600" },
-  { title: "Transfert", url: "/transfer", icon: Send, color: "text-cyan-600" },
-  { title: "Portefeuille", url: "/wallet", icon: Wallet, color: "text-amber-600" },
-  { title: "Liens de paiement", url: "/payment-links", icon: Link2, color: "text-pink-600" },
-  { title: "Clés API", url: "/api-keys", icon: Key, color: "text-orange-600" },
-  { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck, color: "text-blue-600" },
-  { title: "Paramètres", url: "/settings", icon: Settings, color: "text-slate-600" },
+  { title: "Accueil", url: "/dashboard", icon: LayoutDashboard, bg: "bg-violet-100", iconColor: "text-violet-600" },
+  { title: "Transactions", url: "/transactions", icon: ArrowDownUp, bg: "bg-emerald-100", iconColor: "text-emerald-600" },
+  { title: "Transfert", url: "/transfer", icon: Send, bg: "bg-cyan-100", iconColor: "text-cyan-600" },
+  { title: "Portefeuille", url: "/wallet", icon: Wallet, bg: "bg-amber-100", iconColor: "text-amber-600" },
+  { title: "Liens de paiement", url: "/payment-links", icon: Link2, bg: "bg-pink-100", iconColor: "text-pink-600" },
+  { title: "Clés API", url: "/api-keys", icon: Key, bg: "bg-orange-100", iconColor: "text-orange-600" },
+  { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck, bg: "bg-blue-100", iconColor: "text-blue-600" },
+  { title: "Paramètres", url: "/settings", icon: Settings, bg: "bg-slate-100", iconColor: "text-slate-600" },
 ];
 
 const adminMenuItems = [
-  { title: "Administration", url: "/admin", icon: Shield, color: "text-red-600" },
+  { title: "Administration", url: "/admin", icon: Shield, bg: "bg-red-100", iconColor: "text-red-600" },
 ];
 
 export function AppSidebar() {
@@ -68,113 +64,115 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="border-r border-gray-200">
-      <div className="flex flex-col h-full bg-white">
-        <SidebarHeader className="p-5 pb-4 flex-shrink-0 border-b border-gray-100">
+    <Sidebar className="border-r border-gray-200/80">
+      <div className="flex flex-col h-full bg-gray-50/80">
+
+        <SidebarHeader className="px-4 py-5 flex-shrink-0">
           <Link href="/dashboard">
-            <div className="flex items-center gap-3 cursor-pointer group" data-testid="link-logo">
+            <div className="flex items-center gap-3 cursor-pointer" data-testid="link-logo">
               <div className="relative">
-                <div className="absolute inset-0 rounded-xl bg-violet-500/20 blur-md group-hover:bg-violet-500/40 transition-all" />
-                <img src={solvexpayLogo} alt="SolvexPay" className="relative w-9 h-9 rounded-xl object-cover ring-2 ring-violet-100" />
+                <div className="absolute inset-0 rounded-2xl bg-violet-400/25 blur-lg" />
+                <img src={solvexpayLogo} alt="SolvexPay" className="relative w-10 h-10 rounded-2xl object-cover shadow-md ring-1 ring-violet-200" />
               </div>
               <div>
-                <span className="font-bold text-lg text-gray-900 tracking-tight">SolvexPay</span>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs text-emerald-600 font-medium">Système actif</span>
+                <p className="font-bold text-base text-gray-900 leading-none">SolvexPay</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                  <span className="text-xs text-emerald-600 font-medium">Actif</span>
                 </div>
               </div>
             </div>
           </Link>
         </SidebarHeader>
 
-        <SidebarContent className="flex-1 px-3 py-3 overflow-y-auto">
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-2 mb-1">
-              Navigation
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
+        <SidebarContent className="flex-1 px-3 pb-3 overflow-y-auto">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2">Menu principal</p>
+          <SidebarMenu className="space-y-0.5">
+            {menuItems.map((item) => {
+              const isActive = location === item.url || (item.url === "/dashboard" && location === "/");
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <Link
+                    href={item.url}
+                    data-testid={`link-${item.url.replace("/", "")}`}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer group ${
+                      isActive
+                        ? "bg-white shadow-sm border border-gray-200/80 text-gray-900"
+                        : "text-gray-500 hover:bg-white/70 hover:text-gray-800 hover:shadow-sm"
+                    }`}
+                  >
+                    <span className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                      isActive ? item.bg : "bg-gray-100/0"
+                    }`}>
+                      <item.icon className={`w-4 h-4 ${isActive ? item.iconColor : "text-gray-400"}`} />
+                    </span>
+                    <span className={`text-sm flex-1 ${isActive ? "font-semibold text-gray-900" : "font-medium"}`}>
+                      {item.title}
+                    </span>
+                    {isActive && (
+                      <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
+                    )}
+                  </Link>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+
+          {(user as any)?.isAdmin && (
+            <>
+              <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest px-2 mt-5 mb-2">Administration</p>
               <SidebarMenu className="space-y-0.5">
-                {menuItems.map((item) => {
-                  const isActive = location === item.url || (item.url === "/dashboard" && location === "/");
+                {adminMenuItems.map((item) => {
+                  const isActive = location === item.url;
                   return (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        className={`h-10 rounded-xl transition-all duration-150 ${
-                          isActive
-                            ? "bg-violet-50 text-violet-700 shadow-sm"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                      <Link
+                        href={item.url}
+                        data-testid={`link-${item.url.replace("/", "")}`}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer group ${
+                          isActive ? "bg-red-50 shadow-sm border border-red-100 text-red-700" : "text-red-400 hover:bg-red-50/70 hover:text-red-700"
                         }`}
                       >
-                        <Link href={item.url} data-testid={`link-${item.url.replace("/", "")}`} className="flex items-center gap-3 px-3">
-                          <item.icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? "text-violet-600" : item.color}`} />
-                          <span className={`text-sm font-medium ${isActive ? "text-violet-700 font-semibold" : ""}`}>{item.title}</span>
-                          {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-500" />}
-                        </Link>
-                      </SidebarMenuButton>
+                        <span className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? "bg-red-100" : ""}`}>
+                          <item.icon className="w-4 h-4" />
+                        </span>
+                        <span className="text-sm font-medium flex-1">{item.title}</span>
+                      </Link>
                     </SidebarMenuItem>
                   );
                 })}
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {(user as any)?.isAdmin && (
-            <SidebarGroup className="mt-4">
-              <SidebarGroupLabel className="text-xs font-semibold text-red-400 uppercase tracking-widest px-2 mb-1">
-                Admin
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {adminMenuItems.map((item) => {
-                    const isActive = location === item.url;
-                    return (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={isActive}
-                          className={`h-10 rounded-xl ${isActive ? "bg-red-50 text-red-700" : "text-red-500 hover:text-red-700 hover:bg-red-50"}`}
-                        >
-                          <Link href={item.url} data-testid={`link-${item.url.replace("/", "")}`} className="flex items-center gap-3 px-3">
-                            <item.icon className="w-4 h-4 flex-shrink-0" />
-                            <span className="text-sm font-medium">{item.title}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            </>
           )}
         </SidebarContent>
 
-        <SidebarFooter className="p-3 border-t border-gray-100 flex-shrink-0">
+        <SidebarFooter className="p-3 border-t border-gray-200/80 flex-shrink-0 bg-white/60">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 px-3 h-14 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-900 group"
+                className="w-full justify-start gap-3 px-3 h-14 rounded-2xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-900 shadow-sm group"
                 data-testid="button-user-menu"
               >
-                <Avatar className="h-8 w-8 ring-2 ring-violet-200">
+                <Avatar className="h-9 w-9 ring-2 ring-violet-100 flex-shrink-0">
                   <AvatarImage src={user?.profileImageUrl || undefined} />
-                  <AvatarFallback className="text-xs font-bold" style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(160 84% 44%))", color: "white" }}>
+                  <AvatarFallback
+                    className="text-xs font-bold text-white"
+                    style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(160 84% 44%))" }}
+                  >
                     {getInitials()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 text-left min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate" data-testid="text-user-name">{getDisplayName()}</p>
-                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                  <p className="text-sm font-bold text-gray-900 truncate" data-testid="text-user-name">{getDisplayName()}</p>
+                  <p className="text-xs text-gray-400 truncate">{user?.email}</p>
                 </div>
-                <ChevronUp className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                <ChevronDown className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 shadow-xl">
+            <DropdownMenuContent align="end" className="w-56 shadow-xl rounded-xl">
               <DropdownMenuItem asChild>
-                <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
+                <Link href="/settings" className="flex items-center gap-2 cursor-pointer rounded-lg">
                   <Settings className="h-4 w-4" />
                   Paramètres
                 </Link>
@@ -183,7 +181,7 @@ export function AppSidebar() {
               <DropdownMenuItem
                 onClick={() => logout()}
                 disabled={isLoggingOut}
-                className="text-destructive focus:text-destructive cursor-pointer"
+                className="text-destructive focus:text-destructive cursor-pointer rounded-lg"
                 data-testid="button-logout"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -192,6 +190,7 @@ export function AppSidebar() {
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarFooter>
+
       </div>
     </Sidebar>
   );
