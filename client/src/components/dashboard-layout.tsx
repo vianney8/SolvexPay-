@@ -9,6 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { ChevronLeft } from "lucide-react";
 import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 
 interface DashboardLayoutProps {
@@ -17,7 +18,17 @@ interface DashboardLayoutProps {
   breadcrumbs?: { label: string; href?: string }[];
 }
 
+function goBack() {
+  if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    window.location.href = "/dashboard";
+  }
+}
+
 export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayoutProps) {
+  const showBackButton = breadcrumbs && breadcrumbs.length > 0;
+
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -28,10 +39,28 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1">
-          <header className="flex h-14 items-center gap-4 border-b border-border/60 bg-background/95 backdrop-blur-sm px-4 lg:px-6 sticky top-0 z-50 shadow-sm">
-            <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors" data-testid="button-sidebar-toggle" />
-            <Separator orientation="vertical" className="h-5" />
-            <div className="flex-1">
+          <header className="flex h-14 items-center gap-3 border-b border-border/60 bg-background/95 backdrop-blur-sm px-4 lg:px-6 sticky top-0 z-50 shadow-sm">
+            <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0" data-testid="button-sidebar-toggle" />
+            <Separator orientation="vertical" className="h-5 flex-shrink-0" />
+
+            {showBackButton && (
+              <>
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 group"
+                  data-testid="button-back"
+                >
+                  <span className="h-7 w-7 rounded-lg border border-border/70 bg-background flex items-center justify-center group-hover:bg-muted/50 transition-colors">
+                    <ChevronLeft className="h-4 w-4" />
+                  </span>
+                  <span className="hidden sm:inline">Retour</span>
+                </button>
+                <Separator orientation="vertical" className="h-5 flex-shrink-0" />
+              </>
+            )}
+
+            <div className="flex-1 min-w-0">
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
@@ -39,28 +68,26 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
                       Accueil
                     </BreadcrumbLink>
                   </BreadcrumbItem>
-                  {breadcrumbs?.map((crumb, index) => (
-                    <>
-                      <BreadcrumbSeparator key={`sep-${index}`} />
-                      <BreadcrumbItem key={`item-${index}`}>
-                        {crumb.href ? (
-                          <BreadcrumbLink href={crumb.href} className="text-sm">{crumb.label}</BreadcrumbLink>
-                        ) : (
-                          <BreadcrumbPage className="text-sm font-medium">{crumb.label}</BreadcrumbPage>
-                        )}
-                      </BreadcrumbItem>
-                    </>
-                  ))}
+                  {breadcrumbs?.map((crumb, index) => [
+                    <BreadcrumbSeparator key={`sep-${index}`} />,
+                    <BreadcrumbItem key={`item-${index}`}>
+                      {crumb.href ? (
+                        <BreadcrumbLink href={crumb.href} className="text-sm">{crumb.label}</BreadcrumbLink>
+                      ) : (
+                        <BreadcrumbPage className="text-sm font-medium">{crumb.label}</BreadcrumbPage>
+                      )}
+                    </BreadcrumbItem>,
+                  ])}
                 </BreadcrumbList>
               </Breadcrumb>
             </div>
+
             <div className="flex items-center gap-2 flex-shrink-0" data-testid="header-logo">
-              <div className="relative">
-                <img src={solvexpayLogo} alt="SolvexPay" className="w-7 h-7 rounded-lg object-cover ring-1 ring-primary/20" />
-              </div>
+              <img src={solvexpayLogo} alt="SolvexPay" className="w-7 h-7 rounded-lg object-cover ring-1 ring-primary/20" />
               <span className="font-bold text-sm hidden sm:inline bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
             </div>
           </header>
+
           <main className="flex-1 overflow-auto p-4 lg:p-6 bg-background">
             {title && (
               <div className="mb-6">
