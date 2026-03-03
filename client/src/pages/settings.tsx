@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { UserAvatar } from "@/components/user-avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -214,13 +215,6 @@ export default function SettingsPage() {
     passwordMutation.mutate({ currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword });
   };
 
-  const getInitials = () => {
-    if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    if (firstName) return firstName[0].toUpperCase();
-    if (email) return email[0].toUpperCase();
-    return "U";
-  };
-
   return (
     <DashboardLayout title="Paramètres" breadcrumbs={[{ label: "Paramètres" }]}>
       <div className="max-w-2xl space-y-6">
@@ -230,8 +224,8 @@ export default function SettingsPage() {
         >
           <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
           <div className="relative flex items-center gap-4">
-            <div className="h-14 w-14 rounded-2xl bg-white/15 flex items-center justify-center flex-shrink-0 text-2xl font-black">
-              {getInitials()}
+            <div className="h-14 w-14 rounded-2xl overflow-hidden flex-shrink-0 ring-2 ring-white/30">
+              <UserAvatar userId={user?.id} email={email || undefined} size={56} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-xl">{[firstName, lastName].filter(Boolean).join(" ") || "Mon compte"}</p>

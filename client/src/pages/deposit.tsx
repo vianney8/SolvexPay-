@@ -46,6 +46,9 @@ export default function DepositPage() {
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
   const currency = selectedCountry.currency;
   const parsedAmount = parseFloat(amount) || 0;
+  const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
+  const feesAmount = Math.round(parsedAmount * feeRate);
+  const netAmount = parsedAmount - feesAmount;
 
   useEffect(() => { setOperator(""); }, [country]);
 
@@ -308,17 +311,17 @@ export default function DepositPage() {
             <Card className="border-border/60 bg-emerald-500/3">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Montant du dépôt</span>
+                  <span className="text-muted-foreground">Montant brut</span>
                   <span className="font-semibold">{formatCurrency(parsedAmount)} {currency}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Frais</span>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs">Gratuit</Badge>
+                  <span className="text-muted-foreground">Frais ({feeRate * 100}%{["BF","COG"].includes(country) ? " — taux spécial" : ""})</span>
+                  <span className="text-orange-600 font-semibold">- {formatCurrency(feesAmount)} {currency}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm">Total à payer</span>
-                  <span className="font-black text-xl text-emerald-600 dark:text-emerald-400" data-testid="text-deposit-total">{formatCurrency(parsedAmount)} {currency}</span>
+                  <span className="font-bold text-sm">Montant crédité</span>
+                  <span className="font-black text-xl text-emerald-600 dark:text-emerald-400" data-testid="text-deposit-total">{formatCurrency(netAmount)} {currency}</span>
                 </div>
               </CardContent>
             </Card>
@@ -327,7 +330,7 @@ export default function DepositPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
             <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Un prompt <strong>USSD</strong> sera envoyé sur votre téléphone. Confirmez pour finaliser. Délai : instantané à 2 min.
+              Un prompt <strong>USSD</strong> sera envoyé sur votre téléphone. Les frais de service (<strong>{feeRate * 100}%</strong>) sont déduits du montant déposé.
             </p>
           </div>
 

@@ -1,6 +1,7 @@
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -48,13 +49,6 @@ const adminMenuItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
-
-  const getInitials = () => {
-    if (user?.firstName && user?.lastName) return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
-    if (user?.firstName) return user.firstName[0].toUpperCase();
-    if (user?.email) return user.email[0].toUpperCase();
-    return "U";
-  };
 
   const getDisplayName = () => {
     if (user?.firstName) return [user.firstName, user.lastName].filter(Boolean).join(" ");
@@ -161,15 +155,15 @@ export function AppSidebar() {
                 className="w-full justify-start gap-3 px-3 h-14 rounded-2xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-900 shadow-sm group"
                 data-testid="button-user-menu"
               >
-                <Avatar className="h-9 w-9 ring-2 ring-violet-100 flex-shrink-0">
-                  <AvatarImage src={user?.profileImageUrl || undefined} />
-                  <AvatarFallback
-                    className="text-xs font-bold text-white"
-                    style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(160 84% 44%))" }}
-                  >
-                    {getInitials()}
-                  </AvatarFallback>
-                </Avatar>
+                {user?.profileImageUrl ? (
+                  <Avatar className="h-9 w-9 ring-2 ring-violet-100 flex-shrink-0">
+                    <AvatarImage src={user.profileImageUrl} />
+                  </Avatar>
+                ) : (
+                  <div className="ring-2 ring-violet-100 rounded-full flex-shrink-0">
+                    <UserAvatar userId={user?.id} email={user?.email || undefined} size={36} />
+                  </div>
+                )}
                 <div className="flex-1 text-left min-w-0">
                   <p className="text-sm font-bold text-gray-900 truncate" data-testid="text-user-name">{getDisplayName()}</p>
                   <p className="text-xs text-gray-400 truncate">{user?.email}</p>

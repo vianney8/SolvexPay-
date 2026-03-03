@@ -142,9 +142,9 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2">
-            <Card className="border-border/60 h-full">
-              <CardHeader className="flex flex-row items-center justify-between gap-1 pb-4">
+          <div className="lg:col-span-2 space-y-5">
+            <Card className="border-border/60">
+              <CardHeader className="flex flex-row items-center justify-between gap-1 pb-3">
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Activity className="h-4 w-4 text-primary" />
@@ -157,12 +157,12 @@ export default function DashboardPage() {
                   </Button>
                 </Link>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 {transactionsLoading ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <Skeleton className="h-10 w-10 rounded-xl" />
+                      <div key={i} className="flex items-center gap-3 p-2">
+                        <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
                         <div className="flex-1"><Skeleton className="h-4 w-28 mb-1.5" /><Skeleton className="h-3 w-20" /></div>
                         <Skeleton className="h-5 w-24" />
                       </div>
@@ -175,115 +175,139 @@ export default function DashboardPage() {
                     </div>
                     <p className="font-semibold text-sm text-muted-foreground">Aucune transaction</p>
                     <p className="text-xs text-muted-foreground mt-1">Vos transactions apparaîtront ici</p>
+                    <Link href="/deposit">
+                      <Button size="sm" className="mt-4 gap-1.5 font-semibold">
+                        <Plus className="h-3.5 w-3.5" /> Faire un dépôt
+                      </Button>
+                    </Link>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {recentTransactions.map((tx) => (
-                      <div key={tx.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/40 transition-colors" data-testid={`transaction-item-${tx.id}`}>
-                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          tx.type === "deposit" ? "bg-emerald-500/10" : tx.type === "transfer" ? "bg-violet-500/10" : "bg-orange-500/10"
-                        }`}>
-                          {tx.type === "deposit" ? (
-                            <ArrowDownLeft className="h-4 w-4 text-emerald-600" />
-                          ) : tx.type === "transfer" ? (
-                            <ArrowLeftRight className="h-4 w-4 text-violet-600" />
-                          ) : (
-                            <ArrowUpRight className="h-4 w-4 text-orange-600" />
-                          )}
+                  <div className="divide-y divide-border/40">
+                    {recentTransactions.map((tx) => {
+                      const isPayLink = tx.description?.startsWith("Paiement via lien:");
+                      const label = isPayLink ? "Paiement" : tx.type === "deposit" ? "Dépôt" : tx.type === "transfer" ? "Transfert" : "Retrait";
+                      const provider = tx.provider && tx.provider.toLowerCase() !== "omnipay" ? tx.provider : null;
+                      return (
+                        <div key={tx.id} className="flex items-center gap-3 py-3 hover:bg-muted/30 rounded-xl px-2 transition-colors group" data-testid={`transaction-item-${tx.id}`}>
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${tx.type === "deposit" ? "bg-emerald-500/10" : tx.type === "transfer" ? "bg-violet-500/10" : "bg-orange-500/10"}`}>
+                            {tx.type === "deposit" ? <ArrowDownLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : tx.type === "transfer" ? <ArrowLeftRight className="h-4 w-4 text-violet-600 dark:text-violet-400" /> : <ArrowUpRight className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-foreground">
+                              {label}{provider && <span className="font-normal text-muted-foreground text-xs"> · {provider}</span>}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{tx.createdAt && formatDate(tx.createdAt)}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className={`font-bold text-sm ${tx.type === "deposit" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
+                              {tx.type === "deposit" ? "+" : "-"}{formatCurrency(tx.amount)} XOF
+                            </p>
+                            <span className={`text-xs font-semibold ${tx.status === "completed" ? "text-emerald-600 dark:text-emerald-400" : tx.status === "pending" ? "text-amber-600" : "text-red-500"}`}>
+                              {tx.status === "completed" ? "Terminé" : tx.status === "pending" ? "En cours" : "Échoué"}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-foreground capitalize">
-                            {tx.type === "deposit" ? "Dépôt" : tx.type === "transfer" ? "Transfert" : "Retrait"}
-                            {tx.provider && <span className="font-normal text-muted-foreground"> · {tx.provider}</span>}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{tx.createdAt && formatDate(tx.createdAt)}</p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className={`font-bold text-sm ${tx.type === "deposit" ? "text-emerald-600" : "text-foreground"}`}>
-                            {tx.type === "deposit" ? "+" : "-"}{formatCurrency(tx.amount)} XOF
-                          </p>
-                          <Badge
-                            variant="secondary"
-                            className={`text-xs mt-0.5 ${tx.status === "completed" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : tx.status === "pending" ? "bg-amber-500/10 text-amber-600 border-amber-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}`}
-                          >
-                            {tx.status === "completed" ? "Terminé" : tx.status === "pending" ? "En cours" : "Échoué"}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Dépôts", count: depositTx.length, amount: depositTx.reduce((s, t) => s + parseFloat(t.amount), 0), color: "from-emerald-500/20 to-teal-500/10", icon: ArrowDownLeft, iconColor: "text-emerald-600 dark:text-emerald-400", barColor: "bg-gradient-to-r from-emerald-500 to-teal-500" },
+                { label: "Retraits", count: withdrawalTx.length, amount: withdrawalTx.reduce((s, t) => s + parseFloat(t.amount), 0), color: "from-orange-500/20 to-red-500/10", icon: ArrowUpRight, iconColor: "text-orange-600 dark:text-orange-400", barColor: "bg-gradient-to-r from-orange-500 to-red-500" },
+                { label: "En attente", count: pendingTx.length, amount: pendingTx.reduce((s, t) => s + parseFloat(t.amount), 0), color: "from-amber-500/20 to-yellow-500/10", icon: Clock, iconColor: "text-amber-600", barColor: "bg-gradient-to-r from-amber-500 to-yellow-500" },
+              ].map((item) => {
+                const Icon = item.icon;
+                const pct = transactions && transactions.length > 0 ? (item.count / transactions.length) * 100 : 0;
+                return (
+                  <Card key={item.label} className="border-border/60 overflow-hidden">
+                    <div className={`h-1 bg-gradient-to-r ${item.color}`} />
+                    <CardContent className="p-4">
+                      <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center mb-3`}>
+                        <Icon className={`h-4 w-4 ${item.iconColor}`} />
+                      </div>
+                      <p className="text-2xl font-black text-foreground" data-testid={`stat-count-${item.label.toLowerCase()}`}>{item.count}</p>
+                      <p className="text-xs text-muted-foreground font-medium mt-0.5">{item.label}</p>
+                      <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className={`h-full rounded-full ${item.barColor} transition-all duration-700`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
 
           <div className="space-y-4">
-            <Card className="border-border/60">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-9 w-9 rounded-xl bg-violet-500/10 flex items-center justify-center flex-shrink-0">
-                    <ArrowLeftRight className="h-4 w-4 text-violet-600" />
+            <Link href="/transfer" className="block">
+              <div
+                className="relative rounded-2xl p-5 text-white overflow-hidden shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
+                style={{ background: "linear-gradient(135deg, hsl(262 83% 52%) 0%, hsl(280 70% 60%) 100%)" }}
+                data-testid="button-transfer"
+              >
+                <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-1/2 translate-x-1/2" />
+                <div className="relative">
+                  <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+                    <Send className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h3 className="font-bold text-sm">Transfert d'argent</h3>
-                    <p className="text-xs text-muted-foreground">Envoi rapide et sécurisé</p>
+                  <p className="font-black text-base leading-tight">Transfert rapide</p>
+                  <p className="text-white/70 text-xs mt-1">Envoi instantané sécurisé</p>
+                  <div className="flex items-center gap-1 mt-3 text-white/80 text-xs font-semibold">
+                    Transférer maintenant <ArrowRight className="h-3.5 w-3.5" />
                   </div>
                 </div>
-                <Link href="/transfer">
-                  <Button variant="outline" className="w-full text-sm font-semibold border-violet-500/20 text-violet-600 hover:bg-violet-500/5" data-testid="button-transfer">
-                    Transférer maintenant <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+              </div>
+            </Link>
 
-            <Card className="border-border/60">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-9 w-9 rounded-xl bg-pink-500/10 flex items-center justify-center flex-shrink-0">
-                    <Link2 className="h-4 w-4 text-pink-600" />
+            <Link href="/payment-links" className="block">
+              <div
+                className="relative rounded-2xl p-5 text-white overflow-hidden shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
+                style={{ background: "linear-gradient(135deg, hsl(330 80% 52%) 0%, hsl(300 70% 56%) 100%)" }}
+                data-testid="button-goto-payment-links"
+              >
+                <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-1/2 translate-x-1/2" />
+                <div className="relative">
+                  <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+                    <Link2 className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h3 className="font-bold text-sm">Liens de paiement</h3>
-                    <p className="text-xs text-muted-foreground">{stats?.paymentLinksCount || 0} lien(s) actif(s)</p>
+                  <p className="font-black text-base leading-tight">Liens de paiement</p>
+                  <p className="text-white/70 text-xs mt-1">{stats?.paymentLinksCount || 0} lien(s) créé(s)</p>
+                  <div className="flex items-center gap-1 mt-3 text-white/80 text-xs font-semibold">
+                    Créer un lien <ArrowRight className="h-3.5 w-3.5" />
                   </div>
                 </div>
-                <Link href="/payment-links">
-                  <Button variant="outline" className="w-full text-sm font-semibold border-pink-500/20 text-pink-600 hover:bg-pink-500/5" data-testid="button-goto-payment-links">
-                    Créer un lien <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+              </div>
+            </Link>
 
             <Card className="border-border/60">
               <CardContent className="p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm font-bold">Volume des flux</p>
+                  <div className="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                    <BarChart3 className="h-4 w-4 text-violet-600" />
+                  </div>
+                  <p className="text-sm font-bold">Performance</p>
                 </div>
                 <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1.5"><ArrowDownLeft className="h-3 w-3 text-emerald-500" />Dépôts</span>
-                      <span className="font-bold">{depositTx.length}</span>
+                  {[
+                    { label: "Taux de succès", value: transactions && transactions.length > 0 ? Math.round((transactions.filter(t => t.status === "completed").length / transactions.length) * 100) : 0, suffix: "%" },
+                    { label: "Total transactions", value: transactions?.length || 0, suffix: "" },
+                    { label: "Liens actifs", value: stats?.paymentLinksCount || 0, suffix: "" },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{item.label}</span>
+                      <span className="text-sm font-black text-foreground">{item.value}{item.suffix}</span>
                     </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-700" style={{ width: `${transactions && transactions.length > 0 ? (depositTx.length / transactions.length) * 100 : 0}%` }} data-testid="bar-deposits" />
+                  ))}
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="text-muted-foreground">Volume total entrant</span>
                     </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground flex items-center gap-1.5"><ArrowUpRight className="h-3 w-3 text-orange-500" />Retraits</span>
-                      <span className="font-bold">{withdrawalTx.length}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-700" style={{ width: `${transactions && transactions.length > 0 ? (withdrawalTx.length / transactions.length) * 100 : 0}%` }} data-testid="bar-withdrawals" />
-                    </div>
-                  </div>
-                  <div className="pt-1 flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Clock className="h-3 w-3 text-amber-500" />En attente</span>
-                    <Badge variant="secondary" className="text-xs px-2 py-0">{pendingTx.length}</Badge>
+                    <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(stats?.totalDeposits || 0)} <span className="text-sm font-semibold text-muted-foreground">XOF</span>
+                    </p>
                   </div>
                 </div>
               </CardContent>

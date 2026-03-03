@@ -179,17 +179,21 @@ export async function registerRoutes(
         returnUrl,
       });
 
+      const depositFeeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
+      const depositFees = Math.round(amount * depositFeeRate);
+
       const transaction = await storage.createTransaction({
         userId,
         type: "deposit",
         amount: amount.toString(),
         currency,
-        provider: "omnipay",
+        provider: operator,
         phoneNumber,
         reference,
         status: "pending",
         description: description || "Depot SolvexPay",
-      });
+        fees: String(depositFees),
+      } as any);
 
       res.json({
         ...transaction,
@@ -347,10 +351,13 @@ export async function registerRoutes(
         if (statusStr === "completed") {
           await storage.updateTransactionStatus(transaction.id, "completed");
           if (transaction.type === "deposit") {
+            const grossAmount = parseFloat(transaction.amount);
+            const txFees = parseFloat((transaction as any).fees || "0") || 0;
+            const netAmount = grossAmount - txFees;
             await storage.updateWalletBalance(
               transaction.userId,
               transaction.currency,
-              parseFloat(transaction.amount)
+              netAmount > 0 ? netAmount : grossAmount
             );
           }
         } else if (statusStr === "failed") {
@@ -387,10 +394,13 @@ export async function registerRoutes(
         if (statusStr === "completed") {
           await storage.updateTransactionStatus(transaction.id, "completed");
           if (transaction.type === "deposit") {
+            const grossAmt = parseFloat(transaction.amount);
+            const txFees2 = parseFloat((transaction as any).fees || "0") || 0;
+            const netAmt = grossAmt - txFees2;
             await storage.updateWalletBalance(
               transaction.userId,
               transaction.currency,
-              parseFloat(transaction.amount)
+              netAmt > 0 ? netAmt : grossAmt
             );
           }
         } else if (statusStr === "failed") {
@@ -683,10 +693,13 @@ export async function registerRoutes(
       if (statusStr === "completed") {
         await storage.updateTransactionStatus(transaction.id, "completed");
         if (transaction.type === "deposit") {
+          const grossAmtWh = parseFloat(transaction.amount);
+          const txFeesWh = parseFloat((transaction as any).fees || "0") || 0;
+          const netAmtWh = grossAmtWh - txFeesWh;
           await storage.updateWalletBalance(
             transaction.userId,
             transaction.currency,
-            parseFloat(transaction.amount)
+            netAmtWh > 0 ? netAmtWh : grossAmtWh
           );
           console.log(`OmniPay callback: deposit ${reference} completed, wallet credited`);
         } else if (transaction.type === "withdrawal") {
