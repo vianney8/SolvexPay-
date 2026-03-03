@@ -28,6 +28,33 @@ SolvexPay is a pan-African payment aggregation platform that enables businesses 
 - **Polling**: Frontend polls /api/transactions/verify every 5s for pending payments
 - **Webhook URLs endpoint**: GET /api/settings/webhook-urls - returns configured webhook/callback URLs for SendavaPay dashboard setup
 
+## Design System (March 2026 Redesign)
+
+### Color Palette
+- **Primary**: Violet `262 83% 58%` (buttons, links, accents)
+- **Sidebar**: Dark navy gradient `hsl(262 60% 10%)` → `hsl(262 50% 16%)` → `hsl(240 30% 8%)`
+- **Emerald accent**: `160 84% 50%` (success states, active badges)
+- **Amber**: `38 92% 50%` (warnings, highlights)
+- **Background light**: `240 20% 98%`
+
+### CSS Utilities
+- `.gradient-brand` — violet-to-purple gradient
+- `.gradient-emerald` — emerald gradient
+- `.glass` — glassmorphism card effect
+- `.mesh-bg` — subtle mesh background for hero sections
+- `.text-gradient-brand` — animated gradient text
+
+### Pages Redesigned
+All pages use premium gradient cards, polish shadows, and consistent spacing:
+- **Landing** — hero split with floating stats, country flag badges, feature cards with gradient headers
+- **Auth (Login/Register)** — split-screen with decorative dark panel, `AuthPanel` component
+- **Dashboard** — gradient balance card with quick actions, stat cards, recent transactions, mini chart
+- **Transactions** — summary stat cards, filtered list with type/status badges
+- **Wallet** — gradient currency cards for XOF/NGN/GHS/KES, operator grid
+- **Transfer** — step-form with country/operator selection, confirmation screen with fee breakdown
+- **Payment Links** — gradient summary cards, card-per-link layout with image support
+- **Settings** — gradient profile header, tabbed layout (Profil / Sécurité / Intégrations)
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

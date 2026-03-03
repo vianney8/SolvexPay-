@@ -16,59 +16,41 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import {
-  Send, ArrowRight, Globe, Wallet, Info, Phone,
-} from "lucide-react";
+import { Send, ArrowRight, Wallet, Info, Phone, CheckCircle2, ArrowLeft, Globe2 } from "lucide-react";
 import type { Wallet as WalletType } from "@shared/schema";
 
 const countries = [
-  { code: "BJ", name: "Benin", prefix: "+229", currency: "XOF" },
-  { code: "CI", name: "Cote d'Ivoire", prefix: "+225", currency: "XOF" },
-  { code: "BF", name: "Burkina Faso", prefix: "+226", currency: "XOF" },
-  { code: "TG", name: "Togo", prefix: "+228", currency: "XOF" },
-  { code: "SN", name: "Senegal", prefix: "+221", currency: "XOF" },
-  { code: "ML", name: "Mali", prefix: "+223", currency: "XOF" },
-  { code: "NE", name: "Niger", prefix: "+227", currency: "XOF" },
-  { code: "GW", name: "Guinee-Bissau", prefix: "+245", currency: "XOF" },
-  { code: "NG", name: "Nigeria", prefix: "+234", currency: "XOF" },
-  { code: "GH", name: "Ghana", prefix: "+233", currency: "XOF" },
-  { code: "KE", name: "Kenya", prefix: "+254", currency: "XOF" },
-  { code: "CM", name: "Cameroun", prefix: "+237", currency: "XOF" },
-  { code: "CD", name: "RD Congo", prefix: "+243", currency: "XOF" },
-  { code: "CG", name: "Congo-Brazzaville", prefix: "+242", currency: "XOF" },
-  { code: "GN", name: "Guinee", prefix: "+224", currency: "XOF" },
-  { code: "GA", name: "Gabon", prefix: "+241", currency: "XOF" },
-  { code: "TD", name: "Tchad", prefix: "+235", currency: "XOF" },
-  { code: "CF", name: "Centrafrique", prefix: "+236", currency: "XOF" },
-  { code: "MR", name: "Mauritanie", prefix: "+222", currency: "XOF" },
-  { code: "RW", name: "Rwanda", prefix: "+250", currency: "XOF" },
-  { code: "BI", name: "Burundi", prefix: "+257", currency: "XOF" },
-  { code: "TZ", name: "Tanzanie", prefix: "+255", currency: "XOF" },
-  { code: "UG", name: "Ouganda", prefix: "+256", currency: "XOF" },
-  { code: "MG", name: "Madagascar", prefix: "+261", currency: "XOF" },
-  { code: "ZA", name: "Afrique du Sud", prefix: "+27", currency: "XOF" },
-  { code: "ET", name: "Ethiopie", prefix: "+251", currency: "XOF" },
-  { code: "MA", name: "Maroc", prefix: "+212", currency: "XOF" },
-  { code: "DZ", name: "Algerie", prefix: "+213", currency: "XOF" },
-  { code: "TN", name: "Tunisie", prefix: "+216", currency: "XOF" },
-  { code: "EG", name: "Egypte", prefix: "+20", currency: "XOF" },
+  { code: "BJ", name: "Bénin", prefix: "+229", flag: "🇧🇯" },
+  { code: "CI", name: "Côte d'Ivoire", prefix: "+225", flag: "🇨🇮" },
+  { code: "BF", name: "Burkina Faso", prefix: "+226", flag: "🇧🇫" },
+  { code: "TG", name: "Togo", prefix: "+228", flag: "🇹🇬" },
+  { code: "SN", name: "Sénégal", prefix: "+221", flag: "🇸🇳" },
+  { code: "ML", name: "Mali", prefix: "+223", flag: "🇲🇱" },
+  { code: "NE", name: "Niger", prefix: "+227", flag: "🇳🇪" },
+  { code: "GW", name: "Guinée-Bissau", prefix: "+245", flag: "🇬🇼" },
+  { code: "NG", name: "Nigeria", prefix: "+234", flag: "🇳🇬" },
+  { code: "GH", name: "Ghana", prefix: "+233", flag: "🇬🇭" },
+  { code: "KE", name: "Kenya", prefix: "+254", flag: "🇰🇪" },
+  { code: "CM", name: "Cameroun", prefix: "+237", flag: "🇨🇲" },
+  { code: "CD", name: "RD Congo", prefix: "+243", flag: "🇨🇩" },
+  { code: "CG", name: "Congo-Brazzaville", prefix: "+242", flag: "🇨🇬" },
+  { code: "GN", name: "Guinée", prefix: "+224", flag: "🇬🇳" },
+  { code: "GA", name: "Gabon", prefix: "+241", flag: "🇬🇦" },
+  { code: "MA", name: "Maroc", prefix: "+212", flag: "🇲🇦" },
 ];
 
 const operators = [
-  { id: "mtn", name: "MTN Mobile Money" },
-  { id: "orange", name: "Orange Money" },
-  { id: "wave", name: "Wave" },
-  { id: "moov", name: "Moov Money" },
-  { id: "free", name: "Free Money" },
-  { id: "airtel", name: "Airtel Money" },
-  { id: "tmoney", name: "T-Money" },
+  { id: "mtn", name: "MTN Mobile Money", color: "bg-yellow-400" },
+  { id: "orange", name: "Orange Money", color: "bg-orange-500" },
+  { id: "wave", name: "Wave", color: "bg-blue-500" },
+  { id: "moov", name: "Moov Money", color: "bg-purple-500" },
+  { id: "free", name: "Free Money", color: "bg-emerald-500" },
+  { id: "airtel", name: "Airtel Money", color: "bg-red-500" },
+  { id: "tmoney", name: "T-Money", color: "bg-cyan-500" },
 ];
 
-function formatCurrency(amount: number, currency = "XOF") {
-  return new Intl.NumberFormat("fr-FR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount) + ` ${currency}`;
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount) + " XOF";
 }
 
 export default function TransferPage() {
@@ -80,43 +62,28 @@ export default function TransferPage() {
   const [amount, setAmount] = useState("");
   const [step, setStep] = useState<"form" | "confirm">("form");
 
-  const { data: wallet } = useQuery<WalletType>({
-    queryKey: ["/api/wallet"],
-  });
+  const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
 
   const transferMutation = useMutation({
-    mutationFn: async (data: {
-      amount: number;
-      phoneNumber: string;
-      operator: string;
-      country: string;
-      firstName: string;
-      lastName: string;
-    }) => {
+    mutationFn: async (data: { amount: number; phoneNumber: string; operator: string; country: string; firstName: string; lastName: string }) => {
       return apiRequest("POST", "/api/transactions/transfer", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      toast({
-        title: "Transfert initie",
-        description: "Votre transfert a ete envoye avec succes vers le portefeuille du destinataire.",
-      });
+      toast({ title: "Transfert initié", description: "Votre transfert a été envoyé avec succès." });
       setStep("form");
       setAmount("");
       setPhoneNumber("");
       setRecipientName("");
     },
     onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error?.message || "Impossible d'effectuer le transfert.",
-        variant: "destructive",
-      });
+      toast({ title: "Erreur", description: error?.message || "Impossible d'effectuer le transfert.", variant: "destructive" });
     },
   });
 
   const selectedCountry = countries.find(c => c.code === destinationCountry);
+  const selectedOperator = operators.find(p => p.id === operator);
   const parsedAmount = parseFloat(amount) || 0;
   const fees = parsedAmount * 0.02;
   const totalDebit = parsedAmount + fees;
@@ -129,7 +96,7 @@ export default function TransferPage() {
       return;
     }
     if (!phoneNumber || phoneNumber.length < 8) {
-      toast({ title: "Erreur", description: "Numero de telephone invalide", variant: "destructive" });
+      toast({ title: "Erreur", description: "Numéro de téléphone invalide", variant: "destructive" });
       return;
     }
     if (totalDebit > balanceXOF) {
@@ -143,7 +110,6 @@ export default function TransferPage() {
     const nameParts = recipientName.trim().split(" ");
     const firstName = nameParts[0] || recipientName;
     const lastName = nameParts.slice(1).join(" ") || ".";
-
     transferMutation.mutate({
       amount: parsedAmount,
       phoneNumber: `${selectedCountry?.prefix}${phoneNumber}`.replace("+", ""),
@@ -157,96 +123,125 @@ export default function TransferPage() {
   return (
     <DashboardLayout title="Transfert d'argent" breadcrumbs={[{ label: "Transfert" }]}>
       <div className="max-w-2xl mx-auto space-y-6">
-        <Card>
-          <CardContent className="pt-6 pb-4">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center flex-shrink-0">
+        <div
+          className="relative rounded-3xl p-6 text-white overflow-hidden shadow-xl"
+          style={{ background: "linear-gradient(135deg, hsl(262 83% 52%) 0%, hsl(280 70% 60%) 100%)" }}
+        >
+          <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
+          <div className="relative flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-2xl bg-white/15 flex items-center justify-center">
                 <Send className="h-6 w-6 text-white" />
               </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-lg">Envoyer de l'argent</h3>
-                <p className="text-sm text-muted-foreground">Transferez des fonds vers un autre pays africain</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground">Solde disponible</p>
-                <p className="font-bold text-lg" data-testid="text-transfer-balance">{formatCurrency(balanceXOF)}</p>
+              <div>
+                <h3 className="font-bold text-lg">Envoyer de l'argent</h3>
+                <p className="text-white/70 text-sm">Transfert international Mobile Money</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-right">
+              <p className="text-white/60 text-xs font-medium">Solde disponible</p>
+              <p className="font-black text-2xl" data-testid="text-transfer-balance">{formatCurrency(balanceXOF)}</p>
+            </div>
+          </div>
+        </div>
 
         {step === "form" && (
-          <form onSubmit={handleContinue} className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Destination</CardTitle>
-                <CardDescription>Choisissez le pays et l'operateur du destinataire</CardDescription>
+          <form onSubmit={handleContinue} className="space-y-5">
+            <Card className="border-border/60">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Globe2 className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-bold">Destination</CardTitle>
+                    <CardDescription className="text-xs">Pays et opérateur du destinataire</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Pays de destination</Label>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Pays de destination</Label>
                   <Select value={destinationCountry} onValueChange={setDestinationCountry}>
-                    <SelectTrigger data-testid="select-transfer-country">
+                    <SelectTrigger className="h-11 border-border/70" data-testid="select-transfer-country">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {countries.map((c) => (
                         <SelectItem key={c.code} value={c.code}>
-                          {c.name} ({c.prefix})
+                          <span className="flex items-center gap-2">
+                            <span>{c.flag}</span>
+                            <span>{c.name}</span>
+                            <span className="text-muted-foreground text-xs">({c.prefix})</span>
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="space-y-2">
-                  <Label>Operateur Mobile Money</Label>
-                  <Select value={operator} onValueChange={setOperator}>
-                    <SelectTrigger data-testid="select-transfer-operator">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {operators.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Opérateur Mobile Money</Label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {operators.map((op) => (
+                      <button
+                        key={op.id}
+                        type="button"
+                        onClick={() => setOperator(op.id)}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-xs font-semibold ${
+                          operator === op.id
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border/60 text-muted-foreground hover:border-border hover:bg-muted/30"
+                        }`}
+                        data-testid={`option-operator-${op.id}`}
+                      >
+                        <div className={`h-5 w-5 rounded-full ${op.color}`} />
+                        <span className="text-center leading-tight">{op.name.split(" ")[0]}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <input type="hidden" name="operator" value={operator} data-testid="select-transfer-operator" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Destinataire</CardTitle>
-                <CardDescription>Informations sur la personne qui recevra le transfert</CardDescription>
+            <Card className="border-border/60">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <Phone className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-bold">Destinataire</CardTitle>
+                    <CardDescription className="text-xs">Informations du bénéficiaire</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="recipient-name">Nom du destinataire</Label>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom complet du destinataire</Label>
                   <Input
-                    id="recipient-name"
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
-                    placeholder="Nom complet du destinataire"
+                    placeholder="Nom Prénom"
                     required
+                    className="h-11 border-border/70"
                     data-testid="input-transfer-recipient"
                   />
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="phone-number">Numero de telephone</Label>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de téléphone</Label>
                   <div className="flex gap-2">
-                    <div className="flex items-center gap-1 px-3 border rounded-md bg-muted text-sm font-medium min-w-fit flex-shrink-0">
-                      <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                      {selectedCountry?.prefix}
+                    <div className="flex items-center gap-1.5 px-3 border border-border/70 rounded-lg bg-muted/40 text-sm font-semibold flex-shrink-0 h-11">
+                      <span>{selectedCountry?.flag}</span>
+                      <span className="text-muted-foreground">{selectedCountry?.prefix}</span>
                     </div>
                     <Input
-                      id="phone-number"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
                       placeholder="97 00 00 00"
                       type="tel"
                       required
+                      className="flex-1 h-11 border-border/70"
                       data-testid="input-transfer-phone"
                     />
                   </div>
@@ -254,108 +249,128 @@ export default function TransferPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Montant</CardTitle>
-                <CardDescription>Saisissez le montant a envoyer en {selectedCountry?.currency || "XOF"}</CardDescription>
+            <Card className="border-border/60">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Wallet className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-bold">Montant</CardTitle>
+                    <CardDescription className="text-xs">Saisissez le montant à envoyer</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="transfer-amount">Montant ({selectedCountry?.currency || "XOF"})</Label>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (XOF)</Label>
                   <Input
-                    id="transfer-amount"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     type="number"
                     placeholder="10 000"
                     min="500"
                     required
+                    className="h-11 border-border/70 text-lg font-bold"
                     data-testid="input-transfer-amount"
                   />
+                  <p className="text-xs text-muted-foreground">Montant minimum : 500 XOF</p>
                 </div>
 
                 {parsedAmount > 0 && (
-                  <div className="space-y-2 pt-2">
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <span className="text-sm text-muted-foreground">Montant envoye</span>
-                      <span className="font-medium">{formatCurrency(parsedAmount, selectedCountry?.currency)}</span>
+                  <div className="bg-muted/40 rounded-2xl p-4 space-y-3 border border-border/40">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Montant envoyé</span>
+                      <span className="font-semibold">{formatCurrency(parsedAmount)}</span>
                     </div>
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <span className="text-sm text-muted-foreground">Frais de transfert (2%)</span>
-                      <span className="text-sm text-destructive">+ {formatCurrency(fees, selectedCountry?.currency)}</span>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Frais (2%)</span>
+                      <span className="text-destructive font-medium">+ {formatCurrency(fees)}</span>
                     </div>
                     <Separator />
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <span className="font-medium">Total debite</span>
-                      <span className="font-bold text-lg" data-testid="text-transfer-total">{formatCurrency(totalDebit, selectedCountry?.currency)}</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm">Total débité</span>
+                      <span className="font-black text-lg text-foreground" data-testid="text-transfer-total">{formatCurrency(totalDebit)}</span>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
-              <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                Des frais de transfert de 2% sont appliques sur chaque envoi. Le destinataire recevra le montant exact que vous avez saisi. 
-                Les delais de reception dependent de l'operateur et du pays de destination.
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+              <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Des frais de transfert de <strong>2%</strong> sont appliqués. Les délais dépendent de l'opérateur et du pays de destination.
               </p>
             </div>
 
-            <Button type="submit" className="w-full gap-2" data-testid="button-continue-transfer">
-              <ArrowRight className="h-4 w-4" />
-              Continuer
+            <Button type="submit" className="w-full h-12 gap-2 text-base font-bold shadow-lg shadow-primary/20" data-testid="button-continue-transfer">
+              Continuer vers la confirmation
+              <ArrowRight className="h-5 w-5" />
             </Button>
           </form>
         )}
 
         {step === "confirm" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Confirmation du transfert</CardTitle>
-                <CardDescription>Verifiez les informations avant de confirmer</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setStep("form")}
+                className="h-9 w-9 rounded-xl border border-border/70 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div>
+                <h2 className="font-bold text-lg">Confirmation du transfert</h2>
+                <p className="text-xs text-muted-foreground">Vérifiez les informations avant d'envoyer</p>
+              </div>
+            </div>
+
+            <Card className="border-border/60">
+              <CardContent className="p-6 space-y-4">
+                {[
+                  { label: "Destinataire", value: recipientName, testid: "text-confirm-recipient" },
+                  { label: "Téléphone", value: `${selectedCountry?.prefix} ${phoneNumber}`, testid: "text-confirm-phone" },
+                  { label: "Pays", value: `${selectedCountry?.flag} ${selectedCountry?.name}` },
+                  { label: "Opérateur", value: selectedOperator?.name },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center justify-between gap-4 py-2">
+                    <span className="text-sm text-muted-foreground">{item.label}</span>
+                    <span className="font-semibold text-sm text-right" data-testid={item.testid}>{item.value}</span>
+                  </div>
+                ))}
+
+                <Separator />
+
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <span className="text-sm text-muted-foreground">Destinataire</span>
-                    <span className="font-medium" data-testid="text-confirm-recipient">{recipientName}</span>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-muted-foreground">Montant envoyé</span>
+                    <span className="font-semibold text-sm">{formatCurrency(parsedAmount)}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <span className="text-sm text-muted-foreground">Telephone</span>
-                    <span className="font-medium" data-testid="text-confirm-phone">{selectedCountry?.prefix} {phoneNumber}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <span className="text-sm text-muted-foreground">Pays</span>
-                    <span className="font-medium">{selectedCountry?.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <span className="text-sm text-muted-foreground">Operateur</span>
-                    <span className="font-medium">{operators.find(p => p.id === operator)?.name}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <span className="text-sm text-muted-foreground">Montant envoye</span>
-                    <span className="font-medium">{formatCurrency(parsedAmount, selectedCountry?.currency)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center justify-between gap-4">
                     <span className="text-sm text-muted-foreground">Frais (2%)</span>
-                    <span className="text-sm text-destructive">+ {formatCurrency(fees, selectedCountry?.currency)}</span>
+                    <span className="text-sm text-destructive font-medium">+ {formatCurrency(fees)}</span>
                   </div>
                   <Separator />
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <span className="font-semibold">Total debite</span>
-                    <span className="font-bold text-lg">{formatCurrency(totalDebit, selectedCountry?.currency)}</span>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-bold text-base">Total débité</span>
+                    <span className="font-black text-xl">{formatCurrency(totalDebit)}</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <div className="flex gap-3 flex-wrap">
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-violet-500/5 border border-violet-500/20">
+              <CheckCircle2 className="h-4 w-4 text-violet-600 dark:text-violet-400 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                En confirmant, vous autorisez SolvexPay à débiter <strong>{formatCurrency(totalDebit)}</strong> de votre portefeuille.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-12 font-semibold border-border/70"
                 onClick={() => setStep("form")}
                 disabled={transferMutation.isPending}
                 data-testid="button-back-transfer"
@@ -363,13 +378,13 @@ export default function TransferPage() {
                 Modifier
               </Button>
               <Button
-                className="flex-1 gap-2"
+                className="flex-1 h-12 gap-2 font-bold shadow-lg shadow-primary/20"
                 onClick={handleConfirm}
                 disabled={transferMutation.isPending}
                 data-testid="button-confirm-transfer"
               >
                 <Send className="h-4 w-4" />
-                {transferMutation.isPending ? "Envoi en cours..." : "Confirmer le transfert"}
+                {transferMutation.isPending ? "Envoi en cours..." : "Confirmer l'envoi"}
               </Button>
             </div>
           </div>

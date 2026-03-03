@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -20,27 +21,26 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   User,
   Mail,
-  Phone,
   Lock,
   Eye,
   EyeOff,
   Save,
   Loader2,
   Shield,
-  Bell,
   Globe,
   Webhook,
   Copy,
   CheckCircle2,
   ExternalLink,
+  Settings,
 } from "lucide-react";
 
 const countryCodes = [
-  { code: "+229", country: "Benin", label: "BJ +229" },
-  { code: "+225", country: "Cote d'Ivoire", label: "CI +225" },
+  { code: "+229", country: "Bénin", label: "BJ +229" },
+  { code: "+225", country: "Côte d'Ivoire", label: "CI +225" },
   { code: "+226", country: "Burkina Faso", label: "BF +226" },
   { code: "+228", country: "Togo", label: "TG +228" },
-  { code: "+221", country: "Senegal", label: "SN +221" },
+  { code: "+221", country: "Sénégal", label: "SN +221" },
 ];
 
 function detectCountryCode(phone: string) {
@@ -49,118 +49,93 @@ function detectCountryCode(phone: string) {
 
 function stripCountryCode(phone: string) {
   for (const cc of countryCodes) {
-    if (phone?.startsWith(cc.code)) {
-      return phone.slice(cc.code.length);
-    }
+    if (phone?.startsWith(cc.code)) return phone.slice(cc.code.length);
   }
   return phone || "";
 }
 
-function WebhookConfigCard() {
+function WebhookCard() {
   const { toast } = useToast();
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const { data: webhookData } = useQuery<{
-    webhookUrl: string;
-    callbackUrl: string;
-    domain: string;
-    instructions: string;
-    steps: string[];
-  }>({
-    queryKey: ["/api/settings/webhook-urls"],
-  });
+    webhookUrl: string; callbackUrl: string; domain: string; instructions: string; steps: string[];
+  }>({ queryKey: ["/api/settings/webhook-urls"] });
 
-  const copyToClipboard = (text: string, field: string) => {
+  const copy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
-    toast({ title: "Copie !", description: "URL copiee dans le presse-papiers." });
+    toast({ title: "Copié !", description: "URL copiée dans le presse-papiers." });
     setTimeout(() => setCopiedField(null), 2000);
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border-border/60">
+      <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-            <Webhook className="h-5 w-5 text-orange-500" />
+          <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+            <Webhook className="h-5 w-5 text-orange-600 dark:text-orange-400" />
           </div>
           <div>
-            <CardTitle data-testid="text-webhook-title">Webhook & Callback SendavaPay</CardTitle>
-            <CardDescription>Configurez ces URLs dans votre tableau de bord SendavaPay</CardDescription>
+            <CardTitle className="text-base font-bold" data-testid="text-webhook-title">Webhook & Callback OmniPay</CardTitle>
+            <CardDescription className="text-xs">Configurez ces URLs dans votre tableau de bord OmniPay</CardDescription>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label className="text-xs font-semibold uppercase text-muted-foreground">URL du Webhook</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              readOnly
-              value={webhookData?.webhookUrl || "Chargement..."}
-              className="font-mono text-sm bg-muted"
-              data-testid="input-webhook-url"
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => webhookData && copyToClipboard(webhookData.webhookUrl, "webhook")}
-              data-testid="button-copy-webhook"
-            >
-              {copiedField === "webhook" ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-            </Button>
+      <CardContent className="space-y-5">
+        {[
+          { label: "URL du Webhook", key: "webhook", value: webhookData?.webhookUrl, desc: "Reçoit les événements: payment.completed, payment.failed", testId: "input-webhook-url" },
+          { label: "URL de Callback", key: "callback", value: webhookData?.callbackUrl, desc: "URL où le client est redirigé après paiement", testId: "input-callback-url" },
+        ].map((item) => (
+          <div key={item.key} className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{item.label}</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={item.value || "Chargement..."}
+                className="font-mono text-xs h-10 bg-muted/40 border-border/60 text-muted-foreground"
+                data-testid={item.testId}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 flex-shrink-0 border-border/60"
+                onClick={() => item.value && copy(item.value, item.key)}
+                data-testid={`button-copy-${item.key}`}
+              >
+                {copiedField === item.key ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{item.desc}</p>
           </div>
-          <p className="text-xs text-muted-foreground">Recoit les evenements: payment.completed, payment.failed, credit.completed</p>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-xs font-semibold uppercase text-muted-foreground">URL de Callback (Redirection)</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              readOnly
-              value={webhookData?.callbackUrl || "Chargement..."}
-              className="font-mono text-sm bg-muted"
-              data-testid="input-callback-url"
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => webhookData && copyToClipboard(webhookData.callbackUrl, "callback")}
-              data-testid="button-copy-callback"
-            >
-              {copiedField === "callback" ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">URL ou le client est redirige apres le paiement</p>
-        </div>
+        ))}
 
         <Separator />
 
-        <div className="space-y-3">
-          <Label className="text-xs font-semibold uppercase text-muted-foreground">Instructions de configuration</Label>
-          {webhookData?.steps ? (
+        {webhookData?.steps && (
+          <div className="space-y-3">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Instructions de configuration</Label>
             <ol className="space-y-2">
               {webhookData.steps.map((step, i) => (
-                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                  <span className="h-5 w-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-medium">{i + 1}</span>
+                <li key={i} className="text-sm text-muted-foreground flex items-start gap-3">
+                  <span className="h-5 w-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-bold">{i + 1}</span>
                   <span>{step.replace(/^\d+\.\s*/, "")}</span>
                 </li>
               ))}
             </ol>
-          ) : (
-            <p className="text-sm text-muted-foreground">Chargement des instructions...</p>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="pt-2">
+        <div className="pt-1">
           <a
-            href="https://sendavapay.com/dashboard"
+            href="https://omnipay.webtechci.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+            className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-semibold transition-colors"
             data-testid="link-sendavapay-dashboard"
           >
             <ExternalLink className="h-4 w-4" />
-            Ouvrir le tableau de bord SendavaPay
+            Ouvrir le tableau de bord OmniPay
           </a>
         </div>
       </CardContent>
@@ -188,12 +163,7 @@ export default function SettingsPage() {
     }
   }, [user]);
 
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-
+  const [passwordData, setPasswordData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -205,18 +175,9 @@ export default function SettingsPage() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["/api/auth/user"], data);
-      toast({
-        title: "Profil mis a jour",
-        description: "Vos informations ont ete mises a jour avec succes.",
-      });
+      toast({ title: "Profil mis à jour", description: "Vos informations ont été mises à jour." });
     },
-    onError: () => {
-      toast({
-        title: "Erreur",
-        description: "Impossible de mettre a jour le profil.",
-        variant: "destructive",
-      });
-    },
+    onError: () => toast({ title: "Erreur", description: "Impossible de mettre à jour le profil.", variant: "destructive" }),
   });
 
   const passwordMutation = useMutation({
@@ -226,304 +187,235 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      toast({
-        title: "Mot de passe modifie",
-        description: "Votre mot de passe a ete modifie avec succes.",
-      });
+      toast({ title: "Mot de passe modifié", description: "Votre mot de passe a été modifié avec succès." });
     },
     onError: (error: any) => {
       let msg = "Impossible de modifier le mot de passe.";
-      try {
-        const parsed = JSON.parse(error?.message?.replace(/^\d+:\s*/, "") || "{}");
-        msg = parsed.message || msg;
-      } catch {}
-      toast({
-        title: "Erreur",
-        description: msg,
-        variant: "destructive",
-      });
+      try { const p = JSON.parse(error?.message?.replace(/^\d+:\s*/, "") || "{}"); msg = p.message || msg; } catch {}
+      toast({ title: "Erreur", description: msg, variant: "destructive" });
     },
   });
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    profileMutation.mutate({
-      firstName,
-      lastName,
-      email,
-      phone: `${selectedCode}${phoneNumber}`,
-    });
+    profileMutation.mutate({ firstName, lastName, email, phone: `${selectedCode}${phoneNumber}` });
   };
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordData.newPassword.length < 6) {
-      toast({ title: "Erreur", description: "Le mot de passe doit contenir au moins 6 caracteres", variant: "destructive" });
+      toast({ title: "Erreur", description: "6 caractères minimum", variant: "destructive" });
       return;
     }
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast({ title: "Erreur", description: "Les mots de passe ne correspondent pas", variant: "destructive" });
       return;
     }
-    passwordMutation.mutate({
-      currentPassword: passwordData.currentPassword,
-      newPassword: passwordData.newPassword,
-    });
+    passwordMutation.mutate({ currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword });
+  };
+
+  const getInitials = () => {
+    if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    if (firstName) return firstName[0].toUpperCase();
+    if (email) return email[0].toUpperCase();
+    return "U";
   };
 
   return (
-    <DashboardLayout title="Parametres" breadcrumbs={[{ label: "Parametres" }]}>
-      <div className="space-y-6 max-w-2xl">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle data-testid="text-profile-title">Informations personnelles</CardTitle>
-                <CardDescription>Gerez vos informations de profil</CardDescription>
+    <DashboardLayout title="Paramètres" breadcrumbs={[{ label: "Paramètres" }]}>
+      <div className="max-w-2xl space-y-6">
+        <div
+          className="relative rounded-3xl p-6 text-white overflow-hidden shadow-xl"
+          style={{ background: "linear-gradient(135deg, hsl(262 83% 52%) 0%, hsl(280 70% 60%) 100%)" }}
+        >
+          <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 flex items-center justify-center flex-shrink-0 text-2xl font-black">
+              {getInitials()}
+            </div>
+            <div>
+              <p className="font-bold text-xl">{[firstName, lastName].filter(Boolean).join(" ") || "Mon compte"}</p>
+              <p className="text-white/70 text-sm">{email}</p>
+            </div>
+            <div className="ml-auto">
+              <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
+                <Settings className="h-5 w-5 text-white" />
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleProfileSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Prenom</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input
-                      id="firstName"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="Prenom"
-                      className="pl-10"
-                      data-testid="input-firstname"
-                    />
+          </div>
+        </div>
+
+        <Tabs defaultValue="profile" className="space-y-5">
+          <TabsList className="h-11 w-full grid grid-cols-3 bg-muted/50 rounded-xl border border-border/60 p-1">
+            <TabsTrigger value="profile" className="rounded-lg font-semibold text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground">
+              <User className="h-3.5 w-3.5 mr-1.5" />
+              Profil
+            </TabsTrigger>
+            <TabsTrigger value="security" className="rounded-lg font-semibold text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground">
+              <Shield className="h-3.5 w-3.5 mr-1.5" />
+              Sécurité
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="rounded-lg font-semibold text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground">
+              <Webhook className="h-3.5 w-3.5 mr-1.5" />
+              Intégrations
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="profile">
+            <Card className="border-border/60">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <User className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold" data-testid="text-profile-title">Informations personnelles</CardTitle>
+                    <CardDescription className="text-xs">Gérez vos informations de profil</CardDescription>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Nom</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input
-                      id="lastName"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Nom"
-                      className="pl-10"
-                      data-testid="input-lastname"
-                    />
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleProfileSubmit} className="space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Prénom</Label>
+                      <div className="relative">
+                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Prénom" className="pl-10 h-11 border-border/70" data-testid="input-firstname" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom</Label>
+                      <div className="relative">
+                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Nom" className="pl-10 h-11 border-border/70" data-testid="input-lastname" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Adresse email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="votre@email.com" className="pl-10 h-11 border-border/70" data-testid="input-settings-email" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de téléphone</Label>
+                    <div className="flex gap-2">
+                      <Select value={selectedCode} onValueChange={setSelectedCode}>
+                        <SelectTrigger className="w-[130px] h-11 border-border/70" data-testid="button-settings-country-code">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countryCodes.map((cc) => (
+                            <SelectItem key={cc.code} value={cc.code} data-testid={`option-settings-country-${cc.code}`}>{cc.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9\s]/g, ""))}
+                        placeholder="97 00 00 00"
+                        className="flex-1 h-11 border-border/70"
+                        data-testid="input-settings-phone"
+                      />
+                    </div>
+                  </div>
+                  <Button type="submit" className="gap-2 h-11 font-semibold shadow-lg shadow-primary/20" disabled={profileMutation.isPending} data-testid="button-save-profile">
+                    {profileMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Enregistrer les modifications
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60 mt-5">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between gap-4 py-1">
+                  <div>
+                    <p className="font-semibold text-sm">Langue</p>
+                    <p className="text-xs text-muted-foreground">Langue de l'interface</p>
+                  </div>
+                  <Badge className="bg-primary/10 text-primary border-primary/20">Français</Badge>
+                </div>
+                <Separator className="my-3" />
+                <div className="flex items-center justify-between gap-4 py-1">
+                  <div>
+                    <p className="font-semibold text-sm">Devise par défaut</p>
+                    <p className="text-xs text-muted-foreground">Devise principale pour les transactions</p>
+                  </div>
+                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">XOF (FCFA)</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="security">
+            <Card className="border-border/60">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+                    <Lock className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold" data-testid="text-password-title">Sécurité du compte</CardTitle>
+                    <CardDescription className="text-xs">Modifiez votre mot de passe</CardDescription>
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Adresse email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="votre@email.com"
-                    className="pl-10"
-                    data-testid="input-settings-email"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Numero de telephone</Label>
-                <div className="flex gap-2">
-                  <Select value={selectedCode} onValueChange={setSelectedCode}>
-                    <SelectTrigger className="w-[130px]" data-testid="button-settings-country-code">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {countryCodes.map((cc) => (
-                        <SelectItem key={cc.code} value={cc.code} data-testid={`option-settings-country-${cc.code}`}>
-                          {cc.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/[^0-9\s]/g, "");
-                      setPhoneNumber(val);
-                    }}
-                    placeholder="97 00 00 00"
-                    className="flex-1"
-                    data-testid="input-settings-phone"
-                  />
-                </div>
-              </div>
-
-              <Button type="submit" className="gap-2" disabled={profileMutation.isPending} data-testid="button-save-profile">
-                {profileMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Enregistrer
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-                <Lock className="h-5 w-5 text-destructive" />
-              </div>
-              <div>
-                <CardTitle data-testid="text-password-title">Securite</CardTitle>
-                <CardDescription>Modifiez votre mot de passe</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Mot de passe actuel</Label>
-                <div className="relative flex items-center">
-                  <Lock className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    id="currentPassword"
-                    type={showCurrentPassword ? "text" : "password"}
-                    value={passwordData.currentPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                    placeholder="Mot de passe actuel"
-                    className="pl-10 pr-10"
-                    required
-                    data-testid="input-current-password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    data-testid="button-toggle-current-password"
-                  >
-                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handlePasswordSubmit} className="space-y-5">
+                  {[
+                    { key: "currentPassword", label: "Mot de passe actuel", show: showCurrentPassword, setShow: setShowCurrentPassword, testId: "input-current-password", toggleTestId: "button-toggle-current-password" },
+                    { key: "newPassword", label: "Nouveau mot de passe", show: showNewPassword, setShow: setShowNewPassword, testId: "input-new-password", toggleTestId: "button-toggle-new-password" },
+                    { key: "confirmPassword", label: "Confirmer le nouveau mot de passe", show: showConfirmPassword, setShow: setShowConfirmPassword, testId: "input-confirm-new-password", toggleTestId: "button-toggle-confirm-new-password" },
+                  ].map((field) => (
+                    <div key={field.key} className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{field.label}</Label>
+                      <div className="relative flex items-center">
+                        <Lock className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          type={field.show ? "text" : "password"}
+                          value={(passwordData as any)[field.key]}
+                          onChange={(e) => setPasswordData({ ...passwordData, [field.key]: e.target.value })}
+                          placeholder="••••••••"
+                          className="pl-10 pr-11 h-11 border-border/70"
+                          required
+                          data-testid={field.testId}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-1 h-9 w-9 text-muted-foreground hover:text-foreground"
+                          onClick={() => field.setShow(!field.show)}
+                          data-testid={field.toggleTestId}
+                        >
+                          {field.show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      {field.key === "newPassword" && passwordData.newPassword.length > 0 && passwordData.newPassword.length < 6 && (
+                        <p className="text-xs text-destructive font-medium">6 caractères minimum</p>
+                      )}
+                      {field.key === "confirmPassword" && passwordData.confirmPassword.length > 0 && passwordData.newPassword !== passwordData.confirmPassword && (
+                        <p className="text-xs text-destructive font-medium" data-testid="text-password-mismatch">Les mots de passe ne correspondent pas</p>
+                      )}
+                    </div>
+                  ))}
+                  <Button type="submit" variant="destructive" className="gap-2 h-11 font-semibold" disabled={passwordMutation.isPending} data-testid="button-change-password">
+                    {passwordMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+                    Modifier le mot de passe
                   </Button>
-                </div>
-              </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">Nouveau mot de passe</Label>
-                <div className="relative flex items-center">
-                  <Lock className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    id="newPassword"
-                    type={showNewPassword ? "text" : "password"}
-                    value={passwordData.newPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                    placeholder="6 caracteres minimum"
-                    className="pl-10 pr-10"
-                    required
-                    data-testid="input-new-password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    data-testid="button-toggle-new-password"
-                  >
-                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-                {passwordData.newPassword.length > 0 && passwordData.newPassword.length < 6 && (
-                  <p className="text-xs text-destructive">6 caracteres minimum</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirmer le nouveau mot de passe</Label>
-                <div className="relative flex items-center">
-                  <Lock className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={passwordData.confirmPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                    placeholder="Confirmez le mot de passe"
-                    className="pl-10 pr-10"
-                    required
-                    data-testid="input-confirm-new-password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    data-testid="button-toggle-confirm-new-password"
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-                {passwordData.confirmPassword.length > 0 && passwordData.newPassword !== passwordData.confirmPassword && (
-                  <p className="text-xs text-destructive" data-testid="text-password-mismatch">Les mots de passe ne correspondent pas</p>
-                )}
-              </div>
-
-              <Button type="submit" variant="destructive" className="gap-2" disabled={passwordMutation.isPending} data-testid="button-change-password">
-                {passwordMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Shield className="h-4 w-4" />
-                )}
-                Modifier le mot de passe
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <WebhookConfigCard />
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <Globe className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <CardTitle data-testid="text-preferences-title">Preferences</CardTitle>
-                <CardDescription>Parametres de l'application</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-medium text-sm">Langue</p>
-                  <p className="text-sm text-muted-foreground">Langue de l'interface</p>
-                </div>
-                <Badge>Francais</Badge>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-medium text-sm">Devise par defaut</p>
-                  <p className="text-sm text-muted-foreground">Devise principale pour les transactions</p>
-                </div>
-                <Badge>XOF (FCFA)</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          <TabsContent value="integrations">
+            <WebhookCard />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

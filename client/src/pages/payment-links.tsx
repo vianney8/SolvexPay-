@@ -21,36 +21,21 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Plus, Link2, Copy, ExternalLink, Trash2, Search,
-  Globe, Activity, ArrowLeft, ImagePlus, ExternalLink as RedirectIcon,
-  Info, Pencil, Upload, X,
+  Globe, Activity, ArrowLeft, ImagePlus,
+  Info, Pencil, Upload, X, CheckCircle2,
 } from "lucide-react";
 import type { PaymentLink } from "@shared/schema";
 
 function formatCurrency(amount: string | number) {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat("fr-FR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num) + " XOF";
+  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num) + " XOF";
 }
 
 function formatDate(date: string | Date) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(date));
+  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(date));
 }
 
-function PaymentLinkForm({
-  onBack,
-  onSuccess,
-  editLink,
-}: {
-  onBack: () => void;
-  onSuccess: () => void;
-  editLink?: PaymentLink | null;
-}) {
+function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; onSuccess: () => void; editLink?: PaymentLink | null }) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(editLink?.name || "");
@@ -62,66 +47,47 @@ function PaymentLinkForm({
   const [uploading, setUploading] = useState(false);
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; amount: number; currency: string; description?: string; redirectUrl?: string; imageUrl?: string }) => {
-      return apiRequest("POST", "/api/payment-links", data);
-    },
+    mutationFn: async (data: any) => apiRequest("POST", "/api/payment-links", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      toast({ title: "Lien cree avec succes", description: "Votre lien de paiement est pret a etre partage." });
+      toast({ title: "Lien créé", description: "Votre lien de paiement est prêt à être partagé." });
       onSuccess();
     },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de creer le lien de paiement.", variant: "destructive" });
-    },
+    onError: () => toast({ title: "Erreur", description: "Impossible de créer le lien.", variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; amount: number; description?: string | null; redirectUrl?: string | null; imageUrl?: string | null }) => {
-      return apiRequest("PATCH", `/api/payment-links/${editLink!.id}`, data);
-    },
+    mutationFn: async (data: any) => apiRequest("PATCH", `/api/payment-links/${editLink!.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
-      toast({ title: "Lien modifie", description: "Votre lien de paiement a ete mis a jour." });
+      toast({ title: "Lien modifié", description: "Votre lien a été mis à jour." });
       onSuccess();
     },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de modifier le lien de paiement.", variant: "destructive" });
-    },
+    onError: () => toast({ title: "Erreur", description: "Impossible de modifier le lien.", variant: "destructive" }),
   });
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (ev) => setImagePreview(ev.target?.result as string);
     reader.readAsDataURL(file);
-
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append("image", file);
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await response.json();
       if (data.imageUrl) {
         setImageUrl(data.imageUrl);
-        toast({ title: "Image ajoutee", description: "L'image a ete telechargee avec succes." });
+        toast({ title: "Image ajoutée" });
       }
     } catch {
-      toast({ title: "Erreur", description: "Impossible de telecharger l'image.", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible de télécharger l'image.", variant: "destructive" });
     } finally {
       setUploading(false);
     }
-  };
-
-  const removeImage = () => {
-    setImageUrl("");
-    setImagePreview("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -135,15 +101,8 @@ function PaymentLinkForm({
       redirectUrl: redirectUrl.trim() || undefined,
       imageUrl: imageUrl.trim() || undefined,
     };
-
     if (editLink) {
-      updateMutation.mutate({
-        name: payload.name,
-        amount: payload.amount,
-        description: payload.description || null,
-        redirectUrl: payload.redirectUrl || null,
-        imageUrl: payload.imageUrl || null,
-      });
+      updateMutation.mutate({ name: payload.name, amount: payload.amount, description: payload.description || null, redirectUrl: payload.redirectUrl || null, imageUrl: payload.imageUrl || null });
     } else {
       createMutation.mutate(payload);
     }
@@ -158,110 +117,72 @@ function PaymentLinkForm({
     <DashboardLayout title="" breadcrumbs={[{ label: "Liens de paiement", href: "/payment-links" }, { label: editLink ? "Modifier" : "Nouveau lien" }]}>
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-links">
+          <button onClick={onBack} className="h-9 w-9 rounded-xl border border-border/70 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors" data-testid="button-back-links">
             <ArrowLeft className="h-4 w-4" />
-          </Button>
+          </button>
           <div>
-            <h2 className="text-xl font-semibold">{editLink ? "Modifier le lien de paiement" : "Nouveau lien de paiement"}</h2>
-            <p className="text-sm text-muted-foreground">{editLink ? "Modifiez les informations de votre lien" : "Creez un lien personnalise pour recevoir des paiements"}</p>
+            <h2 className="text-xl font-bold">{editLink ? "Modifier le lien" : "Nouveau lien de paiement"}</h2>
+            <p className="text-sm text-muted-foreground">{editLink ? "Modifiez les informations" : "Créez un lien pour recevoir des paiements"}</p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Informations du paiement</CardTitle>
-              <CardDescription>Les details essentiels de votre lien de paiement</CardDescription>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <Card className="border-border/60">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Link2 className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-bold">Informations du paiement</CardTitle>
+                  <CardDescription className="text-xs">Détails essentiels de votre lien</CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="link-name">Nom du produit ou service</Label>
-                <Input
-                  id="link-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: T-shirt personnalise, Abonnement mensuel..."
-                  required
-                  data-testid="input-link-name"
-                />
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom du produit ou service</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: T-shirt, Abonnement mensuel..." required className="h-11 border-border/70" data-testid="input-link-name" />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="link-amount">Montant (XOF)</Label>
-                <Input
-                  id="link-amount"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  type="number"
-                  placeholder="10 000"
-                  min="100"
-                  required
-                  data-testid="input-link-amount"
-                />
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (XOF)</Label>
+                <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" placeholder="10 000" min="100" required className="h-11 border-border/70 text-lg font-bold" data-testid="input-link-amount" />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="link-description">Description (optionnel)</Label>
-                <Textarea
-                  id="link-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Decrivez votre produit ou service pour vos clients..."
-                  rows={3}
-                  data-testid="input-link-description"
-                />
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description (optionnel)</Label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Décrivez votre produit pour vos clients..." rows={3} className="border-border/70 resize-none" data-testid="input-link-description" />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="link-redirect" className="flex items-center gap-2">
-                  <RedirectIcon className="h-4 w-4 text-muted-foreground" />
-                  URL de redirection (optionnel)
-                </Label>
-                <Input
-                  id="link-redirect"
-                  value={redirectUrl}
-                  onChange={(e) => setRedirectUrl(e.target.value)}
-                  type="url"
-                  placeholder="https://votre-site.com/merci"
-                  data-testid="input-link-redirect"
-                />
-                <p className="text-xs text-muted-foreground">Redirigez vos clients apres un paiement reussi</p>
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">URL de redirection (optionnel)</Label>
+                <Input value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} type="url" placeholder="https://votre-site.com/merci" className="h-11 border-border/70" data-testid="input-link-redirect" />
+                <p className="text-xs text-muted-foreground">Redirigez vos clients après paiement réussi</p>
               </div>
-
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <ImagePlus className="h-4 w-4 text-muted-foreground" />
-                  Image du produit (optionnel)
-                </Label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/gif,image/webp"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  data-testid="input-link-image-file"
-                />
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Image du produit (optionnel)</Label>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" data-testid="input-link-image-file" />
                 {imagePreview ? (
-                  <div className="relative rounded-lg border overflow-hidden">
-                    <img src={imagePreview} alt="Apercu du produit" className="w-full h-48 object-cover" data-testid="img-link-preview" />
-                    <div className="absolute top-2 right-2 flex gap-1">
-                      <Button type="button" variant="secondary" size="icon" onClick={() => fileInputRef.current?.click()} data-testid="button-change-image">
-                        <Upload className="h-4 w-4" />
+                  <div className="relative rounded-2xl border border-border/60 overflow-hidden">
+                    <img src={imagePreview} alt="Aperçu" className="w-full h-48 object-cover" data-testid="img-link-preview" />
+                    <div className="absolute top-3 right-3 flex gap-2">
+                      <Button type="button" variant="secondary" size="icon" className="h-8 w-8 rounded-lg shadow-md" onClick={() => fileInputRef.current?.click()} data-testid="button-change-image">
+                        <Upload className="h-3.5 w-3.5" />
                       </Button>
-                      <Button type="button" variant="destructive" size="icon" onClick={removeImage} data-testid="button-remove-image">
-                        <X className="h-4 w-4" />
+                      <Button type="button" variant="destructive" size="icon" className="h-8 w-8 rounded-lg shadow-md" onClick={() => { setImageUrl(""); setImagePreview(""); }} data-testid="button-remove-image">
+                        <X className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div
-                    className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-border/60 rounded-2xl p-10 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/3 transition-all group"
                     data-testid="button-upload-image"
                   >
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {uploading ? "Telechargement en cours..." : "Cliquez pour ajouter une image"}
+                    <div className="h-12 w-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-3 group-hover:bg-primary/10 transition-colors">
+                      <Upload className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <p className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                      {uploading ? "Téléchargement..." : "Cliquez pour ajouter une image"}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">JPG, PNG, GIF ou WebP (max 5 MB)</p>
                   </div>
@@ -271,39 +192,39 @@ function PaymentLinkForm({
           </Card>
 
           {previewAmount > 0 && (
-            <Card>
-              <CardContent className="pt-5 space-y-3">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <span className="text-sm text-muted-foreground">Montant du paiement</span>
-                  <span className="font-medium" data-testid="text-preview-amount">{formatCurrency(previewAmount)}</span>
+            <Card className="border-border/60 bg-muted/30">
+              <CardContent className="p-5 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aperçu des frais</p>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Montant du paiement</span>
+                  <span className="font-semibold" data-testid="text-preview-amount">{formatCurrency(previewAmount)}</span>
                 </div>
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <span className="text-sm text-muted-foreground">Frais d'encaissement (4%)</span>
-                  <span className="text-sm text-destructive" data-testid="text-preview-fees">- {formatCurrency(fees)}</span>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Frais d'encaissement (4%)</span>
+                  <span className="text-destructive font-medium" data-testid="text-preview-fees">- {formatCurrency(fees)}</span>
                 </div>
                 <Separator />
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <span className="font-medium">Montant net recu</span>
-                  <span className="font-bold text-lg" data-testid="text-preview-net">{formatCurrency(netAmount)}</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-sm">Montant net reçu</span>
+                  <span className="font-black text-lg text-emerald-600 dark:text-emerald-400" data-testid="text-preview-net">{formatCurrency(netAmount)}</span>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          <div className="rounded-lg bg-muted/50 border p-4 flex items-start gap-3">
-            <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-muted-foreground">
-              Des frais d'encaissement de 4% seront appliques sur chaque paiement recu via ce lien.
-              Ces frais couvrent les couts de traitement des paiements Mobile Money.
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Des frais d'encaissement de <strong>4%</strong> sont prélevés sur chaque paiement reçu via ce lien.
             </p>
           </div>
 
-          <div className="flex gap-3 flex-wrap">
-            <Button type="button" variant="outline" onClick={onBack} className="flex-1" data-testid="button-cancel-create">
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" onClick={onBack} className="flex-1 h-12 font-semibold border-border/70" data-testid="button-cancel-create">
               Annuler
             </Button>
-            <Button type="submit" className="flex-1" disabled={isPending} data-testid="button-confirm-create-link">
-              {isPending ? (editLink ? "Modification..." : "Creation en cours...") : (editLink ? "Enregistrer les modifications" : "Creer le lien de paiement")}
+            <Button type="submit" className="flex-1 h-12 font-bold shadow-lg shadow-primary/20" disabled={isPending} data-testid="button-confirm-create-link">
+              {isPending ? (editLink ? "Modification..." : "Création...") : (editLink ? "Enregistrer" : "Créer le lien")}
             </Button>
           </div>
         </form>
@@ -317,35 +238,28 @@ export default function PaymentLinksPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingLink, setEditingLink] = useState<PaymentLink | null>(null);
   const [search, setSearch] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({
-    queryKey: ["/api/payment-links"],
-  });
+  const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({ queryKey: ["/api/payment-links"] });
 
   const toggleMutation = useMutation({
-    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      return apiRequest("PATCH", `/api/payment-links/${id}`, { isActive });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
-    },
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/payment-links/${id}`, { isActive }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/payment-links/${id}`);
-    },
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/payment-links/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payment-links"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      toast({ title: "Lien supprime", description: "Le lien de paiement a ete supprime." });
+      toast({ title: "Lien supprimé" });
+      setDeleteConfirmId(null);
     },
   });
 
   const copyLink = (slug: string) => {
-    const url = `${window.location.origin}/pay/${slug}`;
-    navigator.clipboard.writeText(url);
-    toast({ title: "Lien copie", description: "Le lien a ete copie dans le presse-papiers." });
+    navigator.clipboard.writeText(`${window.location.origin}/pay/${slug}`);
+    toast({ title: "Lien copié !", description: "Le lien a été copié dans le presse-papiers." });
   };
 
   if (showCreate || editingLink) {
@@ -366,127 +280,124 @@ export default function PaymentLinksPage() {
   const activeCount = paymentLinks?.filter(l => l.isActive).length || 0;
   const totalUsage = paymentLinks?.reduce((sum, l) => sum + parseInt(String(l.timesUsed) || "0", 10), 0) || 0;
 
+  const summaryCards = [
+    { label: "Total liens", value: paymentLinks?.length || 0, icon: Link2, color: "from-violet-500 to-violet-700", testid: "text-total-links" },
+    { label: "Liens actifs", value: activeCount, icon: Globe, color: "from-emerald-500 to-emerald-700", testid: "text-active-links" },
+    { label: "Utilisations", value: totalUsage, icon: Activity, color: "from-amber-500 to-amber-700", testid: "text-total-usage" },
+  ];
+
   return (
     <DashboardLayout title="Liens de paiement" breadcrumbs={[{ label: "Liens de paiement" }]}>
       <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <Link2 className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total liens</p>
-                  <p className="text-2xl font-bold" data-testid="text-total-links">{paymentLinks?.length || 0}</p>
-                </div>
+        <div className="grid grid-cols-3 gap-4">
+          {summaryCards.map((card) => (
+            <div
+              key={card.label}
+              className={`relative rounded-2xl p-5 text-white overflow-hidden bg-gradient-to-br ${card.color} shadow-lg`}
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/10 -translate-y-1/2 translate-x-1/2" />
+              <div className="relative">
+                <card.icon className="h-5 w-5 mb-3 text-white/70" />
+                <p className="text-2xl font-black" data-testid={card.testid}>{card.value}</p>
+                <p className="text-white/70 text-xs mt-0.5 font-medium">{card.label}</p>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Globe className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Liens actifs</p>
-                  <p className="text-2xl font-bold" data-testid="text-active-links">{activeCount}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                  <Activity className="h-5 w-5 text-orange-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Utilisations</p>
-                  <p className="text-2xl font-bold" data-testid="text-total-usage">{totalUsage}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          ))}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="flex flex-col sm:flex-row gap-3 justify-between">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Rechercher un lien..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="pl-10 h-10 border-border/70"
               data-testid="input-search-links"
             />
           </div>
-          <Button className="gap-2" onClick={() => setShowCreate(true)} data-testid="button-create-link">
+          <Button className="gap-2 h-10 px-5 font-semibold shadow-lg shadow-primary/20" onClick={() => setShowCreate(true)} data-testid="button-create-link">
             <Plus className="h-4 w-4" />
-            Creer un lien
+            Créer un lien
           </Button>
         </div>
 
         {isLoading ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-32 w-full" />
+              <Card key={i} className="border-border/60">
+                <CardContent className="p-5">
+                  <div className="flex gap-4">
+                    <Skeleton className="h-20 w-20 rounded-xl flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-5 w-40" />
+                      <Skeleton className="h-4 w-64" />
+                      <Skeleton className="h-6 w-24" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         ) : filteredLinks.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Link2 className="h-12 w-12 mx-auto mb-3 opacity-50 text-muted-foreground" />
-              <p className="font-medium text-muted-foreground">Aucun lien de paiement</p>
-              <p className="text-sm text-muted-foreground mt-1">Creez votre premier lien pour commencer a recevoir des paiements</p>
+          <Card className="border-border/60 border-dashed">
+            <CardContent className="py-16 text-center">
+              <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                <Link2 className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <p className="font-bold text-foreground mb-1">Aucun lien de paiement</p>
+              <p className="text-sm text-muted-foreground mb-5">Créez votre premier lien pour commencer à recevoir des paiements</p>
+              <Button className="gap-2 shadow-lg shadow-primary/20" onClick={() => setShowCreate(true)}>
+                <Plus className="h-4 w-4" />
+                Créer mon premier lien
+              </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-3">
             {filteredLinks.map((link) => (
-              <Card key={link.id} className="overflow-visible" data-testid={`link-row-${link.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
+              <Card key={link.id} className="border-border/60 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 overflow-hidden" data-testid={`link-row-${link.id}`}>
+                <CardContent className="p-0">
+                  <div className="flex gap-0">
                     {link.imageUrl && (
-                      <div className="sm:w-24 sm:h-24 h-40 rounded-lg overflow-hidden flex-shrink-0">
+                      <div className="w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0">
                         <img src={link.imageUrl} alt={link.name} className="w-full h-full object-cover" data-testid={`img-link-${link.id}`} />
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-sm truncate">{link.name}</h3>
-                        <Badge variant={link.isActive ? "default" : "secondary"} className="text-xs">
-                          {link.isActive ? "Actif" : "Inactif"}
-                        </Badge>
+                    <div className="flex-1 p-5 min-w-0">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-base text-foreground">{link.name}</h3>
+                          <Badge className={`text-xs ${link.isActive ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : "bg-muted text-muted-foreground border-border/60"}`}>
+                            {link.isActive ? "Actif" : "Inactif"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <Switch
+                            checked={link.isActive}
+                            onCheckedChange={(checked) => toggleMutation.mutate({ id: link.id, isActive: checked })}
+                            data-testid={`switch-link-${link.id}`}
+                          />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => setEditingLink(link)} data-testid={`button-edit-link-${link.id}`}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => copyLink(link.slug)} data-testid={`button-copy-link-${link.id}`}>
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => window.open(`${window.location.origin}/pay/${link.slug}`, "_blank")} data-testid={`button-open-link-${link.id}`}>
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive/70 hover:text-destructive hover:bg-destructive/5" onClick={() => setDeleteConfirmId(link.id)} data-testid={`button-delete-link-${link.id}`}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
-                      {link.description && (
-                        <p className="text-sm text-muted-foreground mt-1 truncate">{link.description}</p>
-                      )}
-                      <div className="flex items-center gap-4 mt-2 flex-wrap">
-                        <span className="font-bold text-base">{formatCurrency(link.amount)}</span>
-                        <span className="text-xs text-muted-foreground">{link.timesUsed} utilisation{parseInt(String(link.timesUsed)) !== 1 ? "s" : ""}</span>
-                        <span className="text-xs text-muted-foreground">{link.createdAt && formatDate(link.createdAt)}</span>
+                      {link.description && <p className="text-sm text-muted-foreground mb-2 line-clamp-1">{link.description}</p>}
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <span className="font-black text-xl text-foreground">{formatCurrency(link.amount)}</span>
+                        <span className="text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">{link.timesUsed} utilisation{parseInt(String(link.timesUsed)) !== 1 ? "s" : ""}</span>
+                        {link.createdAt && <span className="text-xs text-muted-foreground">{formatDate(link.createdAt)}</span>}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Switch
-                        checked={link.isActive}
-                        onCheckedChange={(checked) => toggleMutation.mutate({ id: link.id, isActive: checked })}
-                        data-testid={`switch-link-${link.id}`}
-                      />
-                      <Button variant="outline" size="icon" onClick={() => setEditingLink(link)} data-testid={`button-edit-link-${link.id}`}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => copyLink(link.slug)} data-testid={`button-copy-link-${link.id}`}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => window.open(`${window.location.origin}/pay/${link.slug}`, "_blank")} data-testid={`button-open-link-${link.id}`}>
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => deleteMutation.mutate(link.id)} className="text-destructive" data-testid={`button-delete-link-${link.id}`}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -494,6 +405,24 @@ export default function PaymentLinksPage() {
             ))}
           </div>
         )}
+
+        <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+          <DialogContent className="max-w-sm rounded-2xl">
+            <DialogHeader>
+              <div className="h-12 w-12 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+                <Trash2 className="h-6 w-6 text-destructive" />
+              </div>
+              <DialogTitle className="text-center">Supprimer le lien ?</DialogTitle>
+              <DialogDescription className="text-center text-sm">Cette action est irréversible. Le lien sera définitivement supprimé.</DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-3 mt-2">
+              <Button variant="outline" className="flex-1 h-11" onClick={() => setDeleteConfirmId(null)}>Annuler</Button>
+              <Button variant="destructive" className="flex-1 h-11 font-semibold" onClick={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)} disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
