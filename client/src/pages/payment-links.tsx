@@ -304,55 +304,69 @@ export default function PaymentLinksPage() {
 
   return (
     <DashboardLayout title="Liens de paiement" breadcrumbs={[{ label: "Liens de paiement" }]}>
-      <div className="space-y-6">
-        <div className="grid grid-cols-3 gap-4">
-          {summaryCards.map((card) => (
-            <div
-              key={card.label}
-              className={`relative rounded-2xl p-5 text-white overflow-hidden bg-gradient-to-br ${card.color} shadow-lg`}
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/10 -translate-y-1/2 translate-x-1/2" />
-              <div className="relative">
-                <card.icon className="h-5 w-5 mb-3 text-white/70" />
-                <p className="text-2xl font-black" data-testid={card.testid}>{card.value}</p>
-                <p className="text-white/70 text-xs mt-0.5 font-medium">{card.label}</p>
+      <div className="space-y-5">
+
+        <div
+          className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
+          style={{ background: "linear-gradient(135deg, hsl(262 83% 46%) 0%, hsl(300 68% 52%) 60%, hsl(330 78% 50%) 100%)" }}
+        >
+          <div className="absolute top-0 right-0 w-36 h-36 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
+          <div className="relative flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                <Link2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-base">Liens de paiement</p>
+                <p className="text-white/70 text-xs">Recevez des paiements partout en Afrique</p>
               </div>
             </div>
-          ))}
+            <Button
+              onClick={() => setShowCreate(true)}
+              className="h-9 px-4 bg-white/20 hover:bg-white/30 text-white border-0 font-semibold gap-1.5 text-sm flex-shrink-0"
+              data-testid="button-create-link"
+            >
+              <Plus className="h-4 w-4" /> Créer
+            </Button>
+          </div>
+          <div className="relative grid grid-cols-3 gap-3">
+            <div className="bg-white/10 rounded-2xl p-3 backdrop-blur-sm">
+              <p className="text-white/60 text-xs font-medium mb-1">Total liens</p>
+              <p className="text-white font-black text-xl leading-none" data-testid="text-total-links">{isLoading ? "—" : paymentLinks?.length || 0}</p>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-3 backdrop-blur-sm">
+              <p className="text-white/60 text-xs font-medium mb-1">Actifs</p>
+              <p className="text-white font-black text-xl leading-none" data-testid="text-active-links">{isLoading ? "—" : activeCount}</p>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-3 backdrop-blur-sm">
+              <p className="text-white/60 text-xs font-medium mb-1">Utilisations</p>
+              <p className="text-white font-black text-xl leading-none" data-testid="text-total-usage">{isLoading ? "—" : totalUsage}</p>
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher un lien..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 h-10 border-border/70"
-              data-testid="input-search-links"
-            />
-          </div>
-          <Button className="gap-2 h-10 px-5 font-semibold shadow-lg shadow-primary/20" onClick={() => setShowCreate(true)} data-testid="button-create-link">
-            <Plus className="h-4 w-4" />
-            Créer un lien
-          </Button>
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher un lien..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 h-10 border-border/70"
+            data-testid="input-search-links"
+          />
         </div>
 
         {isLoading ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="border-border/60">
-                <CardContent className="p-5">
-                  <div className="flex gap-4">
-                    <Skeleton className="h-20 w-20 rounded-xl flex-shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-5 w-40" />
-                      <Skeleton className="h-4 w-64" />
-                      <Skeleton className="h-6 w-24" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border border-border/60">
+                <Skeleton className="h-12 w-12 rounded-xl flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <Skeleton className="h-7 w-20 rounded-full" />
+              </div>
             ))}
           </div>
         ) : filteredLinks.length === 0 ? (
@@ -364,62 +378,61 @@ export default function PaymentLinksPage() {
               <p className="font-bold text-foreground mb-1">Aucun lien de paiement</p>
               <p className="text-sm text-muted-foreground mb-5">Créez votre premier lien pour commencer à recevoir des paiements</p>
               <Button className="gap-2 shadow-lg shadow-primary/20" onClick={() => setShowCreate(true)}>
-                <Plus className="h-4 w-4" />
-                Créer mon premier lien
+                <Plus className="h-4 w-4" /> Créer mon premier lien
               </Button>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {filteredLinks.map((link) => (
-              <Card key={link.id} className="border-border/60 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 overflow-hidden" data-testid={`link-row-${link.id}`}>
-                <CardContent className="p-0">
-                  <div className="flex gap-0">
-                    {link.imageUrl && (
-                      <div className="w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0">
-                        <img src={link.imageUrl} alt={link.name} className="w-full h-full object-cover" data-testid={`img-link-${link.id}`} />
-                      </div>
-                    )}
-                    <div className="flex-1 p-5 min-w-0">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-base text-foreground">{link.name}</h3>
-                          <Badge className={`text-xs ${link.isActive ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : "bg-muted text-muted-foreground border-border/60"}`}>
-                            {link.isActive ? "Actif" : "Inactif"}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <Switch
-                            checked={link.isActive}
-                            onCheckedChange={(checked) => toggleMutation.mutate({ id: link.id, isActive: checked })}
-                            data-testid={`switch-link-${link.id}`}
-                          />
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => setEditingLink(link)} data-testid={`button-edit-link-${link.id}`}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => copyLink(link.slug)} data-testid={`button-copy-link-${link.id}`}>
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => window.open(`${window.location.origin}/pay/${link.slug}`, "_blank")} data-testid={`button-open-link-${link.id}`}>
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive/70 hover:text-destructive hover:bg-destructive/5" onClick={() => setDeleteConfirmId(link.id)} data-testid={`button-delete-link-${link.id}`}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                      {link.description && <p className="text-sm text-muted-foreground mb-2 line-clamp-1">{link.description}</p>}
-                      <div className="flex items-center gap-4 flex-wrap">
-                        <span className="font-black text-xl text-foreground">{formatCurrency(link.amount)}</span>
-                        <span className="text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">{link.timesUsed} utilisation{parseInt(String(link.timesUsed)) !== 1 ? "s" : ""}</span>
-                        {link.createdAt && <span className="text-xs text-muted-foreground">{formatDate(link.createdAt)}</span>}
-                      </div>
+          <Card className="border-border/60 overflow-hidden">
+            <CardContent className="p-0">
+              {filteredLinks.map((link, index) => (
+                <div
+                  key={link.id}
+                  className={`flex items-center gap-4 px-4 py-3.5 hover:bg-muted/30 transition-colors ${index > 0 ? "border-t border-border/40" : ""}`}
+                  data-testid={`link-row-${link.id}`}
+                >
+                  <div className="h-11 w-11 rounded-xl bg-primary/8 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {link.imageUrl
+                      ? <img src={link.imageUrl} alt={link.name} className="w-full h-full object-cover" data-testid={`img-link-${link.id}`} />
+                      : <Link2 className="h-5 w-5 text-primary/60" />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-sm text-foreground truncate">{link.name}</p>
+                      <Badge className={`text-xs shrink-0 ${link.isActive ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : "bg-muted text-muted-foreground border-border/60"}`}>
+                        {link.isActive ? "Actif" : "Inactif"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      <span className="font-black text-sm text-foreground">{formatCurrency(link.amount)}</span>
+                      <span className="text-xs text-muted-foreground">{link.timesUsed} utilisation{parseInt(String(link.timesUsed)) !== 1 ? "s" : ""}</span>
+                      {link.createdAt && <span className="text-xs text-muted-foreground hidden sm:inline">{formatDate(link.createdAt)}</span>}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Switch
+                      checked={link.isActive}
+                      onCheckedChange={(checked) => toggleMutation.mutate({ id: link.id, isActive: checked })}
+                      data-testid={`switch-link-${link.id}`}
+                    />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => setEditingLink(link)} data-testid={`button-edit-link-${link.id}`}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => copyLink(link.slug)} data-testid={`button-copy-link-${link.id}`}>
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => window.open(`${window.location.origin}/pay/${link.slug}`, "_blank")} data-testid={`button-open-link-${link.id}`}>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive/70 hover:text-destructive hover:bg-destructive/5" onClick={() => setDeleteConfirmId(link.id)} data-testid={`button-delete-link-${link.id}`}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
 
         <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>

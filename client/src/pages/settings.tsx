@@ -69,6 +69,14 @@ function stripCountryCode(phone: string) {
   return phone || "";
 }
 
+function stripWithdrawalPrefix(phone: string, allPrefixes: string[]) {
+  if (!phone) return "";
+  for (const p of allPrefixes) {
+    if (phone.startsWith(p)) return phone.slice(p.length).trim();
+  }
+  return phone;
+}
+
 function WebhookCard() {
   const { toast } = useToast();
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -181,9 +189,12 @@ export default function SettingsPage() {
       setEmail(user.email || "");
       setSelectedCode(detectCountryCode(user.phone || ""));
       setPhoneNumber(stripCountryCode(user.phone || ""));
-      setWCountry((user as any).withdrawalCountry || "BJ");
+      const savedCountry = (user as any).withdrawalCountry || "BJ";
+      setWCountry(savedCountry);
       setWOperator((user as any).withdrawalOperator || "");
-      setWPhone((user as any).withdrawalPhone || "");
+      const savedPhone = (user as any).withdrawalPhone || "";
+      const allPrefixes = WITHDRAWAL_COUNTRIES.map(c => c.prefix);
+      setWPhone(stripWithdrawalPrefix(savedPhone, allPrefixes));
     }
   }, [user]);
 
@@ -413,7 +424,7 @@ export default function SettingsPage() {
                 >
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Pays Mobile Money</Label>
-                    <Select value={wCountry} onValueChange={(v) => { setWCountry(v); setWOperator(""); }}>
+                    <Select value={wCountry} onValueChange={(v) => { setWCountry(v); setWOperator(""); setWPhone(""); }}>
                       <SelectTrigger className="h-11 border-border/70" data-testid="select-withdrawal-country">
                         <SelectValue />
                       </SelectTrigger>
@@ -444,16 +455,20 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro Mobile Money</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <div className="flex gap-0 rounded-xl border border-border/70 overflow-hidden focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400/10 transition-all">
+                      <div className="flex items-center gap-2 px-3 bg-muted/40 border-r border-border/70 flex-shrink-0 select-none">
+                        <span className="text-base">{wSelectedCountry.flag}</span>
+                        <span className="text-sm font-semibold text-muted-foreground">{wSelectedCountry.prefix}</span>
+                      </div>
                       <Input
                         value={wPhone}
-                        onChange={(e) => setWPhone(e.target.value.replace(/[^0-9+\s]/g, ""))}
-                        placeholder={`Ex: ${wSelectedCountry.prefix} 97 00 00 00`}
-                        className="pl-10 h-11 border-border/70"
+                        onChange={(e) => setWPhone(e.target.value.replace(/[^0-9\s]/g, ""))}
+                        placeholder="97 00 00 00"
+                        className="flex-1 h-11 border-0 rounded-none focus-visible:ring-0 bg-transparent"
                         data-testid="input-withdrawal-phone"
                       />
                     </div>
+                    <p className="text-xs text-muted-foreground">Entrez uniquement le numéro local, sans indicatif</p>
                   </div>
                   <Button type="submit" className="gap-2 h-11 font-semibold bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20" disabled={withdrawalAccountMutation.isPending} data-testid="button-save-withdrawal-account">
                     {withdrawalAccountMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

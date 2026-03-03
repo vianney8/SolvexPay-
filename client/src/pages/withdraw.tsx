@@ -56,7 +56,15 @@ export default function WithdrawPage() {
   const [amount, setAmount] = useState("");
   const [country, setCountry] = useState((user as any)?.withdrawalCountry || "BJ");
   const [operator, setOperator] = useState((user as any)?.withdrawalOperator || "");
-  const [phone, setPhone] = useState((user as any)?.withdrawalPhone || "");
+
+  function stripPrefix(phone: string) {
+    if (!phone) return "";
+    for (const c of COUNTRIES) {
+      if (phone.startsWith(c.prefix)) return phone.slice(c.prefix.length).trim();
+    }
+    return phone;
+  }
+  const [phone, setPhone] = useState(stripPrefix((user as any)?.withdrawalPhone || ""));
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [success, setSuccess] = useState(false);
   const [withdrawRef, setWithdrawRef] = useState("");

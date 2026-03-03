@@ -48,6 +48,17 @@ function getDisplayProvider(tx: Transaction) {
   return tx.provider;
 }
 
+function isExpiredPending(tx: Transaction) {
+  if (tx.status !== "pending") return false;
+  const created = tx.createdAt ? new Date(tx.createdAt).getTime() : 0;
+  return Date.now() - created > 12 * 60 * 1000;
+}
+
+function getEffectiveStatus(tx: Transaction) {
+  if (isExpiredPending(tx)) return "failed";
+  return tx.status;
+}
+
 function getStatusStyle(status: string) {
   if (status === "completed") return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
   if (status === "pending") return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
@@ -90,7 +101,7 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
             <p className={`text-3xl font-black ${tx.type === "deposit" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
               {tx.type === "deposit" ? "+" : "-"}{formatCurrency(tx.amount, tx.currency)} {tx.currency}
             </p>
-            <Badge className={`mt-2 ${getStatusStyle(tx.status)}`}>{getStatusLabel(tx.status)}</Badge>
+            <Badge className={`mt-2 ${getStatusStyle(getEffectiveStatus(tx))}`}>{getStatusLabel(getEffectiveStatus(tx))}</Badge>
           </div>
 
           <div className="space-y-3 text-sm">
@@ -172,7 +183,7 @@ export default function TransactionsPage() {
       tx.phoneNumber?.toLowerCase().includes(search.toLowerCase()) ||
       tx.description?.toLowerCase().includes(search.toLowerCase());
     const matchesType = typeFilter === "all" || tx.type === typeFilter;
-    const matchesStatus = statusFilter === "all" || tx.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || getEffectiveStatus(tx) === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
   }) || [];
 
@@ -309,8 +320,8 @@ export default function TransactionsPage() {
                         <p className={`font-bold text-sm ${tx.type === "deposit" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
                           {tx.type === "deposit" ? "+" : "-"}{formatCurrency(tx.amount, tx.currency)} {tx.currency}
                         </p>
-                        <Badge className={`text-xs mt-1 ${getStatusStyle(tx.status)}`}>
-                          {getStatusLabel(tx.status)}
+                        <Badge className={`text-xs mt-1 ${getStatusStyle(getEffectiveStatus(tx))}`}>
+                          {getStatusLabel(getEffectiveStatus(tx))}
                         </Badge>
                       </div>
                     </button>

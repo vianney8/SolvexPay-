@@ -42,7 +42,8 @@ export default function PayPage() {
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [verifyStatus, setVerifyStatus] = useState<string>("PENDING");
   const [phone, setPhone] = useState("");
-  const [customerName, setCustomerName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [country, setCountry] = useState("BJ");
   const [operator, setOperator] = useState("");
@@ -103,11 +104,12 @@ export default function PayPage() {
     e.preventDefault();
     if (!phone || !operator || !country) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     payMutation.mutate({
       phoneNumber: fullPhone,
       operator,
       country,
-      customerName: customerName || undefined,
+      customerName: fullName || undefined,
       customerEmail: customerEmail || undefined,
     });
   };
@@ -344,6 +346,31 @@ export default function PayPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Prénom <span className="text-red-500">*</span></Label>
+                <Input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Jean"
+                  required
+                  className="h-11 border-gray-200 rounded-xl"
+                  data-testid="input-pay-firstname"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Nom <span className="text-red-500">*</span></Label>
+                <Input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Dupont"
+                  required
+                  className="h-11 border-gray-200 rounded-xl"
+                  data-testid="input-pay-lastname"
+                />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Email (optionnel)</Label>
               <Input
@@ -360,7 +387,7 @@ export default function PayPage() {
               type="submit"
               className="w-full h-14 text-base font-black rounded-2xl shadow-lg gap-2"
               style={{ background: !phone || !operator ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
-              disabled={payMutation.isPending || !phone || !operator || !country}
+              disabled={payMutation.isPending || !phone || !operator || !country || !firstName.trim() || !lastName.trim()}
               data-testid="button-confirm-pay"
             >
               {payMutation.isPending ? (
