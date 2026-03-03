@@ -116,12 +116,16 @@ export function verifyCallbackSignature(payload: OmniPayCallbackPayload, callbac
   return expectedSignature === payload.signature;
 }
 
+function normalizeMsisdn(msisdn: string): string {
+  return msisdn.replace(/^\+/, "").replace(/^00/, "");
+}
+
 class OmniPayService {
   async deposit(params: OmniPayDepositParams): Promise<OmniPayDepositResponse> {
     const body: any = {
       action: "paymentrequest",
       apikey: OMNIPAY_API_KEY,
-      msisdn: params.msisdn,
+      msisdn: normalizeMsisdn(params.msisdn),
       amount: String(params.amount),
       reference: params.reference,
       first_name: params.firstName,
@@ -155,7 +159,7 @@ class OmniPayService {
     const body: any = {
       action: "transfer",
       apikey: OMNIPAY_API_KEY,
-      msisdn: params.msisdn,
+      msisdn: normalizeMsisdn(params.msisdn),
       amount: String(params.amount),
       reference: params.reference,
       first_name: params.firstName,
