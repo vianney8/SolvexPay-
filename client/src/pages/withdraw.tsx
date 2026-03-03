@@ -15,6 +15,13 @@ import {
   ArrowUpRight, Info, CheckCircle2, AlertTriangle, Loader2, ChevronDown, ArrowLeft, Send, ShieldAlert,
 } from "lucide-react";
 import { Link } from "wouter";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import type { Wallet as WalletType } from "@shared/schema";
 
 function formatCurrency(amount: number | string) {
@@ -27,13 +34,15 @@ function formatDate(date: string | Date) {
 }
 
 const COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"] },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"] },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"] },
-  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"] },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"] },
-  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"] },
-  { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"] },
+  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"], phonePlaceholder: "01 90 12 34 56" },
+  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"], phonePlaceholder: "07 12 34 56 78" },
+  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
+  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
+  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], phonePlaceholder: "77 123 45 67" },
+  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
+  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
+  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
+  { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"], phonePlaceholder: "06 123 45 67" },
 ];
 
 const OPERATOR_LABEL: Record<string, string> = {
@@ -51,6 +60,7 @@ export default function WithdrawPage() {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [success, setSuccess] = useState(false);
   const [withdrawRef, setWithdrawRef] = useState("");
+  const [kycGateOpen, setKycGateOpen] = useState(false);
 
   const selectedCountry = COUNTRIES.find(c => c.code === country) || COUNTRIES[0];
   const currency = selectedCountry.currency;
@@ -84,7 +94,13 @@ export default function WithdrawPage() {
       toast({ title: "Retrait initié", description: "Les fonds seront envoyés sur votre Mobile Money." });
     },
     onError: (error: any) => {
-      toast({ title: "Erreur", description: error.message || "Impossible d'initier le retrait.", variant: "destructive" });
+      try {
+        const parsed = JSON.parse(error.message?.replace(/^\d+:\s*/, "") || "{}");
+        if (parsed.kycRequired) { setKycGateOpen(true); return; }
+        toast({ title: "Erreur", description: parsed.message || "Impossible d'initier le retrait.", variant: "destructive" });
+      } catch {
+        toast({ title: "Erreur", description: error.message || "Impossible d'initier le retrait.", variant: "destructive" });
+      }
     },
   });
 
@@ -94,43 +110,6 @@ export default function WithdrawPage() {
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
     withdrawMutation.mutate({ amount: withdrawAmount, phoneNumber: fullPhone, operator, country });
   };
-
-  if (user && (user as any).kycStatus !== "verified") {
-    return (
-      <DashboardLayout title="" breadcrumbs={[{ label: "Retrait" }]}>
-        <div className="max-w-md mx-auto mt-6">
-          <Card className="border-border/60 overflow-hidden">
-            <div className="h-1.5 bg-gradient-to-r from-orange-400 to-amber-500" />
-            <CardContent className="pt-10 pb-10 text-center space-y-5">
-              <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mx-auto shadow-xl">
-                <ShieldAlert className="h-10 w-10 text-white" />
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Vérification requise</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  La vérification d'identité (KYC) est obligatoire pour effectuer des retraits.
-                </p>
-              </div>
-              <div className="bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 text-sm text-left space-y-1">
-                <p className="font-semibold text-orange-700 dark:text-orange-400">Statut actuel : {
-                  (user as any).kycStatus === "pending" ? "En cours d'examen" :
-                  (user as any).kycStatus === "rejected" ? "Rejeté" : "Non soumis"
-                }</p>
-                {(user as any).kycStatus === "pending" && (
-                  <p className="text-muted-foreground text-xs">Nos équipes examinent votre dossier. Délai : 24 à 48h.</p>
-                )}
-              </div>
-              <Link href="/kyc">
-                <Button className="w-full h-11 font-bold gap-2 bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20" data-testid="button-go-kyc-withdraw">
-                  <ShieldAlert className="h-4 w-4" /> Vérifier mon identité
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   if (success) {
     return (
@@ -280,7 +259,7 @@ export default function WithdrawPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/[^0-9\s]/g, ""))}
                     type="tel"
-                    placeholder="90 12 34 56"
+                    placeholder={selectedCountry.phonePlaceholder}
                     required
                     className="flex-1 h-12 border-0 rounded-none focus-visible:ring-0 bg-transparent"
                     data-testid="input-withdraw-phone"
@@ -390,6 +369,28 @@ export default function WithdrawPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={kycGateOpen} onOpenChange={setKycGateOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mx-auto mb-2 shadow-lg">
+              <ShieldAlert className="h-7 w-7 text-white" />
+            </div>
+            <DialogTitle className="text-center">Vérification d'identité requise</DialogTitle>
+            <DialogDescription className="text-center">
+              Pour effectuer des retraits, votre compte doit être vérifié. Accédez au menu <strong>Vérification KYC</strong> pour soumettre votre dossier.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 mt-2">
+            <Link href="/kyc" onClick={() => setKycGateOpen(false)}>
+              <Button className="w-full font-bold gap-2 bg-orange-500 hover:bg-orange-600 text-white" data-testid="button-kyc-dialog-withdraw">
+                <ShieldAlert className="h-4 w-4" /> Vérifier mon identité
+              </Button>
+            </Link>
+            <Button variant="ghost" onClick={() => setKycGateOpen(false)} className="w-full">Fermer</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

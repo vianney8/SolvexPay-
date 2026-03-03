@@ -161,7 +161,7 @@ export default function KycPage() {
             <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20">
               <Lock className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                La vérification d'identité est obligatoire pour augmenter vos limites de transaction. Vos données sont chiffrées et sécurisées.
+                La vérification KYC est obligatoire pour accéder aux retraits, transferts et clés API. Vos documents sont chiffrés et traités de manière confidentielle.
               </p>
             </div>
 

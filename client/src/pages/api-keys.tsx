@@ -17,7 +17,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Key, Copy, Trash2, Eye, EyeOff, Code, Globe, Lock, Zap, BookOpen, ShieldAlert } from "lucide-react";
 import { Link } from "wouter";
@@ -36,8 +35,8 @@ function formatDate(date: string | Date | null) {
 
 export default function ApiKeysPage() {
   const { toast } = useToast();
-  const { user } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
+  const [kycGateOpen, setKycGateOpen] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
 
   const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
@@ -54,7 +53,11 @@ export default function ApiKeysPage() {
       setCreateOpen(false);
       toast({ title: "Cle creee", description: "Votre nouvelle cle API de production est prete." });
     },
-    onError: () => {
+    onError: (error: Error) => {
+      try {
+        const parsed = JSON.parse(error.message?.replace(/^\d+:\s*/, "") || "{}");
+        if (parsed.kycRequired) { setKycGateOpen(true); return; }
+      } catch {}
       toast({ title: "Erreur", description: "Impossible de creer la cle API.", variant: "destructive" });
     },
   });
@@ -94,43 +97,6 @@ export default function ApiKeysPage() {
   const toggleKeyVisibility = (id: string) => {
     setVisibleKeys(prev => ({ ...prev, [id]: !prev[id] }));
   };
-
-  if (user && (user as any).kycStatus !== "verified") {
-    return (
-      <DashboardLayout title="Clés API" breadcrumbs={[{ label: "Clés API" }]}>
-        <div className="max-w-md mx-auto mt-6">
-          <Card className="border-border/60 overflow-hidden">
-            <div className="h-1.5 bg-gradient-to-r from-orange-400 to-amber-500" />
-            <CardContent className="pt-10 pb-10 text-center space-y-5">
-              <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mx-auto shadow-xl">
-                <ShieldAlert className="h-10 w-10 text-white" />
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Vérification requise</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  La vérification d'identité (KYC) est obligatoire pour accéder aux clés API.
-                </p>
-              </div>
-              <div className="bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 text-sm text-left space-y-1">
-                <p className="font-semibold text-orange-700 dark:text-orange-400">Statut actuel : {
-                  (user as any).kycStatus === "pending" ? "En cours d'examen" :
-                  (user as any).kycStatus === "rejected" ? "Rejeté" : "Non soumis"
-                }</p>
-                {(user as any).kycStatus === "pending" && (
-                  <p className="text-muted-foreground text-xs">Nos équipes examinent votre dossier. Délai : 24 à 48h.</p>
-                )}
-              </div>
-              <Link href="/kyc">
-                <Button className="w-full h-11 font-bold gap-2 bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20" data-testid="button-go-kyc-api-keys">
-                  <ShieldAlert className="h-4 w-4" /> Vérifier mon identité
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   return (
     <DashboardLayout title="Clés API" breadcrumbs={[{ label: "Clés API" }]}>
@@ -323,6 +289,28 @@ export default function ApiKeysPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={kycGateOpen} onOpenChange={setKycGateOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mx-auto mb-2 shadow-lg">
+              <ShieldAlert className="h-7 w-7 text-white" />
+            </div>
+            <DialogTitle className="text-center">Vérification d'identité requise</DialogTitle>
+            <DialogDescription className="text-center">
+              L'accès aux clés API nécessite une vérification d'identité. Accédez au menu <strong>Vérification KYC</strong> pour soumettre votre dossier.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 mt-2">
+            <Link href="/kyc" onClick={() => setKycGateOpen(false)}>
+              <Button className="w-full font-bold gap-2 bg-orange-500 hover:bg-orange-600 text-white" data-testid="button-kyc-dialog-api-keys">
+                <ShieldAlert className="h-4 w-4" /> Vérifier mon identité
+              </Button>
+            </Link>
+            <Button variant="ghost" onClick={() => setKycGateOpen(false)} className="w-full">Fermer</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
