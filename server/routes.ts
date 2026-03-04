@@ -912,6 +912,62 @@ export async function registerRoutes(
       if (!["pending", "completed", "failed"].includes(status)) {
         return res.status(400).json({ message: "Statut invalide" });
       }
+
+      const transaction = await storage.getTransactionById(id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction introuvable" });
+      }
+
+      if (status === "completed" && transaction.type === "withdrawal" && transaction.status === "pending") {
+        if (!isApiKeyConfigured()) {
+          return res.status(503).json({ message: "Service de paiement OmniPay non configuré" });
+        }
+
+        const amount = parseFloat(transaction.amount);
+        const operator = (transaction as any).provider || "";
+        const phoneNumber = (transaction as any).phoneNumber || "";
+
+        const { users: usersTable } = await import("@shared/models/auth");
+        const { db: dbInst } = await import("./db");
+        const { eq: eqDyn } = await import("drizzle-orm");
+        const [txUser] = await dbInst.select({ firstName: usersTable.firstName, lastName: usersTable.lastName })
+          .from(usersTable).where(eqDyn(usersTable.id, transaction.userId));
+
+        const resolvedFirstName = txUser?.firstName || "Client";
+        const resolvedLastName = txUser?.lastName || "SolvexPay";
+
+        const omnipayOperator = operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase();
+
+        console.log(`Admin: initiating OmniPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${omnipayOperator}, ${amount})`);
+        try {
+          const transferResponse = await omniPayService.transfer({
+            msisdn: phoneNumber,
+            amount,
+            reference: transaction.reference,
+            firstName: resolvedFirstName,
+            lastName: resolvedLastName,
+            operator: omnipayOperator,
+          });
+          console.log(`Admin: OmniPay transfer response for tx ${id}:`, transferResponse);
+
+          const tx = await storage.updateTransactionStatus(id, "completed");
+          return res.json({ ...tx, omnipayId: transferResponse.id, omnipayTriggered: true });
+        } catch (omnipayError: any) {
+          console.error(`Admin: OmniPay transfer failed for tx ${id}:`, omnipayError);
+          return res.status(502).json({
+            message: `Échec du paiement OmniPay: ${omnipayError.message || "Erreur inconnue"}`,
+            omnipayError: true,
+          });
+        }
+      }
+
+      if (status === "failed" && transaction.type === "withdrawal" && transaction.status === "pending") {
+        await storage.updateTransactionStatus(id, "failed");
+        await storage.updateWalletBalance(transaction.userId, transaction.currency, parseFloat(transaction.amount));
+        const tx = await storage.getTransactionById(id);
+        return res.json({ ...tx, refunded: true });
+      }
+
       const tx = await storage.updateTransactionStatus(id, status);
       res.json(tx);
     } catch (error) {

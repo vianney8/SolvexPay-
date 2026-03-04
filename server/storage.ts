@@ -23,6 +23,7 @@ export interface IStorage {
   updateWalletBalance(userId: string, currency: string, amount: number): Promise<Wallet>;
   
   getTransactions(userId: string): Promise<Transaction[]>;
+  getTransactionById(id: string): Promise<Transaction | undefined>;
   getTransactionByReference(reference: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string): Promise<Transaction | undefined>;
@@ -86,6 +87,11 @@ export class DatabaseStorage implements IStorage {
       .from(transactions)
       .where(eq(transactions.userId, userId))
       .orderBy(desc(transactions.createdAt));
+  }
+
+  async getTransactionById(id: string): Promise<Transaction | undefined> {
+    const [tx] = await db.select().from(transactions).where(eq(transactions.id, id));
+    return tx;
   }
 
   async getTransactionByReference(reference: string): Promise<Transaction | undefined> {

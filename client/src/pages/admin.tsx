@@ -235,9 +235,29 @@ export default function AdminPage() {
   });
 
   const txStatusM = useMutation({
-    mutationFn: (d: { txId: string; status: string }) => apiRequest("PATCH", `/api/admin/transactions/${d.txId}/status`, { status: d.status }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] }); toast({ title: "Statut mis à jour" }); setTxEditDialog(null); },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+    mutationFn: async (d: { txId: string; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/transactions/${d.txId}/status`, { status: d.status });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
+      if (data?.omnipayTriggered) {
+        toast({ title: "Paiement envoyé via OmniPay", description: "Le transfert a été initié avec succès." });
+      } else if (data?.refunded) {
+        toast({ title: "Transaction rejetée", description: "Le solde a été remboursé à l'utilisateur." });
+      } else {
+        toast({ title: "Statut mis à jour" });
+      }
+      setTxEditDialog(null);
+    },
+    onError: (e: any) => {
+      let description = e?.message || "Erreur inconnue";
+      try {
+        const parsed = JSON.parse(description.replace(/^\d+:\s*/, ""));
+        description = parsed.message || description;
+      } catch {}
+      toast({ title: "Erreur OmniPay", description, variant: "destructive" });
+    },
   });
 
   const pmM = useMutation({
