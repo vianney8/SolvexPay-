@@ -418,11 +418,8 @@ export default function LandingPage() {
               </a>
             </div>
             <div className="flex items-center gap-2.5">
-              <Link href="/login" data-testid="link-login">
-                <Button variant="ghost" size="sm" className="font-semibold hidden sm:inline-flex" data-testid="button-login">Se connecter</Button>
-              </Link>
-              <Link href="/register">
-                <Button size="sm" className="font-bold shadow-lg shadow-violet-500/25 animate-glow-pulse" data-testid="button-register-nav">Commencer gratuitement</Button>
+              <Link href="/login">
+                <Button size="sm" className="font-bold shadow-lg shadow-violet-500/25 animate-glow-pulse" data-testid="button-login-nav">Se connecter</Button>
               </Link>
             </div>
           </div>
