@@ -23,7 +23,7 @@ import {
   Zap, CalendarDays, BadgeCheck, UserX, Coins, FileText, ArrowUpDown,
   TrendingDown, Building2, ArrowRightLeft, Plus, DollarSign,
   Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
-  Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon, Code2,
+  Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon, Code2, User,
 } from "lucide-react";
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
@@ -1636,7 +1636,11 @@ export default function AdminPage() {
                           <TxChip status={tx.status} />
                           <span className="text-xs font-mono text-muted-foreground">{tx.reference}</span>
                         </div>
-                        <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-foreground/80 bg-muted/60 border border-border/40 rounded-md px-1.5 py-0.5">
+                            <User className="h-2.5 w-2.5 text-muted-foreground" />
+                            {tx.userDisplayName || "—"}
+                          </span>
                           {tx.phoneNumber && <span className="text-xs text-muted-foreground">{tx.phoneNumber}</span>}
                           {tx.provider && <span className="text-xs text-muted-foreground">{tx.provider}</span>}
                           <span className="text-xs text-muted-foreground">{fmtDate(tx.createdAt)}</span>

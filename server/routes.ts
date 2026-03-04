@@ -1464,10 +1464,28 @@ export async function registerRoutes(
   app.get("/api/admin/transactions", isAdmin, async (req, res) => {
     try {
       const { db } = await import("./db");
-      const { desc } = await import("drizzle-orm");
+      const { desc, eq: eqOp } = await import("drizzle-orm");
       const { transactions: txTable } = await import("@shared/schema");
+      const { users: usersTable } = await import("@shared/models/auth");
       const limit = parseInt(req.query.limit as string) || 100;
-      const allTx = await db.select().from(txTable).orderBy(desc(txTable.createdAt)).limit(limit);
+      const rows = await db
+        .select({
+          tx: txTable,
+          userFirstName: usersTable.firstName,
+          userLastName: usersTable.lastName,
+          userEmail: usersTable.email,
+        })
+        .from(txTable)
+        .leftJoin(usersTable, eqOp(txTable.userId, usersTable.id))
+        .orderBy(desc(txTable.createdAt))
+        .limit(limit);
+      const allTx = rows.map(r => ({
+        ...r.tx,
+        userDisplayName: r.userFirstName && r.userLastName
+          ? `${r.userFirstName} ${r.userLastName}`
+          : r.userFirstName || r.userLastName || r.userEmail || "—",
+        userEmail: r.userEmail,
+      }));
       res.json(allTx);
     } catch (error) {
       console.error("Admin transactions error:", error);
