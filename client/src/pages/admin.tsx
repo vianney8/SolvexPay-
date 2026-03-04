@@ -179,6 +179,7 @@ export default function AdminPage() {
   const [migrateData, setMigrateData] = useState({ fromUserId: "", toUserId: "", amount: "", motif: "" });
   const [feeEditDialog, setFeeEditDialog] = useState<{ id: string; feeRate: string; type: string; country: string } | null>(null);
   const [feeRate, setFeeRate] = useState("");
+  const [serviceFeeEdit, setServiceFeeEdit] = useState<{ deposit: string; withdrawal: string; transfer: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [linksSearch, setLinksSearch] = useState("");
@@ -319,6 +320,16 @@ export default function AdminPage() {
   const feeM = useMutation({
     mutationFn: (d: { id: string; feeRate: string }) => apiRequest("PATCH", `/api/admin/fee-configs/${d.id}`, { feeRate: d.feeRate }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-configs"] }); toast({ title: "Frais mis à jour" }); setFeeEditDialog(null); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const { data: serviceFees, isLoading: serviceFeesLoading } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({
+    queryKey: ["/api/admin/service-fees"],
+  });
+
+  const serviceFeesM = useMutation({
+    mutationFn: (d: { deposit?: number; withdrawal?: number; transfer?: number }) => apiRequest("PATCH", "/api/admin/service-fees", d),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/service-fees"] }); toast({ title: "Frais de service mis à jour !" }); setServiceFeeEdit(null); },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
@@ -1192,6 +1203,93 @@ export default function AdminPage() {
               TAB 6 — FRAIS
           ══════════════════════════════════════ */}
           <TabsContent value="fees" className="space-y-4 mt-5">
+
+            {/* ── FRAIS DE SERVICE GLOBAUX ── */}
+            <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                    <Percent className="h-4 w-4 text-violet-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">Frais de service globaux</p>
+                    <p className="text-xs text-muted-foreground">Appliqués à toutes les transactions du site</p>
+                  </div>
+                </div>
+                {!serviceFeeEdit && (
+                  <Button size="sm" variant="outline" className="h-8 text-xs font-bold gap-1.5 rounded-xl"
+                    onClick={() => setServiceFeeEdit({
+                      deposit: String(serviceFees?.deposit ?? 7),
+                      withdrawal: String(serviceFees?.withdrawal ?? 7),
+                      transfer: String(serviceFees?.transfer ?? 7),
+                    })}
+                    data-testid="btn-edit-service-fees"
+                  >
+                    <PenLine className="h-3 w-3" /> Modifier
+                  </Button>
+                )}
+              </div>
+
+              {serviceFeesLoading ? (
+                <div className="p-5 space-y-3">
+                  {[1,2,3].map(i => <Skeleton key={i} className="h-12 rounded-xl" />)}
+                </div>
+              ) : serviceFeeEdit ? (
+                <div className="p-5 space-y-4">
+                  {[
+                    { key: "deposit" as const, label: "Dépôt & Liens de paiement", icon: <Banknote className="h-4 w-4 text-emerald-600" />, color: "emerald" },
+                    { key: "withdrawal" as const, label: "Retrait", icon: <Send className="h-4 w-4 text-rose-600" />, color: "rose" },
+                    { key: "transfer" as const, label: "Transfert", icon: <ArrowRightLeft className="h-4 w-4 text-blue-600" />, color: "blue" },
+                  ].map(({ key, label, icon }) => (
+                    <div key={key} className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 w-52 flex-shrink-0">
+                        {icon}
+                        <span className="text-sm font-semibold">{label}</span>
+                      </div>
+                      <div className="relative flex-1 max-w-[140px]">
+                        <Input
+                          type="number" min="0" max="100" step="0.1"
+                          value={serviceFeeEdit[key]}
+                          onChange={e => setServiceFeeEdit(prev => prev ? { ...prev, [key]: e.target.value } : prev)}
+                          className="pr-8 h-10 text-sm font-bold"
+                          data-testid={`input-service-fee-${key}`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-bold">%</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="outline" className="h-9 text-xs rounded-xl" onClick={() => setServiceFeeEdit(null)}>Annuler</Button>
+                    <Button size="sm" className="h-9 text-xs rounded-xl font-bold"
+                      disabled={serviceFeesM.isPending}
+                      onClick={() => serviceFeesM.mutate({
+                        deposit: parseFloat(serviceFeeEdit.deposit),
+                        withdrawal: parseFloat(serviceFeeEdit.withdrawal),
+                        transfer: parseFloat(serviceFeeEdit.transfer),
+                      })}
+                      data-testid="btn-save-service-fees"
+                    >
+                      {serviceFeesM.isPending ? "Enregistrement..." : "Enregistrer"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-5 grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Dépôt & Liens", value: serviceFees?.deposit ?? 7, icon: <Banknote className="h-4 w-4 text-emerald-600" />, bg: "bg-emerald-500/8" },
+                    { label: "Retrait", value: serviceFees?.withdrawal ?? 7, icon: <Send className="h-4 w-4 text-rose-600" />, bg: "bg-rose-500/8" },
+                    { label: "Transfert", value: serviceFees?.transfer ?? 7, icon: <ArrowRightLeft className="h-4 w-4 text-blue-600" />, bg: "bg-blue-500/8" },
+                  ].map(({ label, value, icon, bg }) => (
+                    <div key={label} className={`rounded-xl p-4 ${bg} border border-border/30 text-center`}>
+                      <div className="flex justify-center mb-2">{icon}</div>
+                      <p className="text-2xl font-black">{value}%</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-start gap-3">
               <Percent className="h-4 w-4 text-indigo-600 mt-0.5 flex-shrink-0" />
               <div>

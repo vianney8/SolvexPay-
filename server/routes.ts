@@ -171,7 +171,7 @@ export async function registerRoutes(
         returnUrl,
       });
 
-      const depositFeeRate = 0.05;
+      const depositFeeRate = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7") / 100;
       const depositFees = Math.round(amount * depositFeeRate);
 
       const transaction = await storage.createTransaction({
@@ -230,7 +230,7 @@ export async function registerRoutes(
       const reference = generateReference();
       const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
 
-      const withdrawalFeeRate = 0.07;
+      const withdrawalFeeRate = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7") / 100;
       const withdrawalFees = Math.round(amount * withdrawalFeeRate);
 
       if (withdrawalMode === "manual") {
@@ -317,7 +317,7 @@ export async function registerRoutes(
       }
 
       const currentBalance = parseFloat((wallet.balanceXOF as string) || "0");
-      const transferFeeRate = 0.06;
+      const transferFeeRate = parseFloat((await storage.getSystemSetting("fee_transfer")) || "7") / 100;
       const transferFees = Math.round(amount * transferFeeRate);
       const totalDeducted = amount + transferFees;
 
@@ -611,7 +611,7 @@ export async function registerRoutes(
       } else {
         linkAmount = fixedAmount;
       }
-      const feeRate = 0.05;
+      const feeRate = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7") / 100;
       const feesAmount = Math.round(linkAmount * feeRate);
 
       console.log(`Initiating payment for link ${slug} with reference: ${reference}`);
@@ -1197,6 +1197,46 @@ export async function registerRoutes(
       res.json(sorted.slice(0, 50));
     } catch (error) {
       console.error("Admin big users error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/service-fees", isAdmin, async (req, res) => {
+    try {
+      const deposit = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
+      const withdrawal = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7");
+      const transfer = parseFloat((await storage.getSystemSetting("fee_transfer")) || "7");
+      res.json({ deposit, withdrawal, transfer });
+    } catch (error) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/service-fees", isAdmin, async (req, res) => {
+    try {
+      const { deposit, withdrawal, transfer } = req.body;
+      if (deposit !== undefined) {
+        const v = parseFloat(deposit);
+        if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide pour dépôt (0-100)" });
+        await storage.setSystemSetting("fee_deposit", String(v));
+      }
+      if (withdrawal !== undefined) {
+        const v = parseFloat(withdrawal);
+        if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide pour retrait (0-100)" });
+        await storage.setSystemSetting("fee_withdrawal", String(v));
+      }
+      if (transfer !== undefined) {
+        const v = parseFloat(transfer);
+        if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide pour transfert (0-100)" });
+        await storage.setSystemSetting("fee_transfer", String(v));
+      }
+      const updated = {
+        deposit: parseFloat((await storage.getSystemSetting("fee_deposit")) || "7"),
+        withdrawal: parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7"),
+        transfer: parseFloat((await storage.getSystemSetting("fee_transfer")) || "7"),
+      };
+      res.json(updated);
+    } catch (error) {
       res.status(500).json({ message: "Erreur serveur" });
     }
   });
