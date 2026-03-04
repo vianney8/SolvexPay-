@@ -23,11 +23,25 @@ interface UserAvatarProps {
   lastName?: string;
   userId?: string;
   email?: string;
+  profileImageUrl?: string | null;
   size?: number;
   className?: string;
 }
 
-export function UserAvatar({ firstName, lastName, userId, email, size = 36, className = "" }: UserAvatarProps) {
+export function UserAvatar({ firstName, lastName, userId, email, profileImageUrl, size = 36, className = "" }: UserAvatarProps) {
+  if (profileImageUrl) {
+    return (
+      <img
+        src={profileImageUrl}
+        alt="Avatar"
+        width={size}
+        height={size}
+        className={`flex-shrink-0 object-cover ${className}`}
+        style={{ borderRadius: "50%", width: size, height: size }}
+      />
+    );
+  }
+
   const initials = [firstName, lastName]
     .filter(Boolean)
     .map((n) => n![0].toUpperCase())

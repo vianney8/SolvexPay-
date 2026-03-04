@@ -259,6 +259,7 @@ export default function SettingsPage() {
                 lastName={lastName || undefined}
                 userId={user?.id}
                 email={email || undefined}
+                profileImageUrl={(user as any)?.profileImageUrl}
                 size={72}
               />
             </div>
