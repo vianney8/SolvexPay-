@@ -26,6 +26,7 @@ const changePasswordSchema = z.object({
 const kycSubmitSchema = z.object({
   kycFirstName: z.string().min(1, "Prénom requis"),
   kycLastName: z.string().min(1, "Nom requis"),
+  kycDocumentNumber: z.string().min(1, "Numéro de la pièce requis"),
   kycDocumentFront: z.string().min(1, "Photo recto requise"),
   kycDocumentBack: z.string().optional().nullable(),
   kycSelfie: z.string().min(1, "Selfie requis"),
@@ -116,13 +117,14 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
 
-      const { kycFirstName, kycLastName, kycDocumentFront, kycDocumentBack, kycSelfie } = validation.data;
+      const { kycFirstName, kycLastName, kycDocumentNumber, kycDocumentFront, kycDocumentBack, kycSelfie } = validation.data;
 
       const updated = await authStorage.upsertUser({
         id: userId,
         kycStatus: "pending",
         kycFirstName,
         kycLastName,
+        kycDocumentNumber,
         kycDocumentFront,
         kycDocumentBack: kycDocumentBack || null,
         kycSelfie,

@@ -653,6 +653,7 @@ export default function AdminPage() {
                           <p className="text-xs text-muted-foreground">{u.email}</p>
                           <p className="text-xs text-muted-foreground">Soumis : {fmtDate(u.updatedAt)}</p>
                           {u.kycFirstName && <p className="text-xs text-muted-foreground">Nom KYC : <strong>{u.kycFirstName} {u.kycLastName}</strong></p>}
+                          {u.kycDocumentNumber && <p className="text-xs text-muted-foreground">N° pièce : <strong className="font-mono">{u.kycDocumentNumber}</strong></p>}
                           {u.kycStatus === "rejected" && u.kycRejectionReason && (
                             <p className="text-xs text-red-500 mt-1"><strong>Motif :</strong> {u.kycRejectionReason}</p>
                           )}

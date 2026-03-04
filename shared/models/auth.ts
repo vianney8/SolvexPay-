@@ -28,6 +28,7 @@ export const users = pgTable("users", {
   kycRejectionReason: varchar("kyc_rejection_reason"),
   kycFirstName: varchar("kyc_first_name"),
   kycLastName: varchar("kyc_last_name"),
+  kycDocumentNumber: varchar("kyc_document_number"),
   kycDocumentFront: varchar("kyc_document_front"),
   kycDocumentBack: varchar("kyc_document_back"),
   kycSelfie: varchar("kyc_selfie"),

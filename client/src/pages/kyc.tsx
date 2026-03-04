@@ -86,6 +86,7 @@ export default function KycPage() {
 
   const [kycFirstName, setKycFirstName] = useState("");
   const [kycLastName, setKycLastName] = useState("");
+  const [kycDocumentNumber, setKycDocumentNumber] = useState("");
   const [kycDocumentFront, setKycDocumentFront] = useState("");
   const [kycDocumentBack, setKycDocumentBack] = useState("");
   const [kycSelfie, setKycSelfie] = useState("");
@@ -94,6 +95,7 @@ export default function KycPage() {
     if (user) {
       if ((user as any).kycFirstName) setKycFirstName((user as any).kycFirstName);
       if ((user as any).kycLastName) setKycLastName((user as any).kycLastName);
+      if ((user as any).kycDocumentNumber) setKycDocumentNumber((user as any).kycDocumentNumber);
       if ((user as any).kycDocumentFront) setKycDocumentFront((user as any).kycDocumentFront);
       if ((user as any).kycDocumentBack) setKycDocumentBack((user as any).kycDocumentBack);
       if ((user as any).kycSelfie) setKycSelfie((user as any).kycSelfie);
@@ -113,9 +115,10 @@ export default function KycPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!kycFirstName || !kycLastName) { toast({ title: "Erreur", description: "Prénom et nom requis", variant: "destructive" }); return; }
+    if (!kycDocumentNumber) { toast({ title: "Erreur", description: "Numéro de la pièce requis", variant: "destructive" }); return; }
     if (!kycDocumentFront) { toast({ title: "Erreur", description: "Photo recto du document requise", variant: "destructive" }); return; }
     if (!kycSelfie) { toast({ title: "Erreur", description: "Selfie requis", variant: "destructive" }); return; }
-    kycMutation.mutate({ kycFirstName, kycLastName, kycDocumentFront, kycDocumentBack: kycDocumentBack || null, kycSelfie });
+    kycMutation.mutate({ kycFirstName, kycLastName, kycDocumentNumber, kycDocumentFront, kycDocumentBack: kycDocumentBack || null, kycSelfie });
   };
 
   const steps = [
@@ -242,6 +245,11 @@ export default function KycPage() {
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de la pièce d'identité <span className="text-rose-500">*</span></Label>
+                  <Input value={kycDocumentNumber} onChange={e => setKycDocumentNumber(e.target.value)} placeholder="Ex : BJ12345678" className="h-11 border-border/70 font-mono" required data-testid="input-kyc-document-number" />
+                </div>
+
                 <Separator />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -254,7 +262,7 @@ export default function KycPage() {
                 <Button
                   type="submit"
                   className="w-full gap-2 h-12 font-bold shadow-xl shadow-primary/20"
-                  disabled={kycMutation.isPending || !kycDocumentFront || !kycSelfie || !kycFirstName || !kycLastName}
+                  disabled={kycMutation.isPending || !kycDocumentFront || !kycSelfie || !kycFirstName || !kycLastName || !kycDocumentNumber}
                   data-testid="button-submit-kyc"
                 >
                   {kycMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" />Envoi en cours...</> : <><Shield className="h-4 w-4" />Soumettre pour vérification</>}
