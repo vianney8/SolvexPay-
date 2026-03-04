@@ -20,6 +20,7 @@ import DepositPage from "@/pages/deposit";
 import WithdrawPage from "@/pages/withdraw";
 import PayPage from "@/pages/pay";
 import AdminPage from "@/pages/admin";
+import SupportPage from "@/pages/support";
 
 function AuthenticatedRoutes() {
   return (
@@ -35,6 +36,7 @@ function AuthenticatedRoutes() {
       <Route path="/kyc" component={KycPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/support" component={SupportPage} />
       <Route component={NotFound} />
     </Switch>
   );

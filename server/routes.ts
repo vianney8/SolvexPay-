@@ -516,6 +516,13 @@ export async function registerRoutes(
   app.delete("/api/payment-links/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
+      const { db } = await import("./db");
+      const { paymentLinks: plTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [existing] = await db.select().from(plTable).where(eq(plTable.id, id));
+      if (existing?.adminLocked) {
+        return res.status(403).json({ message: "Ce lien a été verrouillé par l'administrateur.", adminLocked: true });
+      }
       await storage.deletePaymentLink(id);
       res.json({ success: true });
     } catch (error) {
@@ -524,8 +531,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/notifications", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  app.get("/api/notifications", isAuthenticated, async (req: any, res) => {
     try {
       const notifs = await storage.getActiveNotifications();
       res.json(notifs);
@@ -534,8 +540,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/notifications", async (req, res) => {
-    if (!req.isAuthenticated() || !(req.user as any)?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+  app.get("/api/admin/notifications", isAdmin, async (req: any, res) => {
     try {
       const notifs = await storage.getAllNotifications();
       res.json(notifs);
@@ -544,8 +549,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/notifications", async (req, res) => {
-    if (!req.isAuthenticated() || !(req.user as any)?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+  app.post("/api/admin/notifications", isAdmin, async (req: any, res) => {
     try {
       const { title, message, color } = req.body;
       if (!title || !message) return res.status(400).json({ message: "Title and message are required" });
@@ -556,8 +560,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/notifications/:id", async (req, res) => {
-    if (!req.isAuthenticated() || !(req.user as any)?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+  app.patch("/api/admin/notifications/:id", isAdmin, async (req: any, res) => {
     try {
       const notif = await storage.updateNotification(req.params.id, req.body);
       if (!notif) return res.status(404).json({ message: "Not found" });
@@ -567,8 +570,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/notifications/:id", async (req, res) => {
-    if (!req.isAuthenticated() || !(req.user as any)?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+  app.delete("/api/admin/notifications/:id", isAdmin, async (req: any, res) => {
     try {
       await storage.deleteNotification(req.params.id);
       res.json({ success: true });
@@ -1693,7 +1695,7 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { paymentLinks: plTable } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
-      const [updated] = await db.update(plTable).set({ isActive: !!isActive }).where(eq(plTable.id, id)).returning();
+      const [updated] = await db.update(plTable).set({ isActive: !!isActive, adminLocked: !isActive }).where(eq(plTable.id, id)).returning();
       res.json(updated);
     } catch (error) {
       console.error("Admin toggle payment link error:", error);

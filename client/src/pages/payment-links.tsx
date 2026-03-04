@@ -22,7 +22,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Plus, Link2, Copy, ExternalLink, Trash2, Search,
   Globe, Activity, ArrowLeft, ImagePlus,
-  Info, Pencil, Upload, X, CheckCircle2,
+  Info, Pencil, Upload, X, CheckCircle2, Lock,
 } from "lucide-react";
 import type { PaymentLink } from "@shared/schema";
 
@@ -436,12 +436,18 @@ export default function PaymentLinksPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <Switch
-                      checked={link.isActive}
-                      onCheckedChange={(checked) => toggleMutation.mutate({ id: link.id, isActive: checked })}
-                      data-testid={`switch-link-${link.id}`}
-                    />
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => setEditingLink(link)} data-testid={`button-edit-link-${link.id}`}>
+                    {(link as any).adminLocked ? (
+                      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-red-500/8 border border-red-500/20" title="Verrouillé par l'administrateur">
+                        <Lock className="h-3.5 w-3.5 text-red-500" />
+                      </div>
+                    ) : (
+                      <Switch
+                        checked={link.isActive}
+                        onCheckedChange={(checked) => toggleMutation.mutate({ id: link.id, isActive: checked })}
+                        data-testid={`switch-link-${link.id}`}
+                      />
+                    )}
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => setEditingLink(link)} data-testid={`button-edit-link-${link.id}`} disabled={!!(link as any).adminLocked}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => copyLink(link.slug)} data-testid={`button-copy-link-${link.id}`}>
@@ -450,7 +456,7 @@ export default function PaymentLinksPage() {
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => window.open(`${window.location.origin}/pay/${link.slug}`, "_blank")} data-testid={`button-open-link-${link.id}`}>
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive/70 hover:text-destructive hover:bg-destructive/5" onClick={() => setDeleteConfirmId(link.id)} data-testid={`button-delete-link-${link.id}`}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive/70 hover:text-destructive hover:bg-destructive/5" onClick={() => setDeleteConfirmId(link.id)} data-testid={`button-delete-link-${link.id}`} disabled={!!(link as any).adminLocked}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>

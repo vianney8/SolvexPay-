@@ -208,7 +208,7 @@ export default function ApiKeysPage() {
                           data-testid={`switch-key-${key.id}`}
                         />
                         )}
-                        <Button variant="outline" size="icon" onClick={() => deleteMutation.mutate(key.id)} className="text-destructive border-destructive/20 hover:bg-destructive/5" data-testid={`button-delete-key-${key.id}`}>
+                        <Button variant="outline" size="icon" onClick={() => deleteMutation.mutate(key.id)} className="text-destructive border-destructive/20 hover:bg-destructive/5" data-testid={`button-delete-key-${key.id}`} disabled={!!(key as any).adminLocked}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

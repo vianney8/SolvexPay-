@@ -36,6 +36,7 @@ export const paymentLinks = pgTable("payment_links", {
   slug: text("slug").notNull().unique(),
   allowCustomAmount: boolean("allow_custom_amount").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
+  adminLocked: boolean("admin_locked").notNull().default(false),
   timesUsed: decimal("times_used", { precision: 10, scale: 0 }).notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [index("idx_payment_links_user").on(table.userId)]);
