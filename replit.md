@@ -77,16 +77,28 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: PostgreSQL-backed sessions via connect-pg-simple
 
 ### Data Storage
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL (Neon)
 - **ORM**: Drizzle ORM with drizzle-zod for schema validation
 - **Schema Location**: `shared/schema.ts` contains all table definitions
 - **Tables**: 
   - `users` - User accounts (managed by Replit Auth)
   - `sessions` - Session storage for authentication
   - `wallets` - User wallet balances per currency
-  - `transactions` - Deposit/withdrawal records
+  - `transactions` - Deposit/withdrawal records (`apiKeyId` links API-sourced transactions to the originating API key)
   - `paymentLinks` - Shareable payment links with unique slugs
-  - `apiKeys` - Developer API keys with hashed storage
+  - `apiKeys` - Developer API keys (`sk_live_` + 48 hex chars) with hashed storage, `appName`, `webhookUrl`, `webhookSecret`
+  - `systemSettings` - Key-value settings for fees, support links (seeded on startup via `server/seed.ts`)
+
+### Payment Provider
+- **OmniPay** — only active provider. Keys: `OMNIPAY_API_KEY`, `OMNIPAY_CALLBACK_KEY`
+- Webhook forwarding: OmniPay callbacks → merchant's configured `webhookUrl` with HMAC-SHA256 `x-solvexpay-signature`
+
+### API Payment Flow (Hosted Page)
+- `POST /api/v1/deposit` (with `sk_live_...` Bearer token):
+  - **With phone + operator**: Direct USSD push → returns `payment_url` from OmniPay (Wave) or null
+  - **Without phone/operator**: Creates pending transaction → returns `payment_url: https://solvexpay.com/pay-api/:id` (hosted SolvexPay page)
+- Hosted page `/pay-api/:id` mirrors `/pay/:slug` — customer fills phone/operator, payment processed, merchant balance credited
+- Transaction labelled "Paiement API" in dashboard with violet "API" badge, payer info visible
 
 ### Authentication Flow
 - Replit Auth handles user authentication via OIDC

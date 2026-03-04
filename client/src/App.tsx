@@ -18,6 +18,7 @@ import SettingsPage from "@/pages/settings";
 import DepositPage from "@/pages/deposit";
 import WithdrawPage from "@/pages/withdraw";
 import PayPage from "@/pages/pay";
+import PayApiPage from "@/pages/pay-api";
 import AdminPage from "@/pages/admin";
 import SupportPage from "@/pages/support";
 import DocumentationPage from "@/pages/documentation";
@@ -88,6 +89,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/pay/:slug" component={PayPage} />
+      <Route path="/pay-api/:id" component={PayApiPage} />
       <Route path="/documentation" component={DocumentationPage} />
       {user ? (
         <AuthenticatedRoutes />

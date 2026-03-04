@@ -29,6 +29,10 @@ function isPaymentLink(tx: Transaction) {
   return tx.description?.startsWith("Paiement via lien:");
 }
 
+function isApiPayment(tx: Transaction) {
+  return !!(tx as any).apiKeyId || tx.description?.startsWith("Paiement via API") || tx.description?.startsWith("Dépôt via API");
+}
+
 function getTypeIcon(tx: Transaction) {
   if (tx.type === "deposit") return { icon: ArrowDownLeft, bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400" };
   if (tx.type === "transfer") return { icon: ArrowLeftRight, bg: "bg-violet-500/10", text: "text-violet-600 dark:text-violet-400" };
@@ -37,6 +41,7 @@ function getTypeIcon(tx: Transaction) {
 
 function getTypeLabel(tx: Transaction) {
   if (isPaymentLink(tx)) return "Paiement";
+  if (isApiPayment(tx)) return "Paiement API";
   if (tx.type === "deposit") return "Dépôt";
   if (tx.type === "transfer") return "Transfert";
   return "Retrait";
@@ -74,7 +79,10 @@ function getStatusLabel(status: string) {
 
 function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
   const isLink = isPaymentLink(tx);
+  const isApi = isApiPayment(tx);
   const linkName = isLink ? tx.description?.replace("Paiement via lien: ", "") : undefined;
+  const apiName = isApi ? (tx.description?.replace("Paiement via API — ", "").replace("Dépôt via API — ", "") || "API") : undefined;
+  const showPayerInfo = isLink || isApi;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
@@ -88,8 +96,12 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
               {(() => { const Icon = getTypeIcon(tx).icon; return <Icon className={`h-5 w-5 ${getTypeIcon(tx).text}`} />; })()}
             </div>
             <div>
-              <p className="font-bold text-base">{getTypeLabel(tx)}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-base">{getTypeLabel(tx)}</p>
+                {isApi && <Badge variant="outline" className="text-[10px] font-mono border-violet-500/30 text-violet-600 dark:text-violet-400 px-1.5 py-0">API</Badge>}
+              </div>
               {isLink && linkName && <p className="text-xs text-muted-foreground">{linkName}</p>}
+              {isApi && apiName && <p className="text-xs text-muted-foreground">{apiName}</p>}
             </div>
           </div>
           <button onClick={onClose} className="h-8 w-8 rounded-xl bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors" data-testid="button-close-tx-modal">
@@ -134,7 +146,7 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
                 <span className="font-semibold text-orange-600">{formatCurrency((tx as any).fees, tx.currency)} {tx.currency}</span>
               </div>
             )}
-            {isLink && (
+            {showPayerInfo && (
               <>
                 {(tx as any).payerName && (
                   <div className="flex items-center justify-between py-2 border-b border-border/40">
@@ -307,11 +319,13 @@ export default function TransactionsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold text-sm text-foreground">{getTypeLabel(tx)}</p>
-                          {displayProvider && <span className="text-xs text-muted-foreground">{displayProvider}</span>}
+                          {isApiPayment(tx) && <Badge variant="outline" className="text-[9px] font-mono border-violet-500/30 text-violet-600 dark:text-violet-400 px-1 py-0 h-4">API</Badge>}
+                          {displayProvider && !isApiPayment(tx) && <span className="text-xs text-muted-foreground">{displayProvider}</span>}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <p className="text-xs text-muted-foreground font-mono">{tx.reference.slice(0, 16)}…</p>
                           {tx.phoneNumber && <span className="text-xs text-muted-foreground">{tx.phoneNumber}</span>}
+                          {!tx.phoneNumber && isApiPayment(tx) && <span className="text-xs text-muted-foreground italic">En attente de paiement</span>}
                         </div>
                       </div>
                       <div className="hidden md:block text-xs text-muted-foreground flex-shrink-0 min-w-[120px] text-right">

@@ -60,6 +60,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const { seedDefaults, promoteAdminEmail } = await import("./seed");
+  await seedDefaults();
+  await promoteAdminEmail();
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

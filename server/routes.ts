@@ -455,6 +455,145 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Hosted API Payment Page Routes ──────────────────────────────────────────
+
+  app.get("/api/payment-api/public/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const transaction = await storage.getTransactionById(id);
+      if (!transaction || (transaction as any).apiKeyId === null || (transaction as any).apiKeyId === undefined) {
+        return res.status(404).json({ message: "Paiement introuvable" });
+      }
+      if (!["pending", "completed", "failed"].includes(transaction.status)) {
+        return res.status(404).json({ message: "Paiement introuvable" });
+      }
+      const { db } = await import("./db");
+      const { eq: eqFn } = await import("drizzle-orm");
+      const { users: usersTable } = await import("@shared/models/auth");
+      const [merchant] = await db.select({
+        firstName: usersTable.firstName,
+        lastName: usersTable.lastName,
+        merchantName: usersTable.merchantName,
+      }).from(usersTable).where(eqFn(usersTable.id, transaction.userId));
+      const displayName = merchant?.merchantName || (merchant ? `${merchant.firstName || ""} ${merchant.lastName || ""}`.trim() : "") || "SolvexPay";
+      const apiKeyRow = await storage.getApiKeys(transaction.userId);
+      const matchingKey = (transaction as any).apiKeyId
+        ? apiKeyRow.find((k) => k.id === (transaction as any).apiKeyId)
+        : null;
+      const appName = (matchingKey as any)?.appName || displayName;
+      res.json({
+        id: transaction.id,
+        status: transaction.status,
+        amount: parseFloat(transaction.amount),
+        currency: transaction.currency,
+        fees: transaction.fees ? parseFloat(transaction.fees) : 0,
+        description: transaction.description,
+        payerCountry: (transaction as any).payerCountry || null,
+        appName,
+        merchantName: displayName,
+        phoneNumber: transaction.phoneNumber || null,
+        provider: transaction.provider || null,
+        reference: transaction.reference,
+        redirectUrl: (matchingKey as any)?.redirectUrl || null,
+        createdAt: transaction.createdAt,
+      });
+    } catch (err) {
+      console.error("payment-api/public/:id error:", err);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/payment-api/public/:id/pay", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const transaction = await storage.getTransactionById(id);
+      if (!transaction || transaction.status !== "pending") {
+        return res.status(404).json({ message: "Paiement introuvable ou déjà traité" });
+      }
+      if ((transaction as any).phoneNumber) {
+        return res.status(400).json({ message: "Ce paiement a déjà été initié" });
+      }
+      const validation = publicPaySchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
+      }
+      const { phoneNumber, operator, country, customerName, customerEmail } = validation.data;
+      if (!isApiKeyConfigured()) {
+        return res.status(503).json({ message: "Service de paiement non configuré" });
+      }
+      const amount = parseFloat(transaction.amount);
+      const fullName = (customerName || "Client SolvexPay").trim();
+      const nameParts = fullName.split(" ");
+      const firstName = nameParts[0] || "Client";
+      const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
+      const isWave = operator.toLowerCase() === "wave";
+      const returnUrl = isWave
+        ? `https://solvexpay.com/pay-api/${id}?status=callback&reference=${transaction.reference}`
+        : undefined;
+      const omniOperator = operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase();
+      const depositResponse = await omniPayService.deposit({
+        msisdn: phoneNumber,
+        amount,
+        reference: transaction.reference,
+        firstName,
+        lastName,
+        operator: omniOperator,
+        returnUrl,
+      });
+      const { db } = await import("./db");
+      const { eq: eqFn } = await import("drizzle-orm");
+      const { transactions: txTable } = await import("@shared/schema");
+      await db.update(txTable).set({
+        phoneNumber,
+        provider: operator.toUpperCase(),
+        payerName: customerName || null,
+        payerEmail: customerEmail || null,
+        payerCountry: country,
+        payerOperator: operator.toUpperCase(),
+      } as any).where(eqFn(txTable.id, id));
+      res.json({
+        reference: transaction.reference,
+        paymentUrl: depositResponse.payment_url || null,
+        status: "pending",
+      });
+    } catch (err: any) {
+      console.error("payment-api/public/:id/pay error:", err);
+      res.status(500).json({ message: err.message || "Erreur lors du paiement" });
+    }
+  });
+
+  app.post("/api/payment-api/public/:id/verify", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const transaction = await storage.getTransactionById(id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Paiement introuvable" });
+      }
+      if (transaction.status !== "pending") {
+        const publicStatus = transaction.status === "completed" ? "SUCCESS" : transaction.status === "failed" ? "FAILED" : "PENDING";
+        return res.json({ success: true, status: publicStatus });
+      }
+      const result = await omniPayService.getStatus(transaction.reference);
+      const statusStr = omnipayStatusToString(result.status ?? 0);
+      if (statusStr === "completed") {
+        await storage.updateTransactionStatus(transaction.id, "completed");
+        const grossAmt = parseFloat(transaction.amount);
+        const txFees = parseFloat((transaction as any).fees || "0") || 0;
+        const netAmt = grossAmt - txFees;
+        await storage.updateWalletBalance(transaction.userId, transaction.currency, netAmt > 0 ? netAmt : grossAmt);
+      } else if (statusStr === "failed") {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+      }
+      const publicStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
+      res.json({ success: result.success, status: publicStatus });
+    } catch (err: any) {
+      console.error("payment-api/public/:id/verify error:", err);
+      res.status(500).json({ message: err.message || "Erreur de vérification" });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+
   app.get("/api/payment-links", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -895,15 +1034,6 @@ export async function registerRoutes(
       if (!amount || typeof amount !== "number" || amount < 100) {
         return res.status(400).json({ error: { code: "INVALID_AMOUNT", message: "Montant invalide (minimum 100 XOF).", status: 400 } });
       }
-      if (!phone || typeof phone !== "string") {
-        return res.status(400).json({ error: { code: "INVALID_PHONE", message: "Numéro de téléphone requis.", status: 400 } });
-      }
-      if (!operator || typeof operator !== "string") {
-        return res.status(400).json({ error: { code: "INVALID_OPERATOR", message: "Opérateur requis (MTN, ORANGE, WAVE, MOOV, TMONEY, AIRTEL, VODACOM, FREE).", status: 400 } });
-      }
-      if (!country || typeof country !== "string") {
-        return res.status(400).json({ error: { code: "INVALID_COUNTRY", message: "Code pays requis (BJ, CI, SN, CM, TG, BF, ML, COD, COG).", status: 400 } });
-      }
 
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
@@ -916,21 +1046,70 @@ export async function registerRoutes(
         return res.status(403).json({ error: { code: "KYC_REQUIRED", message: "Vérification KYC requise pour utiliser l'API.", status: 403 } });
       }
 
+      const appName = (req.merchantApiKey as any).appName || `${merchantUser.firstName || ""} ${merchantUser.lastName || ""}`.trim() || "SolvexPay";
+      const apiKeyId = req.merchantApiKey?.id;
+      const feeRate = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7") / 100;
+      const feesAmount = Math.round(amount * feeRate);
+      const reference = generateReference();
+
+      // ── Mode sans phone/operator → page de paiement hébergée SolvexPay ──
+      if (!phone || !operator) {
+        const transaction = await storage.createTransaction({
+          userId: req.merchantUserId,
+          type: "deposit",
+          amount: String(amount),
+          currency: "XOF",
+          provider: operator ? operator.toUpperCase() : null,
+          phoneNumber: phone || null,
+          reference,
+          status: "pending",
+          description: description || `Paiement via API — ${appName}`,
+          fees: String(feesAmount),
+          payerName: customer_name || null,
+          payerEmail: customer_email || null,
+          payerCountry: country || null,
+          payerOperator: operator ? operator.toUpperCase() : null,
+          apiKeyId: apiKeyId || null,
+        } as any);
+
+        const hostedUrl = `https://solvexpay.com/pay-api/${transaction.id}`;
+        return res.status(201).json({
+          id: transaction.id,
+          status: "pending",
+          amount,
+          currency: "XOF",
+          reference,
+          description: transaction.description,
+          fees: feesAmount,
+          net_amount: amount - feesAmount,
+          payment_url: hostedUrl,
+          hosted_page: true,
+          created_at: transaction.createdAt,
+          metadata: metadata || null,
+        });
+      }
+
+      // ── Mode direct : phone + operator fournis → USSD push OmniPay ──
+      if (typeof phone !== "string") {
+        return res.status(400).json({ error: { code: "INVALID_PHONE", message: "Numéro de téléphone invalide.", status: 400 } });
+      }
+      if (typeof operator !== "string") {
+        return res.status(400).json({ error: { code: "INVALID_OPERATOR", message: "Opérateur invalide.", status: 400 } });
+      }
+      if (!country || typeof country !== "string") {
+        return res.status(400).json({ error: { code: "INVALID_COUNTRY", message: "Code pays requis (BJ, CI, SN, CM, TG, BF, ML, COD, COG).", status: 400 } });
+      }
+
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ error: { code: "PROVIDER_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
       }
 
-      const reference = generateReference();
       const fullName = (customer_name || "Client SolvexPay").trim();
       const nameParts = fullName.split(" ");
       const firstName = nameParts[0] || "Client";
       const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
       const isWave = operator.toLowerCase() === "wave";
-      const appName = (req.merchantApiKey as any).appName || `${merchantUser.firstName || ""} ${merchantUser.lastName || ""}`.trim() || "SolvexPay";
       const returnUrl = isWave ? `https://solvexpay.com/api/payment/callback?reference=${reference}` : undefined;
-      const feeRate = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7") / 100;
-      const feesAmount = Math.round(amount * feeRate);
-
       const omniOperator = operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase();
 
       const depositResponse = await omniPayService.deposit({
@@ -952,12 +1131,13 @@ export async function registerRoutes(
         phoneNumber: phone,
         reference,
         status: "pending",
-        description: description || `Dépôt via API — ${appName}`,
+        description: description || `Paiement via API — ${appName}`,
         fees: String(feesAmount),
-        payerName: customer_name || undefined,
-        payerEmail: customer_email || undefined,
+        payerName: customer_name || null,
+        payerEmail: customer_email || null,
         payerCountry: country,
         payerOperator: operator.toUpperCase(),
+        apiKeyId: apiKeyId || null,
       } as any);
 
       res.status(201).json({
@@ -973,6 +1153,7 @@ export async function registerRoutes(
         fees: feesAmount,
         net_amount: amount - feesAmount,
         payment_url: depositResponse.payment_url || null,
+        hosted_page: false,
         omnipay_id: depositResponse.id || null,
         created_at: transaction.createdAt,
         metadata: metadata || null,
