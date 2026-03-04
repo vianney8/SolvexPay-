@@ -135,7 +135,7 @@ export default function WithdrawPage() {
       <DashboardLayout title="" breadcrumbs={[{ label: "Retrait" }]}>
         <div className="max-w-md mx-auto mt-6">
           <Card className="border-border/60 overflow-hidden">
-            <div className="h-1.5 bg-gradient-to-r from-orange-400 to-amber-500" />
+            <div className="h-1.5 bg-gradient-to-r from-cyan-400 to-blue-500" />
             <CardContent className="pt-10 pb-10 text-center space-y-5">
               <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto shadow-xl">
                 <CheckCircle2 className="h-10 w-10 text-white" />
@@ -178,7 +178,7 @@ export default function WithdrawPage() {
       <div className="max-w-md mx-auto space-y-5">
         <div
           className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
-          style={{ background: "linear-gradient(135deg, hsl(24 90% 36%) 0%, hsl(32 95% 46%) 60%, hsl(38 92% 52%) 100%)" }}
+          style={{ background: "linear-gradient(135deg, hsl(200 90% 30%) 0%, hsl(210 85% 48%) 60%, hsl(220 80% 52%) 100%)" }}
         >
           <div className="absolute top-0 right-0 w-36 h-36 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
           <div className="relative flex items-center justify-between gap-3">
@@ -346,8 +346,8 @@ export default function WithdrawPage() {
             </Card>
           )}
 
-          <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-500/5 border border-orange-500/20">
-            <Info className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-cyan-500/5 border border-cyan-500/20">
+            <Info className="h-4 w-4 text-cyan-600 dark:text-cyan-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
               Frais de retrait de <strong>{Math.round(feeRate * 100)}%</strong> appliqués sur le montant retiré. Les fonds arrivent automatiquement (max 24h selon l'opérateur).
             </p>
@@ -356,7 +356,7 @@ export default function WithdrawPage() {
           <Button
             type="submit"
             className="w-full h-13 text-base font-bold gap-2 shadow-xl"
-            style={{ background: !withdrawAmount || insufficientFunds ? undefined : "linear-gradient(135deg, hsl(24 90% 40%) 0%, hsl(38 92% 50%) 100%)" }}
+            style={{ background: !withdrawAmount || insufficientFunds ? undefined : "linear-gradient(135deg, hsl(200 90% 34%) 0%, hsl(220 80% 52%) 100%)" }}
             variant={insufficientFunds ? "outline" : "default"}
             disabled={withdrawMutation.isPending || !withdrawAmount || !phone || !operator || !country || insufficientFunds}
             data-testid="button-confirm-withdraw"
@@ -383,8 +383,8 @@ export default function WithdrawPage() {
                   const statusLabels: Record<string, string> = { completed: "Terminé", pending: "En cours", failed: "Échoué" };
                   return (
                     <div key={tx.id || i} className="flex items-center gap-3 px-4 py-3" data-testid={`withdraw-history-row-${i}`}>
-                      <div className="h-9 w-9 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                        <ArrowUpRight className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      <div className="h-9 w-9 rounded-xl bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
+                        <ArrowUpRight className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">
@@ -409,7 +409,7 @@ export default function WithdrawPage() {
       <Dialog open={kycGateOpen} onOpenChange={setKycGateOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mx-auto mb-2 shadow-lg">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mx-auto mb-2 shadow-lg">
               <ShieldAlert className="h-7 w-7 text-white" />
             </div>
             <DialogTitle className="text-center">Vérification d'identité requise</DialogTitle>
@@ -419,7 +419,7 @@ export default function WithdrawPage() {
           </DialogHeader>
           <div className="flex flex-col gap-2 mt-2">
             <Link href="/kyc" onClick={() => setKycGateOpen(false)}>
-              <Button className="w-full font-bold gap-2 bg-orange-500 hover:bg-orange-600 text-white" data-testid="button-kyc-dialog-withdraw">
+              <Button className="w-full font-bold gap-2 bg-cyan-600 hover:bg-cyan-700 text-white" data-testid="button-kyc-dialog-withdraw">
                 <ShieldAlert className="h-4 w-4" /> Vérifier mon identité
               </Button>
             </Link>

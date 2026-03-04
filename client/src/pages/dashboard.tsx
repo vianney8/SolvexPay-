@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  ArrowLeftRight,
   Link2,
   Activity,
   ArrowRight,
@@ -17,7 +16,6 @@ import {
   BarChart3,
   Clock,
   Wallet,
-  Send,
   Plus,
   ShieldCheck,
   QrCode,
@@ -44,7 +42,6 @@ function formatDate(date: string | Date) {
 const quickActions = [
   { label: "Dépôt", icon: Wallet, href: "/deposit", gradient: "from-emerald-400/40 to-teal-400/30", ring: "border-emerald-300/30" },
   { label: "Retrait", icon: Banknote, href: "/withdraw", gradient: "from-orange-400/40 to-amber-400/30", ring: "border-orange-300/30" },
-  { label: "Envoi", icon: Send, href: "/transfer", gradient: "from-sky-400/40 to-blue-400/30", ring: "border-sky-300/30" },
   { label: "Liens", icon: QrCode, href: "/payment-links", gradient: "from-fuchsia-400/40 to-pink-400/30", ring: "border-fuchsia-300/30" },
 ];
 
@@ -247,12 +244,12 @@ export default function DashboardPage() {
                   <div className="divide-y divide-border/40">
                     {recentTransactions.map((tx) => {
                       const isPayLink = tx.description?.startsWith("Paiement via lien:");
-                      const label = isPayLink ? "Paiement" : tx.type === "deposit" ? "Dépôt" : tx.type === "transfer" ? "Transfert" : "Retrait";
+                      const label = isPayLink ? "Paiement" : tx.type === "deposit" ? "Dépôt" : "Retrait";
                       const provider = tx.provider && tx.provider.toLowerCase() !== "omnipay" ? tx.provider : null;
                       return (
                         <div key={tx.id} className="flex items-center gap-3 py-3 hover:bg-muted/30 rounded-xl px-2 transition-colors group" data-testid={`transaction-item-${tx.id}`}>
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${tx.type === "deposit" ? "bg-emerald-500/10" : tx.type === "transfer" ? "bg-violet-500/10" : "bg-orange-500/10"}`}>
-                            {tx.type === "deposit" ? <ArrowDownLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : tx.type === "transfer" ? <ArrowLeftRight className="h-4 w-4 text-violet-600 dark:text-violet-400" /> : <ArrowUpRight className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${tx.type === "deposit" ? "bg-emerald-500/10" : "bg-orange-500/10"}`}>
+                            {tx.type === "deposit" ? <ArrowDownLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : <ArrowUpRight className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-sm text-foreground">
@@ -310,26 +307,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-4">
-            <Link href="/transfer" className="block">
-              <div
-                className="relative rounded-2xl p-5 text-white overflow-hidden shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
-                style={{ background: "linear-gradient(135deg, hsl(262 83% 52%) 0%, hsl(280 70% 60%) 100%)" }}
-                data-testid="button-transfer"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-1/2 translate-x-1/2" />
-                <div className="relative">
-                  <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
-                    <Send className="h-5 w-5" />
-                  </div>
-                  <p className="font-black text-base leading-tight">Transfert rapide</p>
-                  <p className="text-white/70 text-xs mt-1">Envoi instantané sécurisé</p>
-                  <div className="flex items-center gap-1 mt-3 text-white/80 text-xs font-semibold">
-                    Transférer maintenant <ArrowRight className="h-3.5 w-3.5" />
-                  </div>
-                </div>
-              </div>
-            </Link>
-
             <Link href="/payment-links" className="block">
               <div
                 className="relative rounded-2xl p-5 text-white overflow-hidden shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
