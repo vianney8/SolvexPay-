@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 const DEFAULT_SETTINGS: Record<string, string> = {
   fee_deposit: "7",
   fee_withdrawal: "7",
+  fee_api: "7",
   omnipay_rate_deposit: "3",
   omnipay_rate_withdrawal: "3",
   support_link_whatsapp_direct: "https://wa.me/22891840498",

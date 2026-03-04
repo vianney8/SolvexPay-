@@ -23,7 +23,7 @@ import {
   Zap, CalendarDays, BadgeCheck, UserX, Coins, FileText, ArrowUpDown,
   TrendingDown, Building2, ArrowRightLeft, Plus, DollarSign,
   Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
-  Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon,
+  Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon, Code2,
 } from "lucide-react";
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
@@ -174,7 +174,7 @@ export default function AdminPage() {
   const [depositData, setDepositData] = useState({ amount: "", phone: "", operator: "", motif: "" });
   const [migrateDialog, setMigrateDialog] = useState(false);
   const [migrateData, setMigrateData] = useState({ fromUserId: "", toUserId: "", amount: "", motif: "" });
-  const [serviceFeeEdit, setServiceFeeEdit] = useState<{ deposit: string; withdrawal: string; transfer: string } | null>(null);
+  const [serviceFeeEdit, setServiceFeeEdit] = useState<{ deposit: string; withdrawal: string; transfer: string; api: string } | null>(null);
   const [omnipayRateEdit, setOmnipayRateEdit] = useState<{ deposit: string; withdrawal: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
@@ -316,12 +316,12 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
-  const { data: serviceFees, isLoading: serviceFeesLoading } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({
+  const { data: serviceFees, isLoading: serviceFeesLoading } = useQuery<{ deposit: number; withdrawal: number; transfer: number; api: number }>({
     queryKey: ["/api/admin/service-fees"],
   });
 
   const serviceFeesM = useMutation({
-    mutationFn: (d: { deposit?: number; withdrawal?: number; transfer?: number }) => apiRequest("PATCH", "/api/admin/service-fees", d),
+    mutationFn: (d: { deposit?: number; withdrawal?: number; transfer?: number; api?: number }) => apiRequest("PATCH", "/api/admin/service-fees", d),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/service-fees"] }); toast({ title: "Frais de service mis à jour !" }); setServiceFeeEdit(null); },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
@@ -1279,6 +1279,7 @@ export default function AdminPage() {
                       deposit: String(serviceFees?.deposit ?? 7),
                       withdrawal: String(serviceFees?.withdrawal ?? 7),
                       transfer: String(serviceFees?.transfer ?? 7),
+                      api: String(serviceFees?.api ?? 7),
                     })}
                     data-testid="btn-edit-service-fees"
                   >
@@ -1297,6 +1298,7 @@ export default function AdminPage() {
                     { key: "deposit" as const, label: "Dépôt & Liens de paiement", icon: <Banknote className="h-4 w-4 text-emerald-600" />, color: "emerald" },
                     { key: "withdrawal" as const, label: "Retrait", icon: <Send className="h-4 w-4 text-rose-600" />, color: "rose" },
                     { key: "transfer" as const, label: "Transfert", icon: <ArrowRightLeft className="h-4 w-4 text-blue-600" />, color: "blue" },
+                    { key: "api" as const, label: "Paiement API", icon: <Code2 className="h-4 w-4 text-violet-600" />, color: "violet" },
                   ].map(({ key, label, icon }) => (
                     <div key={key} className="flex items-center gap-4">
                       <div className="flex items-center gap-2 w-52 flex-shrink-0">
@@ -1323,6 +1325,7 @@ export default function AdminPage() {
                         deposit: parseFloat(serviceFeeEdit.deposit),
                         withdrawal: parseFloat(serviceFeeEdit.withdrawal),
                         transfer: parseFloat(serviceFeeEdit.transfer),
+                        api: parseFloat(serviceFeeEdit.api),
                       })}
                       data-testid="btn-save-service-fees"
                     >
@@ -1331,11 +1334,12 @@ export default function AdminPage() {
                   </div>
                 </div>
               ) : (
-                <div className="p-5 grid grid-cols-3 gap-3">
+                <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     { label: "Dépôt & Liens", value: serviceFees?.deposit ?? 7, icon: <Banknote className="h-4 w-4 text-emerald-600" />, bg: "bg-emerald-500/8" },
                     { label: "Retrait", value: serviceFees?.withdrawal ?? 7, icon: <Send className="h-4 w-4 text-rose-600" />, bg: "bg-rose-500/8" },
                     { label: "Transfert", value: serviceFees?.transfer ?? 7, icon: <ArrowRightLeft className="h-4 w-4 text-blue-600" />, bg: "bg-blue-500/8" },
+                    { label: "Paiement API", value: serviceFees?.api ?? 7, icon: <Code2 className="h-4 w-4 text-violet-600" />, bg: "bg-violet-500/8" },
                   ].map(({ label, value, icon, bg }) => (
                     <div key={label} className={`rounded-xl p-4 ${bg} border border-border/30 text-center`}>
                       <div className="flex justify-center mb-2">{icon}</div>

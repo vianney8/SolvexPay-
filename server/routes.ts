@@ -1048,7 +1048,7 @@ export async function registerRoutes(
 
       const appName = (req.merchantApiKey as any).appName || `${merchantUser.firstName || ""} ${merchantUser.lastName || ""}`.trim() || "SolvexPay";
       const apiKeyId = req.merchantApiKey?.id;
-      const feeRate = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7") / 100;
+      const feeRate = parseFloat((await storage.getSystemSetting("fee_api")) || "7") / 100;
       const feesAmount = Math.round(amount * feeRate);
       const reference = generateReference();
 
@@ -1732,7 +1732,8 @@ export async function registerRoutes(
       const deposit = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
       const withdrawal = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7");
       const transfer = parseFloat((await storage.getSystemSetting("fee_transfer")) || "7");
-      res.json({ deposit, withdrawal, transfer });
+      const api = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
+      res.json({ deposit, withdrawal, transfer, api });
     } catch (error) {
       res.status(500).json({ message: "Erreur serveur" });
     }
@@ -1740,7 +1741,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/service-fees", isAdmin, async (req, res) => {
     try {
-      const { deposit, withdrawal, transfer } = req.body;
+      const { deposit, withdrawal, transfer, api } = req.body;
       if (deposit !== undefined) {
         const v = parseFloat(deposit);
         if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide pour dépôt (0-100)" });
@@ -1756,10 +1757,16 @@ export async function registerRoutes(
         if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide pour transfert (0-100)" });
         await storage.setSystemSetting("fee_transfer", String(v));
       }
+      if (api !== undefined) {
+        const v = parseFloat(api);
+        if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide pour API (0-100)" });
+        await storage.setSystemSetting("fee_api", String(v));
+      }
       const updated = {
         deposit: parseFloat((await storage.getSystemSetting("fee_deposit")) || "7"),
         withdrawal: parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7"),
         transfer: parseFloat((await storage.getSystemSetting("fee_transfer")) || "7"),
+        api: parseFloat((await storage.getSystemSetting("fee_api")) || "7"),
       };
       res.json(updated);
     } catch (error) {

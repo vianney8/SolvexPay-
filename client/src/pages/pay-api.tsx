@@ -96,6 +96,24 @@ export default function PayApiPage() {
     enabled: !!id,
   });
 
+  const { data: paymentMethods } = useQuery<any[]>({
+    queryKey: ["/api/payment-methods/public"],
+    queryFn: async () => {
+      const res = await fetch("/api/payment-methods/public");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  function getOperatorStatus(op: string) {
+    if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
+    const pm = paymentMethods.find((m: any) => m.code === op);
+    if (!pm) return { available: true, maintenance: false };
+    const globalMaint = pm.inMaintenance === true;
+    const countryMaint = (pm.maintenanceCountries || []).includes(country);
+    return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint };
+  }
+
   const redirectUrl = paymentInfo?.redirectUrl as string | undefined;
   useEffect(() => {
     if (verifyStatus === "SUCCESS" && redirectUrl) {
@@ -432,24 +450,47 @@ export default function PayApiPage() {
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Opérateur Mobile Money</Label>
               <div className={`grid gap-2 ${selectedCountry.operators.length <= 2 ? "grid-cols-2" : selectedCountry.operators.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
-                {selectedCountry.operators.map((op) => (
-                  <button
-                    key={op}
-                    type="button"
-                    onClick={() => { setOperator(op); setTimeout(() => phoneInputRef.current?.focus(), 50); }}
-                    className={`relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
-                      operator === op ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-100" : "border-gray-200 hover:border-gray-300 bg-white"
-                    }`}
-                    data-testid={`option-pay-operator-${op}`}
-                  >
-                    <div className={`rounded-2xl overflow-hidden transition-transform ${operator === op ? "scale-110" : ""}`}>
-                      <OperatorLogo operator={op} size={52} />
-                    </div>
-                    <span className={`text-[11px] font-bold text-center leading-tight ${operator === op ? "text-blue-700" : "text-gray-500"}`}>
-                      {OPERATOR_LABEL[op] || op}
-                    </span>
-                  </button>
-                ))}
+                {selectedCountry.operators.map((op) => {
+                  const opStatus = getOperatorStatus(op);
+                  const isDisabled = !opStatus.available || opStatus.maintenance;
+                  return (
+                    <button
+                      key={op}
+                      type="button"
+                      onClick={() => {
+                        if (isDisabled) return;
+                        setOperator(op);
+                        setTimeout(() => phoneInputRef.current?.focus(), 50);
+                      }}
+                      disabled={isDisabled}
+                      className={`relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
+                        isDisabled
+                          ? "border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed"
+                          : operator === op
+                          ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-100"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                      data-testid={`option-pay-operator-${op}`}
+                    >
+                      {opStatus.maintenance && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
+                          Maint.
+                        </span>
+                      )}
+                      {!opStatus.available && !opStatus.maintenance && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
+                          Indispo
+                        </span>
+                      )}
+                      <div className={`rounded-2xl overflow-hidden transition-transform ${operator === op ? "scale-110" : ""}`}>
+                        <OperatorLogo operator={op} size={52} />
+                      </div>
+                      <span className={`text-[11px] font-bold text-center leading-tight ${operator === op ? "text-blue-700" : isDisabled ? "text-gray-400" : "text-gray-500"}`}>
+                        {OPERATOR_LABEL[op] || op}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -496,7 +537,7 @@ export default function PayApiPage() {
               type="submit"
               className="w-full h-14 text-base font-black rounded-2xl shadow-lg gap-2"
               style={{ background: !phone || !operator ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
-              disabled={payMutation.isPending || !phone || !operator || !country || !firstName.trim() || !lastName.trim()}
+              disabled={payMutation.isPending || !phone || !operator || !country || !firstName.trim() || !lastName.trim() || (operator ? getOperatorStatus(operator).maintenance || !getOperatorStatus(operator).available : false)}
               data-testid="button-confirm-pay"
             >
               {payMutation.isPending ? (
