@@ -202,6 +202,10 @@ export default function AdminPage() {
   const { data: paymentMethods, isLoading: pmLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-methods"] });
   const { data: feeConfigs, isLoading: feeLoading } = useQuery<any[]>({ queryKey: ["/api/admin/fee-configs"] });
   const { data: commissions, isLoading: comLoading } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
+  const { data: financialSummary, isLoading: finLoading } = useQuery<any>({
+    queryKey: ["/api/admin/financial-summary"],
+    staleTime: 30000,
+  });
   const { data: userTxList } = useQuery<any[]>({
     queryKey: ["/api/admin/users", expandedUserId, "transactions"],
     enabled: !!expandedUserId,
@@ -432,6 +436,102 @@ export default function AdminPage() {
               <div>
                 <p className="text-2xl font-black text-foreground" data-testid="total-users-count">{totalUsersCount}</p>
                 <p className="text-xs text-muted-foreground">Utilisateurs inscrits sur la plateforme</p>
+              </div>
+            </div>
+
+            {/* ── RÉSUMÉ FINANCIER ── */}
+            <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
+              <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-600 px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-white" />
+                  <p className="text-white font-bold text-sm">Résumé Financier</p>
+                </div>
+                <button
+                  onClick={() => { queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] }); }}
+                  className="text-white/70 hover:text-white transition-colors"
+                  data-testid="btn-refresh-financial"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y divide-border/40 bg-card">
+                {[
+                  {
+                    label: "Reçu via OmniPay",
+                    value: finLoading ? null : fmt(financialSummary?.omnipayDeposits || 0),
+                    sub: `Frais collectés : ${finLoading ? "…" : fmt(financialSummary?.omnipayDepositFees || 0)} XOF`,
+                    icon: TrendingUp,
+                    grad: "from-emerald-500 to-teal-500",
+                    bg: "bg-emerald-500/8",
+                    text: "text-emerald-600 dark:text-emerald-400",
+                    testid: "fin-omnipay-received",
+                  },
+                  {
+                    label: "Soldes en Wallets",
+                    value: finLoading ? null : fmt(financialSummary?.totalWalletBalance || 0),
+                    sub: `Ajustements admin : ${finLoading ? "…" : fmt(financialSummary?.adminDeposits || 0)} XOF`,
+                    icon: Wallet,
+                    grad: "from-violet-500 to-purple-500",
+                    bg: "bg-violet-500/8",
+                    text: "text-violet-600 dark:text-violet-400",
+                    testid: "fin-wallet-balance",
+                  },
+                  {
+                    label: "Total Retiré",
+                    value: finLoading ? null : fmt(financialSummary?.withdrawals || 0),
+                    sub: `Frais : ${finLoading ? "…" : fmt(financialSummary?.withdrawalFees || 0)} XOF`,
+                    icon: TrendingDown,
+                    grad: "from-rose-500 to-red-500",
+                    bg: "bg-rose-500/8",
+                    text: "text-rose-600 dark:text-rose-400",
+                    testid: "fin-total-withdrawn",
+                  },
+                  {
+                    label: "Total des Frais",
+                    value: finLoading ? null : fmt(financialSummary?.totalFees || 0),
+                    sub: `Transferts : ${finLoading ? "…" : fmt(financialSummary?.transfers || 0)} XOF`,
+                    icon: Coins,
+                    grad: "from-amber-500 to-orange-500",
+                    bg: "bg-amber-500/8",
+                    text: "text-amber-600 dark:text-amber-400",
+                    testid: "fin-total-fees",
+                  },
+                ].map((item, i) => (
+                  <div key={i} className={`p-4 ${item.bg} flex flex-col gap-2`} data-testid={item.testid}>
+                    <div className="flex items-center gap-2">
+                      <div className={`h-7 w-7 rounded-lg bg-gradient-to-br ${item.grad} flex items-center justify-center flex-shrink-0`}>
+                        <item.icon className="h-3.5 w-3.5 text-white" />
+                      </div>
+                      <p className="text-xs text-muted-foreground font-medium leading-tight">{item.label}</p>
+                    </div>
+                    {finLoading ? (
+                      <Skeleton className="h-7 w-24 rounded-lg" />
+                    ) : (
+                      <p className={`font-black text-xl ${item.text}`}>{item.value} <span className="text-xs font-semibold text-muted-foreground">XOF</span></p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground">{item.sub}</p>
+                  </div>
+                ))}
+              </div>
+              {/* OmniPay live balance bar */}
+              <div className="bg-slate-900 dark:bg-slate-950 px-5 py-3 flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <p className="text-xs text-slate-300 font-semibold">Solde OmniPay en temps réel :</p>
+                </div>
+                {omniLoading ? (
+                  <Skeleton className="h-4 w-40 rounded bg-slate-700" />
+                ) : omnipayBalance?.balance ? (
+                  <div className="flex gap-3 flex-wrap">
+                    {omnipayBalance.balance.map((b: any, i: number) => (
+                      <span key={i} className="text-xs font-bold text-emerald-400">
+                        {b.countryName}: <span className="text-white">{b.amount.toLocaleString()} {b.currency}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400">Indisponible</span>
+                )}
               </div>
             </div>
 

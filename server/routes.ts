@@ -912,6 +912,46 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/financial-summary", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { sum, eq, and, ne } = await import("drizzle-orm");
+      const { transactions: txTable, wallets: walletsTable } = await import("@shared/schema");
+
+      const [omnipayDeposits] = await db.select({ total: sum(txTable.amount), fees: sum(txTable.fees) })
+        .from(txTable).where(and(eq(txTable.type, "deposit"), eq(txTable.status, "completed"), ne(txTable.provider, "admin")));
+
+      const [adminDeposits] = await db.select({ total: sum(txTable.amount) })
+        .from(txTable).where(and(eq(txTable.type, "deposit"), eq(txTable.status, "completed"), eq(txTable.provider, "admin")));
+
+      const [withdrawals] = await db.select({ total: sum(txTable.amount), fees: sum(txTable.fees) })
+        .from(txTable).where(and(eq(txTable.type, "withdrawal"), eq(txTable.status, "completed")));
+
+      const [transfers] = await db.select({ total: sum(txTable.amount), fees: sum(txTable.fees) })
+        .from(txTable).where(and(eq(txTable.type, "transfer"), eq(txTable.status, "completed")));
+
+      const [walletTotal] = await db.select({ total: sum(walletsTable.balanceXOF) }).from(walletsTable);
+
+      const [allFees] = await db.select({ total: sum(txTable.fees) })
+        .from(txTable).where(eq(txTable.status, "completed"));
+
+      res.json({
+        omnipayDeposits: parseFloat(omnipayDeposits.total || "0"),
+        omnipayDepositFees: parseFloat(omnipayDeposits.fees || "0"),
+        adminDeposits: parseFloat(adminDeposits.total || "0"),
+        withdrawals: parseFloat(withdrawals.total || "0"),
+        withdrawalFees: parseFloat(withdrawals.fees || "0"),
+        transfers: parseFloat(transfers.total || "0"),
+        transferFees: parseFloat(transfers.fees || "0"),
+        totalWalletBalance: parseFloat(walletTotal.total || "0"),
+        totalFees: parseFloat(allFees.total || "0"),
+      });
+    } catch (error) {
+      console.error("Financial summary error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   app.get("/api/admin/transactions", isAdmin, async (req, res) => {
     try {
       const { db } = await import("./db");
