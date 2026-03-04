@@ -145,10 +145,10 @@ export default function LandingPage() {
             ))}
           </div>
           <div className="hidden md:flex items-center gap-3">
-            <Link href="/auth">
+            <Link href="/login">
               <button className="text-sm font-semibold text-white/70 hover:text-white transition-colors px-4 py-2">Connexion</button>
             </Link>
-            <Link href="/auth">
+            <Link href="/register">
               <button className="text-sm font-black px-5 py-2.5 rounded-xl text-white" style={{ background: "linear-gradient(135deg, #7c3aed, #2563eb)" }}>
                 Commencer gratuitement
               </button>
@@ -164,8 +164,8 @@ export default function LandingPage() {
               <a key={href} href={href} onClick={() => setMobileMenu(false)} className="block text-sm font-medium text-white/70 hover:text-white py-2">{label}</a>
             ))}
             <div className="flex flex-col gap-2 pt-2">
-              <Link href="/auth"><button className="w-full text-sm font-semibold text-white/70 hover:text-white py-2.5 rounded-xl border border-white/10">Connexion</button></Link>
-              <Link href="/auth"><button className="w-full text-sm font-black py-2.5 rounded-xl text-white" style={{ background: "linear-gradient(135deg, #7c3aed, #2563eb)" }}>Commencer gratuitement</button></Link>
+              <Link href="/login"><button className="w-full text-sm font-semibold text-white/70 hover:text-white py-2.5 rounded-xl border border-white/10">Connexion</button></Link>
+              <Link href="/register"><button className="w-full text-sm font-black py-2.5 rounded-xl text-white" style={{ background: "linear-gradient(135deg, #7c3aed, #2563eb)" }}>Commencer gratuitement</button></Link>
             </div>
           </div>
         )}
@@ -206,7 +206,7 @@ export default function LandingPage() {
               </p>
 
               <div className="anim-slide-up-3 flex flex-col sm:flex-row gap-4">
-                <Link href="/auth">
+                <Link href="/register">
                   <button className="group flex items-center gap-3 px-8 py-4 rounded-2xl text-white font-black text-base shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-violet-500/30" style={{ background: "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)", animation: "pulse-ring 3s infinite" }}>
                     Commencer gratuitement
                     <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -425,7 +425,7 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/auth">
+                <Link href="/register">
                   <button className="flex items-center gap-2 text-sm font-bold transition-all hover:gap-3" style={{ color: f.color }}>
                     Démarrer <ArrowRight className="h-4 w-4" />
                   </button>
@@ -587,7 +587,7 @@ export default function LandingPage() {
                     Lire la documentation <ExternalLink className="h-4 w-4" />
                   </button>
                 </Link>
-                <Link href="/auth">
+                <Link href="/register">
                   <button className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white/70 hover:text-white transition-colors" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
                     Obtenir une clé API
                   </button>
@@ -672,7 +672,7 @@ export default function LandingPage() {
           </h2>
           <p className="text-white/55 text-lg mb-10">Rejoignez les marchands qui font confiance à SolvexPay pour encaisser en Mobile Money partout en Afrique.</p>
           <div className="flex justify-center">
-            <Link href="/auth">
+            <Link href="/register">
               <button className="group flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-white font-black text-base shadow-2xl hover:scale-105 transition-transform" style={{ background: "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)" }}>
                 Créer mon compte gratuitement
                 <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -709,7 +709,7 @@ export default function LandingPage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-white/30 mb-4">Compte</p>
               <ul className="space-y-3">
-                {[["/auth", "Inscription"], ["/auth", "Connexion"], ["/dashboard", "Tableau de bord"], ["/documentation", "Clés API"]].map(([href, label]) => (
+                {[["/register", "Inscription"], ["/login", "Connexion"], ["/dashboard", "Tableau de bord"], ["/documentation", "Clés API"]].map(([href, label]) => (
                   <li key={label}><Link href={href}><span className="text-sm text-white/50 hover:text-white transition-colors cursor-pointer">{label}</span></Link></li>
                 ))}
               </ul>
