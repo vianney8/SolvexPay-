@@ -103,7 +103,11 @@ export default function PayPage() {
 
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !operator || !country) return;
+    if (payMutation.isPending) return;
+    if (!phone || !operator || !country) {
+      toast({ title: "Champs requis", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
+      return;
+    }
     const isCustom = (paymentLink as any)?.allowCustomAmount;
     const parsedCustom = parseFloat(customAmount);
     if (isCustom && (!customAmount || parsedCustom < 100)) return;
@@ -247,17 +251,17 @@ export default function PayPage() {
                   <p className="text-xs text-gray-400 mb-4" data-testid="text-payment-merchant">à {(paymentLink as any).merchantName}</p>
                 )}
                 <p className="text-xs text-gray-500 font-medium mb-2">Choisissez le montant à payer</p>
-                <div className="flex items-center gap-2 rounded-xl border-2 border-blue-300 bg-blue-50 px-4 py-3 focus-within:border-blue-500 transition-all">
+                <div className="flex items-center gap-2 rounded-xl border-2 border-blue-300 bg-blue-50 px-4 py-2 focus-within:border-blue-500 transition-all w-full max-w-[280px] mx-auto">
                   <input
                     type="number"
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
-                    placeholder={parseFloat(paymentLink.amount) > 0 ? `Min. ${formatAmount(paymentLink.amount)}` : "Entrez le montant"}
+                    placeholder={parseFloat(paymentLink.amount) > 0 ? `${formatAmount(paymentLink.amount)}` : "Montant"}
                     min={parseFloat(paymentLink.amount) > 0 ? parseFloat(paymentLink.amount) : 100}
-                    className="flex-1 text-3xl font-black text-blue-600 bg-transparent outline-none text-center placeholder:text-blue-300"
+                    className="flex-1 text-2xl font-black text-blue-600 bg-transparent outline-none text-center placeholder:text-blue-300 w-full"
                     data-testid="input-custom-amount"
                   />
-                  <span className="text-lg font-bold text-blue-400">{paymentLink.currency}</span>
+                  <span className="text-base font-bold text-blue-400">{paymentLink.currency}</span>
                 </div>
                 {parseFloat(paymentLink.amount) > 0 && (
                   <p className="text-xs text-gray-400 mt-1">Minimum : {formatAmount(paymentLink.amount)} {paymentLink.currency}</p>
