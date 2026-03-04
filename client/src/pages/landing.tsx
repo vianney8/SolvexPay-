@@ -23,11 +23,6 @@ const COUNTRIES = [
   { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", currency: "XAF", operators: ["Airtel", "MTN"], color: "#009A44" },
 ];
 
-const OPERATOR_NAMES: Record<string, string> = {
-  MTN: "MTN Money", Orange: "Orange Money", Moov: "Moov Money",
-  Wave: "Wave", TMoney: "T-Money", Vodacom: "M-Pesa",
-  Airtel: "Airtel Money", Free: "Free Money",
-};
 
 const FAQS = [
   { q: "Comment fonctionne SolvexPay ?", a: "SolvexPay est une passerelle de paiement Mobile Money pan-africaine. Après inscription, vous créez des liens de paiement ou utilisez notre API pour encaisser via MTN, Orange, Wave, Moov et plus. Tout le flux de paiement est hébergé sur notre plateforme sécurisée." },
@@ -70,7 +65,6 @@ function AnimatedOrb({ cx, cy, r, color, delay = 0 }: { cx: string; cy: string; 
 }
 
 export default function LandingPage() {
-  const [activeCountry, setActiveCountry] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [notifIdx, setNotifIdx] = useState(0);
@@ -471,50 +465,17 @@ export default function LandingPage() {
       <section id="pays" className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
 
-          {/* Country pills */}
-          <div className="flex flex-wrap gap-2 justify-center mb-10">
-            {COUNTRIES.map((c, i) => (
-              <button
+          <div className="flex flex-wrap gap-3 justify-center">
+            {COUNTRIES.map((c) => (
+              <div
                 key={c.code}
-                onClick={() => setActiveCountry(i)}
-                className="country-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold"
-                style={activeCountry === i ? { background: `${c.color}20`, border: `2px solid ${c.color}60`, color: "white" } : { background: "rgba(255,255,255,0.04)", border: "2px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}
-                data-testid={`button-country-${c.code}`}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
               >
                 <span className="text-lg">{c.flag}</span>
                 <span>{c.name}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Operators grid */}
-          <div className="rounded-3xl p-8" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-            <div className="flex items-center gap-4 mb-8">
-              <span className="text-5xl">{COUNTRIES[activeCountry].flag}</span>
-              <div>
-                <h3 className="text-2xl font-black text-white">{COUNTRIES[activeCountry].name}</h3>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-sm text-white/40">{COUNTRIES[activeCountry].operators.length} opérateur(s)</span>
-                  <span className="w-1 h-1 rounded-full bg-white/20" />
-                  <span className="text-sm font-bold" style={{ color: COUNTRIES[activeCountry].color }}>{COUNTRIES[activeCountry].currency}</span>
-                </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {COUNTRIES[activeCountry].operators.map((op) => (
-                <div key={op} className="op-card flex flex-col items-center gap-3 p-5 rounded-2xl cursor-pointer" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <div className="rounded-2xl overflow-hidden shadow-lg"><OperatorLogo operator={op} size={56} /></div>
-                  <div className="text-center">
-                    <p className="text-sm font-black text-white">{OPERATOR_NAMES[op] || op}</p>
-                    <div className="flex items-center justify-center gap-1.5 mt-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span className="text-[11px] text-emerald-400 font-semibold">Actif</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
       </section>
