@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Send,
   Shield,
+  BookOpen,
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
@@ -39,6 +40,7 @@ const menuItems = [
   { title: "Liens de paiement", url: "/payment-links", icon: Link2, bg: "bg-pink-100", iconColor: "text-pink-600" },
   { title: "Clés API", url: "/api-keys", icon: Key, bg: "bg-orange-100", iconColor: "text-orange-600" },
   { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck, bg: "bg-blue-100", iconColor: "text-blue-600" },
+  { title: "Documentation", url: "/documentation", icon: BookOpen, bg: "bg-indigo-100", iconColor: "text-indigo-600", externalUrl: "https://docs.solvexpay.site" },
   { title: "Paramètres", url: "/settings", icon: Settings, bg: "bg-slate-100", iconColor: "text-slate-600" },
 ];
 
@@ -91,29 +93,47 @@ export function AppSidebar() {
           <SidebarMenu className="space-y-0.5">
             {menuItems.map((item) => {
               const isActive = location === item.url || (item.url === "/dashboard" && location === "/");
+              const itemClass = `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer group ${
+                isActive
+                  ? "bg-white shadow-sm border border-gray-200/80 text-gray-900"
+                  : "text-gray-500 hover:bg-white/70 hover:text-gray-800 hover:shadow-sm"
+              }`;
+              const itemContent = (
+                <>
+                  <span className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                    isActive ? item.bg : "bg-gray-100/0"
+                  }`}>
+                    <item.icon className={`w-4 h-4 ${isActive ? item.iconColor : "text-gray-400"}`} />
+                  </span>
+                  <span className={`text-sm flex-1 ${isActive ? "font-semibold text-gray-900" : "font-medium"}`}>
+                    {item.title}
+                  </span>
+                  {isActive && (
+                    <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
+                  )}
+                </>
+              );
               return (
                 <SidebarMenuItem key={item.title}>
-                  <Link
-                    href={item.url}
-                    data-testid={`link-${item.url.replace("/", "")}`}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer group ${
-                      isActive
-                        ? "bg-white shadow-sm border border-gray-200/80 text-gray-900"
-                        : "text-gray-500 hover:bg-white/70 hover:text-gray-800 hover:shadow-sm"
-                    }`}
-                  >
-                    <span className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                      isActive ? item.bg : "bg-gray-100/0"
-                    }`}>
-                      <item.icon className={`w-4 h-4 ${isActive ? item.iconColor : "text-gray-400"}`} />
-                    </span>
-                    <span className={`text-sm flex-1 ${isActive ? "font-semibold text-gray-900" : "font-medium"}`}>
-                      {item.title}
-                    </span>
-                    {isActive && (
-                      <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
-                    )}
-                  </Link>
+                  {(item as any).externalUrl ? (
+                    <a
+                      href={(item as any).externalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid={`link-documentation`}
+                      className={itemClass}
+                    >
+                      {itemContent}
+                    </a>
+                  ) : (
+                    <Link
+                      href={item.url}
+                      data-testid={`link-${item.url.replace("/", "")}`}
+                      className={itemClass}
+                    >
+                      {itemContent}
+                    </Link>
+                  )}
                 </SidebarMenuItem>
               );
             })}
