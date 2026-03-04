@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
-import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, type OmniPayCallbackPayload } from "./services/omnipay";
+import { sendavaPayService, isApiKeyConfigured as isSendavaPayConfigured } from "./services/sendavapay";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -224,13 +224,13 @@ export async function registerRoutes(
       const { amount, phoneNumber, operator, country } = validation.data;
       const currency = "XOF";
 
-      if (!isApiKeyConfigured()) {
-        return res.status(503).json({ message: "Service de paiement non configure" });
+      if (!isSendavaPayConfigured()) {
+        return res.status(503).json({ message: "Service de paiement SendavaPay non configuré" });
       }
 
       const wallet = await storage.getWallet(userId);
       if (!wallet) {
-        return res.status(400).json({ message: "Aucun portefeuille trouve" });
+        return res.status(400).json({ message: "Aucun portefeuille trouvé" });
       }
 
       const balanceKey = `balance${currency}` as keyof typeof wallet;
@@ -248,30 +248,22 @@ export async function registerRoutes(
           type: "withdrawal",
           amount: amount.toString(),
           currency,
-          provider: operator,
+          provider: "sendavapay",
           phoneNumber,
           reference,
           status: "pending",
-          description: `Retrait vers ${phoneNumber} via ${operator}`,
+          description: `Retrait vers ${phoneNumber} via ${operator} (Manuel)`,
         });
         await storage.updateWalletBalance(userId, currency, -amount);
         return res.json({ ...transaction, mode: "manual" });
       }
 
-      const fullName = req.user?.name || req.user?.firstName || "Client";
-      const nameParts = fullName.trim().split(" ");
-      const resolvedFirstName = nameParts[0] || "Client";
-      const resolvedLastName = nameParts.slice(1).join(" ") || "SolvexPay";
-
-      const isWave = operator.toLowerCase() === "wave";
-
-      const transferResponse = await omniPayService.transfer({
-        msisdn: phoneNumber,
+      // Appel automatique via SendavaPay
+      const withdrawResponse = await sendavaPayService.createWithdraw({
         amount,
-        reference,
-        firstName: resolvedFirstName,
-        lastName: resolvedLastName,
-        operator: isWave ? operator : undefined,
+        phoneNumber,
+        operator,
+        country,
       });
 
       const transaction = await storage.createTransaction({
@@ -279,18 +271,18 @@ export async function registerRoutes(
         type: "withdrawal",
         amount: amount.toString(),
         currency,
-        provider: operator,
+        provider: "sendavapay",
         phoneNumber,
-        reference,
+        reference: withdrawResponse.reference || reference,
         status: "pending",
-        description: `Retrait vers ${phoneNumber} via ${operator}`,
+        description: `Retrait automatique vers ${phoneNumber} via ${operator}`,
       });
 
       await storage.updateWalletBalance(userId, currency, -amount);
 
       res.json({
         ...transaction,
-        omnipayId: transferResponse.id,
+        txid: withdrawResponse.txid,
       });
     } catch (error: any) {
       console.error("Error creating withdrawal:", error);
@@ -329,13 +321,11 @@ export async function registerRoutes(
       const reference = generateReference();
       const isWave = operator.toLowerCase() === "wave";
 
-      const transferResponse = await omniPayService.transfer({
-        msisdn: phoneNumber,
+      const transferResponse = await sendavaPayService.createWithdraw({
         amount,
-        reference,
-        firstName,
-        lastName,
-        operator: isWave ? operator : undefined,
+        phoneNumber,
+        operator,
+        country,
       });
 
       const transaction = await storage.createTransaction({
@@ -343,9 +333,9 @@ export async function registerRoutes(
         type: "transfer",
         amount: amount.toString(),
         currency,
-        provider: "omnipay",
+        provider: "sendavapay",
         phoneNumber,
-        reference,
+        reference: transferResponse.reference || reference,
         status: "pending",
         description: `Transfert vers ${firstName} ${lastName} (${phoneNumber})`,
       });
@@ -354,7 +344,7 @@ export async function registerRoutes(
 
       res.json({
         ...transaction,
-        omnipayId: transferResponse.id,
+        txid: transferResponse.txid,
       });
     } catch (error: any) {
       console.error("Error creating transfer:", error);
