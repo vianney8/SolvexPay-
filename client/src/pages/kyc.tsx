@@ -1,81 +1,121 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
-  ShieldCheck,
-  Upload,
-  User,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Loader2,
-  FileText,
-  Camera,
-  Lock,
+  Shield, CheckCircle2, Clock, AlertTriangle, Loader2,
+  Upload, BadgeCheck, Lock,
 } from "lucide-react";
 
-type KycStatus = "not_started" | "pending" | "verified" | "rejected";
+function kycStatusLabel(status: string) {
+  if (status === "verified") return { label: "Vérifié", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" };
+  if (status === "pending") return { label: "En attente", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" };
+  if (status === "rejected") return { label: "Rejeté", color: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20" };
+  return { label: "Non démarré", color: "bg-muted text-muted-foreground" };
+}
+
+function FileUploadField({ label, fieldName, value, onUploaded, required }: { label: string; fieldName: string; value: string; onUploaded: (url: string) => void; required?: boolean }) {
+  const { toast } = useToast();
+  const ref = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd, credentials: "include" });
+      const data = await res.json();
+      if (data.imageUrl) { onUploaded(data.imageUrl); toast({ title: "Photo téléchargée" }); }
+      else toast({ title: "Erreur", description: "Impossible de télécharger", variant: "destructive" });
+    } catch {
+      toast({ title: "Erreur", description: "Erreur de téléchargement", variant: "destructive" });
+    } finally { setUploading(false); }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        {label}{required && <span className="text-rose-500 ml-1">*</span>}
+      </Label>
+      <input ref={ref} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+      {value ? (
+        <div className="relative rounded-xl overflow-hidden border border-border/60 group">
+          <img src={value} alt={label} className="w-full h-36 object-cover" />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+            <Button type="button" size="sm" variant="secondary" onClick={() => ref.current?.click()} className="gap-1.5">
+              <Upload className="h-3.5 w-3.5" />Changer
+            </Button>
+          </div>
+          <div className="absolute top-2 right-2">
+            <Badge className="bg-emerald-500 text-white text-xs border-0">✓</Badge>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => ref.current?.click()}
+          disabled={uploading}
+          className="w-full h-28 border-2 border-dashed border-border/60 rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:bg-primary/5 transition-colors"
+          data-testid={`btn-upload-${fieldName}`}
+        >
+          {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
+          <span className="text-xs font-medium">{uploading ? "Téléchargement…" : "Cliquez pour choisir une photo"}</span>
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function KycPage() {
-  const { toast } = useToast();
   const { user } = useAuth();
-  const kycStatus = ((user as any)?.kycStatus as KycStatus) || "not_started";
+  const { toast } = useToast();
 
-  const [docType, setDocType] = useState("cni");
-  const [idNumber, setIdNumber] = useState("");
-  const [docFront, setDocFront] = useState<File | null>(null);
-  const [docBack, setDocBack] = useState<File | null>(null);
-  const [selfie, setSelfie] = useState<File | null>(null);
+  const kycStatus = (user as any)?.kycStatus || "not_started";
+  const kycSt = kycStatusLabel(kycStatus);
 
-  const submitMutation = useMutation({
-    mutationFn: async (data: { docType: string; idNumber: string }) => {
-      const res = await apiRequest("POST", "/api/kyc/submit", data);
-      return res.json();
+  const [kycFirstName, setKycFirstName] = useState("");
+  const [kycLastName, setKycLastName] = useState("");
+  const [kycDocumentFront, setKycDocumentFront] = useState("");
+  const [kycDocumentBack, setKycDocumentBack] = useState("");
+  const [kycSelfie, setKycSelfie] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      if ((user as any).kycFirstName) setKycFirstName((user as any).kycFirstName);
+      if ((user as any).kycLastName) setKycLastName((user as any).kycLastName);
+      if ((user as any).kycDocumentFront) setKycDocumentFront((user as any).kycDocumentFront);
+      if ((user as any).kycDocumentBack) setKycDocumentBack((user as any).kycDocumentBack);
+      if ((user as any).kycSelfie) setKycSelfie((user as any).kycSelfie);
+    }
+  }, [user]);
+
+  const kycMutation = useMutation({
+    mutationFn: async (data: any) => { const res = await apiRequest("POST", "/api/kyc/submit", data); return res.json(); },
+    onSuccess: (data) => { queryClient.setQueryData(["/api/auth/user"], data); toast({ title: "Demande envoyée", description: "Votre demande de vérification a été soumise." }); },
+    onError: (error: any) => {
+      let msg = "Erreur lors de la soumission.";
+      try { const p = JSON.parse(error?.message?.replace(/^\d+:\s*/, "") || "{}"); msg = p.message || msg; } catch {}
+      toast({ title: "Erreur", description: msg, variant: "destructive" });
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(["/api/auth/user"], data.user || data);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: "Documents soumis", description: "Votre vérification est en cours. Vous serez notifié par email." });
-    },
-    onError: () => toast({ title: "Erreur", description: "Impossible de soumettre votre dossier.", variant: "destructive" }),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idNumber) {
-      toast({ title: "Erreur", description: "Veuillez saisir le numéro du document", variant: "destructive" });
-      return;
-    }
-    submitMutation.mutate({ docType, idNumber });
-  };
-
-  const statusBg: Record<KycStatus, string> = {
-    not_started: "from-orange-500 to-amber-600",
-    pending: "from-amber-500 to-orange-600",
-    verified: "from-emerald-500 to-teal-600",
-    rejected: "from-red-500 to-rose-700",
-  };
-
-  const statusLabel: Record<KycStatus, string> = {
-    not_started: "Non vérifié",
-    pending: "En cours d'examen",
-    verified: "Identité vérifiée",
-    rejected: "Rejeté",
+    if (!kycFirstName || !kycLastName) { toast({ title: "Erreur", description: "Prénom et nom requis", variant: "destructive" }); return; }
+    if (!kycDocumentFront) { toast({ title: "Erreur", description: "Photo recto du document requise", variant: "destructive" }); return; }
+    if (!kycSelfie) { toast({ title: "Erreur", description: "Selfie requis", variant: "destructive" }); return; }
+    kycMutation.mutate({ kycFirstName, kycLastName, kycDocumentFront, kycDocumentBack: kycDocumentBack || null, kycSelfie });
   };
 
   const steps = [
@@ -84,33 +124,32 @@ export default function KycPage() {
     { label: "Validé", done: kycStatus === "verified" },
   ];
 
-  const docTypeLabels: Record<string, string> = {
-    cni: "Carte Nationale d'Identité",
-    passport: "Passeport",
-    permis: "Permis de conduire",
-  };
+  const statusGradient =
+    kycStatus === "verified" ? "from-emerald-600 to-teal-600" :
+    kycStatus === "pending" ? "from-amber-500 to-orange-500" :
+    kycStatus === "rejected" ? "from-rose-500 to-red-600" :
+    "from-violet-600 to-indigo-600";
 
   return (
-    <DashboardLayout title="" breadcrumbs={[{ label: "Vérification KYC" }]}>
-      <div className="max-w-lg mx-auto space-y-5">
-        <div
-          className={`relative rounded-3xl p-6 text-white overflow-hidden shadow-xl bg-gradient-to-br ${statusBg[kycStatus]}`}
-        >
+    <DashboardLayout title="Vérification KYC" breadcrumbs={[{ label: "Vérification KYC" }]}>
+      <div className="max-w-xl space-y-5">
+
+        {/* ── Bannière statut ── */}
+        <div className={`relative rounded-3xl p-6 text-white overflow-hidden shadow-xl bg-gradient-to-br ${statusGradient}`}>
           <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
           <div className="relative">
             <div className="flex items-center gap-4 mb-5">
               <div className="h-14 w-14 rounded-2xl bg-white/15 flex items-center justify-center flex-shrink-0">
-                {kycStatus === "verified" ? <CheckCircle2 className="h-7 w-7" /> :
+                {kycStatus === "verified" ? <BadgeCheck className="h-7 w-7" /> :
                  kycStatus === "pending" ? <Clock className="h-7 w-7" /> :
-                 kycStatus === "rejected" ? <AlertCircle className="h-7 w-7" /> :
-                 <ShieldCheck className="h-7 w-7" />}
+                 kycStatus === "rejected" ? <AlertTriangle className="h-7 w-7" /> :
+                 <Shield className="h-7 w-7" />}
               </div>
               <div>
                 <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Statut KYC</p>
-                <p className="font-black text-xl leading-tight" data-testid="text-kyc-status-title">{statusLabel[kycStatus]}</p>
+                <p className="font-black text-xl leading-tight" data-testid="text-kyc-status-title">{kycSt.label}</p>
               </div>
             </div>
-
             <div className="flex items-center gap-2">
               {steps.map((step, i) => (
                 <div key={step.label} className="flex items-center gap-2 flex-1">
@@ -125,177 +164,139 @@ export default function KycPage() {
           </div>
         </div>
 
-        {kycStatus === "verified" && (
-          <Card className="border-emerald-200 bg-emerald-50/50">
-            <CardContent className="p-6 text-center space-y-3">
-              <div className="h-16 w-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+        {/* ── Carte principale ── */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${kycStatus === "verified" ? "bg-emerald-500/10" : kycStatus === "pending" ? "bg-amber-500/10" : "bg-primary/10"}`}>
+                  <Shield className={`h-5 w-5 ${kycStatus === "verified" ? "text-emerald-600" : kycStatus === "pending" ? "text-amber-600" : "text-primary"}`} />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-bold">Vérification d'identité</CardTitle>
+                  <CardDescription className="text-xs">Vérifiez votre identité pour débloquer tous les services</CardDescription>
+                </div>
               </div>
-              <h3 className="font-bold text-lg text-emerald-700">Identité vérifiée avec succès</h3>
-              <p className="text-sm text-emerald-600/80">Vous avez accès à toutes les fonctionnalités de SolvexPay.</p>
-            </CardContent>
-          </Card>
-        )}
+              <Badge className={kycSt.color} data-testid="badge-kyc-status">{kycSt.label}</Badge>
+            </div>
+          </CardHeader>
 
-        {kycStatus === "pending" && (
-          <Card className="border-amber-200 bg-amber-50/50">
-            <CardContent className="p-6 text-center space-y-3">
-              <div className="h-16 w-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto">
-                <Clock className="h-8 w-8 text-amber-600 animate-pulse" />
-              </div>
-              <h3 className="font-bold text-lg text-amber-700">Vérification en cours</h3>
-              <p className="text-sm text-amber-600/80">Nos équipes examinent vos documents. Délai : 24 à 48 heures. Vous recevrez un email de confirmation.</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {(kycStatus === "not_started" || kycStatus === "rejected") && (
-          <>
-            {kycStatus === "rejected" && (
-              <div className="flex items-start gap-3 p-4 rounded-2xl bg-destructive/5 border border-destructive/20">
-                <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-destructive font-medium">Votre dossier a été rejeté. Soumettez à nouveau des documents valides et lisibles.</p>
+          <CardContent className="space-y-5">
+            {kycStatus === "verified" && (
+              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-4 flex items-start gap-3">
+                <BadgeCheck className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-sm text-emerald-700 dark:text-emerald-300">Identité vérifiée</p>
+                  <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">Votre compte a été vérifié avec succès. Tous les services sont débloqués.</p>
+                </div>
               </div>
             )}
 
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20">
-              <Lock className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                La vérification KYC est obligatoire pour accéder aux retraits, transferts et clés API. Vos documents sont chiffrés et traités de manière confidentielle.
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Card className="border-border/60">
-                <CardContent className="p-5 space-y-5">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type de document</Label>
-                    <Select value={docType} onValueChange={setDocType}>
-                      <SelectTrigger className="h-11 border-border/70" data-testid="select-doc-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cni">Carte Nationale d'Identité (CNI)</SelectItem>
-                        <SelectItem value="passport">Passeport</SelectItem>
-                        <SelectItem value="permis">Permis de conduire</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Numéro du {docTypeLabels[docType] || "document"}
-                    </Label>
-                    <div className="relative">
-                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      <Input
-                        value={idNumber}
-                        onChange={(e) => setIdNumber(e.target.value)}
-                        placeholder="Numéro de la pièce d'identité"
-                        className="pl-10 h-11 border-border/70"
-                        required
-                        data-testid="input-id-number"
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border/60">
-                <CardContent className="p-5 space-y-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <FileText className="h-3.5 w-3.5" /> Documents requis
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { id: "doc-front", label: "Recto", file: docFront, setFile: setDocFront, testId: "input-doc-front" },
-                      { id: "doc-back", label: "Verso", file: docBack, setFile: setDocBack, testId: "input-doc-back" },
-                    ].map((item) => (
-                      <div key={item.id} className="space-y-1.5">
-                        <Label className="text-xs font-semibold text-muted-foreground">{item.label}</Label>
-                        <input type="file" accept="image/*,.pdf" onChange={(e) => item.setFile(e.target.files?.[0] || null)} className="hidden" id={item.id} data-testid={item.testId} />
-                        <label
-                          htmlFor={item.id}
-                          className={`flex flex-col items-center gap-2 p-5 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${item.file ? "border-primary/40 bg-primary/5" : "border-border/60 hover:border-primary/30 hover:bg-muted/20"}`}
-                        >
-                          {item.file ? (
-                            <>
-                              <CheckCircle2 className="h-6 w-6 text-primary" />
-                              <p className="text-xs font-semibold text-primary text-center truncate w-full">{item.file.name}</p>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="h-6 w-6 text-muted-foreground" />
-                              <p className="text-xs text-muted-foreground text-center">Cliquez pour ajouter</p>
-                            </>
-                          )}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <Camera className="h-3.5 w-3.5" /> Selfie avec le document
-                    </Label>
-                    <input type="file" accept="image/*" onChange={(e) => setSelfie(e.target.files?.[0] || null)} className="hidden" id="selfie" data-testid="input-selfie" />
-                    <label
-                      htmlFor="selfie"
-                      className={`flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${selfie ? "border-primary/40 bg-primary/5" : "border-border/60 hover:border-primary/30 hover:bg-muted/20"}`}
-                    >
-                      {selfie ? (
-                        <>
-                          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <CheckCircle2 className="h-5 w-5 text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-primary truncate">{selfie.name}</p>
-                            <p className="text-xs text-muted-foreground">Selfie ajouté</p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-                            <Camera className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold text-foreground">Prenez un selfie</p>
-                            <p className="text-xs text-muted-foreground">Tenez votre document à côté de votre visage</p>
-                          </div>
-                        </>
-                      )}
-                    </label>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">Formats acceptés : PNG, JPG ou PDF — Max 5 MB par fichier</p>
-                </CardContent>
-              </Card>
-
-              <Button
-                type="submit"
-                className="w-full h-12 font-bold gap-2 shadow-xl shadow-primary/20"
-                disabled={submitMutation.isPending}
-                data-testid="button-submit-kyc"
-              >
-                {submitMutation.isPending ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Envoi en cours...</>
-                ) : (
-                  <><ShieldCheck className="h-4 w-4" /> Soumettre pour vérification</>
-                )}
-              </Button>
-
-              <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
-                <Badge variant="outline" className="gap-1 text-xs">
-                  <Lock className="h-3 w-3" /> Données chiffrées
-                </Badge>
-                <Badge variant="outline" className="gap-1 text-xs">
-                  <ShieldCheck className="h-3 w-3" /> Traitement sécurisé
-                </Badge>
+            {kycStatus === "pending" && (
+              <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-sm text-amber-700 dark:text-amber-300">En cours de vérification</p>
+                  <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">Votre dossier est en cours de révision. Vous serez notifié dès la validation.</p>
+                </div>
               </div>
-            </form>
-          </>
-        )}
+            )}
+
+            {kycStatus === "rejected" && (
+              <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 p-4 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-sm text-rose-700 dark:text-rose-300">Demande rejetée</p>
+                  {(user as any)?.kycRejectionReason && (
+                    <p className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-0.5">Motif : {(user as any).kycRejectionReason}</p>
+                  )}
+                  <p className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-1">Vous pouvez soumettre une nouvelle demande ci-dessous.</p>
+                </div>
+              </div>
+            )}
+
+            {kycStatus === "not_started" && (
+              <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4">
+                <div className="flex items-start gap-2 mb-2">
+                  <Lock className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Documents requis :</p>
+                </div>
+                <ul className="space-y-1 text-xs text-blue-600/80 dark:text-blue-400/80 list-disc list-inside ml-2">
+                  <li>Pièce d'identité (CNI, passeport ou permis) — recto obligatoire, verso recommandé</li>
+                  <li>Selfie tenant la pièce d'identité</li>
+                </ul>
+              </div>
+            )}
+
+            {kycStatus !== "verified" && (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Prénom <span className="text-rose-500">*</span></Label>
+                    <Input value={kycFirstName} onChange={e => setKycFirstName(e.target.value)} placeholder="Prénom sur document" className="h-11 border-border/70" required data-testid="input-kyc-firstname" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom <span className="text-rose-500">*</span></Label>
+                    <Input value={kycLastName} onChange={e => setKycLastName(e.target.value)} placeholder="Nom sur document" className="h-11 border-border/70" required data-testid="input-kyc-lastname" />
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FileUploadField label="Pièce d'identité (recto)" fieldName="doc-front" value={kycDocumentFront} onUploaded={setKycDocumentFront} required />
+                  <FileUploadField label="Pièce d'identité (verso)" fieldName="doc-back" value={kycDocumentBack} onUploaded={setKycDocumentBack} />
+                </div>
+
+                <FileUploadField label="Selfie avec la pièce d'identité" fieldName="selfie" value={kycSelfie} onUploaded={setKycSelfie} required />
+
+                {kycStatus === "pending" && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">Vous pouvez mettre à jour votre dossier et soumettre à nouveau.</p>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full gap-2 h-12 font-bold shadow-xl shadow-primary/20"
+                  disabled={kycMutation.isPending || !kycDocumentFront || !kycSelfie || !kycFirstName || !kycLastName}
+                  data-testid="button-submit-kyc"
+                >
+                  {kycMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" />Envoi en cours...</> : <><Shield className="h-4 w-4" />{kycStatus === "pending" ? "Mettre à jour la demande" : "Soumettre pour vérification"}</>}
+                </Button>
+
+                <div className="flex items-center gap-2 justify-center flex-wrap">
+                  <Badge variant="outline" className="gap-1 text-xs"><Lock className="h-3 w-3" /> Données chiffrées</Badge>
+                  <Badge variant="outline" className="gap-1 text-xs"><Shield className="h-3 w-3" /> Traitement sécurisé</Badge>
+                </div>
+              </form>
+            )}
+
+            {kycStatus === "verified" && (
+              <div className="space-y-4">
+                <p className="text-sm font-semibold text-muted-foreground">Documents soumis :</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(user as any)?.kycDocumentFront && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium">Recto</p>
+                      <img src={(user as any).kycDocumentFront} alt="Recto" className="rounded-xl border border-border/60 w-full h-32 object-cover" />
+                    </div>
+                  )}
+                  {(user as any)?.kycDocumentBack && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium">Verso</p>
+                      <img src={(user as any).kycDocumentBack} alt="Verso" className="rounded-xl border border-border/60 w-full h-32 object-cover" />
+                    </div>
+                  )}
+                  {(user as any)?.kycSelfie && (
+                    <div className="space-y-1 sm:col-span-2">
+                      <p className="text-xs text-muted-foreground font-medium">Selfie</p>
+                      <img src={(user as any).kycSelfie} alt="Selfie" className="rounded-xl border border-border/60 w-full h-40 object-cover" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
