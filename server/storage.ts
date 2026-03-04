@@ -233,7 +233,7 @@ export function generateApiKey(): { key: string; prefix: string; hash: string } 
 }
 
 export function generateSlug(): string {
-  return randomBytes(8).toString("hex");
+  return randomBytes(4).toString("hex");
 }
 
 export function generateReference(): string {
