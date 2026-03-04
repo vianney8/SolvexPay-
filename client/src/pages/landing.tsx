@@ -31,7 +31,7 @@ const OPERATOR_NAMES: Record<string, string> = {
 
 const FAQS = [
   { q: "Comment fonctionne SolvexPay ?", a: "SolvexPay est une passerelle de paiement Mobile Money pan-africaine. Après inscription, vous créez des liens de paiement ou utilisez notre API pour encaisser via MTN, Orange, Wave, Moov et plus. Tout le flux de paiement est hébergé sur notre plateforme sécurisée." },
-  { q: "Quels sont les frais ?", a: "Frais simples et transparents : Encaissement 5% · Retrait 7% · Transfert 6%. Minimum de transaction : 100 XOF/XAF/CDF. Aucun abonnement mensuel, aucun frais caché." },
+  { q: "Quels sont les frais ?", a: "Les frais sont simples et transparents. Consultez la section Tarifs pour les taux exacts en vigueur. Aucun abonnement mensuel, aucun frais caché." },
   { q: "Le KYC est-il obligatoire ?", a: "Le KYC est requis pour débloquer tous les plafonds. Sans KYC vous pouvez tester la plateforme avec des limites réduites. La vérification prend généralement moins de 24h." },
   { q: "Comment intégrer l'API ?", a: "Créez votre compte, accédez à 'Clés API' dans votre tableau de bord. Deux méthodes : redirection directe GET /api/v1/checkout (zéro code JavaScript) ou API JSON POST /api/v1/deposit pour les intégrations serveur." },
   { q: "Quels pays sont couverts ?", a: "9 pays : Bénin, Côte d'Ivoire, Burkina Faso, Togo, Sénégal, Mali, Cameroun, RD Congo, Congo-Brazzaville. Couverture en constante expansion." },
@@ -77,6 +77,10 @@ export default function LandingPage() {
   const [statsVisible, setStatsVisible] = useState(false);
   const statsRef = useRef<HTMLDivElement>(null);
   const { data: contactLinks } = useQuery<Record<string, string>>({ queryKey: ["/api/support-links"] });
+  const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
+  const feeDeposit = serviceFees?.deposit ?? 7;
+  const feeWithdrawal = serviceFees?.withdrawal ?? 7;
+  const feeTransfer = serviceFees?.transfer ?? 7;
 
   const stat1 = useCountUp(9, 1800, statsVisible);
   const stat2 = useCountUp(10, 2000, statsVisible);
@@ -535,9 +539,9 @@ export default function LandingPage() {
 
           <div className="grid sm:grid-cols-3 gap-5 mb-8">
             {[
-              { type: "Encaissement", icon: ArrowRight, rate: "5%", color: "#7c3aed", desc: "Sur chaque dépôt reçu" },
-              { type: "Retrait", icon: CreditCard, rate: "7%", color: "#2563eb", desc: "Sur chaque retrait effectué" },
-              { type: "Transfert", icon: Send, rate: "6%", color: "#059669", desc: "Mobile Money sortant" },
+              { type: "Encaissement", icon: ArrowRight, rate: `${feeDeposit}%`, color: "#7c3aed", desc: "Sur chaque dépôt reçu" },
+              { type: "Retrait", icon: CreditCard, rate: `${feeWithdrawal}%`, color: "#2563eb", desc: "Sur chaque retrait effectué" },
+              { type: "Transfert", icon: Send, rate: `${feeTransfer}%`, color: "#059669", desc: "Mobile Money sortant" },
             ].map((p) => (
               <div key={p.type} className="text-center p-8 rounded-3xl" style={{ background: `${p.color}10`, border: `1px solid ${p.color}22` }}>
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: `${p.color}18` }}>
@@ -552,7 +556,7 @@ export default function LandingPage() {
 
           <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
             <Zap className="h-4 w-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-yellow-400/80">Minimum de transaction : <strong>100 XOF</strong> (Bénin, CI, BF, TG, SN, ML) · <strong>100 XAF</strong> (Cameroun, Congo-Brazza.) · <strong>100 CDF</strong> (RD Congo). Paiements instantanés 24/7.</p>
+            <p className="text-sm text-yellow-400/80">Aucun abonnement mensuel. Aucun frais caché. Vous payez uniquement sur les transactions réussies, disponible <strong>24/7</strong>.</p>
           </div>
         </div>
       </section>
@@ -674,18 +678,13 @@ export default function LandingPage() {
             Prêt à accepter des <span className="shimmer-text">paiements</span> ?
           </h2>
           <p className="text-white/55 text-lg mb-10">Rejoignez les marchands qui font confiance à SolvexPay pour encaisser en Mobile Money partout en Afrique.</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex justify-center">
             <Link href="/auth">
               <button className="group flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-white font-black text-base shadow-2xl hover:scale-105 transition-transform" style={{ background: "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)" }}>
                 Créer mon compte gratuitement
                 <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </button>
             </Link>
-            <a href={whatsapp} target="_blank" rel="noopener noreferrer">
-              <button className="flex items-center justify-center gap-2 px-10 py-5 rounded-2xl font-bold text-white/70 hover:text-white transition-colors" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                Contacter le support
-              </button>
-            </a>
           </div>
           <p className="text-xs text-white/25 mt-6">Inscription gratuite · Aucune carte bancaire requise · KYC en moins de 24h</p>
         </div>
