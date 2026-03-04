@@ -400,7 +400,8 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ success: result.success, status: statusStr, omnipayStatus: result.status });
+      const frontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
+      res.json({ success: result.success, status: frontendStatus, omnipayStatus: result.status });
     } catch (error: any) {
       console.error("Verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -436,7 +437,8 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ success: result.success, status: statusStr });
+      const publicFrontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
+      res.json({ success: result.success, status: publicFrontendStatus });
     } catch (error: any) {
       console.error("Public verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });

@@ -11,10 +11,12 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { OperatorLogo } from "@/components/operator-logo";
 import {
-  ArrowDownLeft, Wallet, Info, CheckCircle2, Loader2, XCircle, ChevronDown, ArrowLeft, Zap,
+  ArrowDownLeft, Info, CheckCircle2, Loader2, XCircle, ChevronDown, ArrowLeft, Zap,
+  Smartphone, RefreshCw, Clock, Wifi, Shield,
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
+import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
@@ -44,6 +46,8 @@ export default function DepositPage() {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
+  const [verifyCount, setVerifyCount] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
 
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
   const currency = selectedCountry.currency;
@@ -90,19 +94,24 @@ export default function DepositPage() {
     },
   });
 
+  const [verifyStatus, setVerifyStatus] = useState<"PENDING" | "SUCCESS" | "FAILED" | "CANCELLED">("PENDING");
+
   const verifyMutation = useMutation({
     mutationFn: async (reference: string) => {
       const res = await apiRequest("POST", "/api/transactions/verify", { reference });
       return res.json();
     },
     onSuccess: (data: any) => {
+      setVerifyCount(c => c + 1);
       if (data.status === "SUCCESS") {
+        setVerifyStatus("SUCCESS");
         setPaymentStatus("success");
         queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
         queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
         queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
         toast({ title: "Paiement confirmé !" });
       } else if (data.status === "FAILED" || data.status === "CANCELLED") {
+        setVerifyStatus(data.status as "FAILED" | "CANCELLED");
         setPaymentStatus("error");
         toast({ title: "Paiement échoué", variant: "destructive" });
       }
@@ -115,6 +124,12 @@ export default function DepositPage() {
     return () => clearInterval(interval);
   }, [pendingReference, paymentStatus]);
 
+  useEffect(() => {
+    if (paymentStatus !== "processing") return;
+    const t = setInterval(() => setElapsed(e => e + 1), 1000);
+    return () => clearInterval(t);
+  }, [paymentStatus]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!parsedAmount || !phone || !operator || !country) return;
@@ -124,60 +139,179 @@ export default function DepositPage() {
 
   const resetForm = () => {
     setPaymentStatus("idle"); setAmount(""); setPhone(""); setCustomerName(""); setDescription(""); setPendingReference(null);
+    setVerifyCount(0); setElapsed(0); setVerifyStatus("PENDING");
     window.history.replaceState({}, "", "/deposit");
   };
 
   if (paymentStatus !== "idle") {
-    const configs = {
-      processing: { gradient: "from-amber-500 to-orange-500", icon: Loader2, label: "Paiement en cours...", sublabel: "Un prompt USSD a été envoyé. Confirmez sur votre téléphone.", spin: true },
-      success: { gradient: "from-emerald-500 to-teal-500", icon: CheckCircle2, label: "Dépôt confirmé !", sublabel: "Votre solde a été crédité avec succès.", spin: false },
-      error: { gradient: "from-red-500 to-rose-600", icon: XCircle, label: "Paiement échoué", sublabel: "Le paiement n'a pas abouti. Veuillez réessayer.", spin: false },
-    };
-    const cfg = configs[paymentStatus];
-    const Icon = cfg.icon;
+    const isSuccess = paymentStatus === "success";
+    const isFailed = paymentStatus === "error";
+    const isPending = paymentStatus === "processing";
+    const elapsedMin = Math.floor(elapsed / 60);
+    const elapsedSec = elapsed % 60;
+    const elapsedStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`;
+
+    const steps = [
+      { label: "Initié", done: true },
+      { label: "Confirmation", done: isSuccess || isFailed },
+      { label: "Crédité", done: isSuccess },
+    ];
+
     return (
-      <DashboardLayout title="" breadcrumbs={[{ label: "Dépôt" }]}>
-        <div className="max-w-md mx-auto mt-6">
-          <Card className="border-border/60 overflow-hidden">
-            <div className={`h-1.5 bg-gradient-to-r ${cfg.gradient}`} />
-            <CardContent className="pt-10 pb-10 text-center space-y-5">
-              <div className={`h-20 w-20 rounded-3xl bg-gradient-to-br ${cfg.gradient} flex items-center justify-center mx-auto shadow-xl`}>
-                <Icon className={`h-10 w-10 text-white ${cfg.spin ? "animate-spin" : ""}`} />
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-bold" data-testid="text-deposit-status">{cfg.label}</h2>
-                <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">{cfg.sublabel}</p>
-              </div>
-              {parsedAmount > 0 && (
-                <div className="bg-muted/40 rounded-2xl px-6 py-4 inline-block">
-                  <p className="text-3xl font-black">{formatCurrency(parsedAmount)} <span className="text-muted-foreground text-base font-semibold">{currency}</span></p>
-                </div>
-              )}
-              {pendingReference && (
-                <p className="text-xs text-muted-foreground font-mono bg-muted/50 px-4 py-2 rounded-lg inline-block" data-testid="text-deposit-ref">Réf: {pendingReference}</p>
-              )}
-              {paymentStatus === "processing" && (
-                <div className="flex items-center justify-center gap-2 text-sm text-amber-600 dark:text-amber-400 font-medium">
-                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  Vérification en cours...
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <Link href="/dashboard" className="flex-1">
-                  <Button variant="outline" className="w-full h-11 font-semibold" data-testid="button-back-dashboard">
-                    <ArrowLeft className="h-4 w-4 mr-1.5" /> Tableau de bord
-                  </Button>
-                </Link>
-                {(paymentStatus === "success" || paymentStatus === "error") && (
-                  <Button className="flex-1 h-11 font-bold shadow-lg shadow-primary/20" onClick={resetForm} data-testid="button-new-deposit">
-                    {paymentStatus === "error" ? "Réessayer" : "Nouveau dépôt"}
-                  </Button>
+      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "linear-gradient(145deg, #0f0c29 0%, #1a1040 40%, #0f2027 100%)" }}>
+        <header className="px-4 py-4 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-7 h-7 rounded-lg object-cover" />
+            <span className="font-black text-base text-white/90">SolvexPay</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-white/40">
+            <Shield className="h-3 w-3" />
+            <span>Paiement sécurisé</span>
+          </div>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-sm space-y-4">
+
+            {/* Icône animée */}
+            <div className="flex flex-col items-center gap-6">
+              <div className="relative flex items-center justify-center">
+                {isPending && (
+                  <>
+                    <div className="absolute h-36 w-36 rounded-full border border-amber-400/20 animate-ping" style={{ animationDuration: "2s" }} />
+                    <div className="absolute h-28 w-28 rounded-full border border-amber-400/30 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.6s" }} />
+                    <div className="absolute h-20 w-20 rounded-full bg-amber-400/10" />
+                  </>
                 )}
+                {isSuccess && (
+                  <>
+                    <div className="absolute h-36 w-36 rounded-full border border-emerald-400/20 animate-ping" style={{ animationDuration: "2s" }} />
+                    <div className="absolute h-28 w-28 rounded-full bg-emerald-400/10" />
+                  </>
+                )}
+                {isFailed && <div className="absolute h-28 w-28 rounded-full bg-rose-400/10" />}
+                <div className={`relative h-20 w-20 rounded-full flex items-center justify-center shadow-2xl ${
+                  isSuccess ? "bg-gradient-to-br from-emerald-400 to-teal-500"
+                  : isFailed ? "bg-gradient-to-br from-rose-500 to-red-600"
+                  : "bg-gradient-to-br from-amber-400 to-orange-500"
+                }`}>
+                  {isPending && <Loader2 className="h-9 w-9 text-white animate-spin" />}
+                  {isSuccess && <CheckCircle2 className="h-9 w-9 text-white" />}
+                  {isFailed && <XCircle className="h-9 w-9 text-white" />}
+                </div>
               </div>
-            </CardContent>
-          </Card>
+
+              <div className="text-center space-y-1.5">
+                <h2 className="text-2xl font-black text-white" data-testid="text-deposit-status">
+                  {isSuccess ? "Dépôt confirmé !" : isFailed ? "Paiement échoué" : "En attente de confirmation"}
+                </h2>
+                <p className="text-sm text-white/50 max-w-xs mx-auto leading-relaxed">
+                  {isSuccess ? "Votre solde a été crédité avec succès."
+                  : isFailed ? "Le paiement n'a pas abouti. Vérifiez votre solde et réessayez."
+                  : "Ouvrez votre téléphone et confirmez le prompt USSD envoyé par votre opérateur."}
+                </p>
+              </div>
+            </div>
+
+            {/* Carte montant + steps */}
+            <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div className="p-5 text-center">
+                <p className="text-xs text-white/40 font-medium mb-1">Montant déposé</p>
+                <p className="text-4xl font-black text-white tracking-tight" data-testid="text-deposit-amount">{formatCurrency(parsedAmount)} <span className="text-xl font-bold text-white/40">{currency}</span></p>
+                <p className="text-xs text-white/30 mt-1">{operator} · {selectedCountry.name}</p>
+              </div>
+              <div className="px-5 pb-5">
+                <div className="flex items-center gap-1">
+                  {steps.map((step, i) => (
+                    <div key={i} className="flex items-center flex-1">
+                      <div className="flex flex-col items-center flex-1">
+                        <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
+                          step.done
+                            ? isSuccess ? "bg-emerald-400 text-white" : isFailed && i === 2 ? "bg-rose-400 text-white" : "bg-amber-400 text-white"
+                            : "bg-white/10 text-white/30"
+                        }`}>
+                          {step.done ? (isSuccess || i < 2 ? "✓" : isFailed && i === 2 ? "✗" : i + 1) : i + 1}
+                        </div>
+                        <p className="text-[9px] text-white/40 font-semibold mt-1">{step.label}</p>
+                      </div>
+                      {i < steps.length - 1 && (
+                        <div className={`h-0.5 flex-1 mx-1 mb-4 rounded-full ${step.done ? (isSuccess ? "bg-emerald-400/50" : "bg-amber-400/50") : "bg-white/10"}`} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Indicateurs temps + vérifications */}
+            {isPending && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    <Clock className="h-3 w-3 text-white/40" />
+                    <p className="text-[10px] text-white/40 font-medium">Temps écoulé</p>
+                  </div>
+                  <p className="text-base font-black text-white/80">{elapsedStr}</p>
+                </div>
+                <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <p className="text-[10px] text-white/40 font-medium">Vérifications</p>
+                  </div>
+                  <p className="text-base font-black text-white/80">{verifyCount}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Instructions mobile */}
+            {isPending && (
+              <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
+                <Smartphone className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-amber-300 mb-0.5">Action requise sur votre téléphone</p>
+                  <p className="text-[11px] text-amber-200/60 leading-relaxed">
+                    Vous avez reçu un <strong className="text-amber-300">prompt USSD</strong>. Entrez votre code PIN pour valider. Vérification automatique toutes les <strong className="text-amber-300">5 secondes</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Référence */}
+            {pendingReference && (
+              <p className="text-center text-[10px] text-white/25 font-mono" data-testid="text-deposit-ref">Réf : {pendingReference}</p>
+            )}
+
+            {/* Live status */}
+            {isPending && (
+              <div className="flex items-center justify-center gap-2 text-xs text-white/40">
+                <Wifi className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
+                <span>Vérification automatique active...</span>
+              </div>
+            )}
+
+            {/* Boutons */}
+            <div className="flex gap-3">
+              <Link href="/dashboard" className="flex-1">
+                <Button variant="outline" className="w-full h-12 font-bold border-white/10 text-white/60 hover:bg-white/5 hover:text-white bg-transparent" data-testid="button-back-dashboard">
+                  <ArrowLeft className="h-4 w-4 mr-1.5" />
+                  {isSuccess ? "Tableau de bord" : "Retour"}
+                </Button>
+              </Link>
+              {(isSuccess || isFailed) && (
+                <Button
+                  className="flex-1 h-12 font-black"
+                  style={{ background: isFailed ? "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" : "linear-gradient(135deg, #059669 0%, #047857 100%)" }}
+                  onClick={resetForm}
+                  data-testid="button-new-deposit"
+                >
+                  {isFailed ? <><RefreshCw className="h-4 w-4 mr-1.5" />Réessayer</> : "Nouveau dépôt"}
+                </Button>
+              )}
+            </div>
+
+          </div>
         </div>
-      </DashboardLayout>
+      </div>
     );
   }
 

@@ -200,6 +200,13 @@ class OmniPayService {
     });
 
     if (response.data.success !== 1) {
+      const msg = (response.data.message || "").toLowerCase();
+      if (msg.includes("pending") || msg.includes("validation") || msg.includes("en cours")) {
+        return { ...response.data, success: 1, status: 2 };
+      }
+      if (msg.includes("failed") || msg.includes("fail") || msg.includes("transaction failed") || msg.includes("cancel")) {
+        return { ...response.data, success: 1, status: 4 };
+      }
       throw new Error(response.data.message || `Erreur OmniPay code ${response.data.code}`);
     }
 
