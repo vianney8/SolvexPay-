@@ -69,7 +69,6 @@ const COUNTRIES = [
   { code: "COG", name: "Congo", flag: "🇨🇬" },
 ];
 
-const TX_TYPES = ["deposit", "withdrawal", "transfer"];
 const TX_TYPE_LABELS: Record<string, string> = { deposit: "Dépôt", withdrawal: "Retrait", transfer: "Transfert" };
 
 function fmt(n: number) {
@@ -162,8 +161,6 @@ export default function AdminPage() {
   const [txStatus, setTxStatus] = useState("all");
   const [txType, setTxType] = useState("all");
   const [statsPeriod, setStatsPeriod] = useState("month");
-  const [feeTypeTab, setFeeTypeTab] = useState("deposit");
-
   // Dialogs
   const [kycDialog, setKycDialog] = useState<{ userId: string; name: string; status: string } | null>(null);
   const [kycAction, setKycAction] = useState<"verified" | "rejected">("verified");
@@ -177,8 +174,6 @@ export default function AdminPage() {
   const [depositData, setDepositData] = useState({ amount: "", phone: "", operator: "", motif: "" });
   const [migrateDialog, setMigrateDialog] = useState(false);
   const [migrateData, setMigrateData] = useState({ fromUserId: "", toUserId: "", amount: "", motif: "" });
-  const [feeEditDialog, setFeeEditDialog] = useState<{ id: string; feeRate: string; type: string; country: string } | null>(null);
-  const [feeRate, setFeeRate] = useState("");
   const [serviceFeeEdit, setServiceFeeEdit] = useState<{ deposit: string; withdrawal: string; transfer: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
@@ -203,7 +198,6 @@ export default function AdminPage() {
     staleTime: 30000,
   });
   const { data: paymentMethods, isLoading: pmLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-methods"] });
-  const { data: feeConfigs, isLoading: feeLoading } = useQuery<any[]>({ queryKey: ["/api/admin/fee-configs"] });
   const { data: commissions, isLoading: comLoading } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
   const { data: financialSummary, isLoading: finLoading } = useQuery<any>({
     queryKey: ["/api/admin/financial-summary"],
@@ -317,12 +311,6 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
-  const feeM = useMutation({
-    mutationFn: (d: { id: string; feeRate: string }) => apiRequest("PATCH", `/api/admin/fee-configs/${d.id}`, { feeRate: d.feeRate }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-configs"] }); toast({ title: "Frais mis à jour" }); setFeeEditDialog(null); },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
-  });
-
   const { data: serviceFees, isLoading: serviceFeesLoading } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({
     queryKey: ["/api/admin/service-fees"],
   });
@@ -391,7 +379,6 @@ export default function AdminPage() {
   const pendingKyc = (kycList || []).filter((u: any) => u.kycStatus === "pending");
   const pendingWithdrawals = (allTx || []).filter(t => t.type === "withdrawal" && t.status === "pending");
 
-  const feeByTypeCountry = (feeConfigs || []).filter((f: any) => f.type === feeTypeTab);
   const totalWalletBalance = (wallets || []).reduce((s: number, u: any) => s + parseFloat(u.wallet?.balanceXOF || "0"), 0);
   const filteredPaymentLinks = (allPaymentLinks || []).filter(l =>
     !linksSearch || [l.name, l.slug, l.user?.email, l.user?.firstName, l.user?.lastName].join(" ").toLowerCase().includes(linksSearch.toLowerCase())
@@ -1290,65 +1277,6 @@ export default function AdminPage() {
               )}
             </div>
 
-            <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-start gap-3">
-              <Percent className="h-4 w-4 text-indigo-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-bold text-indigo-700 dark:text-indigo-400">Configuration des frais par type et par pays</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Les frais s'appliquent selon le type d'opération et le pays. BF et COG ont un taux de base plus élevé (6%).</p>
-              </div>
-            </div>
-
-            <div className="flex gap-1.5">
-              {TX_TYPES.map(t => (
-                <button key={t} onClick={() => setFeeTypeTab(t)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${feeTypeTab === t ? "bg-indigo-600 text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                  data-testid={`btn-fee-type-${t}`}>
-                  {t === "deposit" && <Banknote className="h-4 w-4" />}
-                  {t === "withdrawal" && <Send className="h-4 w-4" />}
-                  {t === "transfer" && <ArrowRightLeft className="h-4 w-4" />}
-                  {TX_TYPE_LABELS[t]}
-                </button>
-              ))}
-            </div>
-
-            {feeLoading ? (
-              <div className="space-y-2">{[1,2,3,4].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
-            ) : (
-              <div className="space-y-2">
-                {feeByTypeCountry.map((fc: any) => {
-                  const countryInfo = COUNTRIES.find(c => c.code === fc.country);
-                  return (
-                    <div key={fc.id} className="flex items-center gap-3 p-3.5 rounded-2xl border border-border/50 hover:border-border/80 transition-colors bg-card" data-testid={`row-fee-${fc.id}`}>
-                      <div className="text-xl flex-shrink-0">
-                        {fc.country === "default" ? "🌍" : (countryInfo?.flag || "🏳️")}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold">
-                          {fc.country === "default" ? "Taux par défaut (tous pays)" : (countryInfo?.name || fc.country)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {fc.country === "default" ? "Appliqué si aucun taux spécifique au pays" : `Code: ${fc.country}`}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-right">
-                          <p className={`text-lg font-black ${parseFloat(fc.feeRate) > 5 ? "text-orange-600" : "text-indigo-600"}`}>{fc.feeRate}%</p>
-                          {fc.minAmount && parseFloat(fc.minAmount) > 0 && <p className="text-xs text-muted-foreground">min {fmt(parseFloat(fc.minAmount))}</p>}
-                        </div>
-                        <button
-                          onClick={() => { setFeeEditDialog({ id: fc.id, feeRate: fc.feeRate, type: fc.type, country: fc.country }); setFeeRate(fc.feeRate); }}
-                          className="h-8 w-8 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 flex items-center justify-center transition-colors"
-                          data-testid={`btn-edit-fee-${fc.id}`}
-                        >
-                          <PenLine className="h-3.5 w-3.5 text-indigo-600" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-                {feeByTypeCountry.length === 0 && <div className="text-center py-8 text-sm text-muted-foreground">Chargement des configurations...</div>}
-              </div>
-            )}
           </TabsContent>
 
           {/* ══════════════════════════════════════
@@ -1795,31 +1723,6 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-
-      {/* ════ FEE EDIT DIALOG ════ */}
-      <Dialog open={!!feeEditDialog} onOpenChange={(o) => { if (!o) setFeeEditDialog(null); }}>
-        <DialogContent className="max-w-xs rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Percent className="h-5 w-5 text-indigo-500" />Modifier le taux</DialogTitle>
-            <DialogDescription>
-              {feeEditDialog?.type ? TX_TYPE_LABELS[feeEditDialog.type] : ""} — {feeEditDialog?.country === "default" ? "Taux par défaut" : COUNTRIES.find(c => c.code === feeEditDialog?.country)?.name || feeEditDialog?.country}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Taux de commission (%)</Label>
-            <div className="relative mt-2">
-              <Input type="number" min="0" max="20" step="0.1" value={feeRate} onChange={e => setFeeRate(e.target.value)} placeholder="5" className="pr-8 h-11" data-testid="input-fee-rate" />
-              <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFeeEditDialog(null)} className="h-10">Annuler</Button>
-            <Button onClick={() => feeEditDialog && feeM.mutate({ id: feeEditDialog.id, feeRate })} disabled={feeM.isPending || !feeRate} className="h-10" data-testid="btn-confirm-fee">
-              {feeM.isPending ? "..." : "Enregistrer"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* ── Reset Stats Confirmation Dialog ── */}
       <Dialog open={resetStatsDialog} onOpenChange={o => { if (!o) { setResetStatsDialog(false); setResetConfirmText(""); } }}>
