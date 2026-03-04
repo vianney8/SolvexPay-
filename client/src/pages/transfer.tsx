@@ -131,14 +131,14 @@ export default function TransferPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Pays</span><span className="font-semibold">{selectedCountry.flag} {selectedCountry.name}</span></div>
                 {recipientName && <div className="flex justify-between"><span className="text-muted-foreground">Bénéficiaire</span><span className="font-semibold">{recipientName}</span></div>}
               </div>
-              <div className="flex gap-3 pt-2">
-                <Link href="/dashboard" className="flex-1">
-                  <Button variant="outline" className="w-full h-11 font-semibold" data-testid="button-back-dashboard">
-                    <ArrowLeft className="h-4 w-4 mr-1.5" /> Tableau de bord
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Link href="/dashboard" className="w-full sm:flex-1">
+                  <Button variant="outline" className="w-full h-12 font-semibold text-sm" data-testid="button-back-dashboard">
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Tableau de bord
                   </Button>
                 </Link>
                 <Button
-                  className="flex-1 h-11 font-bold"
+                  className="w-full sm:flex-1 h-12 font-bold text-sm"
                   onClick={() => { setSuccess(false); setAmount(""); setPhone(""); setRecipientName(""); setOperator(""); }}
                   data-testid="button-new-transfer"
                 >

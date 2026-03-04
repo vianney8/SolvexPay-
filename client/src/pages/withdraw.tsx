@@ -141,14 +141,14 @@ export default function WithdrawPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Pays</span><span className="font-semibold">{selectedCountry.flag} {selectedCountry.name}</span></div>
                 {withdrawRef && <div className="flex justify-between"><span className="text-muted-foreground">Référence</span><span className="font-mono text-xs">{withdrawRef}</span></div>}
               </div>
-              <div className="flex gap-3 pt-2">
-                <Link href="/dashboard" className="flex-1">
-                  <Button variant="outline" className="w-full h-11 font-semibold" data-testid="button-back-dashboard">
-                    <ArrowLeft className="h-4 w-4 mr-1.5" /> Tableau de bord
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Link href="/dashboard" className="w-full sm:flex-1">
+                  <Button variant="outline" className="w-full h-12 font-semibold text-sm" data-testid="button-back-dashboard">
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Tableau de bord
                   </Button>
                 </Link>
                 <Button
-                  className="flex-1 h-11 font-bold shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="w-full sm:flex-1 h-12 font-bold shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
                   onClick={() => { setSuccess(false); setAmount(""); setPhone(""); setWithdrawRef(""); setOperator(""); }}
                   data-testid="button-new-withdraw"
                 >
