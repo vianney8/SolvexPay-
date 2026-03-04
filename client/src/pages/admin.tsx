@@ -26,6 +26,37 @@ import {
   Trash2, Smartphone,
 } from "lucide-react";
 
+function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
+  const [broken, setBroken] = useState(false);
+  const isBase64 = src.startsWith("data:");
+  const openFull = () => {
+    if (isBase64) {
+      const win = window.open();
+      if (win) { win.document.write(`<img src="${src}" style="max-width:100%;height:auto;" />`); }
+    } else {
+      window.open(src, "_blank", "noopener,noreferrer");
+    }
+  };
+  if (broken) {
+    return (
+      <div className="w-full h-20 rounded-lg border border-border/60 bg-muted/50 flex flex-col items-center justify-center gap-1 text-muted-foreground">
+        <AlertTriangle className="h-4 w-4" />
+        <span className="text-[9px] font-medium">Image indisponible</span>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onClick={openFull}
+      onError={() => setBroken(true)}
+      className="w-full h-20 object-cover rounded-lg border border-border/60 hover:opacity-80 transition-opacity cursor-zoom-in"
+      data-testid={testId}
+    />
+  );
+}
+
 const COUNTRIES = [
   { code: "BJ", name: "Bénin", flag: "🇧🇯" },
   { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮" },
@@ -696,25 +727,19 @@ export default function AdminPage() {
                           {u.kycDocumentFront && (
                             <div className="space-y-1">
                               <p className="text-[10px] text-muted-foreground font-medium text-center">Recto</p>
-                              <a href={u.kycDocumentFront} target="_blank" rel="noreferrer">
-                                <img src={u.kycDocumentFront} alt="Recto" className="w-full h-20 object-cover rounded-lg border border-border/60 hover:opacity-80 transition-opacity cursor-zoom-in" data-testid={`img-kyc-front-${u.id}`} />
-                              </a>
+                              <KycImage src={u.kycDocumentFront} alt="Recto" testId={`img-kyc-front-${u.id}`} />
                             </div>
                           )}
                           {u.kycDocumentBack && (
                             <div className="space-y-1">
                               <p className="text-[10px] text-muted-foreground font-medium text-center">Verso</p>
-                              <a href={u.kycDocumentBack} target="_blank" rel="noreferrer">
-                                <img src={u.kycDocumentBack} alt="Verso" className="w-full h-20 object-cover rounded-lg border border-border/60 hover:opacity-80 transition-opacity cursor-zoom-in" data-testid={`img-kyc-back-${u.id}`} />
-                              </a>
+                              <KycImage src={u.kycDocumentBack} alt="Verso" testId={`img-kyc-back-${u.id}`} />
                             </div>
                           )}
                           {u.kycSelfie && (
                             <div className="space-y-1">
                               <p className="text-[10px] text-muted-foreground font-medium text-center">Selfie</p>
-                              <a href={u.kycSelfie} target="_blank" rel="noreferrer">
-                                <img src={u.kycSelfie} alt="Selfie" className="w-full h-20 object-cover rounded-lg border border-border/60 hover:opacity-80 transition-opacity cursor-zoom-in" data-testid={`img-kyc-selfie-${u.id}`} />
-                              </a>
+                              <KycImage src={u.kycSelfie} alt="Selfie" testId={`img-kyc-selfie-${u.id}`} />
                             </div>
                           )}
                         </div>

@@ -6,21 +6,9 @@ import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipaySta
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
-
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      cb(null, uniqueSuffix + path.extname(file.originalname));
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = /jpeg|jpg|png|gif|webp/;
@@ -720,7 +708,9 @@ export async function registerRoutes(
     if (!req.file) {
       return res.status(400).json({ message: "Aucun fichier fourni" });
     }
-    const imageUrl = `/uploads/${req.file.filename}`;
+    const base64 = req.file.buffer.toString("base64");
+    const mimeType = req.file.mimetype || "image/jpeg";
+    const imageUrl = `data:${mimeType};base64,${base64}`;
     res.json({ imageUrl });
   });
 
@@ -1523,8 +1513,6 @@ export async function registerRoutes(
   });
 
   // ─── END ADMIN ROUTES ──────────────────────────────────────────────────────
-
-  app.use("/uploads", (await import("express")).default.static(uploadDir));
 
   return httpServer;
 }

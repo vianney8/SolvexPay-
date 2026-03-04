@@ -245,7 +245,13 @@ export default function PayPage() {
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
         {paymentLink.imageUrl && (
           <div className="w-full h-52 overflow-hidden">
-            <img src={paymentLink.imageUrl} alt={paymentLink.name} className="w-full h-full object-cover" data-testid="img-payment-product-thumb" />
+            <img
+              src={paymentLink.imageUrl}
+              alt={paymentLink.name}
+              className="w-full h-full object-cover"
+              data-testid="img-payment-product-thumb"
+              onError={(e) => { const el = e.target as HTMLImageElement; el.parentElement!.style.display = "none"; }}
+            />
           </div>
         )}
         <div className="p-6 space-y-5">
