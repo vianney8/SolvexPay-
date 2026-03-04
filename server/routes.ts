@@ -602,20 +602,22 @@ export async function registerRoutes(
       const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
       const feesAmount = Math.round(linkAmount * feeRate);
 
+      console.log(`Initiating payment for link ${slug} with reference: ${reference}`);
       const depositResponse = await omniPayService.deposit({
         msisdn: phoneNumber,
         amount: linkAmount,
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
-        operator: isWave || operator.toLowerCase() === "mixx" ? operator : undefined,
+        operator: operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase(),
         returnUrl,
       });
+      console.log(`Payment response for ${reference}:`, depositResponse);
 
       const transaction = await storage.createTransaction({
         userId: paymentLink.userId,
         type: "deposit",
-        amount: paymentLink.amount,
+        amount: linkAmount.toString(),
         currency: paymentLink.currency,
         provider: operator,
         phoneNumber,

@@ -34,96 +34,8 @@ const OPERATOR_LABEL: Record<string, string> = {
   TMoney: "T-Money", Vodacom: "Vodacom M-Pesa", Airtel: "Airtel Money", Free: "Free Money",
 };
 
-export default function PayPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const { toast } = useToast();
-
-  const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
-  const [pendingReference, setPendingReference] = useState<string | null>(null);
-  const [verifyStatus, setVerifyStatus] = useState<string>("PENDING");
-  const [phone, setPhone] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [country, setCountry] = useState("BJ");
-  const [operator, setOperator] = useState("");
-  const [showCountryPicker, setShowCountryPicker] = useState(false);
-  const [showDescription, setShowDescription] = useState(false);
-  const [customAmount, setCustomAmount] = useState("");
-
-  const selectedCountry = COUNTRIES.find(c => c.code === country)!;
-
-  useEffect(() => { setOperator(""); }, [country]);
-
-  const { data: paymentLink, isLoading, error } = useQuery<PaymentLink>({
-    queryKey: ["/api/payment-links/public", slug],
-    queryFn: async () => {
-      const res = await fetch(`/api/payment-links/public/${slug}`);
-      if (!res.ok) throw new Error("not found");
-      return res.json();
-    },
-  });
-
-  const payMutation = useMutation({
-    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName?: string; customerEmail?: string }) => {
-      const res = await apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      setPendingReference(data.sendavaReference || data.reference);
-      setPaymentStatus("processing");
-      if (data.paymentUrl) {
-        window.open(data.paymentUrl, "_blank");
-      }
-      toast({ title: "Paiement initié", description: "Confirmez le paiement sur votre téléphone." });
-    },
-    onError: () => {
-      setPaymentStatus("error");
-      toast({ title: "Erreur", description: "Le paiement n'a pas pu être initié.", variant: "destructive" });
-    },
-  });
-
-  useEffect(() => {
-    if (!pendingReference || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/payment-links/verify-public", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reference: pendingReference }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.status) setVerifyStatus(data.status);
-        }
-      } catch {}
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [pendingReference, verifyStatus]);
-
-  const handlePay = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (payMutation.isPending) return;
-    if (!phone || !operator || !country) {
-      toast({ title: "Champs requis", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
-      return;
-    }
-    const isCustom = (paymentLink as any)?.allowCustomAmount;
-    const parsedCustom = parseFloat(customAmount);
-    if (isCustom && (!customAmount || parsedCustom < 100)) return;
-    const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
-    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-    payMutation.mutate({
-      phoneNumber: fullPhone,
-      operator,
-      country,
-      customerName: fullName || undefined,
-      customerEmail: customerEmail || undefined,
-      ...(isCustom ? { customAmount: parsedCustom } : {}),
-    } as any);
-  };
-
-  const PageWrapper = ({ children }: { children: React.ReactNode }) => (
+function PageWrapper({ children }: { children: React.ReactNode }) {
+  return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <a href="https://solvexpay.site" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -147,11 +59,30 @@ export default function PayPage() {
       </footer>
     </div>
   );
+}
 
-  if (isLoading) {
-    return (
-      <PageWrapper>
-        <div className="bg-white rounded-3xl shadow-lg p-6 space-y-5">
+export default function PayPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const { toast } = useToast();
+
+  const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
+  const [pendingReference, setPendingReference] = useState<string | null>(null);
+  const [verifyStatus, setVerifyStatus] = useState<string>("PENDING");
+  const [phone, setPhone] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [country, setCountry] = useState("BJ");
+  const [operator, setOperator] = useState("");
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
+  const [customAmount, setCustomAmount] = useState("");
+
+  const selectedCountry = COUNTRIES.find(c => c.code === country)!;
+
+  useEffect(() => { setOperator(""); }, [country]);
+
+  const { data: paymentLink, isLoading, error } = useQuery<PaymentLink>({
           <Skeleton className="h-48 w-full rounded-2xl" />
           <Skeleton className="h-6 w-40 mx-auto" />
           <Skeleton className="h-14 w-48 mx-auto" />
