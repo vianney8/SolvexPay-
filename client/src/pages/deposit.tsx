@@ -217,7 +217,7 @@ export default function DepositPage() {
             <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)" }}>
               <div className="p-5 text-center">
                 <p className="text-xs text-white/40 font-medium mb-1">Montant déposé</p>
-                <p className="text-4xl font-black text-white tracking-tight" data-testid="text-deposit-amount">{formatCurrency(parsedAmount)} <span className="text-xl font-bold text-white/40">{currency}</span></p>
+                <p className="text-2xl font-black text-white tracking-tight" data-testid="text-deposit-amount">{formatCurrency(parsedAmount)} <span className="text-base font-bold text-white/40">{currency}</span></p>
                 <p className="text-xs text-white/30 mt-1">{operator} · {selectedCountry.name}</p>
               </div>
               <div className="px-5 pb-5">
@@ -230,7 +230,7 @@ export default function DepositPage() {
                             ? isSuccess ? "bg-emerald-400 text-white" : isFailed && i === 2 ? "bg-rose-400 text-white" : "bg-amber-400 text-white"
                             : "bg-white/10 text-white/30"
                         }`}>
-                          {step.done ? (isSuccess || i < 2 ? "✓" : isFailed && i === 2 ? "✗" : i + 1) : i + 1}
+                          {step.done ? (isFailed && i === 2 ? "✗" : "✓") : ""}
                         </div>
                         <p className="text-[9px] text-white/40 font-semibold mt-1">{step.label}</p>
                       </div>
@@ -285,7 +285,7 @@ export default function DepositPage() {
             {isPending && (
               <div className="flex items-center justify-center gap-2 text-xs text-white/40">
                 <Wifi className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
-                <span>Vérification automatique active...</span>
+                <span>vérification automatique active...</span>
               </div>
             )}
 

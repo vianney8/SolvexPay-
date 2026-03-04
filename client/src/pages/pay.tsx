@@ -310,7 +310,7 @@ export default function PayPage() {
             <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)" }}>
               <div className="p-5 text-center">
                 <p className="text-xs text-white/40 font-medium mb-1">Montant</p>
-                <p className="text-4xl font-black text-white tracking-tight">{displayAmount} <span className="text-xl font-bold text-white/40">{paymentLink.currency}</span></p>
+                <p className="text-2xl font-black text-white tracking-tight">{displayAmount} <span className="text-base font-bold text-white/40">{paymentLink.currency}</span></p>
                 <p className="text-sm font-semibold text-white/60 mt-1">{paymentLink.name}</p>
               </div>
 
@@ -325,7 +325,7 @@ export default function PayPage() {
                             ? isSuccess ? "bg-emerald-400 text-white" : isFailed && i === 2 ? "bg-rose-400 text-white" : "bg-amber-400 text-white"
                             : "bg-white/10 text-white/30"
                         }`}>
-                          {step.done ? (isSuccess || i < stepIndex ? "✓" : isFailed && i === 2 ? "✗" : i + 1) : i + 1}
+                          {step.done ? (isFailed && i === 2 ? "✗" : "✓") : ""}
                         </div>
                         <p className="text-[9px] text-white/40 font-semibold mt-1 text-center">{step.label}</p>
                       </div>
@@ -380,7 +380,7 @@ export default function PayPage() {
             {isPending && (
               <div className="flex items-center justify-center gap-2 text-xs text-white/40">
                 <Wifi className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
-                <span>Vérification automatique active...</span>
+                <span>vérification automatique active...</span>
               </div>
             )}
 
