@@ -1116,38 +1116,60 @@ export default function LandingPage() {
             <div className="space-y-3">
               <p className="text-sm font-bold text-foreground uppercase tracking-wider">Produit</p>
               <ul className="space-y-2.5">
-                {["Tableau de bord", "Liens de paiement", "API Gateway", "Clés API", "Vérification KYC"].map((item) => (
-                  <li key={item}><Link href="/register"><span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">{item}</span></Link></li>
+                {[
+                  { label: "Tableau de bord", href: "/login" },
+                  { label: "Liens de paiement", href: "/login" },
+                  { label: "API Gateway", href: "/login" },
+                  { label: "Clés API", href: "/login" },
+                  { label: "Vérification KYC", href: "/login" },
+                ].map((item) => (
+                  <li key={item.label}>
+                    <Link href={item.href}>
+                      <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">{item.label}</span>
+                    </Link>
+                  </li>
                 ))}
               </ul>
             </div>
             <div className="space-y-3">
               <p className="text-sm font-bold text-foreground uppercase tracking-wider">Ressources</p>
               <ul className="space-y-2.5">
-                {[{ label: "Documentation", href: "https://docs.solvexpay.site" }, { label: "Guide de démarrage", href: "https://docs.solvexpay.site" }, { label: "Référence API", href: "https://docs.solvexpay.site" }].map((item) => (
-                  <li key={item.label}><a href={item.href} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{item.label}</a></li>
+                {[
+                  { label: "Documentation", href: "https://docs.solvexpay.site" },
+                  { label: "Guide de démarrage", href: "https://docs.solvexpay.site" },
+                  { label: "Référence API", href: "https://docs.solvexpay.site" },
+                  { label: "Support", href: "https://wa.me/22891840498" },
+                ].map((item) => (
+                  <li key={item.label}>
+                    <a href={item.href} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{item.label}</a>
+                  </li>
                 ))}
               </ul>
             </div>
             <div className="space-y-3">
               <p className="text-sm font-bold text-foreground uppercase tracking-wider">Support</p>
               <ul className="space-y-2.5">
-                <li className="flex items-center gap-2 text-sm text-muted-foreground"><Mail className="h-3.5 w-3.5 flex-shrink-0" /><span>support@solvexpay.site</span></li>
-                <li className="flex items-center gap-2 text-sm text-muted-foreground"><MessageCircle className="h-3.5 w-3.5 flex-shrink-0" /><span>WhatsApp 24/7</span></li>
-                <li className="flex items-center gap-2 text-sm text-muted-foreground"><Globe className="h-3.5 w-3.5 flex-shrink-0" /><span>9 pays couverts</span></li>
+                <li>
+                  <a href="mailto:support@solvexpay.site" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    <Mail className="h-3.5 w-3.5 flex-shrink-0" /><span>support@solvexpay.site</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="https://wa.me/22891840498" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    <MessageCircle className="h-3.5 w-3.5 flex-shrink-0" /><span>WhatsApp 24/7</span>
+                  </a>
+                </li>
+                <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Globe className="h-3.5 w-3.5 flex-shrink-0" /><span>9 pays couverts</span>
+                </li>
               </ul>
-              <a href="#support" className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 hover:text-green-700 transition-colors">
+              <a href="https://wa.me/22891840498" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 hover:text-green-700 transition-colors">
                 <MessageCircle className="h-3.5 w-3.5" /> Nous contacter
               </a>
             </div>
           </div>
-          <div className="pt-8 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="pt-8 border-t border-border/50 flex items-center justify-center">
             <p className="text-xs text-muted-foreground" data-testid="text-copyright">© 2026 SolvexPay. Tous droits réservés.</p>
-            <div className="flex items-center gap-6 text-xs text-muted-foreground">
-              <span className="cursor-pointer hover:text-foreground transition-colors">Conditions d'utilisation</span>
-              <span className="cursor-pointer hover:text-foreground transition-colors">Confidentialité</span>
-              <span className="cursor-pointer hover:text-foreground transition-colors">Mentions légales</span>
-            </div>
           </div>
         </div>
       </footer>
