@@ -236,12 +236,30 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Solde insuffisant" });
       }
 
+      const reference = generateReference();
+      const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
+
+      if (withdrawalMode === "manual") {
+        const transaction = await storage.createTransaction({
+          userId,
+          type: "withdrawal",
+          amount: amount.toString(),
+          currency,
+          provider: operator,
+          phoneNumber,
+          reference,
+          status: "pending",
+          description: `Retrait vers ${phoneNumber} via ${operator}`,
+        });
+        await storage.updateWalletBalance(userId, currency, -amount);
+        return res.json({ ...transaction, mode: "manual" });
+      }
+
       const fullName = req.user?.name || req.user?.firstName || "Client";
       const nameParts = fullName.trim().split(" ");
       const resolvedFirstName = nameParts[0] || "Client";
       const resolvedLastName = nameParts.slice(1).join(" ") || "SolvexPay";
 
-      const reference = generateReference();
       const isWave = operator.toLowerCase() === "wave";
 
       const transferResponse = await omniPayService.transfer({
@@ -258,11 +276,11 @@ export async function registerRoutes(
         type: "withdrawal",
         amount: amount.toString(),
         currency,
-        provider: "omnipay",
+        provider: operator,
         phoneNumber,
         reference,
         status: "pending",
-        description: `Retrait vers ${phoneNumber}`,
+        description: `Retrait vers ${phoneNumber} via ${operator}`,
       });
 
       await storage.updateWalletBalance(userId, currency, -amount);
@@ -1401,6 +1419,27 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Admin stats reset error:", error);
       res.status(500).json({ message: "Erreur lors de la réinitialisation" });
+    }
+  });
+
+  app.get("/api/admin/system-settings", isAdmin, async (_req, res) => {
+    try {
+      const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
+      res.json({ withdrawalMode });
+    } catch (error) {
+      res.status(500).json({ message: "Erreur" });
+    }
+  });
+
+  app.patch("/api/admin/system-settings", isAdmin, async (req, res) => {
+    try {
+      const { withdrawalMode } = req.body;
+      if (withdrawalMode && ["auto", "manual"].includes(withdrawalMode)) {
+        await storage.setSystemSetting("withdrawalMode", withdrawalMode);
+      }
+      res.json({ withdrawalMode: withdrawalMode || "auto" });
+    } catch (error) {
+      res.status(500).json({ message: "Erreur" });
     }
   });
 

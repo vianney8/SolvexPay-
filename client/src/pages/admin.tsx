@@ -23,7 +23,7 @@ import {
   Zap, CalendarDays, BadgeCheck, UserX, Coins, FileText, ArrowUpDown,
   TrendingDown, Building2, Network, ArrowRightLeft, Plus, DollarSign,
   Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
-  Trash2,
+  Trash2, Smartphone,
 } from "lucide-react";
 
 const COUNTRIES = [
@@ -82,6 +82,46 @@ function TypeChip({ type }: { type: string }) {
 
 const PERIOD_OPTS = [{ v: "day", l: "24h" }, { v: "week", l: "7j" }, { v: "month", l: "Ce mois" }];
 
+function WithdrawalModeCard() {
+  const { toast } = useToast();
+  const { data, isLoading } = useQuery<{ withdrawalMode: string }>({ queryKey: ["/api/admin/system-settings"] });
+  const mutation = useMutation({
+    mutationFn: (mode: string) => apiRequest("PATCH", "/api/admin/system-settings", { withdrawalMode: mode }).then(r => r.json()),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/system-settings"] }); toast({ title: "Mode de retrait mis à jour" }); },
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const isAuto = data?.withdrawalMode !== "manual";
+
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-bold flex items-center gap-2">
+          <Smartphone className="h-4 w-4 text-orange-500" />
+          Mode de traitement des retraits
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-xl border border-border/60 p-4 space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-1">
+              <p className="font-bold text-sm">{isLoading ? "Chargement..." : isAuto ? "Automatique (OmniPay)" : "Manuel (admin)"}</p>
+              <p className="text-xs text-muted-foreground">{isAuto ? "Les retraits sont envoyés directement via OmniPay." : "Les retraits restent en attente, l'admin les traite manuellement."}</p>
+            </div>
+            <div className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isAuto ? "bg-emerald-500" : "bg-muted-foreground/30"} ${mutation.isPending ? "opacity-50 pointer-events-none" : ""}`}
+              role="switch" aria-checked={isAuto} onClick={() => mutation.mutate(isAuto ? "manual" : "auto")} data-testid="toggle-withdrawal-mode">
+              <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${isAuto ? "translate-x-5" : "translate-x-0"}`} />
+            </div>
+          </div>
+          <div className={`rounded-lg px-3 py-2 text-xs font-semibold border ${isAuto ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"}`}>
+            {isAuto ? "✓ Les retraits sont traités automatiquement en temps réel" : "⚠ Les retraits nécessitent une validation manuelle par l'admin"}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminPage() {
   const { toast } = useToast();
 
@@ -106,8 +146,6 @@ export default function AdminPage() {
   const [depositData, setDepositData] = useState({ amount: "", phone: "", operator: "", motif: "" });
   const [migrateDialog, setMigrateDialog] = useState(false);
   const [migrateData, setMigrateData] = useState({ fromUserId: "", toUserId: "", amount: "", motif: "" });
-  const [txEditDialog, setTxEditDialog] = useState<{ id: string; status: string } | null>(null);
-  const [newTxStatus, setNewTxStatus] = useState("completed");
   const [feeEditDialog, setFeeEditDialog] = useState<{ id: string; feeRate: string; type: string; country: string } | null>(null);
   const [feeRate, setFeeRate] = useState("");
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
@@ -629,11 +667,6 @@ export default function AdminPage() {
                             </button>
                           </div>
                         )}
-                        {u.kycStatus !== "pending" && (
-                          <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); }} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-muted/50" data-testid={`btn-kyc-edit-${u.id}`}>
-                            <PenLine className="h-3.5 w-3.5" />
-                          </button>
-                        )}
                       </div>
 
                       {/* KYC Photos */}
@@ -1122,11 +1155,6 @@ export default function AdminPage() {
                           <p className="text-sm font-black">{fmt(parseFloat(tx.amount))}</p>
                           {tx.fees && parseFloat(tx.fees) > 0 && <p className="text-xs text-muted-foreground">Frais: {fmt(parseFloat(tx.fees))}</p>}
                         </div>
-                        <button onClick={() => { setTxEditDialog({ id: tx.id, status: tx.status }); setNewTxStatus(tx.status); }}
-                          className="h-8 w-8 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
-                          data-testid={`btn-edit-tx-${tx.id}`}>
-                          <PenLine className="h-3.5 w-3.5 text-muted-foreground" />
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -1139,6 +1167,7 @@ export default function AdminPage() {
               TAB 9 — PARAMÈTRES ADMIN
           ══════════════════════════════════════ */}
           <TabsContent value="settings" className="space-y-5 mt-5">
+            <WithdrawalModeCard />
             <Card className="border-border/50">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -1187,8 +1216,9 @@ export default function AdminPage() {
             </div>
             {kycAction === "rejected" && (
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Motif de rejet <span className="text-red-500">*</span></Label>
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Motif de rejet <span className="text-muted-foreground text-xs font-normal">(optionnel)</span></Label>
                 <Textarea value={kycReason} onChange={e => setKycReason(e.target.value)} placeholder="Ex: Document flou, identité non concordante..." rows={3} data-testid="textarea-kyc-reason" />
+                <p className="text-xs text-muted-foreground">Si vous renseignez un motif, l'utilisateur le verra dans ses paramètres.</p>
               </div>
             )}
           </div>
@@ -1196,7 +1226,7 @@ export default function AdminPage() {
             <Button variant="outline" onClick={() => setKycDialog(null)} className="h-10">Annuler</Button>
             <Button
               onClick={() => kycDialog && kycM.mutate({ userId: kycDialog.userId, kycStatus: kycAction, rejectionReason: kycAction === "rejected" ? kycReason : undefined })}
-              disabled={kycM.isPending || (kycAction === "rejected" && !kycReason.trim())}
+              disabled={kycM.isPending}
               className={`h-10 ${kycAction === "verified" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
               data-testid="btn-kyc-confirm">
               {kycM.isPending ? "Enregistrement..." : kycAction === "verified" ? "Approuver" : "Rejeter"}
@@ -1360,30 +1390,6 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ════ TX STATUS DIALOG ════ */}
-      <Dialog open={!!txEditDialog} onOpenChange={(o) => { if (!o) setTxEditDialog(null); }}>
-        <DialogContent className="max-w-xs rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><ArrowUpDown className="h-5 w-5 text-indigo-500" />Modifier le statut</DialogTitle>
-          </DialogHeader>
-          <div className="py-2">
-            <Select value={newTxStatus} onValueChange={setNewTxStatus}>
-              <SelectTrigger className="h-11" data-testid="select-new-status"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">En attente</SelectItem>
-                <SelectItem value="completed">Complété</SelectItem>
-                <SelectItem value="failed">Échoué</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTxEditDialog(null)} className="h-10">Annuler</Button>
-            <Button onClick={() => txEditDialog && txStatusM.mutate({ txId: txEditDialog.id, status: newTxStatus })} disabled={txStatusM.isPending} className="h-10" data-testid="btn-confirm-tx-status">
-              {txStatusM.isPending ? "..." : "Enregistrer"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* ════ FEE EDIT DIALOG ════ */}
       <Dialog open={!!feeEditDialog} onOpenChange={(o) => { if (!o) setFeeEditDialog(null); }}>

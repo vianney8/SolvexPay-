@@ -3,6 +3,7 @@ import {
   paymentLinks, 
   apiKeys, 
   wallets,
+  systemSettings,
   type Transaction, 
   type InsertTransaction,
   type PaymentLink,
@@ -44,6 +45,9 @@ export interface IStorage {
     transactionCount: number;
     paymentLinksCount: number;
   }>;
+
+  getSystemSetting(key: string): Promise<string | null>;
+  setSystemSetting(key: string, value: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -206,6 +210,18 @@ export class DatabaseStorage implements IStorage {
       transactionCount: txs.length,
       paymentLinksCount: links.length,
     };
+  }
+
+  async getSystemSetting(key: string): Promise<string | null> {
+    const [row] = await db.select().from(systemSettings).where(eq(systemSettings.key, key));
+    return row?.value ?? null;
+  }
+
+  async setSystemSetting(key: string, value: string): Promise<void> {
+    await db.insert(systemSettings).values({ key, value }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { value, updatedAt: new Date() },
+    });
   }
 }
 

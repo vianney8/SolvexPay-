@@ -78,6 +78,12 @@ export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit
 export type PaymentMethod = typeof paymentMethods.$inferSelect;
 export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
 
+export const systemSettings = pgTable("system_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const feeConfigs = pgTable("fee_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   type: text("type").notNull(),
