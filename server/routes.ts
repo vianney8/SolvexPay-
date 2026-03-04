@@ -158,7 +158,7 @@ export async function registerRoutes(
 
       const reference = generateReference();
       const isWave = operator.toLowerCase() === "wave";
-      const returnUrl = isWave ? `https://solvexpay.site/api/payment/callback?reference=${reference}` : undefined;
+      const returnUrl = isWave ? `https://solvexpay.com/api/payment/callback?reference=${reference}` : undefined;
 
       const depositResponse = await omniPayService.deposit({
         msisdn: phoneNumber,
@@ -589,7 +589,7 @@ export async function registerRoutes(
   const SUPPORT_LINK_DEFAULTS: Record<string, string> = {
     support_link_whatsapp_direct: "https://wa.me/22891840498",
     support_link_whatsapp_group: "https://chat.whatsapp.com/FeGmjzHa1VG7v4VGo0Rxbd",
-    support_link_email: "mailto:support@solvexpay.site",
+    support_link_email: "mailto:support@solvexpay.com",
     support_link_whatsapp_channel: "https://whatsapp.com/channel/0029Vb3WFkb2ZjCZTb0Dq11F",
     support_link_facebook: "https://www.facebook.com/profile.php?id=61574706268491",
   };
@@ -705,7 +705,7 @@ export async function registerRoutes(
       const resolvedLastName = nameParts.slice(1).join(" ") || "SolvexPay";
       const isWave = operator.toLowerCase() === "wave";
       const returnUrl = isWave
-        ? `https://solvexpay.site/pay/${slug}?status=callback&reference=${reference}`
+        ? `https://solvexpay.com/pay/${slug}?status=callback&reference=${reference}`
         : undefined;
 
       const fixedAmount = parseFloat(paymentLink.amount);
@@ -951,17 +951,17 @@ export async function registerRoutes(
   });
 
   app.get("/api/settings/webhook-urls", isAuthenticated, async (req, res) => {
-    const baseUrl = "https://solvexpay.site";
+    const baseUrl = "https://solvexpay.com";
 
     res.json({
       callbackUrl: `${baseUrl}/api/webhooks/omnipay`,
       returnUrl: `${baseUrl}/api/payment/callback`,
-      domain: "solvexpay.site",
+      domain: "solvexpay.com",
       instructions: "Configurez ces URLs dans votre tableau de bord OmniPay dans Mon Compte > URL de Callback.",
       steps: [
         "1. Connectez-vous a votre compte OmniPay sur omnipay.webtechci.com",
         "2. Allez dans Mon Compte > URL de Callback",
-        "3. Configurez l'URL de callback: https://solvexpay.site/api/webhooks/omnipay",
+        "3. Configurez l'URL de callback: https://solvexpay.com/api/webhooks/omnipay",
         "4. Copiez la cle de callback et configurez-la comme OMNIPAY_CALLBACK_KEY",
         "5. Configurez votre cle API comme OMNIPAY_API_KEY"
       ]

@@ -78,7 +78,7 @@ const CHANNEL_META = [
 const DEFAULTS: Record<string, string> = {
   support_link_whatsapp_direct: "https://wa.me/22891840498",
   support_link_whatsapp_group: "https://chat.whatsapp.com/FeGmjzHa1VG7v4VGo0Rxbd",
-  support_link_email: "mailto:support@solvexpay.site",
+  support_link_email: "mailto:support@solvexpay.com",
   support_link_whatsapp_channel: "https://whatsapp.com/channel/0029Vb3WFkb2ZjCZTb0Dq11F",
   support_link_facebook: "https://www.facebook.com/profile.php?id=61574706268491",
 };

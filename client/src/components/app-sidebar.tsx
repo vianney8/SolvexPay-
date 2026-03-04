@@ -39,7 +39,7 @@ const menuItems = [
   { title: "Liens de paiement", url: "/payment-links", icon: Link2, bg: "bg-pink-100", iconColor: "text-pink-600" },
   { title: "Clés API", url: "/api-keys", icon: Key, bg: "bg-orange-100", iconColor: "text-orange-600" },
   { title: "Vérification KYC", url: "/kyc", icon: ShieldCheck, bg: "bg-blue-100", iconColor: "text-blue-600" },
-  { title: "Documentation", url: "/documentation", icon: BookOpen, bg: "bg-indigo-100", iconColor: "text-indigo-600", externalUrl: "https://docs.solvexpay.site" },
+  { title: "Documentation", url: "/documentation", icon: BookOpen, bg: "bg-indigo-100", iconColor: "text-indigo-600", externalUrl: "https://docs.solvexpay.com" },
   { title: "Support", url: "/support", icon: HeadphonesIcon, bg: "bg-rose-100", iconColor: "text-rose-600" },
   { title: "Paramètres", url: "/settings", icon: Settings, bg: "bg-slate-100", iconColor: "text-slate-600" },
 ];

@@ -400,7 +400,7 @@ export default function LandingPage() {
               <a href="#tarifs" className="hover:text-foreground transition-colors">Tarifs</a>
               <a href="#pays" className="hover:text-foreground transition-colors">Pays</a>
               <a href="#support" className="hover:text-foreground transition-colors">Support</a>
-              <a href="https://docs.solvexpay.site" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors flex items-center gap-1.5">
+              <a href="https://docs.solvexpay.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors flex items-center gap-1.5">
                 <BookOpen className="h-4 w-4" /> Documentation
               </a>
             </div>
@@ -458,7 +458,7 @@ export default function LandingPage() {
                     Créer un compte gratuit <ChevronRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <a href="https://docs.solvexpay.site" target="_blank" rel="noopener noreferrer">
+                <a href="https://docs.solvexpay.com" target="_blank" rel="noopener noreferrer">
                   <Button size="lg" variant="outline" className="h-12 px-8 text-base font-semibold border-border/80 hover:bg-muted/50">
                     <BookOpen className="mr-2 h-4 w-4" /> Documentation API
                   </Button>
@@ -917,7 +917,7 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
-              <a href="https://docs.solvexpay.site" target="_blank" rel="noopener noreferrer">
+              <a href="https://docs.solvexpay.com" target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" className="font-semibold border-border/80 hover:bg-muted/50">
                   <BookOpen className="mr-2 h-4 w-4" /> Voir la documentation <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -931,7 +931,7 @@ export default function LandingPage() {
               <pre className="p-5 text-sm font-mono overflow-x-auto leading-relaxed">
                 <code>
                   <span className="text-slate-500">{"// Initier un paiement Mobile Money\n"}</span>
-                  <span className="text-violet-400">{"const "}</span><span className="text-slate-100">{"response = "}</span><span className="text-amber-400">{"await "}</span><span className="text-slate-100">{"fetch("}</span><span className="text-emerald-400">{"'https://api.solvexpay.site/v1/deposit'"}</span><span className="text-slate-100">{", {\n"}</span>
+                  <span className="text-violet-400">{"const "}</span><span className="text-slate-100">{"response = "}</span><span className="text-amber-400">{"await "}</span><span className="text-slate-100">{"fetch("}</span><span className="text-emerald-400">{"'https://api.solvexpay.com/v1/deposit'"}</span><span className="text-slate-100">{", {\n"}</span>
                   <span className="text-slate-100">{"  method: "}</span><span className="text-emerald-400">{"'POST'"}</span><span className="text-slate-100">{",\n"}</span>
                   <span className="text-slate-100">{"  headers: { "}</span><span className="text-emerald-400">{"'Authorization'"}</span><span className="text-slate-100">{": "}</span><span className="text-emerald-400">{"'Bearer YOUR_KEY'"}</span><span className="text-slate-100">{" },\n"}</span>
                   <span className="text-slate-100">{"  body: JSON.stringify({\n"}</span>
@@ -1032,7 +1032,7 @@ export default function LandingPage() {
             <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-card border border-border/60 shadow-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Email :</span>
-              <a href="mailto:support@solvexpay.site" className="text-sm font-bold text-violet-600 hover:underline">support@solvexpay.site</a>
+              <a href="mailto:support@solvexpay.com" className="text-sm font-bold text-violet-600 hover:underline">support@solvexpay.com</a>
               <span className="text-muted-foreground/40">·</span>
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Réponse en moins de 2h</span>
@@ -1079,7 +1079,7 @@ export default function LandingPage() {
                 Commencer gratuitement <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <a href="https://docs.solvexpay.site" target="_blank" rel="noopener noreferrer">
+            <a href="https://docs.solvexpay.com" target="_blank" rel="noopener noreferrer">
               <Button size="lg" variant="outline" className="h-13 px-8 text-base font-semibold border-white/30 text-white bg-white/10 hover:bg-white/20 backdrop-blur-sm">
                 <BookOpen className="mr-2 h-4 w-4" /> Documentation
               </Button>
@@ -1135,9 +1135,9 @@ export default function LandingPage() {
               <p className="text-sm font-bold text-foreground uppercase tracking-wider">Ressources</p>
               <ul className="space-y-2.5">
                 {[
-                  { label: "Documentation", href: "https://docs.solvexpay.site" },
-                  { label: "Guide de démarrage", href: "https://docs.solvexpay.site" },
-                  { label: "Référence API", href: "https://docs.solvexpay.site" },
+                  { label: "Documentation", href: "https://docs.solvexpay.com" },
+                  { label: "Guide de démarrage", href: "https://docs.solvexpay.com" },
+                  { label: "Référence API", href: "https://docs.solvexpay.com" },
                   { label: "Support", href: "https://wa.me/22891840498" },
                 ].map((item) => (
                   <li key={item.label}>
@@ -1150,8 +1150,8 @@ export default function LandingPage() {
               <p className="text-sm font-bold text-foreground uppercase tracking-wider">Support</p>
               <ul className="space-y-2.5">
                 <li>
-                  <a href="mailto:support@solvexpay.site" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    <Mail className="h-3.5 w-3.5 flex-shrink-0" /><span>support@solvexpay.site</span>
+                  <a href="mailto:support@solvexpay.com" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    <Mail className="h-3.5 w-3.5 flex-shrink-0" /><span>support@solvexpay.com</span>
                   </a>
                 </li>
                 <li>

@@ -38,7 +38,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <a href="https://solvexpay.site" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+        <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-xl object-cover" />
           <span className="font-black text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
         </a>
@@ -53,7 +53,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
         <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400">
           <Shield className="h-3.5 w-3.5" />
           <span>Paiement sécurisé par{" "}
-            <a href="https://solvexpay.site" target="_blank" rel="noopener noreferrer" className="text-violet-600 font-semibold hover:underline">SolvexPay</a>
+            <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="text-violet-600 font-semibold hover:underline">SolvexPay</a>
           </span>
         </div>
       </footer>
@@ -251,7 +251,7 @@ export default function PayPage() {
     return (
       <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(145deg, #020617 0%, #0b1d3a 50%, #03111f 100%)" }}>
         <header className="px-4 py-4 flex items-center justify-between">
-          <a href="https://solvexpay.site" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
+          <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
             <img src={solvexpayLogo} alt="SolvexPay" className="w-7 h-7 rounded-lg object-cover" />
             <span className="font-black text-base text-white/90">SolvexPay</span>
           </a>
