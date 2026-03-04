@@ -148,7 +148,7 @@ export default function WithdrawPage() {
                   </Button>
                 </Link>
                 <Button
-                  className="flex-1 h-11 font-bold shadow-lg shadow-primary/20"
+                  className="flex-1 h-11 font-bold shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:bg-primary/90"
                   onClick={() => { setSuccess(false); setAmount(""); setPhone(""); setWithdrawRef(""); setOperator(""); }}
                   data-testid="button-new-withdraw"
                 >
