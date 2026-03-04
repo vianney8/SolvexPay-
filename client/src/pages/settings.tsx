@@ -541,7 +541,7 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {kycStatus !== "verified" && (
+                {(kycStatus === "not_started" || kycStatus === "rejected") && (
                   <form onSubmit={handleKycSubmit} className="space-y-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -563,13 +563,9 @@ export default function SettingsPage() {
 
                     <FileUploadField label="Selfie avec la pièce d'identité" fieldName="selfie" value={kycSelfie} onUploaded={setKycSelfie} required />
 
-                    {kycStatus === "pending" && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400">Vous pouvez mettre à jour votre dossier et soumettre à nouveau.</p>
-                    )}
-
                     <Button type="submit" className="w-full gap-2 h-11 font-semibold" disabled={kycMutation.isPending || !kycDocumentFront || !kycSelfie || !kycFirstName || !kycLastName} data-testid="button-submit-kyc">
                       {kycMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
-                      {kycStatus === "pending" ? "Mettre à jour la demande" : "Soumettre la demande de vérification"}
+                      Soumettre la demande de vérification
                     </Button>
                   </form>
                 )}
