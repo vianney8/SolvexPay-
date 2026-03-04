@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { UserAvatar } from "@/components/user-avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,8 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   User, Mail, Lock, Eye, EyeOff, Save, Loader2, Shield, Globe,
-  Webhook, Copy, CheckCircle2, ExternalLink, Settings, Smartphone,
-  Upload, Camera, FileText, AlertTriangle, BadgeCheck, Store,
+  Settings, Smartphone, Upload, Camera, FileText, AlertTriangle, BadgeCheck, Store,
 } from "lucide-react";
 
 const countryCodes = [
@@ -69,68 +68,6 @@ function kycStatusLabel(status: string) {
   return { label: "Non démarré", color: "bg-muted text-muted-foreground" };
 }
 
-function WebhookCard() {
-  const { toast } = useToast();
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  const { data: webhookData } = useQuery<{ webhookUrl: string; callbackUrl: string; domain: string; instructions: string; steps: string[] }>({ queryKey: ["/api/settings/webhook-urls"] });
-  const copy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    toast({ title: "Copié !", description: "URL copiée dans le presse-papiers." });
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-  return (
-    <Card className="border-border/60">
-      <CardHeader className="pb-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-            <Webhook className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-          </div>
-          <div>
-            <CardTitle className="text-base font-bold" data-testid="text-webhook-title">Webhook & Callback OmniPay</CardTitle>
-            <CardDescription className="text-xs">Configurez ces URLs dans votre tableau de bord OmniPay</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        {[
-          { label: "URL du Webhook", key: "webhook", value: webhookData?.webhookUrl, desc: "Reçoit les événements: payment.completed, payment.failed", testId: "input-webhook-url" },
-          { label: "URL de Callback", key: "callback", value: webhookData?.callbackUrl, desc: "URL où le client est redirigé après paiement", testId: "input-callback-url" },
-        ].map((item) => (
-          <div key={item.key} className="space-y-2">
-            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{item.label}</Label>
-            <div className="flex items-center gap-2">
-              <Input readOnly value={item.value || "Chargement..."} className="font-mono text-xs h-10 bg-muted/40 border-border/60 text-muted-foreground" data-testid={item.testId} />
-              <Button variant="outline" size="icon" className="h-10 w-10 flex-shrink-0 border-border/60" onClick={() => item.value && copy(item.value, item.key)} data-testid={`button-copy-${item.key}`}>
-                {copiedField === item.key ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">{item.desc}</p>
-          </div>
-        ))}
-        <Separator />
-        {webhookData?.steps && (
-          <div className="space-y-3">
-            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Instructions de configuration</Label>
-            <ol className="space-y-2">
-              {webhookData.steps.map((step, i) => (
-                <li key={i} className="text-sm text-muted-foreground flex items-start gap-3">
-                  <span className="h-5 w-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-bold">{i + 1}</span>
-                  <span>{step.replace(/^\d+\.\s*/, "")}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-        <div className="pt-1">
-          <a href="https://omnipay.webtechci.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-semibold transition-colors" data-testid="link-sendavapay-dashboard">
-            <ExternalLink className="h-4 w-4" />Ouvrir le tableau de bord OmniPay
-          </a>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function FileUploadField({ label, fieldName, value, onUploaded, required }: { label: string; fieldName: string; value: string; onUploaded: (url: string) => void; required?: boolean }) {
   const { toast } = useToast();
@@ -478,7 +415,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <WebhookCard />
           </TabsContent>
 
           {/* ── KYC TAB ── */}
