@@ -55,17 +55,6 @@ const ALL_COUNTRIES = [
     fees: [{ op: "Airtel", deposit: "5%", withdraw: "7%", min: "100 XAF" }, { op: "MTN", deposit: "5%", withdraw: "7%", min: "100 XAF" }] },
 ];
 
-const ALL_OPERATORS = [
-  { key: "MTN", label: "MTN Money" },
-  { key: "Orange", label: "Orange Money" },
-  { key: "Wave", label: "Wave" },
-  { key: "Moov", label: "Moov Money" },
-  { key: "TMoney", label: "T-Money" },
-  { key: "Airtel", label: "Airtel Money" },
-  { key: "Vodacom", label: "M-Pesa" },
-  { key: "Free", label: "Free Money" },
-];
-
 const features = [
   {
     icon: LinkIcon,
@@ -392,8 +381,6 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 
 export default function LandingPage() {
   const [activeCountry, setActiveCountry] = useState(0);
-  const operatorsDoubled = [...ALL_OPERATORS, ...ALL_OPERATORS];
-
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
 
@@ -578,31 +565,6 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── OPERATOR MARQUEE ─── */}
-      <section className="py-10 border-y border-border/40 bg-gradient-to-b from-muted/20 to-muted/40 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 mb-5 text-center">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em]">Opérateurs Mobile Money supportés</p>
-        </div>
-        <div className="marquee-container">
-          <div className="marquee-track gap-5">
-            {operatorsDoubled.map((op, i) => (
-              <div key={i} className="flex-shrink-0 flex items-center gap-3 px-4 py-3 rounded-2xl border border-border/60 bg-card shadow-sm hover:shadow-md transition-all hover:border-violet-200 cursor-default">
-                <div className="rounded-xl overflow-hidden flex-shrink-0">
-                  <OperatorLogo operator={op.key} size={44} />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-foreground whitespace-nowrap">{op.label}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] text-emerald-600 font-medium">Actif</span>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
