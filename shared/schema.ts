@@ -102,6 +102,23 @@ export const insertFeeConfigSchema = createInsertSchema(feeConfigs).omit({ id: t
 export type FeeConfig = typeof feeConfigs.$inferSelect;
 export type InsertFeeConfig = z.infer<typeof insertFeeConfigSchema>;
 
+export const adminWithdrawals = pgTable("admin_withdrawals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("XOF"),
+  phoneNumber: text("phone_number").notNull(),
+  operator: text("operator").notNull(),
+  recipientName: text("recipient_name"),
+  reference: text("reference").notNull(),
+  omnipayId: text("omnipay_id"),
+  status: text("status").notNull().default("pending"),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AdminWithdrawal = typeof adminWithdrawals.$inferSelect;
+
 // Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,

@@ -1345,6 +1345,78 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/omnipay/withdraw", isAdmin, async (req: any, res) => {
+    try {
+      const { amount, phoneNumber, operator, recipientName, note } = req.body;
+      if (!amount || !phoneNumber || !operator) {
+        return res.status(400).json({ message: "Montant, numéro et opérateur requis" });
+      }
+      const parsedAmount = parseFloat(String(amount));
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ message: "Montant invalide" });
+      }
+      const { db } = await import("./db");
+      const { adminWithdrawals } = await import("@shared/schema");
+      const reference = `ADMIN-WD-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      const nameParts = (recipientName || "Admin SolvexPay").trim().split(" ");
+      const firstName = nameParts[0] || "Admin";
+      const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
+      const transferResult = await omniPayService.transfer({
+        msisdn: phoneNumber,
+        amount: parsedAmount,
+        reference,
+        firstName,
+        lastName,
+        operator,
+      });
+      const statusStr = omnipayStatusToString(transferResult.status ?? 0);
+      const [inserted] = await db.insert(adminWithdrawals).values({
+        amount: String(parsedAmount),
+        phoneNumber,
+        operator,
+        recipientName: recipientName || null,
+        reference,
+        omnipayId: transferResult.id ? String(transferResult.id) : null,
+        status: statusStr,
+        note: note || null,
+      }).returning();
+      res.json({ success: true, withdrawal: inserted, omnipayStatus: statusStr });
+    } catch (error: any) {
+      console.error("Admin OmniPay withdraw error:", error);
+      res.status(500).json({ message: error.message || "Erreur lors du retrait OmniPay" });
+    }
+  });
+
+  app.get("/api/admin/omnipay/withdrawals", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { adminWithdrawals } = await import("@shared/schema");
+      const { desc } = await import("drizzle-orm");
+      const history = await db.select().from(adminWithdrawals).orderBy(desc(adminWithdrawals.createdAt)).limit(100);
+      res.json(history);
+    } catch (error) {
+      console.error("Admin withdrawals history error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/admin/omnipay/withdrawals/:id/check", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { adminWithdrawals } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [wd] = await db.select().from(adminWithdrawals).where(eq(adminWithdrawals.id, req.params.id));
+      if (!wd) return res.status(404).json({ message: "Retrait introuvable" });
+      const result = await omniPayService.getStatus(wd.reference);
+      const statusStr = omnipayStatusToString(result.status ?? 0);
+      await db.update(adminWithdrawals).set({ status: statusStr, updatedAt: new Date() }).where(eq(adminWithdrawals.id, wd.id));
+      res.json({ status: statusStr, omnipayStatus: result.status });
+    } catch (error: any) {
+      console.error("Admin withdrawal check error:", error);
+      res.status(500).json({ message: error.message || "Erreur vérification statut" });
+    }
+  });
+
   // All wallets for admin view
   app.get("/api/admin/wallets", isAdmin, async (req, res) => {
     try {

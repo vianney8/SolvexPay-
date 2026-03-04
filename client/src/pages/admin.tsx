@@ -183,6 +183,8 @@ export default function AdminPage() {
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [linksSearch, setLinksSearch] = useState("");
   const [apiKeysSearch, setApiKeysSearch] = useState("");
+  const [wdDialog, setWdDialog] = useState(false);
+  const [wdForm, setWdForm] = useState({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
 
   // Queries
   const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"] });
@@ -204,6 +206,10 @@ export default function AdminPage() {
   const { data: commissions, isLoading: comLoading } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
   const { data: financialSummary, isLoading: finLoading } = useQuery<any>({
     queryKey: ["/api/admin/financial-summary"],
+    staleTime: 30000,
+  });
+  const { data: adminWdHistory, isLoading: wdHistoryLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/omnipay/withdrawals"],
     staleTime: 30000,
   });
   const { data: userTxList } = useQuery<any[]>({
@@ -340,6 +346,28 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
+  const wdM = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/admin/omnipay/withdraw", data),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] });
+      toast({ title: "Retrait initié", description: `Statut OmniPay : ${res.omnipayStatus}` });
+      setWdDialog(false);
+      setWdForm({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
+    },
+    onError: (e: any) => toast({ title: "Erreur retrait", description: e?.message, variant: "destructive" }),
+  });
+
+  const wdCheckM = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/omnipay/withdrawals/${id}/check`, {}),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] });
+      toast({ title: "Statut mis à jour", description: `Statut : ${res.status}` });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
   const filteredUsers = (users || []).filter(u =>
     !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase())
   );
@@ -446,13 +474,23 @@ export default function AdminPage() {
                   <BarChart3 className="h-4 w-4 text-white" />
                   <p className="text-white font-bold text-sm">Résumé Financier</p>
                 </div>
-                <button
-                  onClick={() => { queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] }); }}
-                  className="text-white/70 hover:text-white transition-colors"
-                  data-testid="btn-refresh-financial"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setWdDialog(true)}
+                    className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 transition-colors rounded-lg px-3 py-1.5 text-xs font-bold text-white"
+                    data-testid="btn-admin-wd-open"
+                  >
+                    <TrendingDown className="h-3.5 w-3.5" />
+                    Retrait OmniPay
+                  </button>
+                  <button
+                    onClick={() => { queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] }); }}
+                    className="text-white/70 hover:text-white transition-colors"
+                    data-testid="btn-refresh-financial"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y divide-border/40 bg-card">
                 {[
@@ -533,6 +571,76 @@ export default function AdminPage() {
                   <span className="text-xs text-slate-400">Indisponible</span>
                 )}
               </div>
+            </div>
+
+            {/* ── HISTORIQUE RETRAITS ADMIN OMNIPAY ── */}
+            <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
+              <div className="bg-slate-800 dark:bg-slate-900 px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-slate-300" />
+                  <p className="text-slate-200 font-bold text-sm">Historique des retraits OmniPay</p>
+                  {(adminWdHistory || []).length > 0 && (
+                    <span className="text-[10px] font-bold bg-slate-600 text-slate-200 rounded-full px-2 py-0.5">{(adminWdHistory || []).length}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setWdDialog(true)}
+                  className="flex items-center gap-1.5 bg-rose-600/80 hover:bg-rose-600 transition-colors rounded-lg px-3 py-1.5 text-xs font-bold text-white"
+                  data-testid="btn-admin-wd-open-2"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Nouveau retrait
+                </button>
+              </div>
+              {wdHistoryLoading ? (
+                <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
+              ) : (adminWdHistory || []).length === 0 ? (
+                <div className="py-10 flex flex-col items-center gap-2 text-muted-foreground bg-card">
+                  <Banknote className="h-8 w-8 opacity-30" />
+                  <p className="text-sm">Aucun retrait admin effectué</p>
+                </div>
+              ) : (
+                <div className="bg-card divide-y divide-border/40">
+                  {(adminWdHistory || []).map((wd: any) => (
+                    <div key={wd.id} className="px-5 py-3 flex items-center gap-3 flex-wrap" data-testid={`row-admin-wd-${wd.id}`}>
+                      <div className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        wd.status === "completed" ? "bg-emerald-500/15" : wd.status === "failed" ? "bg-rose-500/15" : "bg-amber-500/15"
+                      }`}>
+                        {wd.status === "completed" ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                         wd.status === "failed" ? <XCircle className="h-4 w-4 text-rose-500" /> :
+                         <Clock className="h-4 w-4 text-amber-500" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold">{parseFloat(wd.amount).toLocaleString()} {wd.currency}</p>
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
+                            wd.status === "completed" ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400" :
+                            wd.status === "failed" ? "border-rose-500/40 text-rose-600 dark:text-rose-400" :
+                            "border-amber-500/40 text-amber-600 dark:text-amber-400"
+                          }`}>{wd.status}</Badge>
+                          <span className="text-[10px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">{wd.operator}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{wd.phoneNumber} {wd.recipientName ? `· ${wd.recipientName}` : ""}</p>
+                        {wd.note && <p className="text-[10px] text-muted-foreground italic mt-0.5">{wd.note}</p>}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <p className="text-[10px] text-muted-foreground">{new Date(wd.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                        {wd.status === "pending" && (
+                          <button
+                            onClick={() => wdCheckM.mutate(wd.id)}
+                            disabled={wdCheckM.isPending}
+                            className="text-[10px] font-bold text-indigo-500 hover:text-indigo-400 flex items-center gap-0.5"
+                            data-testid={`btn-check-wd-${wd.id}`}
+                          >
+                            <RefreshCw className="h-2.5 w-2.5" />
+                            Vérifier
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -1647,6 +1755,113 @@ export default function AdminPage() {
               data-testid="btn-confirm-reset"
             >
               {resetStatsM.isPending ? "Suppression…" : "Réinitialiser"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── MODAL RETRAIT OMNIPAY ADMIN ── */}
+      <Dialog open={wdDialog} onOpenChange={(o) => { if (!o) { setWdDialog(false); setWdForm({ amount: "", phone: "", operator: "", recipientName: "", note: "" }); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center">
+                <TrendingDown className="h-4 w-4 text-white" />
+              </div>
+              Retrait depuis OmniPay
+            </DialogTitle>
+            <DialogDescription>
+              Transférez des fonds depuis le solde OmniPay vers un numéro Mobile Money.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {omnipayBalance?.balance && (
+              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-3">
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">Solde disponible :</p>
+                <div className="flex flex-wrap gap-3">
+                  {omnipayBalance.balance.map((b: any, i: number) => (
+                    <span key={i} className="text-sm font-black text-emerald-600 dark:text-emerald-300">
+                      {b.amount.toLocaleString()} {b.currency} <span className="text-xs font-normal text-muted-foreground">({b.countryName})</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="wd-amount">Montant (XOF) *</Label>
+              <Input
+                id="wd-amount"
+                type="number"
+                placeholder="Ex: 50000"
+                value={wdForm.amount}
+                onChange={e => setWdForm(f => ({ ...f, amount: e.target.value }))}
+                data-testid="input-wd-amount"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="wd-phone">Numéro de téléphone *</Label>
+              <Input
+                id="wd-phone"
+                placeholder="Ex: 22901234567"
+                value={wdForm.phone}
+                onChange={e => setWdForm(f => ({ ...f, phone: e.target.value }))}
+                data-testid="input-wd-phone"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="wd-operator">Opérateur *</Label>
+              <Select value={wdForm.operator} onValueChange={v => setWdForm(f => ({ ...f, operator: v }))}>
+                <SelectTrigger id="wd-operator" data-testid="select-wd-operator">
+                  <SelectValue placeholder="Choisir l'opérateur" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MTN">MTN Mobile Money</SelectItem>
+                  <SelectItem value="MOOV">Moov Money</SelectItem>
+                  <SelectItem value="ORANGE">Orange Money</SelectItem>
+                  <SelectItem value="WAVE">Wave</SelectItem>
+                  <SelectItem value="FREE">Free Money</SelectItem>
+                  <SelectItem value="AIRTEL">Airtel Money</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="wd-recipient">Nom du bénéficiaire</Label>
+              <Input
+                id="wd-recipient"
+                placeholder="Ex: Vianney Essou"
+                value={wdForm.recipientName}
+                onChange={e => setWdForm(f => ({ ...f, recipientName: e.target.value }))}
+                data-testid="input-wd-recipient"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="wd-note">Note (optionnel)</Label>
+              <Textarea
+                id="wd-note"
+                placeholder="Ex: Paiement prestataire..."
+                value={wdForm.note}
+                onChange={e => setWdForm(f => ({ ...f, note: e.target.value }))}
+                className="resize-none"
+                rows={2}
+                data-testid="input-wd-note"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setWdDialog(false)} disabled={wdM.isPending}>Annuler</Button>
+            <Button
+              className="bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white"
+              disabled={wdM.isPending || !wdForm.amount || !wdForm.phone || !wdForm.operator}
+              onClick={() => wdM.mutate({
+                amount: parseFloat(wdForm.amount),
+                phoneNumber: wdForm.phone,
+                operator: wdForm.operator,
+                recipientName: wdForm.recipientName || undefined,
+                note: wdForm.note || undefined,
+              })}
+              data-testid="btn-confirm-admin-wd"
+            >
+              {wdM.isPending ? "Envoi en cours…" : "Confirmer le retrait"}
             </Button>
           </DialogFooter>
         </DialogContent>
