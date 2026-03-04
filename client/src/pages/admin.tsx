@@ -23,7 +23,7 @@ import {
   Zap, CalendarDays, BadgeCheck, UserX, Coins, FileText, ArrowUpDown,
   TrendingDown, Building2, ArrowRightLeft, Plus, DollarSign,
   Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
-  Trash2, Smartphone, Bell, X, BellOff, BellRing,
+  Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon,
 } from "lucide-react";
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
@@ -182,6 +182,7 @@ export default function AdminPage() {
   const [wdDialog, setWdDialog] = useState(false);
   const [wdForm, setWdForm] = useState({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
   const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue" });
+  const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
 
   // Queries
   const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"] });
@@ -216,6 +217,7 @@ export default function AdminPage() {
   const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-links"] });
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({ queryKey: ["/api/admin/api-keys"] });
   const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({ queryKey: ["/api/admin/notifications"] });
+  const { data: supportLinks, isLoading: supportLinksLoading } = useQuery<Record<string, string>>({ queryKey: ["/api/support-links"] });
 
   // Mutations
   const blockM = useMutation({
@@ -394,6 +396,16 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
+  const saveSupportLinksM = useMutation({
+    mutationFn: (data: Record<string, string>) => apiRequest("PUT", "/api/admin/support-links", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support-links"] });
+      setSupportLinksForm(null);
+      toast({ title: "Liens de support mis à jour" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
   const filteredUsers = (users || []).filter(u =>
     !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase())
   );
@@ -464,6 +476,7 @@ export default function AdminPage() {
                 { v: "payments", label: "Moyens de paiement", Icon: CreditCard, badge: 0 },
                 { v: "transactions", label: "Transactions", Icon: ArrowDownUp, badge: pendingWithdrawals.length },
                 { v: "notifications", label: "Notifications", Icon: Bell, badge: (adminNotifications || []).filter((n: any) => n.isActive).length },
+                { v: "support-links", label: "Liens Support", Icon: HeadphonesIcon, badge: 0 },
                 { v: "settings", label: "Paramètres", Icon: Settings2, badge: 0 },
               ].map(({ v, label, Icon, badge }) => (
                 <TabsTrigger key={v} value={v} className="gap-1.5 text-xs py-2 px-3 rounded-xl whitespace-nowrap relative" data-testid={`tab-${v}`}>
@@ -1631,7 +1644,67 @@ export default function AdminPage() {
           </TabsContent>
 
           {/* ══════════════════════════════════════
-              TAB 9 — PARAMÈTRES ADMIN
+              TAB 10 — LIENS SUPPORT
+          ══════════════════════════════════════ */}
+          <TabsContent value="support-links" className="space-y-4 mt-5">
+            <div className="p-4 rounded-2xl bg-violet-500/5 border border-violet-500/20 flex items-start gap-3">
+              <HeadphonesIcon className="h-4 w-4 text-violet-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-violet-700 dark:text-violet-400">Liens de contact Support</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Modifiez les liens affichés sur la page Support pour tous les utilisateurs.</p>
+              </div>
+            </div>
+            <Card className="border-border/50">
+              <CardContent className="pt-5 space-y-4">
+                {supportLinksLoading ? (
+                  <div className="space-y-3">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 rounded-xl" />)}</div>
+                ) : (() => {
+                  const form = supportLinksForm || supportLinks || {};
+                  const fields = [
+                    { key: "support_link_whatsapp_direct", label: "WhatsApp Direct", placeholder: "https://wa.me/..." },
+                    { key: "support_link_whatsapp_group", label: "Groupe WhatsApp", placeholder: "https://chat.whatsapp.com/..." },
+                    { key: "support_link_email", label: "Email (lien mailto:)", placeholder: "mailto:support@..." },
+                    { key: "support_link_whatsapp_channel", label: "Canal WhatsApp", placeholder: "https://whatsapp.com/channel/..." },
+                    { key: "support_link_facebook", label: "Page Facebook", placeholder: "https://www.facebook.com/..." },
+                  ];
+                  return (
+                    <>
+                      {fields.map(f => (
+                        <div key={f.key} className="space-y-1.5">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{f.label}</Label>
+                          <Input
+                            value={form[f.key] || ""}
+                            onChange={e => setSupportLinksForm(prev => ({ ...(prev || supportLinks || {}), [f.key]: e.target.value }))}
+                            placeholder={f.placeholder}
+                            className="h-10 text-sm font-mono"
+                            data-testid={`input-support-${f.key}`}
+                          />
+                        </div>
+                      ))}
+                      <div className="flex gap-3 pt-2">
+                        {supportLinksForm && (
+                          <Button variant="outline" className="flex-1 h-10" onClick={() => setSupportLinksForm(null)} data-testid="btn-cancel-support-links">
+                            Annuler
+                          </Button>
+                        )}
+                        <Button
+                          className="flex-1 h-10 font-bold"
+                          onClick={() => saveSupportLinksM.mutate(form)}
+                          disabled={saveSupportLinksM.isPending}
+                          data-testid="btn-save-support-links"
+                        >
+                          {saveSupportLinksM.isPending ? "Enregistrement..." : "Enregistrer les liens"}
+                        </Button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ══════════════════════════════════════
+              TAB 11 — PARAMÈTRES ADMIN
           ══════════════════════════════════════ */}
           <TabsContent value="settings" className="space-y-5 mt-5">
             <WithdrawalModeCard />
