@@ -47,6 +47,9 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
   const [imagePreview, setImagePreview] = useState(editLink?.imageUrl || "");
   const [uploading, setUploading] = useState(false);
 
+  const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
+  const feeRate = (serviceFees?.deposit ?? 7) / 100;
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => apiRequest("POST", "/api/payment-links", data),
     onSuccess: () => {
@@ -112,7 +115,7 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
   };
 
   const previewAmount = !allowCustomAmount && amount ? parseFloat(String(amount)) : 0;
-  const fees = previewAmount * 0.04;
+  const fees = previewAmount * feeRate;
   const netAmount = previewAmount - fees;
   const isPending = createMutation.isPending || updateMutation.isPending;
 
@@ -251,7 +254,7 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
             <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Des frais d'encaissement de <strong>4%</strong> sont prélevés sur chaque paiement reçu via ce lien.
+              Des frais d'encaissement de <strong>{Math.round(feeRate * 100)}%</strong> sont prélevés sur chaque paiement reçu via ce lien.
             </p>
           </div>
 
