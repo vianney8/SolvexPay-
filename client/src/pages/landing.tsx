@@ -735,13 +735,8 @@ export default function LandingPage() {
               </ul>
             </div>
           </div>
-          <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="border-t border-white/10 pt-6 flex justify-center">
             <p className="text-xs text-white/25">© 2026 SolvexPay. Tous droits réservés.</p>
-            <div className="flex items-center gap-6">
-              {[["Confidentialité", "#"], ["Conditions", "#"], ["Sécurité", "#"]].map(([label, href]) => (
-                <a key={label} href={href} className="text-xs text-white/30 hover:text-white/60 transition-colors">{label}</a>
-              ))}
-            </div>
           </div>
         </div>
       </footer>
