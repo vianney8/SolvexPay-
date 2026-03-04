@@ -258,7 +258,7 @@ export default function SettingsPage() {
 
   const kycMutation = useMutation({
     mutationFn: async (data: any) => { const res = await apiRequest("POST", "/api/kyc/submit", data); return res.json(); },
-    onSuccess: (data) => { queryClient.setQueryData(["/api/auth/user"], data); toast({ title: "Demande envoyée", description: "Votre demande de vérification a été soumise." }); },
+    onSuccess: (data) => { queryClient.setQueryData(["/api/auth/user"], data); toast({ title: "Demande envoyée", description: "Votre demande a été soumise. Vous recevrez une réponse sous 24h au plus tard 48h." }); },
     onError: (error: any) => {
       let msg = "Erreur lors de la soumission.";
       try { const p = JSON.parse(error?.message?.replace(/^\d+:\s*/, "") || "{}"); msg = p.message || msg; } catch {}
@@ -515,7 +515,7 @@ export default function SettingsPage() {
                     <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="font-semibold text-sm text-amber-700 dark:text-amber-300">En cours de vérification</p>
-                      <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">Votre dossier est en cours de révision. Vous serez notifié dès la validation.</p>
+                      <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">Votre dossier est en cours de révision par nos équipes. Vous serez notifié dans un délai de 24h au plus tard 48h.</p>
                     </div>
                   </div>
                 )}
