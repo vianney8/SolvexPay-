@@ -22,7 +22,8 @@ import {
   Globe, Percent, Eye, CreditCard, Send, Activity, Star, ZapOff,
   Zap, CalendarDays, BadgeCheck, UserX, Coins, FileText, ArrowUpDown,
   TrendingDown, Building2, Network, ArrowRightLeft, Plus, DollarSign,
-  Layers, Settings2, MapPin,
+  Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
+  Trash2,
 } from "lucide-react";
 
 const COUNTRIES = [
@@ -109,6 +110,10 @@ export default function AdminPage() {
   const [newTxStatus, setNewTxStatus] = useState("completed");
   const [feeEditDialog, setFeeEditDialog] = useState<{ id: string; feeRate: string; type: string; country: string } | null>(null);
   const [feeRate, setFeeRate] = useState("");
+  const [resetStatsDialog, setResetStatsDialog] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [linksSearch, setLinksSearch] = useState("");
+  const [apiKeysSearch, setApiKeysSearch] = useState("");
 
   // Queries
   const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"] });
@@ -133,6 +138,8 @@ export default function AdminPage() {
     enabled: !!expandedUserId,
     queryFn: () => fetch(`/api/admin/users/${expandedUserId}/transactions`, { credentials: "include" }).then(r => r.json()),
   });
+  const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-links"] });
+  const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({ queryKey: ["/api/admin/api-keys"] });
 
   // Mutations
   const blockM = useMutation({
@@ -207,6 +214,30 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
+  const toggleLinkM = useMutation({
+    mutationFn: (d: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/admin/payment-links/${d.id}/toggle`, { isActive: d.isActive }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] }); toast({ title: "Lien de paiement mis à jour" }); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const toggleApiKeyM = useMutation({
+    mutationFn: (d: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/admin/api-keys/${d.id}/toggle`, { isActive: d.isActive }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/api-keys"] }); toast({ title: "Clé API mise à jour" }); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const resetStatsM = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/stats/reset", { confirm: "CONFIRMER_RESET" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
+      toast({ title: "Statistiques réinitialisées", description: "Toutes les transactions ont été supprimées" });
+      setResetStatsDialog(false); setResetConfirmText("");
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
   const filteredUsers = (users || []).filter(u =>
     !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase())
   );
@@ -221,6 +252,13 @@ export default function AdminPage() {
 
   const feeByTypeCountry = (feeConfigs || []).filter((f: any) => f.type === feeTypeTab);
   const totalWalletBalance = (wallets || []).reduce((s: number, u: any) => s + parseFloat(u.wallet?.balanceXOF || "0"), 0);
+  const filteredPaymentLinks = (allPaymentLinks || []).filter(l =>
+    !linksSearch || [l.name, l.slug, l.user?.email, l.user?.firstName, l.user?.lastName].join(" ").toLowerCase().includes(linksSearch.toLowerCase())
+  );
+  const filteredApiKeys = (allApiKeys || []).filter(k =>
+    !apiKeysSearch || [k.name, k.keyPrefix, k.websiteUrl, k.user?.email, k.user?.firstName, k.user?.lastName].join(" ").toLowerCase().includes(apiKeysSearch.toLowerCase())
+  );
+  const totalUsersCount = (users || []).length;
 
   return (
     <DashboardLayout title="Administration" breadcrumbs={[{ label: "Administration" }]}>
@@ -242,9 +280,11 @@ export default function AdminPage() {
               </div>
               <div className="hidden md:flex items-center gap-3">
                 {[
-                  { label: "Utilisateurs", value: stats?.userCount, color: "text-cyan-300" },
+                  { label: "Total utilisateurs", value: totalUsersCount || stats?.userCount, color: "text-cyan-300" },
                   { label: "KYC en attente", value: pendingKyc.length, color: "text-amber-300" },
                   { label: "Retraits pendants", value: pendingWithdrawals.length, color: "text-rose-300" },
+                  { label: "Liens de paiement", value: (allPaymentLinks || []).length, color: "text-violet-300" },
+                  { label: "Clés API", value: (allApiKeys || []).length, color: "text-emerald-300" },
                 ].map((s, i) => (
                   <div key={i} className="text-center bg-white/8 backdrop-blur-sm rounded-2xl px-4 py-2.5 border border-white/10">
                     <p className={`font-black text-2xl ${s.color}`} data-testid={`header-stat-${i}`}>{s.value ?? "—"}</p>
@@ -264,6 +304,7 @@ export default function AdminPage() {
                 { v: "users", label: "Utilisateurs", Icon: Users },
                 { v: "kyc", label: "KYC", Icon: BadgeCheck },
                 { v: "wallets", label: "Wallets & Solde", Icon: Wallet },
+                { v: "links-keys", label: "Liens & API", Icon: Link2 },
                 { v: "fees", label: "Frais", Icon: Percent },
                 { v: "payments", label: "Moyens de paiement", Icon: CreditCard },
                 { v: "transactions", label: "Transactions", Icon: ArrowDownUp },
@@ -279,6 +320,22 @@ export default function AdminPage() {
               TAB 1 — VUE D'ENSEMBLE
           ══════════════════════════════════════ */}
           <TabsContent value="overview" className="space-y-5 mt-5">
+            {/* Total users banner */}
+            <div className="rounded-2xl bg-gradient-to-r from-indigo-600/10 to-cyan-600/10 border border-indigo-500/20 p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-black text-foreground" data-testid="total-users-count">{totalUsersCount}</p>
+                  <p className="text-xs text-muted-foreground">Utilisateurs inscrits sur la plateforme</p>
+                </div>
+              </div>
+              <Button variant="destructive" size="sm" className="gap-2 rounded-xl flex-shrink-0" onClick={() => setResetStatsDialog(true)} data-testid="btn-reset-stats">
+                <RotateCcw className="h-3.5 w-3.5" />Réinitialiser les stats
+              </Button>
+            </div>
+
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm font-bold text-muted-foreground">Période :</p>
               <div className="flex gap-1">
@@ -716,7 +773,132 @@ export default function AdminPage() {
           </TabsContent>
 
           {/* ══════════════════════════════════════
-              TAB 5 — FRAIS
+              TAB 5 — LIENS & API
+          ══════════════════════════════════════ */}
+          <TabsContent value="links-keys" className="space-y-5 mt-5">
+
+            {/* ── Payment Links ── */}
+            <Card className="border-border/50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <Link2 className="h-4 w-4 text-violet-500" />
+                    Liens de paiement
+                    <Badge variant="secondary" className="text-xs">{(allPaymentLinks || []).length}</Badge>
+                  </CardTitle>
+                  <div className="relative w-56">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input placeholder="Rechercher…" value={linksSearch} onChange={e => setLinksSearch(e.target.value)} className="pl-8 h-8 text-xs rounded-xl" data-testid="input-links-search" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {plLoading ? (
+                  <div className="p-4 space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
+                ) : filteredPaymentLinks.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground text-sm">Aucun lien de paiement</div>
+                ) : (
+                  <div className="divide-y divide-border/40">
+                    {filteredPaymentLinks.map((link: any) => (
+                      <div key={link.id} className="px-4 py-3 flex items-start gap-3 hover:bg-muted/30 transition-colors" data-testid={`payment-link-${link.id}`}>
+                        <div className={`mt-0.5 h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${link.isActive ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-rose-100 dark:bg-rose-900/30"}`}>
+                          <Link2 className={`h-4 w-4 ${link.isActive ? "text-emerald-600" : "text-rose-500"}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-sm truncate">{link.name || "Sans nom"}</p>
+                            <Badge variant={link.isActive ? "default" : "destructive"} className="text-xs flex-shrink-0">
+                              {link.isActive ? "Actif" : "Bloqué"}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <p className="text-xs text-muted-foreground font-mono">/pay/{link.slug}</p>
+                            <a href={`/pay/${link.slug}`} target="_blank" rel="noreferrer" className="text-indigo-500 hover:text-indigo-600" data-testid={`link-open-${link.id}`}>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                            {link.user && <p className="text-xs text-muted-foreground">👤 {link.user.firstName} {link.user.lastName} — {link.user.email}</p>}
+                            {link.amount && <p className="text-xs text-muted-foreground">💰 {parseInt(link.amount).toLocaleString()} FCFA</p>}
+                            <p className="text-xs text-muted-foreground">🔁 {link.timesUsed || 0} utilisation(s)</p>
+                            {link.description && <p className="text-xs text-muted-foreground italic truncate max-w-xs">"{link.description}"</p>}
+                          </div>
+                        </div>
+                        <Switch
+                          checked={!!link.isActive}
+                          onCheckedChange={v => toggleLinkM.mutate({ id: link.id, isActive: v })}
+                          data-testid={`toggle-link-${link.id}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ── API Keys ── */}
+            <Card className="border-border/50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <Key className="h-4 w-4 text-amber-500" />
+                    Clés API
+                    <Badge variant="secondary" className="text-xs">{(allApiKeys || []).length}</Badge>
+                  </CardTitle>
+                  <div className="relative w-56">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input placeholder="Rechercher…" value={apiKeysSearch} onChange={e => setApiKeysSearch(e.target.value)} className="pl-8 h-8 text-xs rounded-xl" data-testid="input-apikeys-search" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {akLoading ? (
+                  <div className="p-4 space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
+                ) : filteredApiKeys.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground text-sm">Aucune clé API</div>
+                ) : (
+                  <div className="divide-y divide-border/40">
+                    {filteredApiKeys.map((key: any) => (
+                      <div key={key.id} className="px-4 py-3 flex items-start gap-3 hover:bg-muted/30 transition-colors" data-testid={`api-key-${key.id}`}>
+                        <div className={`mt-0.5 h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${key.isActive ? "bg-amber-100 dark:bg-amber-900/30" : "bg-rose-100 dark:bg-rose-900/30"}`}>
+                          <Key className={`h-4 w-4 ${key.isActive ? "text-amber-600" : "text-rose-500"}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-sm truncate">{key.name || "Clé sans nom"}</p>
+                            <Badge variant={key.isActive ? "default" : "destructive"} className="text-xs flex-shrink-0">
+                              {key.isActive ? "Active" : "Bloquée"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono mt-0.5">{key.keyPrefix}••••••••</p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                            {key.user && <p className="text-xs text-muted-foreground">👤 {key.user.firstName} {key.user.lastName} — {key.user.email}</p>}
+                            {key.websiteUrl && (
+                              <p className="text-xs text-indigo-500 flex items-center gap-1">
+                                <Globe className="h-3 w-3 flex-shrink-0" />
+                                <a href={key.websiteUrl} target="_blank" rel="noreferrer" className="hover:underline truncate max-w-xs" data-testid={`key-website-${key.id}`}>{key.websiteUrl}</a>
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">🌍 Env: <span className="font-semibold">{key.environment || "live"}</span></p>
+                            <p className="text-xs text-muted-foreground">📅 {key.createdAt ? new Date(key.createdAt).toLocaleDateString("fr-FR") : "—"}</p>
+                            {key.lastUsedAt && <p className="text-xs text-muted-foreground">🕐 Dernier usage: {new Date(key.lastUsedAt).toLocaleDateString("fr-FR")}</p>}
+                          </div>
+                        </div>
+                        <Switch
+                          checked={!!key.isActive}
+                          onCheckedChange={v => toggleApiKeyM.mutate({ id: key.id, isActive: v })}
+                          data-testid={`toggle-apikey-${key.id}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ══════════════════════════════════════
+              TAB 6 — FRAIS
           ══════════════════════════════════════ */}
           <TabsContent value="fees" className="space-y-4 mt-5">
             <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-start gap-3">
@@ -1174,6 +1356,43 @@ export default function AdminPage() {
             <Button variant="outline" onClick={() => setFeeEditDialog(null)} className="h-10">Annuler</Button>
             <Button onClick={() => feeEditDialog && feeM.mutate({ id: feeEditDialog.id, feeRate })} disabled={feeM.isPending || !feeRate} className="h-10" data-testid="btn-confirm-fee">
               {feeM.isPending ? "..." : "Enregistrer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Reset Stats Confirmation Dialog ── */}
+      <Dialog open={resetStatsDialog} onOpenChange={o => { if (!o) { setResetStatsDialog(false); setResetConfirmText(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <Trash2 className="h-5 w-5" />Réinitialiser toutes les statistiques
+            </DialogTitle>
+            <DialogDescription>
+              Cette action va <strong>supprimer définitivement toutes les transactions</strong> de la plateforme. Les soldes des utilisateurs ne seront pas affectés. Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 p-3 text-sm text-rose-700 dark:text-rose-300">
+              ⚠️ Pour confirmer, tapez <strong>CONFIRMER</strong> dans le champ ci-dessous.
+            </div>
+            <Input
+              placeholder="Tapez CONFIRMER pour valider"
+              value={resetConfirmText}
+              onChange={e => setResetConfirmText(e.target.value)}
+              className="rounded-xl"
+              data-testid="input-reset-confirm"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetStatsDialog(false); setResetConfirmText(""); }}>Annuler</Button>
+            <Button
+              variant="destructive"
+              disabled={resetConfirmText !== "CONFIRMER" || resetStatsM.isPending}
+              onClick={() => resetStatsM.mutate()}
+              data-testid="btn-confirm-reset"
+            >
+              {resetStatsM.isPending ? "Suppression…" : "Réinitialiser"}
             </Button>
           </DialogFooter>
         </DialogContent>

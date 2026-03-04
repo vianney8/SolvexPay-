@@ -47,6 +47,7 @@ export const apiKeys = pgTable("api_keys", {
   keyHash: text("key_hash").notNull(),
   fullKey: text("full_key"),
   environment: text("environment").notNull().default("live"),
+  websiteUrl: text("website_url"),
   isActive: boolean("is_active").notNull().default(true),
   lastUsedAt: timestamp("last_used_at"),
   createdAt: timestamp("created_at").defaultNow(),

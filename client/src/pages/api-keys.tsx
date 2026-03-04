@@ -86,6 +86,7 @@ export default function ApiKeysPage() {
     const formData = new FormData(e.currentTarget);
     createMutation.mutate({
       name: formData.get("name") as string,
+      websiteUrl: (formData.get("websiteUrl") as string) || null,
     });
   };
 
@@ -136,11 +137,15 @@ export default function ApiKeysPage() {
             </DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="key-name">Nom de la cle</Label>
+                <Label htmlFor="key-name">Nom de la clé</Label>
                 <Input id="key-name" name="name" placeholder="Ex: Mon application mobile" required data-testid="input-key-name" />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="key-website">Site web lié (optionnel)</Label>
+                <Input id="key-website" name="websiteUrl" type="url" placeholder="https://monsite.com" data-testid="input-key-website" />
+              </div>
               <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-confirm-create-key">
-                {createMutation.isPending ? "Creation..." : "Creer la cle de production"}
+                {createMutation.isPending ? "Création..." : "Créer la clé de production"}
               </Button>
             </form>
           </DialogContent>

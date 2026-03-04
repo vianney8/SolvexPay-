@@ -75,6 +75,7 @@ const createPaymentLinkSchema = z.object({
 
 const createApiKeySchema = z.object({
   name: z.string().min(1, "Nom requis"),
+  websiteUrl: z.string().url("URL invalide").optional().or(z.literal("")).nullable(),
 });
 
 const updatePaymentLinkSchema = z.object({
@@ -613,7 +614,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { name } = validation.data;
+      const { name, websiteUrl } = validation.data;
 
       const { key, prefix, hash } = generateApiKey();
 
@@ -625,6 +626,7 @@ export async function registerRoutes(
         fullKey: key,
         environment: "live",
         isActive: true,
+        websiteUrl: websiteUrl || null,
       });
 
       res.json(apiKey);
@@ -1300,6 +1302,94 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Admin fee config update error:", error);
       res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // All payment links (admin view)
+  app.get("/api/admin/payment-links", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { paymentLinks: plTable } = await import("@shared/schema");
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { desc } = await import("drizzle-orm");
+      const links = await db.select().from(plTable).orderBy(desc(plTable.createdAt));
+      const enriched = await Promise.all(links.map(async (link) => {
+        const [user] = await db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName, email: usersTable.email }).from(usersTable).where((await import("drizzle-orm")).eq(usersTable.id, link.userId));
+        return { ...link, user: user || null };
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Admin payment links error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/payment-links/:id/toggle", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      const { db } = await import("./db");
+      const { paymentLinks: plTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await db.update(plTable).set({ isActive: !!isActive }).where(eq(plTable.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Admin toggle payment link error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // All API keys (admin view)
+  app.get("/api/admin/api-keys", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { apiKeys: akTable } = await import("@shared/schema");
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { desc } = await import("drizzle-orm");
+      const keys = await db.select().from(akTable).orderBy(desc(akTable.createdAt));
+      const enriched = await Promise.all(keys.map(async (key) => {
+        const [user] = await db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName, email: usersTable.email }).from(usersTable).where((await import("drizzle-orm")).eq(usersTable.id, key.userId));
+        const { keyHash: _, ...safeKey } = key;
+        return { ...safeKey, user: user || null };
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Admin API keys error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/api-keys/:id/toggle", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      const { db } = await import("./db");
+      const { apiKeys: akTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await db.update(akTable).set({ isActive: !!isActive }).where(eq(akTable.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Clé non trouvée" });
+      const { keyHash: _, ...safeKey } = updated;
+      res.json(safeKey);
+    } catch (error) {
+      console.error("Admin toggle API key error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // Reset all stats (delete all transactions)
+  app.post("/api/admin/stats/reset", isAdmin, async (req, res) => {
+    try {
+      const { confirm } = req.body;
+      if (confirm !== "CONFIRMER_RESET") {
+        return res.status(400).json({ message: "Confirmation invalide" });
+      }
+      const { db } = await import("./db");
+      const { transactions: txTable } = await import("@shared/schema");
+      await db.delete(txTable);
+      res.json({ success: true, message: "Toutes les statistiques ont été réinitialisées" });
+    } catch (error) {
+      console.error("Admin stats reset error:", error);
+      res.status(500).json({ message: "Erreur lors de la réinitialisation" });
     }
   });
 
