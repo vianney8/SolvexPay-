@@ -31,7 +31,7 @@ import {
   Shield,
   BookOpen,
 } from "lucide-react";
-import solvexpayLogo from "../assets/images/solvexpay-logo-new.jpg";
+import solvexpayIcon from "../assets/images/solvexpay-icon.jpg";
 
 const menuItems = [
   { title: "Accueil", url: "/dashboard", icon: LayoutDashboard, bg: "bg-violet-100", iconColor: "text-violet-600" },
@@ -66,7 +66,7 @@ export function AppSidebar() {
             <div className="flex items-center gap-3 cursor-pointer" data-testid="link-logo">
               <div className="relative flex-shrink-0">
                 <div className="h-9 w-9 rounded-xl bg-white flex items-center justify-center shadow-md ring-1 ring-blue-100 overflow-hidden">
-                  <img src={solvexpayLogo} alt="SolvexPay" className="w-full h-full object-contain" />
+                  <img src={solvexpayIcon} alt="SolvexPay" className="w-full h-full object-contain" />
                 </div>
               </div>
               <div>

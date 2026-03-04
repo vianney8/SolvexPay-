@@ -10,7 +10,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { ChevronLeft } from "lucide-react";
-import solvexpayLogo from "@/assets/images/solvexpay-logo-new.jpg";
+import solvexpayIcon from "@/assets/images/solvexpay-icon.jpg";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -81,7 +81,7 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
             </div>
 
             <div className="flex-shrink-0 h-7 w-7 rounded-lg bg-white ring-1 ring-blue-100 overflow-hidden flex items-center justify-center" data-testid="header-logo">
-              <img src={solvexpayLogo} alt="SolvexPay" className="w-full h-full object-contain" />
+              <img src={solvexpayIcon} alt="SolvexPay" className="w-full h-full object-contain" />
             </div>
           </header>
 
