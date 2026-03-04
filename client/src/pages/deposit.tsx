@@ -344,7 +344,7 @@ export default function DepositPage() {
                   <span className="font-semibold">{formatCurrency(parsedAmount)} {currency}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Frais d'encaissement ({feeRate * 100}%)</span>
+                  <span className="text-muted-foreground">Frais d'encaissement ({Math.round(feeRate * 100)}%)</span>
                   <span className="text-orange-600 font-semibold">- {formatCurrency(feesAmount)} {currency}</span>
                 </div>
                 <Separator />
@@ -359,7 +359,7 @@ export default function DepositPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
             <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Un prompt <strong>USSD</strong> sera envoyé sur votre téléphone. Les frais de service (<strong>{feeRate * 100}%</strong>) sont déduits du montant déposé.
+              Un prompt <strong>USSD</strong> sera envoyé sur votre téléphone. Les frais de service (<strong>{Math.round(feeRate * 100)}%</strong>) sont déduits du montant déposé.
             </p>
           </div>
 

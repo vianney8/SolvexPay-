@@ -301,7 +301,7 @@ export default function TransferPage() {
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(transferAmount)} XOF</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Frais de transfert ({feeRate * 100}%)</span>
+                  <span className="text-muted-foreground">Frais de transfert ({Math.round(feeRate * 100)}%)</span>
                   <span className="text-destructive font-medium">+ {formatCurrency(fees)} XOF</span>
                 </div>
                 <Separator />
@@ -316,7 +316,7 @@ export default function TransferPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20">
             <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Frais de transfert de <strong>{feeRate * 100}%</strong> déduits de votre compte en plus du montant. Le bénéficiaire reçoit exactement le montant saisi.
+              Frais de transfert de <strong>{Math.round(feeRate * 100)}%</strong> déduits de votre compte en plus du montant. Le bénéficiaire reçoit exactement le montant saisi.
             </p>
           </div>
 
