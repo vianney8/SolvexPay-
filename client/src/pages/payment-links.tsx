@@ -239,8 +239,8 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
             <Button type="button" variant="outline" onClick={onBack} className="flex-1 h-12 font-semibold border-border/70" data-testid="button-cancel-create">
               Annuler
             </Button>
-            <Button type="submit" className="flex-1 h-12 font-bold shadow-lg shadow-primary/20" disabled={isPending} data-testid="button-confirm-create-link">
-              {isPending ? (editLink ? "Modification..." : "Création...") : (editLink ? "Enregistrer" : "Créer le lien")}
+            <Button type="submit" className="flex-1 h-12 font-bold shadow-lg shadow-primary/20" disabled={isPending || uploading} data-testid="button-confirm-create-link">
+              {uploading ? "Upload en cours..." : isPending ? (editLink ? "Modification..." : "Création...") : (editLink ? "Enregistrer" : "Créer le lien")}
             </Button>
           </div>
         </form>
