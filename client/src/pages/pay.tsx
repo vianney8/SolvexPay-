@@ -85,14 +85,6 @@ export default function PayPage() {
 
   useEffect(() => { setOperator(""); }, [country]);
 
-  const redirectUrl = (paymentLink as any)?.redirectUrl as string | undefined;
-  useEffect(() => {
-    if (verifyStatus === "SUCCESS" && redirectUrl) {
-      const timer = setTimeout(() => { window.location.href = redirectUrl; }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [verifyStatus, redirectUrl]);
-
   const { data: paymentMethods } = useQuery<any[]>({
     queryKey: ["/api/payment-methods/public"],
     queryFn: async () => {
@@ -119,6 +111,14 @@ export default function PayPage() {
       return res.json();
     },
   });
+
+  const redirectUrl = (paymentLink as any)?.redirectUrl as string | undefined;
+  useEffect(() => {
+    if (verifyStatus === "SUCCESS" && redirectUrl) {
+      const timer = setTimeout(() => { window.location.href = redirectUrl; }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [verifyStatus, redirectUrl]);
 
   const payMutation = useMutation({
     mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName?: string; customerEmail?: string }) => {
