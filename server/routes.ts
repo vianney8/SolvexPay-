@@ -1280,6 +1280,20 @@ export async function registerRoutes(
   });
 
   // OmniPay balance
+  app.post("/api/admin/payment-methods/global-maintenance", isAdmin, async (req, res) => {
+    try {
+      const { inMaintenance } = req.body;
+      const { db } = await import("./db");
+      const { paymentMethods: pmTable } = await import("@shared/schema");
+      await db.update(pmTable).set({ inMaintenance: !!inMaintenance, maintenanceCountries: [], updatedAt: new Date() });
+      const methods = await db.select().from(pmTable);
+      res.json(methods);
+    } catch (error) {
+      console.error("Admin global maintenance error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   app.get("/api/admin/omnipay/balance", isAdmin, async (req, res) => {
     try {
       const balances = await omniPayService.getBalance();

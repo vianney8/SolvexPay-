@@ -10,7 +10,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { ChevronLeft } from "lucide-react";
-import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
+import solvexpayLogo from "@/assets/images/solvexpay-logo-new.jpg";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -42,7 +42,7 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
           <header className="flex h-14 items-center gap-3 border-b border-border/60 bg-background/95 backdrop-blur-sm px-4 lg:px-6 sticky top-0 z-50 shadow-sm">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0" data-testid="button-sidebar-toggle" />
             {!showBackButton && (
-              <span className="font-bold text-sm bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+              <span className="font-black text-sm"><span className="text-blue-800">Solvex</span><span className="text-slate-400">Pay</span></span>
             )}
             <Separator orientation="vertical" className="h-5 flex-shrink-0" />
 
@@ -80,8 +80,8 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
               </Breadcrumb>
             </div>
 
-            <div className="flex-shrink-0" data-testid="header-logo">
-              <img src={solvexpayLogo} alt="SolvexPay" className="w-7 h-7 rounded-lg object-cover ring-1 ring-primary/20" />
+            <div className="flex-shrink-0 h-7 w-7 rounded-lg bg-white ring-1 ring-blue-100 overflow-hidden flex items-center justify-center" data-testid="header-logo">
+              <img src={solvexpayLogo} alt="SolvexPay" className="w-full h-full object-contain" />
             </div>
           </header>
 

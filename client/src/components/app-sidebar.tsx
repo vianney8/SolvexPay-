@@ -31,7 +31,7 @@ import {
   Shield,
   BookOpen,
 } from "lucide-react";
-import solvexpayLogo from "../assets/images/solvexpay-logo.png";
+import solvexpayLogo from "../assets/images/solvexpay-logo-new.jpg";
 
 const menuItems = [
   { title: "Accueil", url: "/dashboard", icon: LayoutDashboard, bg: "bg-violet-100", iconColor: "text-violet-600" },
@@ -64,12 +64,13 @@ export function AppSidebar() {
         <SidebarHeader className="px-4 py-5 flex-shrink-0">
           <Link href="/dashboard">
             <div className="flex items-center gap-3 cursor-pointer" data-testid="link-logo">
-              <div className="relative">
-                <div className="absolute inset-0 rounded-2xl bg-violet-400/25 blur-lg" />
-                <img src={solvexpayLogo} alt="SolvexPay" className="relative w-10 h-10 rounded-2xl object-cover shadow-md ring-1 ring-violet-200" />
+              <div className="relative flex-shrink-0">
+                <div className="h-9 w-9 rounded-xl bg-white flex items-center justify-center shadow-md ring-1 ring-blue-100 overflow-hidden">
+                  <img src={solvexpayLogo} alt="SolvexPay" className="w-full h-full object-contain" />
+                </div>
               </div>
               <div>
-                <p className="font-bold text-base text-gray-900 leading-none">SolvexPay</p>
+                <p className="font-black text-base leading-none"><span className="text-blue-800">Solvex</span><span className="text-slate-400">Pay</span></p>
                 <div className="flex items-center gap-1.5 mt-1">
                   {(user as any)?.kycStatus === "verified" ? (
                     <>

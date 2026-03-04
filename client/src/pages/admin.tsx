@@ -297,6 +297,15 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
+  const globalMaintM = useMutation({
+    mutationFn: (inMaintenance: boolean) => apiRequest("POST", "/api/admin/payment-methods/global-maintenance", { inMaintenance }),
+    onSuccess: (_, inMaintenance) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] });
+      toast({ title: inMaintenance ? "Tous les opérateurs en maintenance" : "Tous les opérateurs remis en service" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
   const feeM = useMutation({
     mutationFn: (d: { id: string; feeRate: string }) => apiRequest("PATCH", `/api/admin/fee-configs/${d.id}`, { feeRate: d.feeRate }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-configs"] }); toast({ title: "Frais mis à jour" }); setFeeEditDialog(null); },
@@ -1046,6 +1055,27 @@ export default function AdminPage() {
                 <strong>Désactiver</strong> un réseau l'empêche complètement d'être utilisé dans tous les pays.
                 La <strong>maintenance par pays</strong> permet de bloquer un opérateur uniquement dans les pays sélectionnés — ex: MTN Bénin en maintenance, MTN Côte d'Ivoire toujours actif.
               </p>
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => globalMaintM.mutate(true)}
+                disabled={globalMaintM.isPending}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-sm font-bold hover:bg-amber-500/15 transition-colors disabled:opacity-60"
+                data-testid="btn-global-maintenance-on"
+              >
+                <ZapOff className="h-4 w-4" />
+                Tout mettre en maintenance
+              </button>
+              <button
+                onClick={() => globalMaintM.mutate(false)}
+                disabled={globalMaintM.isPending}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-sm font-bold hover:bg-emerald-500/15 transition-colors disabled:opacity-60"
+                data-testid="btn-global-maintenance-off"
+              >
+                <Zap className="h-4 w-4" />
+                Tout remettre en service
+              </button>
             </div>
 
             {pmLoading ? (
