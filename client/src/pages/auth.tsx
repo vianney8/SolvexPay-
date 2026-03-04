@@ -361,7 +361,6 @@ export function RegisterPage() {
 
           {/* Colorful country flags bar */}
           <div className="p-3 rounded-2xl bg-gradient-to-r from-violet-50 via-emerald-50 to-amber-50 border border-violet-100/80">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Disponible dans 9 pays</p>
             <div className="flex flex-wrap gap-1.5">
               {countryCodes.map((c) => (
                 <span key={c.code} className="text-lg" title={c.country}>{c.flag}</span>
