@@ -96,13 +96,16 @@ export default function TransferPage() {
     if (!transferAmount || !phone || !operator || !country || insufficientFunds) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
     const nameParts = recipientName.trim().split(" ");
+    const firstName = nameParts[0] || "Client";
+    const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
+
     transferMutation.mutate({
       amount: transferAmount,
       phoneNumber: fullPhone,
       operator,
       country,
-      firstName: nameParts[0] || undefined,
-      lastName: nameParts.slice(1).join(" ") || undefined,
+      firstName,
+      lastName,
     });
   };
 
