@@ -65,8 +65,8 @@ export function AppSidebar() {
           <Link href="/dashboard">
             <div className="flex items-center gap-3 cursor-pointer" data-testid="link-logo">
               <div className="relative flex-shrink-0">
-                <div className="h-9 w-9 rounded-xl bg-white flex items-center justify-center shadow-md ring-1 ring-blue-100 overflow-hidden">
-                  <img src={solvexpayIcon} alt="SolvexPay" className="w-full h-full object-contain" />
+                <div className="h-9 w-9 rounded-xl shadow-md ring-1 ring-blue-100 overflow-hidden">
+                  <img src={solvexpayIcon} alt="SolvexPay" className="w-full h-full object-cover" />
                 </div>
               </div>
               <div>

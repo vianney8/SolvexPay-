@@ -80,8 +80,8 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
               </Breadcrumb>
             </div>
 
-            <div className="flex-shrink-0 h-7 w-7 rounded-lg bg-white ring-1 ring-blue-100 overflow-hidden flex items-center justify-center" data-testid="header-logo">
-              <img src={solvexpayIcon} alt="SolvexPay" className="w-full h-full object-contain" />
+            <div className="flex-shrink-0 h-7 w-7 rounded-lg ring-1 ring-blue-100 overflow-hidden" data-testid="header-logo">
+              <img src={solvexpayIcon} alt="SolvexPay" className="w-full h-full object-cover" />
             </div>
           </header>
 
