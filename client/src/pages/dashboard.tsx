@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   QrCode,
   Banknote,
+  Key,
   TrendingUp,
   TrendingDown,
   CalendarDays,
@@ -43,6 +44,7 @@ const quickActions = [
   { label: "Dépôt", icon: Wallet, href: "/deposit", gradient: "from-emerald-400/40 to-teal-400/30", ring: "border-emerald-300/30" },
   { label: "Retrait", icon: Banknote, href: "/withdraw", gradient: "from-orange-400/40 to-amber-400/30", ring: "border-orange-300/30" },
   { label: "Liens", icon: QrCode, href: "/payment-links", gradient: "from-fuchsia-400/40 to-pink-400/30", ring: "border-fuchsia-300/30" },
+  { label: "API", icon: Key, href: "/api-keys", gradient: "from-indigo-400/40 to-blue-400/30", ring: "border-indigo-300/30" },
 ];
 
 function isExpiredPending(tx: Transaction): boolean {
