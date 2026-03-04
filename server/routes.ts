@@ -6,6 +6,7 @@ import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipaySta
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
+import crypto from "crypto";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -64,7 +65,15 @@ const createPaymentLinkSchema = z.object({
 
 const createApiKeySchema = z.object({
   name: z.string().min(1, "Nom requis"),
+  appName: z.string().min(1, "Nom de l'application requis"),
   websiteUrl: z.string().url("URL invalide").optional().or(z.literal("")).nullable(),
+});
+
+const updateApiKeySchema = z.object({
+  isActive: z.boolean().optional(),
+  redirectUrl: z.string().url("URL invalide").optional().or(z.literal("")).nullable(),
+  webhookUrl: z.string().url("URL invalide").optional().or(z.literal("")).nullable(),
+  appName: z.string().min(1).optional(),
 });
 
 const updatePaymentLinkSchema = z.object({
@@ -788,16 +797,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { name, websiteUrl } = validation.data;
+      const { name, appName, websiteUrl } = validation.data;
 
       const { key, prefix, hash } = generateApiKey();
+      const webhookSecret = `whs_live_${crypto.randomBytes(24).toString("hex")}`;
 
       const apiKey = await storage.createApiKey({
         userId,
         name,
+        appName: appName || null,
         keyPrefix: prefix,
         keyHash: hash,
         fullKey: key,
+        webhookSecret,
         environment: "live",
         isActive: true,
         websiteUrl: websiteUrl || null,
@@ -813,10 +825,9 @@ export async function registerRoutes(
   app.patch("/api/api-keys/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { isActive } = req.body;
-
-      if (typeof isActive !== "boolean") {
-        return res.status(400).json({ message: "isActive must be a boolean" });
+      const validation = updateApiKeySchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
       }
 
       const { db } = await import("./db");
@@ -824,11 +835,17 @@ export async function registerRoutes(
       const { eq, and } = await import("drizzle-orm");
       const [existing] = await db.select().from(akTable).where(and(eq(akTable.id, id), eq(akTable.userId, req.user.id)));
       if (!existing) return res.status(404).json({ message: "Clé non trouvée" });
-      if (existing.adminLocked) {
+      if (existing.adminLocked && validation.data.isActive !== undefined) {
         return res.status(403).json({ message: "Cette clé a été verrouillée par l'administrateur.", adminLocked: true });
       }
 
-      const apiKey = await storage.updateApiKey(id, { isActive });
+      const updateData: Record<string, any> = {};
+      if (validation.data.isActive !== undefined) updateData.isActive = validation.data.isActive;
+      if (validation.data.redirectUrl !== undefined) updateData.redirectUrl = validation.data.redirectUrl || null;
+      if (validation.data.webhookUrl !== undefined) updateData.webhookUrl = validation.data.webhookUrl || null;
+      if (validation.data.appName !== undefined) updateData.appName = validation.data.appName;
+
+      const apiKey = await storage.updateApiKey(id, updateData);
       res.json(apiKey);
     } catch (error) {
       console.error("Error updating API key:", error);

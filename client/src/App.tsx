@@ -20,6 +20,7 @@ import WithdrawPage from "@/pages/withdraw";
 import PayPage from "@/pages/pay";
 import AdminPage from "@/pages/admin";
 import SupportPage from "@/pages/support";
+import DocumentationPage from "@/pages/documentation";
 
 function AuthenticatedRoutes() {
   return (
@@ -35,6 +36,7 @@ function AuthenticatedRoutes() {
       <Route path="/settings" component={SettingsPage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/support" component={SupportPage} />
+      <Route path="/documentation" component={DocumentationPage} />
       <Route component={NotFound} />
     </Switch>
   );
