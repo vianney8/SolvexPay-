@@ -76,15 +76,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateWalletBalance(userId: string, currency: string, amount: number): Promise<Wallet> {
-    if (currency !== "XOF") {
-      throw new Error(`Devise non supportee: ${currency}. Seul le XOF est accepte.`);
+    let amountXOF: number;
+    if (currency === "XOF" || currency === "XAF") {
+      amountXOF = Math.floor(amount);
+    } else if (currency === "CDF") {
+      amountXOF = Math.floor(amount * 0.23);
+    } else {
+      amountXOF = Math.floor(amount);
     }
-    
+
     const [wallet] = await db
       .update(wallets)
       .set({
         updatedAt: new Date(),
-        balanceXOF: sql`${wallets.balanceXOF} + ${amount}`,
+        balanceXOF: sql`${wallets.balanceXOF} + ${amountXOF}`,
       })
       .where(eq(wallets.userId, userId))
       .returning();
