@@ -171,7 +171,7 @@ export async function registerRoutes(
         returnUrl,
       });
 
-      const depositFeeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
+      const depositFeeRate = 0.05;
       const depositFees = Math.round(amount * depositFeeRate);
 
       const transaction = await storage.createTransaction({
@@ -230,6 +230,9 @@ export async function registerRoutes(
       const reference = generateReference();
       const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
 
+      const withdrawalFeeRate = 0.07;
+      const withdrawalFees = Math.round(amount * withdrawalFeeRate);
+
       if (withdrawalMode === "manual") {
         const transaction = await storage.createTransaction({
           userId,
@@ -241,7 +244,8 @@ export async function registerRoutes(
           reference,
           status: "pending",
           description: `Retrait vers ${phoneNumber} via ${operator}`,
-        });
+          fees: String(withdrawalFees),
+        } as any);
         await storage.updateWalletBalance(userId, currency, -amount);
         return res.json({ ...transaction, mode: "manual" });
       }
@@ -274,7 +278,8 @@ export async function registerRoutes(
         reference,
         status: "pending",
         description: `Retrait vers ${phoneNumber} via ${operator}`,
-      });
+        fees: String(withdrawalFees),
+      } as any);
 
       await storage.updateWalletBalance(userId, currency, -amount);
 
@@ -330,6 +335,9 @@ export async function registerRoutes(
       });
       console.log(`OmniPay transfer response for ${reference}:`, transferResponse);
 
+      const transferFeeRate = 0.06;
+      const transferFees = Math.round(amount * transferFeeRate);
+
       const transaction = await storage.createTransaction({
         userId,
         type: "transfer",
@@ -340,7 +348,8 @@ export async function registerRoutes(
         reference,
         status: "pending",
         description: `Transfert vers ${firstName} ${lastName} (${phoneNumber})`,
-      });
+        fees: String(transferFees),
+      } as any);
 
       await storage.updateWalletBalance(userId, currency, -amount);
 
@@ -587,7 +596,7 @@ export async function registerRoutes(
       } else {
         linkAmount = fixedAmount;
       }
-      const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
+      const feeRate = 0.05;
       const feesAmount = Math.round(linkAmount * feeRate);
 
       console.log(`Initiating payment for link ${slug} with reference: ${reference}`);

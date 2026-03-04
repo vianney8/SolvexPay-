@@ -79,7 +79,7 @@ export default function WithdrawPage() {
   const { data: allTransactions } = useQuery<any[]>({ queryKey: ["/api/transactions"] });
   const balance = parseFloat(String(wallet?.balanceXOF || 0));
   const withdrawAmount = parseFloat(amount) || 0;
-  const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
+  const feeRate = 0.07;
   const fees = Math.round(withdrawAmount * feeRate);
   const netAmount = withdrawAmount - fees;
   const insufficientFunds = withdrawAmount > balance && withdrawAmount > 0;
@@ -321,7 +321,7 @@ export default function WithdrawPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-500/5 border border-orange-500/20">
             <Info className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Frais de <strong>{feeRate * 100}%</strong> appliqués{["BF", "COG"].includes(country) ? " (taux spécial Burkina/Congo)" : ""}. Les fonds arrivent en quelques minutes (max 24h selon l'opérateur).
+              Frais de retrait de <strong>{feeRate * 100}%</strong> appliqués sur le montant retiré. Les fonds arrivent en quelques minutes (max 24h selon l'opérateur).
             </p>
           </div>
 

@@ -36,23 +36,23 @@ import depositScreenshot from "@assets/Screenshot_20260304-051537_1772597828247.
 
 const ALL_COUNTRIES = [
   { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"], color: "from-green-500 to-emerald-600",
-    fees: [{ op: "MTN", deposit: "5%", withdraw: "1%", min: "100 XOF" }, { op: "Moov", deposit: "5%", withdraw: "1%", min: "100 XOF" }] },
+    fees: [{ op: "MTN", deposit: "5%", withdraw: "7%", min: "100 XOF" }, { op: "Moov", deposit: "5%", withdraw: "7%", min: "100 XOF" }] },
   { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["MTN", "Orange", "Moov", "Wave"], color: "from-orange-500 to-amber-600",
-    fees: [{ op: "MTN", deposit: "5%", withdraw: "1%", min: "100 XOF" }, { op: "Orange", deposit: "5%", withdraw: "1%", min: "100 XOF" }, { op: "Wave", deposit: "5%", withdraw: "1%", min: "100 XOF" }, { op: "Moov", deposit: "5%", withdraw: "1%", min: "100 XOF" }] },
+    fees: [{ op: "MTN", deposit: "5%", withdraw: "7%", min: "100 XOF" }, { op: "Orange", deposit: "5%", withdraw: "7%", min: "100 XOF" }, { op: "Wave", deposit: "5%", withdraw: "7%", min: "100 XOF" }, { op: "Moov", deposit: "5%", withdraw: "7%", min: "100 XOF" }] },
   { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], color: "from-red-500 to-rose-600",
-    fees: [{ op: "Moov", deposit: "6%", withdraw: "1%", min: "100 XOF" }, { op: "Orange", deposit: "6%", withdraw: "1%", min: "100 XOF" }] },
+    fees: [{ op: "Moov", deposit: "5%", withdraw: "7%", min: "100 XOF" }, { op: "Orange", deposit: "5%", withdraw: "7%", min: "100 XOF" }] },
   { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], color: "from-yellow-500 to-orange-500",
-    fees: [{ op: "TMoney", deposit: "5%", withdraw: "1%", min: "100 XOF" }, { op: "Moov", deposit: "5%", withdraw: "1%", min: "100 XOF" }] },
+    fees: [{ op: "TMoney", deposit: "5%", withdraw: "7%", min: "100 XOF" }, { op: "Moov", deposit: "5%", withdraw: "7%", min: "100 XOF" }] },
   { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], color: "from-green-600 to-teal-600",
-    fees: [{ op: "Orange", deposit: "5%", withdraw: "1%", min: "100 XOF" }, { op: "Wave", deposit: "5%", withdraw: "1%", min: "100 XOF" }, { op: "Free", deposit: "5%", withdraw: "1%", min: "100 XOF" }] },
+    fees: [{ op: "Orange", deposit: "5%", withdraw: "7%", min: "100 XOF" }, { op: "Wave", deposit: "5%", withdraw: "7%", min: "100 XOF" }, { op: "Free", deposit: "5%", withdraw: "7%", min: "100 XOF" }] },
   { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], color: "from-green-700 to-emerald-700",
-    fees: [{ op: "Orange", deposit: "5%", withdraw: "1%", min: "100 XOF" }, { op: "Moov", deposit: "5%", withdraw: "1%", min: "100 XOF" }] },
+    fees: [{ op: "Orange", deposit: "5%", withdraw: "7%", min: "100 XOF" }, { op: "Moov", deposit: "5%", withdraw: "7%", min: "100 XOF" }] },
   { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], color: "from-yellow-600 to-green-600",
-    fees: [{ op: "MTN", deposit: "5%", withdraw: "1%", min: "100 XAF" }, { op: "Orange", deposit: "5%", withdraw: "1%", min: "100 XAF" }] },
+    fees: [{ op: "MTN", deposit: "5%", withdraw: "7%", min: "100 XAF" }, { op: "Orange", deposit: "5%", withdraw: "7%", min: "100 XAF" }] },
   { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], color: "from-sky-500 to-blue-600",
-    fees: [{ op: "Vodacom", deposit: "5%", withdraw: "1%", min: "100 CDF" }, { op: "Airtel", deposit: "5%", withdraw: "1%", min: "100 CDF" }, { op: "Orange", deposit: "5%", withdraw: "1%", min: "100 CDF" }] },
+    fees: [{ op: "Vodacom", deposit: "5%", withdraw: "7%", min: "100 CDF" }, { op: "Airtel", deposit: "5%", withdraw: "7%", min: "100 CDF" }, { op: "Orange", deposit: "5%", withdraw: "7%", min: "100 CDF" }] },
   { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"], color: "from-green-600 to-red-600",
-    fees: [{ op: "Airtel", deposit: "6%", withdraw: "1%", min: "100 XAF" }, { op: "MTN", deposit: "6%", withdraw: "1%", min: "100 XAF" }] },
+    fees: [{ op: "Airtel", deposit: "5%", withdraw: "7%", min: "100 XAF" }, { op: "MTN", deposit: "5%", withdraw: "7%", min: "100 XAF" }] },
 ];
 
 const ALL_OPERATORS = [
@@ -108,7 +108,7 @@ const stats = [
 
 const faqs = [
   { q: "Comment fonctionne SolvexPay ?", a: "SolvexPay est une passerelle de paiement Mobile Money pan-africaine. Après inscription, vous pouvez créer des liens de paiement ou utiliser notre API pour accepter des paiements MTN, Orange, Wave, Moov et bien d'autres." },
-  { q: "Quels sont les frais de transaction ?", a: "Les frais varient selon le pays et l'opérateur. En général, les dépôts sont facturés à 5% (6% pour le Burkina Faso et Congo-Brazza.) et les retraits à 1% (min. 100 XOF/XAF). Les transferts entre comptes SolvexPay sont gratuits." },
+  { q: "Quels sont les frais de transaction ?", a: "Les frais sont simples et uniformes pour tous les pays : encaissement (dépôt) à 5%, retrait à 7%, transfert Mobile Money à 6%. Le minimum de transaction est de 100 XOF/XAF/CDF selon le pays." },
   { q: "Est-ce que je dois vérifier mon identité (KYC) ?", a: "Le KYC est requis pour augmenter les plafonds de transaction. Sans KYC, vous pouvez tester la plateforme avec des plafonds réduits. La vérification prend généralement moins de 24h." },
   { q: "Comment intégrer l'API dans mon application ?", a: "Après connexion, accédez à 'Clés API' dans votre tableau de bord. Vous y trouverez vos clés et la documentation complète pour intégrer SolvexPay." },
   { q: "Quels pays sont supportés ?", a: "SolvexPay couvre actuellement 9 pays : Bénin, Côte d'Ivoire, Burkina Faso, Togo, Sénégal, Mali, Cameroun, RD Congo et Congo-Brazzaville." },
@@ -617,7 +617,7 @@ export default function LandingPage() {
               <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
                 <Zap className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-700 leading-relaxed">
-                  <strong>Transferts gratuits</strong> entre comptes SolvexPay. Frais spéciaux de 6% pour Burkina Faso et Congo-Brazza.
+                  Frais uniformes dans tous les pays : <strong>Dépôt 5%</strong> · <strong>Retrait 7%</strong> · <strong>Transfert 6%</strong>
                 </p>
               </div>
             </div>

@@ -48,7 +48,7 @@ export default function DepositPage() {
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
   const currency = selectedCountry.currency;
   const parsedAmount = parseFloat(amount) || 0;
-  const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
+  const feeRate = 0.05;
   const feesAmount = Math.round(parsedAmount * feeRate);
   const netAmount = parsedAmount - feesAmount;
 
@@ -317,7 +317,7 @@ export default function DepositPage() {
                   <span className="font-semibold">{formatCurrency(parsedAmount)} {currency}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Frais ({feeRate * 100}%{["BF","COG"].includes(country) ? " — taux spécial" : ""})</span>
+                  <span className="text-muted-foreground">Frais d'encaissement ({feeRate * 100}%)</span>
                   <span className="text-orange-600 font-semibold">- {formatCurrency(feesAmount)} {currency}</span>
                 </div>
                 <Separator />
