@@ -21,9 +21,7 @@ import {
   Plus,
   ShieldCheck,
   QrCode,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  ArrowRightLeft,
+  Banknote,
   TrendingUp,
   TrendingDown,
   CalendarDays,
@@ -42,9 +40,9 @@ function formatDate(date: string | Date) {
 }
 
 const quickActions = [
-  { label: "Dépôt", icon: ArrowDownToLine, href: "/deposit", gradient: "from-emerald-400/40 to-teal-400/30", ring: "border-emerald-300/30" },
-  { label: "Retrait", icon: ArrowUpFromLine, href: "/withdraw", gradient: "from-orange-400/40 to-amber-400/30", ring: "border-orange-300/30" },
-  { label: "Envoi", icon: ArrowRightLeft, href: "/transfer", gradient: "from-sky-400/40 to-blue-400/30", ring: "border-sky-300/30" },
+  { label: "Dépôt", icon: Wallet, href: "/deposit", gradient: "from-emerald-400/40 to-teal-400/30", ring: "border-emerald-300/30" },
+  { label: "Retrait", icon: Banknote, href: "/withdraw", gradient: "from-orange-400/40 to-amber-400/30", ring: "border-orange-300/30" },
+  { label: "Envoi", icon: Send, href: "/transfer", gradient: "from-sky-400/40 to-blue-400/30", ring: "border-sky-300/30" },
   { label: "Liens", icon: QrCode, href: "/payment-links", gradient: "from-fuchsia-400/40 to-pink-400/30", ring: "border-fuchsia-300/30" },
 ];
 
