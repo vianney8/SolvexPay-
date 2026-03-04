@@ -11,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { OperatorLogo } from "@/components/operator-logo";
 import {
   CheckCircle2, XCircle, Loader2, ChevronDown, Shield,
-  Smartphone, RefreshCw, Clock, Wifi, Code2,
+  ChevronUp, Smartphone, RefreshCw, Clock, Wifi,
 } from "lucide-react";
 import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 
@@ -40,13 +40,11 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <a href="https://solvexpay.com" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+        <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-xl object-cover" />
           <span className="font-black text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
         </a>
-        <Badge variant="outline" className="text-xs font-mono border-gray-300 text-gray-500 gap-1">
-          <Code2 className="h-3 w-3" /> Paiement API sécurisé
-        </Badge>
+        <Badge variant="outline" className="text-xs font-mono border-gray-300 text-gray-500">Paiement sécurisé</Badge>
       </header>
       <div className="flex-1 flex items-start justify-center p-4 pt-6">
         <div className="w-full max-w-md">{children}</div>
@@ -55,7 +53,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
         <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400">
           <Shield className="h-3.5 w-3.5" />
           <span>Paiement sécurisé par{" "}
-            <a href="https://solvexpay.com" className="text-violet-600 font-semibold hover:underline">SolvexPay</a>
+            <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="text-violet-600 font-semibold hover:underline">SolvexPay</a>
           </span>
         </div>
       </footer>
@@ -80,6 +78,7 @@ export default function PayApiPage() {
   const [country, setCountry] = useState("BJ");
   const [operator, setOperator] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
 
   const selectedCountry = COUNTRIES.find((c) => c.code === country) || COUNTRIES[0];
   useEffect(() => { setOperator(""); }, [country]);
@@ -91,6 +90,14 @@ export default function PayApiPage() {
       if (!res.ok) throw new Error("not found");
       const data = await res.json();
       if (data.payerCountry) setCountry(data.payerCountry);
+      if (data.provider) setOperator(data.provider.charAt(0).toUpperCase() + data.provider.slice(1).toLowerCase());
+      if (data.phoneNumber) {
+        const prefix = COUNTRIES.find((c) => c.code === data.payerCountry)?.prefix || "";
+        const stripped = data.phoneNumber.startsWith(prefix)
+          ? data.phoneNumber.slice(prefix.length)
+          : data.phoneNumber;
+        setPhone(stripped);
+      }
       return data;
     },
     enabled: !!id,
@@ -168,7 +175,7 @@ export default function PayApiPage() {
     e.preventDefault();
     if (payMutation.isPending) return;
     if (!phone || !operator || !country) {
-      toast({ title: "Champs requis", description: "Veuillez remplir tous les champs.", variant: "destructive" });
+      toast({ title: "Champs requis", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
       return;
     }
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
@@ -180,7 +187,8 @@ export default function PayApiPage() {
     return (
       <PageWrapper>
         <div className="bg-white rounded-3xl shadow-lg p-6 space-y-5">
-          <Skeleton className="h-6 w-32 mx-auto" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
+          <Skeleton className="h-6 w-40 mx-auto" />
           <Skeleton className="h-14 w-48 mx-auto" />
           <Skeleton className="h-12 w-full rounded-xl" />
           <Skeleton className="h-12 w-full rounded-xl" />
@@ -197,7 +205,7 @@ export default function PayApiPage() {
           <div className="h-16 w-16 rounded-2xl bg-red-100 flex items-center justify-center mx-auto">
             <XCircle className="h-8 w-8 text-red-500" />
           </div>
-          <h2 className="text-xl font-bold">Paiement introuvable</h2>
+          <h2 className="text-xl font-bold">Lien non trouvé</h2>
           <p className="text-sm text-gray-500">Ce lien de paiement n'existe pas ou a expiré.</p>
         </div>
       </PageWrapper>
@@ -236,28 +244,33 @@ export default function PayApiPage() {
     const isSuccess = verifyStatus === "SUCCESS";
     const isFailed = ["FAILED", "CANCELLED"].includes(verifyStatus);
     const isPending = !isSuccess && !isFailed;
+    const shouldRedirect = isSuccess && redirectUrl;
     const elapsedMin = Math.floor(elapsed / 60);
     const elapsedSec = elapsed % 60;
     const elapsedStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`;
+
     const steps = [
       { label: "Initié", done: true },
       { label: "Confirmation", done: isSuccess || isFailed },
-      { label: "Validé", done: isSuccess },
+      { label: "Crédité", done: isSuccess },
     ];
 
     return (
       <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(145deg, #020617 0%, #0b1d3a 50%, #03111f 100%)" }}>
         <header className="px-4 py-4 flex items-center justify-between">
-          <a href="https://solvexpay.com" className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
+          <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
             <img src={solvexpayLogo} alt="SolvexPay" className="w-7 h-7 rounded-lg object-cover" />
             <span className="font-black text-base text-white/90">SolvexPay</span>
           </a>
           <div className="flex items-center gap-1.5 text-xs text-white/40">
-            <Shield className="h-3 w-3" /><span>Paiement sécurisé</span>
+            <Shield className="h-3 w-3" />
+            <span>Paiement sécurisé</span>
           </div>
         </header>
+
         <div className="flex-1 flex items-start justify-center p-4 pt-10 overflow-y-auto">
           <div className="w-full max-w-sm space-y-4">
+
             <div className="flex flex-col items-center gap-6">
               <div className="relative flex items-center justify-center h-24 w-24" style={{ overflow: "visible" }}>
                 {isPending && (
@@ -284,9 +297,10 @@ export default function PayApiPage() {
                   {isFailed && <XCircle className="h-6 w-6 text-white" />}
                 </div>
               </div>
+
               <div className="text-center space-y-1.5">
                 <h2 className="text-2xl font-black text-white" data-testid="text-payment-status">
-                  {isSuccess ? "Paiement confirmé !" : isFailed ? "Paiement échoué" : "En attente de confirmation"}
+                  {isSuccess ? "Paiement confirmé !" : isFailed ? (verifyStatus === "CANCELLED" ? "Paiement annulé" : "Paiement échoué") : "En attente de confirmation"}
                 </h2>
                 <p className="text-sm text-white/50 max-w-xs mx-auto leading-relaxed">
                   {isSuccess ? "Votre paiement a été traité avec succès. Merci !"
@@ -314,7 +328,7 @@ export default function PayApiPage() {
                           <p className="text-[8px] text-white/35 font-semibold mt-0.5 text-center leading-tight">{step.label}</p>
                         </div>
                         {i < steps.length - 1 && (
-                          <div className={`h-0.5 flex-1 mx-1 mb-3 rounded-full transition-all ${step.done ? isSuccess ? "bg-emerald-400/50" : "bg-amber-400/50" : "bg-white/10"}`} />
+                          <div className={`h-0.5 flex-1 mx-1 mb-3 rounded-full transition-all ${step.done ? (isSuccess ? "bg-emerald-400/50" : "bg-amber-400/50") : "bg-white/10"}`} />
                         )}
                       </div>
                     ))}
@@ -364,8 +378,10 @@ export default function PayApiPage() {
               </div>
             )}
 
-            {verifyStatus === "SUCCESS" && redirectUrl && (
-              <p className="text-center text-xs text-emerald-400/60 animate-pulse">Redirection dans 3 secondes...</p>
+            {shouldRedirect && (
+              <p className="text-center text-xs text-emerald-400/60 animate-pulse" data-testid="text-redirect-notice">
+                Redirection dans 3 secondes...
+              </p>
             )}
 
             {isFailed && (
@@ -375,7 +391,7 @@ export default function PayApiPage() {
                 onClick={() => { setPaymentStatus("idle"); setPendingReference(null); setVerifyStatus("PENDING"); setVerifyCount(0); setElapsed(0); }}
                 data-testid="button-retry-payment"
               >
-                <RefreshCw className="h-4 w-4 mr-2" /> Réessayer
+                <RefreshCw className="h-4 w-4 mr-2" /> Réessayer le paiement
               </Button>
             )}
             {isSuccess && (
@@ -391,6 +407,9 @@ export default function PayApiPage() {
     );
   }
 
+  const descriptionText = paymentInfo.description || "";
+  const truncatedDesc = descriptionText.length > 600 ? descriptionText.slice(0, 600) + "..." : descriptionText;
+
   return (
     <PageWrapper>
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
@@ -401,13 +420,26 @@ export default function PayApiPage() {
               {formatAmount(paymentInfo.amount)} <span className="text-xl font-bold text-blue-400">{paymentInfo.currency}</span>
             </p>
             {paymentInfo.appName && (
-              <p className="text-sm font-bold text-gray-700 mt-1" data-testid="text-payment-name">{paymentInfo.appName}</p>
+              <p className="text-sm font-bold text-gray-700 mt-2" data-testid="text-payment-name">{paymentInfo.appName}</p>
             )}
             {paymentInfo.merchantName && paymentInfo.merchantName !== paymentInfo.appName && (
               <p className="text-xs text-gray-400 mt-0.5" data-testid="text-payment-merchant">via {paymentInfo.merchantName}</p>
             )}
-            {paymentInfo.description && (
-              <p className="text-xs text-gray-500 mt-2 px-4 leading-relaxed">{paymentInfo.description}</p>
+            {descriptionText && (
+              <div className="mt-3 text-left px-1">
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  {showDescription ? descriptionText : truncatedDesc}
+                </p>
+                {descriptionText.length > 600 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDescription(!showDescription)}
+                    className="mt-1 text-xs font-semibold text-violet-500 hover:text-violet-600 flex items-center gap-0.5"
+                  >
+                    {showDescription ? <><ChevronUp className="h-3 w-3" /> Voir moins</> : <><ChevronDown className="h-3 w-3" /> Voir plus</>}
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -457,11 +489,7 @@ export default function PayApiPage() {
                     <button
                       key={op}
                       type="button"
-                      onClick={() => {
-                        if (isDisabled) return;
-                        setOperator(op);
-                        setTimeout(() => phoneInputRef.current?.focus(), 50);
-                      }}
+                      onClick={() => { if (isDisabled) return; setOperator(op); setTimeout(() => phoneInputRef.current?.focus(), 50); }}
                       disabled={isDisabled}
                       className={`relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
                         isDisabled
@@ -473,14 +501,10 @@ export default function PayApiPage() {
                       data-testid={`option-pay-operator-${op}`}
                     >
                       {opStatus.maintenance && (
-                        <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
-                          Maint.
-                        </span>
+                        <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">Maint.</span>
                       )}
                       {!opStatus.available && !opStatus.maintenance && (
-                        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
-                          Indispo
-                        </span>
+                        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">Indispo</span>
                       )}
                       <div className={`rounded-2xl overflow-hidden transition-transform ${operator === op ? "scale-110" : ""}`}>
                         <OperatorLogo operator={op} size={52} />

@@ -510,9 +510,6 @@ export async function registerRoutes(
       if (!transaction || transaction.status !== "pending") {
         return res.status(404).json({ message: "Paiement introuvable ou déjà traité" });
       }
-      if ((transaction as any).phoneNumber) {
-        return res.status(400).json({ message: "Ce paiement a déjà été initié" });
-      }
       const validation = publicPaySchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ message: validation.error.errors[0].message });
@@ -1052,109 +1049,37 @@ export async function registerRoutes(
       const feesAmount = Math.round(amount * feeRate);
       const reference = generateReference();
 
-      // ── Mode sans phone/operator → page de paiement hébergée SolvexPay ──
-      if (!phone || !operator) {
-        const transaction = await storage.createTransaction({
-          userId: req.merchantUserId,
-          type: "deposit",
-          amount: String(amount),
-          currency: "XOF",
-          provider: operator ? operator.toUpperCase() : null,
-          phoneNumber: phone || null,
-          reference,
-          status: "pending",
-          description: description || `Paiement via API — ${appName}`,
-          fees: String(feesAmount),
-          payerName: customer_name || null,
-          payerEmail: customer_email || null,
-          payerCountry: country || null,
-          payerOperator: operator ? operator.toUpperCase() : null,
-          apiKeyId: apiKeyId || null,
-        } as any);
-
-        const hostedUrl = `https://solvexpay.com/pay-api/${transaction.id}`;
-        return res.status(201).json({
-          id: transaction.id,
-          status: "pending",
-          amount,
-          currency: "XOF",
-          reference,
-          description: transaction.description,
-          fees: feesAmount,
-          net_amount: amount - feesAmount,
-          payment_url: hostedUrl,
-          hosted_page: true,
-          created_at: transaction.createdAt,
-          metadata: metadata || null,
-        });
-      }
-
-      // ── Mode direct : phone + operator fournis → USSD push OmniPay ──
-      if (typeof phone !== "string") {
-        return res.status(400).json({ error: { code: "INVALID_PHONE", message: "Numéro de téléphone invalide.", status: 400 } });
-      }
-      if (typeof operator !== "string") {
-        return res.status(400).json({ error: { code: "INVALID_OPERATOR", message: "Opérateur invalide.", status: 400 } });
-      }
-      if (!country || typeof country !== "string") {
-        return res.status(400).json({ error: { code: "INVALID_COUNTRY", message: "Code pays requis (BJ, CI, SN, CM, TG, BF, ML, COD, COG).", status: 400 } });
-      }
-
-      if (!isApiKeyConfigured()) {
-        return res.status(503).json({ error: { code: "PROVIDER_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
-      }
-
-      const fullName = (customer_name || "Client SolvexPay").trim();
-      const nameParts = fullName.split(" ");
-      const firstName = nameParts[0] || "Client";
-      const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
-      const isWave = operator.toLowerCase() === "wave";
-      const returnUrl = isWave ? `https://solvexpay.com/api/payment/callback?reference=${reference}` : undefined;
-      const omniOperator = operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase();
-
-      const depositResponse = await omniPayService.deposit({
-        msisdn: phone,
-        amount,
-        reference,
-        firstName,
-        lastName,
-        operator: omniOperator,
-        returnUrl,
-      });
-
+      // ── Toutes les intégrations → page de paiement hébergée SolvexPay ──
       const transaction = await storage.createTransaction({
         userId: req.merchantUserId,
         type: "deposit",
         amount: String(amount),
         currency: "XOF",
-        provider: operator.toUpperCase(),
-        phoneNumber: phone,
+        provider: operator ? operator.toUpperCase() : null,
+        phoneNumber: phone || null,
         reference,
         status: "pending",
         description: description || `Paiement via API — ${appName}`,
         fees: String(feesAmount),
         payerName: customer_name || null,
         payerEmail: customer_email || null,
-        payerCountry: country,
-        payerOperator: operator.toUpperCase(),
+        payerCountry: country || null,
+        payerOperator: operator ? operator.toUpperCase() : null,
         apiKeyId: apiKeyId || null,
       } as any);
 
+      const hostedUrl = `https://solvexpay.com/pay-api/${transaction.id}`;
       res.status(201).json({
         id: transaction.id,
-        status: transaction.status,
+        status: "pending",
         amount,
         currency: "XOF",
-        operator: operator.toUpperCase(),
-        phone,
-        country,
         reference,
         description: transaction.description,
         fees: feesAmount,
         net_amount: amount - feesAmount,
-        payment_url: depositResponse.payment_url || null,
-        hosted_page: false,
-        omnipay_id: depositResponse.id || null,
+        payment_url: hostedUrl,
+        hosted_page: true,
         created_at: transaction.createdAt,
         metadata: metadata || null,
       });
