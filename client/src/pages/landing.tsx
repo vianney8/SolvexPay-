@@ -400,7 +400,7 @@ export default function LandingPage() {
               <a href="#tarifs" className="hover:text-foreground transition-colors">Tarifs</a>
               <a href="#pays" className="hover:text-foreground transition-colors">Pays</a>
               <a href="#support" className="hover:text-foreground transition-colors">Support</a>
-              <a href="https://docs.solvexpay.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors flex items-center gap-1.5">
+              <a href="/documentation" className="hover:text-foreground transition-colors flex items-center gap-1.5">
                 <BookOpen className="h-4 w-4" /> Documentation
               </a>
             </div>
@@ -458,7 +458,7 @@ export default function LandingPage() {
                     Créer un compte gratuit <ChevronRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <a href="https://docs.solvexpay.com" target="_blank" rel="noopener noreferrer">
+                <a href="/documentation">
                   <Button size="lg" variant="outline" className="h-12 px-8 text-base font-semibold border-border/80 hover:bg-muted/50">
                     <BookOpen className="mr-2 h-4 w-4" /> Documentation API
                   </Button>
@@ -917,7 +917,7 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
-              <a href="https://docs.solvexpay.com" target="_blank" rel="noopener noreferrer">
+              <a href="/documentation">
                 <Button variant="outline" className="font-semibold border-border/80 hover:bg-muted/50">
                   <BookOpen className="mr-2 h-4 w-4" /> Voir la documentation <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -1079,7 +1079,7 @@ export default function LandingPage() {
                 Commencer gratuitement <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <a href="https://docs.solvexpay.com" target="_blank" rel="noopener noreferrer">
+            <a href="/documentation">
               <Button size="lg" variant="outline" className="h-13 px-8 text-base font-semibold border-white/30 text-white bg-white/10 hover:bg-white/20 backdrop-blur-sm">
                 <BookOpen className="mr-2 h-4 w-4" /> Documentation
               </Button>
@@ -1135,9 +1135,9 @@ export default function LandingPage() {
               <p className="text-sm font-bold text-foreground uppercase tracking-wider">Ressources</p>
               <ul className="space-y-2.5">
                 {[
-                  { label: "Documentation", href: "https://docs.solvexpay.com" },
-                  { label: "Guide de démarrage", href: "https://docs.solvexpay.com" },
-                  { label: "Référence API", href: "https://docs.solvexpay.com" },
+                  { label: "Documentation", href: "/documentation" },
+                  { label: "Guide de démarrage", href: "/documentation" },
+                  { label: "Référence API", href: "/documentation" },
                   { label: "Support", href: "https://wa.me/22891840498" },
                 ].map((item) => (
                   <li key={item.label}>

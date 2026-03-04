@@ -88,6 +88,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/pay/:slug" component={PayPage} />
+      <Route path="/documentation" component={DocumentationPage} />
       {user ? (
         <AuthenticatedRoutes />
       ) : (

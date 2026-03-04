@@ -3,12 +3,14 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Key, Zap, Webhook, Globe, Lock, BookOpen, Copy, Check,
   ArrowRight, ShieldCheck, AlertCircle, CheckCircle2,
   Code2, Terminal, FileText, CreditCard, ArrowDownToLine,
 } from "lucide-react";
 import { Link } from "wouter";
+import solvexpayIcon from "@/assets/images/solvexpay-icon.jpg";
 
 const BASE_URL = "https://solvexpay.com";
 
@@ -95,12 +97,9 @@ function ParamRow({ name, type, required, desc }: { name: string; type: string; 
   );
 }
 
-export default function DocumentationPage() {
-  const [activeSection, setActiveSection] = useState("intro");
-
+function DocContent({ activeSection, setActiveSection }: { activeSection: string; setActiveSection: (s: string) => void }) {
   return (
-    <DashboardLayout title="Documentation API" breadcrumbs={[{ label: "Documentation API" }]}>
-      <div className="max-w-5xl">
+    <div className="max-w-5xl">
         <div className="flex gap-8">
 
           <aside className="hidden lg:block w-48 flex-shrink-0">
@@ -651,7 +650,59 @@ if (!response.ok) {
 
           </div>
         </div>
-      </div>
-    </DashboardLayout>
+    </div>
+  );
+}
+
+export default function DocumentationPage() {
+  const { user } = useAuth();
+  const [activeSection, setActiveSection] = useState("intro");
+
+  if (user) {
+    return (
+      <DashboardLayout title="Documentation API" breadcrumbs={[{ label: "Documentation API" }]}>
+        <DocContent activeSection={activeSection} setActiveSection={setActiveSection} />
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+          <Link href="/">
+            <div className="flex items-center gap-2.5 cursor-pointer">
+              <img src={solvexpayIcon} alt="SolvexPay" className="h-7 w-7 rounded-lg" />
+              <span className="font-black text-sm">
+                <span className="text-blue-800">Solvex</span><span className="text-slate-400">Pay</span>
+              </span>
+            </div>
+          </Link>
+          <div className="hidden md:flex items-center gap-5 text-sm font-medium text-muted-foreground">
+            {SECTIONS.map((s) => (
+              <a
+                key={s.id}
+                href={`#${s.id}`}
+                onClick={() => setActiveSection(s.id)}
+                className={`hover:text-foreground transition-colors ${activeSection === s.id ? "text-primary font-semibold" : ""}`}
+              >
+                {s.label}
+              </a>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/login">
+              <Button size="sm" variant="outline" className="font-semibold">Se connecter</Button>
+            </Link>
+            <Link href="/register">
+              <Button size="sm" className="font-bold">Créer un compte</Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <DocContent activeSection={activeSection} setActiveSection={setActiveSection} />
+      </main>
+    </div>
   );
 }
