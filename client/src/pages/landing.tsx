@@ -470,13 +470,6 @@ export default function LandingPage() {
       {/* COUNTRIES & OPERATORS */}
       <section id="pays" className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-14">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-4" style={{ background: "rgba(5,150,105,0.12)", border: "1px solid rgba(5,150,105,0.25)", color: "#34d399" }}>
-              Couverture géographique
-            </div>
-            <h2 className="text-4xl sm:text-5xl font-black text-white">9 pays · <span className="shimmer-text">10+ opérateurs</span></h2>
-            <p className="text-white/50 mt-3">Sélectionnez un pays pour explorer les opérateurs disponibles.</p>
-          </div>
 
           {/* Country pills */}
           <div className="flex flex-wrap gap-2 justify-center mb-10">
