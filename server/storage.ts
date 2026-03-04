@@ -80,7 +80,7 @@ export class DatabaseStorage implements IStorage {
     if (currency === "XOF" || currency === "XAF") {
       amountXOF = Math.floor(amount);
     } else if (currency === "CDF") {
-      amountXOF = Math.floor(amount * 0.23);
+      amountXOF = Math.floor(amount * 0.22);
     } else {
       amountXOF = Math.floor(amount);
     }
