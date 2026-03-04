@@ -1351,6 +1351,39 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/omnipay-rates", isAdmin, async (req, res) => {
+    try {
+      const deposit = parseFloat((await storage.getSystemSetting("omnipay_rate_deposit")) || "3");
+      const withdrawal = parseFloat((await storage.getSystemSetting("omnipay_rate_withdrawal")) || "3");
+      res.json({ deposit, withdrawal });
+    } catch (error) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/omnipay-rates", isAdmin, async (req, res) => {
+    try {
+      const { deposit, withdrawal } = req.body;
+      if (deposit !== undefined) {
+        const v = parseFloat(deposit);
+        if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide (0-100)" });
+        await storage.setSystemSetting("omnipay_rate_deposit", String(v));
+      }
+      if (withdrawal !== undefined) {
+        const v = parseFloat(withdrawal);
+        if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide (0-100)" });
+        await storage.setSystemSetting("omnipay_rate_withdrawal", String(v));
+      }
+      const updated = {
+        deposit: parseFloat((await storage.getSystemSetting("omnipay_rate_deposit")) || "3"),
+        withdrawal: parseFloat((await storage.getSystemSetting("omnipay_rate_withdrawal")) || "3"),
+      };
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   app.get("/api/admin/commissions", isAdmin, async (req, res) => {
     try {
       const { db } = await import("./db");
@@ -1361,6 +1394,9 @@ export async function registerRoutes(
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
+      const omnipayDepositRate = parseFloat((await storage.getSystemSetting("omnipay_rate_deposit")) || "3") / 100;
+      const omnipayWithdrawalRate = parseFloat((await storage.getSystemSetting("omnipay_rate_withdrawal")) || "3") / 100;
+
       const [totalFees] = await db.select({ total: sum(txTable.fees) }).from(txTable).where(eq(txTable.status, "completed"));
       const [monthFees] = await db.select({ total: sum(txTable.fees) }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, startOfMonth)));
       const [lastMonthFees] = await db.select({ total: sum(txTable.fees) }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, startOfLastMonth), lt(txTable.createdAt, endOfLastMonth)));
@@ -1368,15 +1404,54 @@ export async function registerRoutes(
       const [monthVolume] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, startOfMonth)));
       const [txCountCompleted] = await db.select({ count: count() }).from(txTable).where(eq(txTable.status, "completed"));
 
+      const [depositFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit"), eq(txTable.provider, "omnipay")));
+      const [withdrawalFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "withdrawal")));
+      const [monthDepositFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit"), eq(txTable.provider, "omnipay"), gte(txTable.createdAt, startOfMonth)));
+      const [monthWithdrawalFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "withdrawal"), gte(txTable.createdAt, startOfMonth)));
+
+      const totalDepositFees = parseFloat(depositFees.fees || "0");
+      const totalWithdrawalFees = parseFloat(withdrawalFees.fees || "0");
+      const totalDepositVolume = parseFloat(depositFees.volume || "0");
+      const totalWithdrawalVolume = parseFloat(withdrawalFees.volume || "0");
+      const monthDepositFeesVal = parseFloat(monthDepositFees.fees || "0");
+      const monthWithdrawalFeesVal = parseFloat(monthWithdrawalFees.fees || "0");
+      const monthDepositVolumeVal = parseFloat(monthDepositFees.volume || "0");
+      const monthWithdrawalVolumeVal = parseFloat(monthWithdrawalFees.volume || "0");
+
+      const omnipayCostDeposit = Math.round(totalDepositVolume * omnipayDepositRate);
+      const omnipayCostWithdrawal = Math.round(totalWithdrawalVolume * omnipayWithdrawalRate);
+      const omnipayCostDepositMonth = Math.round(monthDepositVolumeVal * omnipayDepositRate);
+      const omnipayCostWithdrawalMonth = Math.round(monthWithdrawalVolumeVal * omnipayWithdrawalRate);
+      const totalOmniPayCost = omnipayCostDeposit + omnipayCostWithdrawal;
+      const totalAdminFees = parseFloat(totalFees.total || "0");
+      const adminNetProfit = totalAdminFees - totalOmniPayCost;
+      const monthAdminFees = parseFloat(monthFees.total || "0");
+      const monthOmniPayCost = omnipayCostDepositMonth + omnipayCostWithdrawalMonth;
+      const monthNetProfit = monthAdminFees - monthOmniPayCost;
+
       res.json({
-        totalFees: parseFloat(totalFees.total || "0"),
-        monthFees: parseFloat(monthFees.total || "0"),
+        totalFees: totalAdminFees,
+        monthFees: monthAdminFees,
         lastMonthFees: parseFloat(lastMonthFees.total || "0"),
         totalVolume: parseFloat(totalVolume.total || "0"),
         monthVolume: parseFloat(monthVolume.total || "0"),
         completedTxCount: txCountCompleted.count,
-        estimatedOmniPayCut: parseFloat(totalVolume.total || "0") * 0.02,
-        estimatedNetRevenue: parseFloat(totalFees.total || "0") - parseFloat(totalVolume.total || "0") * 0.02,
+        totalDepositFees,
+        totalWithdrawalFees,
+        totalDepositVolume,
+        totalWithdrawalVolume,
+        omnipayCostDeposit,
+        omnipayCostWithdrawal,
+        totalOmniPayCost,
+        adminNetProfit,
+        monthDepositFees: monthDepositFeesVal,
+        monthWithdrawalFees: monthWithdrawalFeesVal,
+        monthOmniPayCost,
+        monthNetProfit,
+        omnipayDepositRate: omnipayDepositRate * 100,
+        omnipayWithdrawalRate: omnipayWithdrawalRate * 100,
+        estimatedOmniPayCut: totalOmniPayCost,
+        estimatedNetRevenue: adminNetProfit,
       });
     } catch (error) {
       console.error("Admin commissions error:", error);

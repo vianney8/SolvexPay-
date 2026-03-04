@@ -175,6 +175,7 @@ export default function AdminPage() {
   const [migrateDialog, setMigrateDialog] = useState(false);
   const [migrateData, setMigrateData] = useState({ fromUserId: "", toUserId: "", amount: "", motif: "" });
   const [serviceFeeEdit, setServiceFeeEdit] = useState<{ deposit: string; withdrawal: string; transfer: string } | null>(null);
+  const [omnipayRateEdit, setOmnipayRateEdit] = useState<{ deposit: string; withdrawal: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [linksSearch, setLinksSearch] = useState("");
@@ -322,6 +323,21 @@ export default function AdminPage() {
   const serviceFeesM = useMutation({
     mutationFn: (d: { deposit?: number; withdrawal?: number; transfer?: number }) => apiRequest("PATCH", "/api/admin/service-fees", d),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/service-fees"] }); toast({ title: "Frais de service mis à jour !" }); setServiceFeeEdit(null); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const { data: omnipayRates, isLoading: omnipayRatesLoading } = useQuery<{ deposit: number; withdrawal: number }>({
+    queryKey: ["/api/admin/omnipay-rates"],
+  });
+
+  const omnipayRatesM = useMutation({
+    mutationFn: (d: { deposit?: number; withdrawal?: number }) => apiRequest("PATCH", "/api/admin/omnipay-rates", d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay-rates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
+      toast({ title: "Taux OmniPay mis à jour !" });
+      setOmnipayRateEdit(null);
+    },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
@@ -751,23 +767,36 @@ export default function AdminPage() {
 
               <Card className="lg:col-span-2 border-border/50">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2"><Coins className="h-4 w-4 text-amber-500" />Revenus plateforme</CardTitle>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2"><Coins className="h-4 w-4 text-amber-500" />Bénéfices plateforme</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Frais collectés des utilisateurs</p>
                   {[
-                    { label: "Frais ce mois", val: fmt(commissions?.monthFees || 0), color: "text-emerald-600" },
-                    { label: "Frais mois dernier", val: fmt(commissions?.lastMonthFees || 0), color: "text-muted-foreground" },
-                    { label: "Frais totaux", val: fmt(commissions?.totalFees || 0), color: "text-indigo-600" },
+                    { label: `Dépôts (OmniPay)`, val: fmt(commissions?.totalDepositFees || 0), color: "text-emerald-600" },
+                    { label: `Retraits`, val: fmt(commissions?.totalWithdrawalFees || 0), color: "text-cyan-600" },
+                    { label: "Total frais perçus", val: fmt(commissions?.totalFees || 0), color: "text-indigo-600", bold: true },
                   ].map(item => (
-                    <div key={item.label} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
+                    <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">
                       <span className="text-xs text-muted-foreground">{item.label}</span>
-                      <span className={`text-sm font-black ${item.color}`}>{comLoading ? "—" : item.val}</span>
+                      <span className={`text-sm font-${(item as any).bold ? "black" : "semibold"} ${item.color}`}>{comLoading ? "—" : item.val}</span>
                     </div>
                   ))}
-                  <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                    <p className="text-xs text-muted-foreground">Revenu net estimé</p>
-                    <p className="text-lg font-black text-amber-600">{comLoading ? "—" : fmt(Math.max(0, commissions?.estimatedNetRevenue || 0))}</p>
-                    <p className="text-xs text-muted-foreground">après coût OmniPay ~2%</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-3 mb-2">Coût OmniPay déduit</p>
+                  {[
+                    { label: `Dépôts (@${commissions?.omnipayDepositRate ?? omnipayRates?.deposit ?? 3}%)`, val: fmt(commissions?.omnipayCostDeposit || 0), color: "text-rose-500" },
+                    { label: `Retraits (@${commissions?.omnipayWithdrawalRate ?? omnipayRates?.withdrawal ?? 3}%)`, val: fmt(commissions?.omnipayCostWithdrawal || 0), color: "text-rose-500" },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">
+                      <span className="text-xs text-muted-foreground">{item.label}</span>
+                      <span className={`text-sm font-semibold ${item.color}`}>{comLoading ? "—" : `- ${item.val}`}</span>
+                    </div>
+                  ))}
+                  <div className={`mt-3 p-3 rounded-xl border ${(commissions?.adminNetProfit ?? 0) >= 0 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-rose-500/10 border-rose-500/20"}`}>
+                    <p className="text-xs text-muted-foreground">Bénéfice net admin</p>
+                    <p className={`text-xl font-black ${(commissions?.adminNetProfit ?? 0) >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                      {comLoading ? "—" : `${fmt(commissions?.adminNetProfit || 0)} XOF`}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Ce mois : {comLoading ? "—" : `${fmt(commissions?.monthNetProfit || 0)} XOF`}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1307,6 +1336,91 @@ export default function AdminPage() {
                     { label: "Dépôt & Liens", value: serviceFees?.deposit ?? 7, icon: <Banknote className="h-4 w-4 text-emerald-600" />, bg: "bg-emerald-500/8" },
                     { label: "Retrait", value: serviceFees?.withdrawal ?? 7, icon: <Send className="h-4 w-4 text-rose-600" />, bg: "bg-rose-500/8" },
                     { label: "Transfert", value: serviceFees?.transfer ?? 7, icon: <ArrowRightLeft className="h-4 w-4 text-blue-600" />, bg: "bg-blue-500/8" },
+                  ].map(({ label, value, icon, bg }) => (
+                    <div key={label} className={`rounded-xl p-4 ${bg} border border-border/30 text-center`}>
+                      <div className="flex justify-center mb-2">{icon}</div>
+                      <p className="text-2xl font-black">{value}%</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── TAUX OMNIPAY (COÛT RÉEL) ── */}
+            <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                    <TrendingDown className="h-4 w-4 text-rose-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">Taux de coût OmniPay</p>
+                    <p className="text-xs text-muted-foreground">Utilisé pour calculer votre bénéfice net réel</p>
+                  </div>
+                </div>
+                {!omnipayRateEdit && (
+                  <Button size="sm" variant="outline" className="h-8 text-xs font-bold gap-1.5 rounded-xl"
+                    onClick={() => setOmnipayRateEdit({
+                      deposit: String(omnipayRates?.deposit ?? 3),
+                      withdrawal: String(omnipayRates?.withdrawal ?? 3),
+                    })}
+                    data-testid="btn-edit-omnipay-rates"
+                  >
+                    <PenLine className="h-3 w-3" /> Modifier
+                  </Button>
+                )}
+              </div>
+
+              {omnipayRatesLoading ? (
+                <div className="p-5 space-y-3">
+                  {[1,2].map(i => <Skeleton key={i} className="h-12 rounded-xl" />)}
+                </div>
+              ) : omnipayRateEdit ? (
+                <div className="p-5 space-y-4">
+                  <div className="p-3 rounded-xl bg-amber-500/8 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
+                    Entrez les taux que OmniPay vous facture (voir votre contrat OmniPay). Par défaut : 3% collecte, 3% décaissement.
+                  </div>
+                  {[
+                    { key: "deposit" as const, label: "Collecte (PAY-IN) — Dépôts", icon: <TrendingUp className="h-4 w-4 text-rose-600" /> },
+                    { key: "withdrawal" as const, label: "Décaissement (PAY-OUT) — Retraits", icon: <TrendingDown className="h-4 w-4 text-rose-600" /> },
+                  ].map(({ key, label, icon }) => (
+                    <div key={key} className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 w-64 flex-shrink-0">
+                        {icon}
+                        <span className="text-sm font-semibold">{label}</span>
+                      </div>
+                      <div className="relative flex-1 max-w-[140px]">
+                        <Input
+                          type="number" min="0" max="100" step="0.5"
+                          value={omnipayRateEdit[key]}
+                          onChange={e => setOmnipayRateEdit(prev => prev ? { ...prev, [key]: e.target.value } : prev)}
+                          className="pr-8 h-10 text-sm font-bold"
+                          data-testid={`input-omnipay-rate-${key}`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-bold">%</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="outline" className="h-9 text-xs rounded-xl" onClick={() => setOmnipayRateEdit(null)}>Annuler</Button>
+                    <Button size="sm" className="h-9 text-xs rounded-xl font-bold"
+                      disabled={omnipayRatesM.isPending}
+                      onClick={() => omnipayRatesM.mutate({
+                        deposit: parseFloat(omnipayRateEdit.deposit),
+                        withdrawal: parseFloat(omnipayRateEdit.withdrawal),
+                      })}
+                      data-testid="btn-save-omnipay-rates"
+                    >
+                      {omnipayRatesM.isPending ? "Enregistrement..." : "Enregistrer"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-5 grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Collecte (PAY-IN)", value: omnipayRates?.deposit ?? 3, icon: <TrendingUp className="h-4 w-4 text-rose-600" />, bg: "bg-rose-500/8" },
+                    { label: "Décaissement (PAY-OUT)", value: omnipayRates?.withdrawal ?? 3, icon: <TrendingDown className="h-4 w-4 text-rose-600" />, bg: "bg-rose-500/8" },
                   ].map(({ label, value, icon, bg }) => (
                     <div key={label} className={`rounded-xl p-4 ${bg} border border-border/30 text-center`}>
                       <div className="flex justify-center mb-2">{icon}</div>
