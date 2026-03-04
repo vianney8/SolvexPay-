@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
 export default function PayPage() {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
+  const phoneInputRef = useRef<HTMLInputElement>(null);
 
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
@@ -83,6 +84,77 @@ export default function PayPage() {
   useEffect(() => { setOperator(""); }, [country]);
 
   const { data: paymentLink, isLoading, error } = useQuery<PaymentLink>({
+    queryKey: ["/api/payment-links/public", slug],
+    queryFn: async () => {
+      const res = await fetch(`/api/payment-links/public/${slug}`);
+      if (!res.ok) throw new Error("not found");
+      return res.json();
+    },
+  });
+
+  const payMutation = useMutation({
+    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName?: string; customerEmail?: string }) => {
+      const res = await apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setPendingReference(data.sendavaReference || data.reference);
+      setPaymentStatus("processing");
+      if (data.paymentUrl) {
+        window.open(data.paymentUrl, "_blank");
+      }
+      toast({ title: "Paiement initié", description: "Confirmez le paiement sur votre téléphone." });
+    },
+    onError: () => {
+      setPaymentStatus("error");
+      toast({ title: "Erreur", description: "Le paiement n'a pas pu être initié.", variant: "destructive" });
+    },
+  });
+
+  useEffect(() => {
+    if (!pendingReference || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/payment-links/verify-public", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference: pendingReference }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status) setVerifyStatus(data.status);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [pendingReference, verifyStatus]);
+
+  const handlePay = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (payMutation.isPending) return;
+    if (!phone || !operator || !country) {
+      toast({ title: "Champs requis", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
+      return;
+    }
+    const isCustom = (paymentLink as any)?.allowCustomAmount;
+    const parsedCustom = parseFloat(customAmount);
+    if (isCustom && (!customAmount || parsedCustom < 100)) return;
+    const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    payMutation.mutate({
+      phoneNumber: fullPhone,
+      operator,
+      country,
+      customerName: fullName || undefined,
+      customerEmail: customerEmail || undefined,
+      ...(isCustom ? { customAmount: parsedCustom } : {}),
+    } as any);
+  };
+
+  if (isLoading) {
+    return (
+      <PageWrapper>
+        <div className="bg-white rounded-3xl shadow-lg p-6 space-y-5">
           <Skeleton className="h-48 w-full rounded-2xl" />
           <Skeleton className="h-6 w-40 mx-auto" />
           <Skeleton className="h-14 w-48 mx-auto" />
@@ -132,6 +204,9 @@ export default function PayPage() {
     };
     const cfg = statusConfig[verifyStatus] || statusConfig.PENDING;
     const StatusIcon = cfg.icon;
+    const displayAmount = customAmount && parseFloat(customAmount) > 0
+      ? formatAmount(parseFloat(customAmount))
+      : formatAmount(paymentLink.amount);
     return (
       <PageWrapper>
         <div className="bg-white rounded-3xl shadow-lg p-8 text-center space-y-5">
@@ -144,7 +219,7 @@ export default function PayPage() {
           </div>
           <div className="bg-gray-50 rounded-2xl p-4">
             <p className="text-sm text-gray-500">Montant</p>
-            <p className="text-3xl font-black text-gray-900">{formatAmount(paymentLink.amount)} <span className="text-lg font-bold text-gray-400">{paymentLink.currency}</span></p>
+            <p className="text-3xl font-black text-gray-900">{displayAmount} <span className="text-lg font-bold text-gray-400">{paymentLink.currency}</span></p>
             <p className="text-sm font-medium text-gray-700 mt-1">{paymentLink.name}</p>
           </div>
           {pendingReference && <p className="text-xs text-gray-400 font-mono">Réf : {pendingReference}</p>}
@@ -274,7 +349,10 @@ export default function PayPage() {
                   <button
                     key={op}
                     type="button"
-                    onClick={() => setOperator(op)}
+                    onClick={() => {
+                      setOperator(op);
+                      setTimeout(() => phoneInputRef.current?.focus(), 50);
+                    }}
                     className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
                       operator === op
                         ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-100"
@@ -303,9 +381,11 @@ export default function PayPage() {
                   <span className="text-sm font-semibold text-gray-500">{selectedCountry.prefix}</span>
                 </div>
                 <Input
+                  ref={phoneInputRef}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/[^0-9\s]/g, ""))}
                   type="tel"
+                  inputMode="numeric"
                   placeholder={selectedCountry.phonePlaceholder}
                   required
                   className="flex-1 h-12 border-0 rounded-none focus-visible:ring-0 bg-white"
