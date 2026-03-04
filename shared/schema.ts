@@ -1,4 +1,4 @@
-import { sql, relations } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, decimal, timestamp, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -59,6 +59,23 @@ export const wallets = pgTable("wallets", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const paymentMethods = pgTable("payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  category: text("category").notNull().default("mobile_money"),
+  isActive: boolean("is_active").notNull().default(true),
+  inMaintenance: boolean("in_maintenance").notNull().default(false),
+  feeType: text("fee_type").notNull().default("percentage"),
+  feeValue: decimal("fee_value", { precision: 5, scale: 2 }).notNull().default("5"),
+  countries: text("countries").array().default([]),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({ id: true });
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
 
 // Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({

@@ -940,19 +940,210 @@ export async function registerRoutes(
   app.patch("/api/admin/users/:id/kyc", isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { kycStatus } = req.body;
+      const { kycStatus, rejectionReason } = req.body;
       if (!["not_started", "pending", "verified", "rejected"].includes(kycStatus)) {
         return res.status(400).json({ message: "Statut KYC invalide" });
       }
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
       const { eq } = await import("drizzle-orm");
-      const [updated] = await db.update(usersTable).set({ kycStatus, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
+      const updateData: any = { kycStatus, updatedAt: new Date() };
+      if (kycStatus === "rejected" && rejectionReason) updateData.kycRejectionReason = rejectionReason;
+      if (kycStatus === "verified") updateData.kycRejectionReason = null;
+      const [updated] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
       const { passwordHash: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
       console.error("Admin KYC update error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/block", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isBlocked } = req.body;
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await db.update(usersTable).set({ isBlocked: !!isBlocked, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
+      const { passwordHash: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Admin block user error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/fee", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { customFeeRate } = req.body;
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await db.update(usersTable).set({ customFeeRate: customFeeRate ? String(customFeeRate) : null, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
+      const { passwordHash: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Admin fee update error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/users/:id/transactions", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const txList = await storage.getTransactions(id);
+      res.json(txList);
+    } catch (error) {
+      console.error("Admin user tx error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/big-users", isAdmin, async (req, res) => {
+    try {
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { desc, count, sum, eq } = await import("drizzle-orm");
+      const { transactions: txTable, wallets: walletsTable } = await import("@shared/schema");
+      const allUsers = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
+      const enriched = await Promise.all(allUsers.map(async (u) => {
+        const wallet = await storage.getWallet(u.id);
+        const txs = await storage.getTransactions(u.id);
+        const totalVolume = txs.reduce((s, t) => s + parseFloat(t.amount), 0);
+        const last24h = txs.filter(t => t.createdAt && Date.now() - new Date(t.createdAt).getTime() < 86400000);
+        const { passwordHash: _, ...safe } = u;
+        return { ...safe, wallet, txCount: txs.length, totalVolume, last24hCount: last24h.length, last24hVolume: last24h.reduce((s, t) => s + parseFloat(t.amount), 0) };
+      }));
+      const sorted = enriched.sort((a, b) => parseFloat(b.wallet?.balanceXOF || "0") - parseFloat(a.wallet?.balanceXOF || "0"));
+      res.json(sorted.slice(0, 50));
+    } catch (error) {
+      console.error("Admin big users error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/commissions", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { sum, count, eq, and, gte, lt } = await import("drizzle-orm");
+      const { transactions: txTable } = await import("@shared/schema");
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const [totalFees] = await db.select({ total: sum(txTable.fees) }).from(txTable).where(eq(txTable.status, "completed"));
+      const [monthFees] = await db.select({ total: sum(txTable.fees) }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, startOfMonth)));
+      const [lastMonthFees] = await db.select({ total: sum(txTable.fees) }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, startOfLastMonth), lt(txTable.createdAt, endOfLastMonth)));
+      const [totalVolume] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.status, "completed"));
+      const [monthVolume] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, startOfMonth)));
+      const [txCountCompleted] = await db.select({ count: count() }).from(txTable).where(eq(txTable.status, "completed"));
+
+      res.json({
+        totalFees: parseFloat(totalFees.total || "0"),
+        monthFees: parseFloat(monthFees.total || "0"),
+        lastMonthFees: parseFloat(lastMonthFees.total || "0"),
+        totalVolume: parseFloat(totalVolume.total || "0"),
+        monthVolume: parseFloat(monthVolume.total || "0"),
+        completedTxCount: txCountCompleted.count,
+        estimatedOmniPayCut: parseFloat(totalVolume.total || "0") * 0.02,
+        estimatedNetRevenue: parseFloat(totalFees.total || "0") - parseFloat(totalVolume.total || "0") * 0.02,
+      });
+    } catch (error) {
+      console.error("Admin commissions error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/stats/period", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { count, sum, eq, and, gte } = await import("drizzle-orm");
+      const { transactions: txTable } = await import("@shared/schema");
+      const period = (req.query.period as string) || "month";
+      const now = new Date();
+      let since: Date;
+      if (period === "day") since = new Date(now.getTime() - 86400000);
+      else if (period === "week") since = new Date(now.getTime() - 7 * 86400000);
+      else since = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const [pTotal] = await db.select({ count: count(), volume: sum(txTable.amount) }).from(txTable).where(gte(txTable.createdAt, since));
+      const [pCompleted] = await db.select({ count: count() }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, since)));
+      const [pFailed] = await db.select({ count: count() }).from(txTable).where(and(eq(txTable.status, "failed"), gte(txTable.createdAt, since)));
+      const [pPending] = await db.select({ count: count() }).from(txTable).where(and(eq(txTable.status, "pending"), gte(txTable.createdAt, since)));
+      const [pDeposits] = await db.select({ count: count(), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.type, "deposit"), gte(txTable.createdAt, since)));
+      const [pWithdrawals] = await db.select({ count: count(), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.type, "withdrawal"), gte(txTable.createdAt, since)));
+      const [pTransfers] = await db.select({ count: count(), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.type, "transfer"), gte(txTable.createdAt, since)));
+      const [pFees] = await db.select({ total: sum(txTable.fees) }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, since)));
+
+      res.json({
+        period,
+        since: since.toISOString(),
+        total: pTotal.count,
+        volume: parseFloat(pTotal.volume || "0"),
+        completed: pCompleted.count,
+        failed: pFailed.count,
+        pending: pPending.count,
+        successRate: pTotal.count > 0 ? Math.round((pCompleted.count / pTotal.count) * 100) : 0,
+        deposits: { count: pDeposits.count, volume: parseFloat(pDeposits.volume || "0") },
+        withdrawals: { count: pWithdrawals.count, volume: parseFloat(pWithdrawals.volume || "0") },
+        transfers: { count: pTransfers.count, volume: parseFloat(pTransfers.volume || "0") },
+        fees: parseFloat(pFees.total || "0"),
+      });
+    } catch (error) {
+      console.error("Admin period stats error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/payment-methods", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { paymentMethods: pmTable } = await import("@shared/schema");
+      const methods = await db.select().from(pmTable);
+      if (methods.length === 0) {
+        const defaultMethods = [
+          { code: "MTN", name: "MTN Mobile Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "CM", "COG"] },
+          { code: "Orange", name: "Orange Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "BF", "CM", "ML", "SN"] },
+          { code: "Moov", name: "Moov Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "BF", "TG", "ML"] },
+          { code: "Wave", name: "Wave", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "SN"] },
+          { code: "TMoney", name: "T-Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["TG"] },
+          { code: "Free", name: "Free Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["SN"] },
+          { code: "Airtel", name: "Airtel Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["COD", "COG"] },
+          { code: "Vodacom", name: "Vodacom M-Pesa", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["COD"] },
+        ];
+        const inserted = await db.insert(pmTable).values(defaultMethods as any).returning();
+        return res.json(inserted);
+      }
+      res.json(methods);
+    } catch (error) {
+      console.error("Admin payment methods error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/payment-methods/:code", isAdmin, async (req, res) => {
+    try {
+      const { code } = req.params;
+      const { isActive, inMaintenance, feeValue, feeType } = req.body;
+      const { db } = await import("./db");
+      const { paymentMethods: pmTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const updateData: any = { updatedAt: new Date() };
+      if (isActive !== undefined) updateData.isActive = isActive;
+      if (inMaintenance !== undefined) updateData.inMaintenance = inMaintenance;
+      if (feeValue !== undefined) updateData.feeValue = String(feeValue);
+      if (feeType !== undefined) updateData.feeType = feeType;
+      const [updated] = await db.update(pmTable).set(updateData).where(eq(pmTable.code, code)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Admin update payment method error:", error);
       res.status(500).json({ message: "Erreur serveur" });
     }
   });
