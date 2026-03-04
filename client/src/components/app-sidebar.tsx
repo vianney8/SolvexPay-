@@ -181,7 +181,7 @@ export function AppSidebar() {
                   </Avatar>
                 ) : (
                   <div className="ring-2 ring-violet-100 rounded-full flex-shrink-0">
-                    <UserAvatar userId={user?.id} email={user?.email || undefined} size={36} />
+                    <UserAvatar firstName={user?.firstName || undefined} lastName={user?.lastName || undefined} userId={user?.id} email={user?.email || undefined} size={36} />
                   </div>
                 )}
                 <div className="flex-1 text-left min-w-0">
