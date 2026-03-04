@@ -39,6 +39,7 @@ export interface IStorage {
   incrementPaymentLinkUsage(id: string): Promise<void>;
   
   getApiKeys(userId: string): Promise<ApiKey[]>;
+  findApiKeyByFullKey(key: string): Promise<ApiKey | undefined>;
   createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
   updateApiKey(id: string, data: Partial<ApiKey>): Promise<ApiKey | undefined>;
   deleteApiKey(id: string): Promise<void>;
@@ -174,6 +175,14 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(apiKeys.createdAt));
   }
 
+  async findApiKeyByFullKey(key: string): Promise<ApiKey | undefined> {
+    const [found] = await db
+      .select()
+      .from(apiKeys)
+      .where(eq(apiKeys.fullKey, key));
+    return found;
+  }
+
   async createApiKey(apiKey: InsertApiKey): Promise<ApiKey> {
     const [key] = await db
       .insert(apiKeys)
@@ -262,8 +271,8 @@ export class DatabaseStorage implements IStorage {
 }
 
 export function generateApiKey(): { key: string; prefix: string; hash: string } {
-  const key = `sk_${randomBytes(24).toString("hex")}`;
-  const prefix = key.substring(0, 12);
+  const key = `sk_live_${randomBytes(24).toString("hex")}`;
+  const prefix = key.substring(0, 16);
   const hash = createHash("sha256").update(key).digest("hex");
   return { key, prefix, hash };
 }

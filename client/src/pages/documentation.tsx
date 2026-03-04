@@ -2,48 +2,47 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   Key, Zap, Webhook, Globe, Lock, BookOpen, Copy, Check,
-  ArrowRight, ShieldCheck, AlertCircle, CheckCircle2, XCircle,
+  ArrowRight, ShieldCheck, AlertCircle, CheckCircle2,
   Code2, Terminal, FileText, CreditCard, ArrowDownToLine,
 } from "lucide-react";
+import { Link } from "wouter";
 
-const BASE_URL = "https://api.solvexpay.com";
+const BASE_URL = "https://solvexpay.com";
 
 const SECTIONS = [
   { id: "intro", label: "Introduction", icon: BookOpen },
   { id: "auth", label: "Authentification", icon: Key },
   { id: "deposit", label: "Initier un dépôt", icon: ArrowDownToLine },
   { id: "status", label: "Vérifier le statut", icon: CheckCircle2 },
-  { id: "balance", label: "Consulter le solde", icon: CreditCard },
+  { id: "balance", label: "Solde", icon: CreditCard },
   { id: "webhooks", label: "Webhooks", icon: Webhook },
   { id: "errors", label: "Codes d'erreur", icon: AlertCircle },
 ];
 
 const OPERATORS = [
-  { code: "MTN", countries: ["BJ", "CI", "CM", "COG"], label: "MTN Mobile Money" },
-  { code: "ORANGE", countries: ["CI", "BF", "CM", "ML", "SN"], label: "Orange Money" },
-  { code: "WAVE", countries: ["CI", "SN"], label: "Wave" },
-  { code: "MOOV", countries: ["BJ", "CI", "BF", "TG", "ML"], label: "Moov Money" },
-  { code: "TMONEY", countries: ["TG"], label: "T-Money" },
-  { code: "AIRTEL", countries: ["COD", "COG"], label: "Airtel Money" },
-  { code: "VODACOM", countries: ["COD"], label: "Vodacom M-Pesa" },
-  { code: "FREE", countries: ["SN"], label: "Free Money" },
+  { code: "MTN", countries: "BJ, CI, CM, COG" },
+  { code: "ORANGE", countries: "CI, BF, CM, ML, SN" },
+  { code: "WAVE", countries: "CI, SN" },
+  { code: "MOOV", countries: "BJ, CI, BF, TG, ML" },
+  { code: "TMONEY", countries: "TG" },
+  { code: "AIRTEL", countries: "COD, COG" },
+  { code: "VODACOM", countries: "COD" },
+  { code: "FREE", countries: "SN" },
 ];
 
 const ERRORS = [
-  { code: 400, key: "INVALID_AMOUNT", desc: "Le montant est invalide ou inférieur au minimum requis" },
+  { code: 400, key: "INVALID_AMOUNT", desc: "Montant invalide ou inférieur au minimum (100 XOF)" },
   { code: 400, key: "INVALID_PHONE", desc: "Numéro de téléphone invalide ou format incorrect" },
-  { code: 400, key: "INVALID_OPERATOR", desc: "Opérateur non reconnu ou non disponible dans ce pays" },
+  { code: 400, key: "INVALID_OPERATOR", desc: "Opérateur non reconnu ou non disponible" },
+  { code: 400, key: "INVALID_COUNTRY", desc: "Code pays invalide ou non supporté" },
   { code: 401, key: "UNAUTHORIZED", desc: "Clé API manquante, invalide ou désactivée" },
   { code: 403, key: "KYC_REQUIRED", desc: "Vérification KYC requise pour utiliser l'API" },
   { code: 404, key: "NOT_FOUND", desc: "Transaction introuvable avec cet identifiant" },
-  { code: 422, key: "INSUFFICIENT_BALANCE", desc: "Solde insuffisant pour effectuer cette opération" },
-  { code: 429, key: "RATE_LIMITED", desc: "Trop de requêtes, réessayez dans quelques secondes" },
-  { code: 500, key: "SERVER_ERROR", desc: "Erreur interne du serveur, contactez le support" },
-  { code: 503, key: "PROVIDER_UNAVAILABLE", desc: "L'opérateur Mobile Money est temporairement indisponible" },
+  { code: 503, key: "PROVIDER_UNAVAILABLE", desc: "Opérateur Mobile Money temporairement indisponible" },
+  { code: 500, key: "SERVER_ERROR", desc: "Erreur interne, contactez le support" },
 ];
 
 function CodeBlock({ code, lang = "bash" }: { code: string; lang?: string }) {
@@ -56,15 +55,10 @@ function CodeBlock({ code, lang = "bash" }: { code: string; lang?: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <div className="relative group rounded-xl overflow-hidden border border-border/50">
+    <div className="relative rounded-xl overflow-hidden border border-border/50">
       <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-white/10">
         <span className="text-xs text-slate-400 font-mono">{lang}</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-slate-400 hover:text-white hover:bg-white/10 gap-1"
-          onClick={handleCopy}
-        >
+        <Button variant="ghost" size="sm" className="h-6 px-2 text-slate-400 hover:text-white hover:bg-white/10 gap-1" onClick={handleCopy}>
           {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           <span className="text-xs">{copied ? "Copié" : "Copier"}</span>
         </Button>
@@ -80,8 +74,6 @@ function MethodBadge({ method }: { method: string }) {
   const colors: Record<string, string> = {
     GET: "bg-blue-500 text-white",
     POST: "bg-emerald-500 text-white",
-    PATCH: "bg-amber-500 text-white",
-    DELETE: "bg-red-500 text-white",
   };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold font-mono ${colors[method] || "bg-muted"}`}>
@@ -90,8 +82,17 @@ function MethodBadge({ method }: { method: string }) {
   );
 }
 
-function SectionAnchor({ id }: { id: string }) {
-  return <div id={id} className="-mt-20 pt-20" />;
+function ParamRow({ name, type, required, desc }: { name: string; type: string; required: boolean; desc: string }) {
+  return (
+    <div className="flex items-start gap-3 px-4 py-2.5 text-xs border-b border-border/40 last:border-0">
+      <code className="font-mono font-bold text-primary w-32 flex-shrink-0">{name}</code>
+      <code className="font-mono text-muted-foreground w-14 flex-shrink-0">{type}</code>
+      <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold ${required ? "bg-red-500/10 text-red-600" : "bg-muted text-muted-foreground"}`}>
+        {required ? "requis" : "optionnel"}
+      </span>
+      <span className="text-muted-foreground">{desc}</span>
+    </div>
+  );
 }
 
 export default function DocumentationPage() {
@@ -101,6 +102,7 @@ export default function DocumentationPage() {
     <DashboardLayout title="Documentation API" breadcrumbs={[{ label: "Documentation API" }]}>
       <div className="max-w-5xl">
         <div className="flex gap-8">
+
           <aside className="hidden lg:block w-48 flex-shrink-0">
             <div className="sticky top-24 space-y-1">
               {SECTIONS.map((s) => (
@@ -114,13 +116,20 @@ export default function DocumentationPage() {
                   {s.label}
                 </a>
               ))}
+              <div className="pt-4 border-t border-border/50 mt-4">
+                <Link href="/api-keys">
+                  <Button size="sm" className="w-full gap-1.5 text-xs font-bold">
+                    <Key className="h-3.5 w-3.5" /> Mes clés API
+                  </Button>
+                </Link>
+              </div>
             </div>
           </aside>
 
           <div className="flex-1 min-w-0 space-y-12">
 
-            <SectionAnchor id="intro" />
-            <section className="space-y-6">
+            {/* INTRO */}
+            <section id="intro" className="space-y-5 scroll-mt-20">
               <div
                 className="rounded-3xl p-7 text-white"
                 style={{ background: "linear-gradient(135deg, hsl(220 83% 48%) 0%, hsl(260 70% 60%) 100%)" }}
@@ -130,27 +139,25 @@ export default function DocumentationPage() {
                     <BookOpen className="h-6 w-6" />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-black">Documentation API</h1>
-                    <p className="text-white/70 text-sm">SolvexPay — Paiements Mobile Money en Afrique</p>
+                    <h1 className="text-2xl font-black">Documentation API SolvexPay</h1>
+                    <p className="text-white/70 text-sm">Paiements Mobile Money — Afrique francophone</p>
                   </div>
                 </div>
                 <p className="text-white/80 text-sm leading-relaxed">
-                  L'API SolvexPay vous permet d'intégrer les paiements Mobile Money dans vos applications.
-                  Acceptez des paiements depuis 9 pays africains via MTN, Orange, Wave, Moov et plus.
+                  Intégrez les paiements Mobile Money dans votre application en quelques lignes de code. SolvexPay agrège 8 opérateurs dans 9 pays africains via notre partenaire OmniPay.
                 </p>
                 <div className="flex flex-wrap gap-2 mt-4">
-                  <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">REST JSON</span>
+                  <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">REST · JSON</span>
                   <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">HTTPS requis</span>
-                  <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">9 pays</span>
-                  <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">8 opérateurs</span>
+                  <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">9 pays · 8 opérateurs</span>
                 </div>
               </div>
 
               <div className="grid sm:grid-cols-3 gap-4">
                 {[
-                  { icon: Zap, title: "Rapide", desc: "Initiation de paiement en moins de 2 secondes", color: "bg-amber-500/10 text-amber-600" },
-                  { icon: ShieldCheck, title: "Sécurisé", desc: "Signatures HMAC-SHA256 sur tous les webhooks", color: "bg-emerald-500/10 text-emerald-600" },
-                  { icon: Globe, title: "Pan-africain", desc: "9 pays, 8 opérateurs Mobile Money", color: "bg-blue-500/10 text-blue-600" },
+                  { icon: Zap, title: "Démarrage rapide", desc: "Créez une clé API et faites votre premier appel en 5 minutes", color: "bg-amber-500/10 text-amber-600" },
+                  { icon: ShieldCheck, title: "Sécurisé", desc: "Signatures HMAC-SHA256 sur tous les webhooks reçus", color: "bg-emerald-500/10 text-emerald-600" },
+                  { icon: Globe, title: "Multi-pays", desc: "MTN, Orange, Wave, Moov et plus selon le pays", color: "bg-blue-500/10 text-blue-600" },
                 ].map((item) => (
                   <Card key={item.title} className="border-border/60">
                     <CardContent className="p-4">
@@ -165,27 +172,28 @@ export default function DocumentationPage() {
               </div>
 
               <Card className="border-border/60">
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Terminal className="h-4 w-4" /> URL de base
+                    <Terminal className="h-4 w-4" /> URL de base de l'API
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="bg-muted/60 rounded-xl px-4 py-3 border border-border/60 font-mono text-sm font-semibold text-primary">
-                    {BASE_URL}
+                    {BASE_URL}/api/v1
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">Toutes les requêtes doivent utiliser HTTPS. Les requêtes HTTP sont rejetées.</p>
                 </CardContent>
               </Card>
             </section>
 
-            <SectionAnchor id="auth" />
-            <section className="space-y-5">
+            {/* AUTHENTIFICATION */}
+            <section id="auth" className="space-y-5 scroll-mt-20">
               <div>
                 <h2 className="text-xl font-black flex items-center gap-2">
                   <Key className="h-5 w-5 text-primary" /> Authentification
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Toutes les requêtes API doivent inclure votre clé API dans le header <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">Authorization</code>.
+                  Chaque requête doit inclure votre clé API dans le header <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">Authorization</code> sous la forme <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">Bearer sk_live_xxx</code>.
                 </p>
               </div>
 
@@ -193,71 +201,76 @@ export default function DocumentationPage() {
                 <CardContent className="p-4 flex items-start gap-3">
                   <Lock className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-bold text-amber-700">Gardez votre clé secrète</p>
-                    <p className="text-xs text-amber-600 mt-0.5">Ne l'exposez jamais côté client (navigateur). Faites vos appels API uniquement depuis votre serveur backend.</p>
+                    <p className="text-sm font-bold text-amber-700">Clé confidentielle — côté serveur uniquement</p>
+                    <p className="text-xs text-amber-600 mt-0.5">N'exposez jamais votre clé API dans du code JavaScript frontend, une app mobile ou un dépôt public. Utilisez des variables d'environnement.</p>
                   </div>
                 </CardContent>
               </Card>
 
-              <CodeBlock lang="bash — Authentification" code={`# Incluez votre clé API dans chaque requête
-curl -X POST ${BASE_URL}/v1/deposit \\
+              <CodeBlock lang="bash" code={`curl -X POST ${BASE_URL}/api/v1/deposit \\
   -H "Authorization: Bearer sk_live_VOTRE_CLE_API" \\
-  -H "Content-Type: application/json"`} />
+  -H "Content-Type: application/json" \\
+  -d '{ ... }'`} />
 
-              <CodeBlock lang="javascript — Node.js" code={`const axios = require('axios');
+              <CodeBlock lang="javascript (Node.js)" code={`// Stockez votre clé dans une variable d'environnement
+// SOLVEXPAY_API_KEY=sk_live_xxxx dans votre .env
 
-const client = axios.create({
-  baseURL: '${BASE_URL}',
+const response = await fetch('${BASE_URL}/api/v1/deposit', {
+  method: 'POST',
   headers: {
     'Authorization': \`Bearer \${process.env.SOLVEXPAY_API_KEY}\`,
     'Content-Type': 'application/json',
   },
+  body: JSON.stringify({ ... }),
 });`} />
             </section>
 
-            <SectionAnchor id="deposit" />
-            <section className="space-y-5">
+            {/* DÉPÔT */}
+            <section id="deposit" className="space-y-5 scroll-mt-20">
               <div>
                 <h2 className="text-xl font-black flex items-center gap-2">
-                  <ArrowDownToLine className="h-5 w-5 text-primary" /> Initier un dépôt (paiement entrant)
+                  <ArrowDownToLine className="h-5 w-5 text-primary" /> Initier un dépôt
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Demandez à un client de payer via son téléphone Mobile Money. Il reçoit une notification push ou USSD sur son téléphone.
+                  Demande au client de payer via son téléphone Mobile Money. Il reçoit une notification push (MTN, Orange...) ou est redirigé vers une page Wave.
                 </p>
               </div>
 
               <div className="border border-border/60 rounded-xl overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
                   <MethodBadge method="POST" />
-                  <code className="text-sm font-mono font-semibold">/v1/deposit</code>
+                  <code className="text-sm font-mono font-semibold">/api/v1/deposit</code>
                 </div>
-                <div className="p-4 space-y-4">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Paramètres du body (JSON)</p>
-                    <div className="divide-y divide-border/50 border border-border/60 rounded-xl overflow-hidden">
-                      {[
-                        { param: "amount", type: "number", req: true, desc: "Montant en XOF (minimum 100)" },
-                        { param: "phone", type: "string", req: true, desc: "Numéro de téléphone du payeur au format international (+22697000000)" },
-                        { param: "operator", type: "string", req: true, desc: "Code opérateur : MTN, ORANGE, WAVE, MOOV, TMONEY, AIRTEL, VODACOM, FREE" },
-                        { param: "country", type: "string", req: true, desc: "Code pays ISO 3166-1 alpha-2 : BJ, CI, SN, CM, TG, BF, ML, COD, COG" },
-                        { param: "description", type: "string", req: false, desc: "Description affichée au client (optionnel)" },
-                        { param: "customer_name", type: "string", req: false, desc: "Nom du client (optionnel, affiché sur la page de paiement)" },
-                        { param: "customer_email", type: "string", req: false, desc: "Email du client pour reçu automatique (optionnel)" },
-                        { param: "metadata", type: "object", req: false, desc: "Données personnalisées retournées dans le webhook (optionnel)" },
-                      ].map((p) => (
-                        <div key={p.param} className="flex items-start gap-3 px-4 py-2.5 text-xs">
-                          <code className="font-mono font-bold text-primary w-28 flex-shrink-0">{p.param}</code>
-                          <code className="font-mono text-muted-foreground w-14 flex-shrink-0">{p.type}</code>
-                          <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold ${p.req ? "bg-red-500/10 text-red-600" : "bg-muted text-muted-foreground"}`}>{p.req ? "requis" : "optionnel"}</span>
-                          <span className="text-muted-foreground">{p.desc}</span>
-                        </div>
-                      ))}
-                    </div>
+                <div className="p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Paramètres (body JSON)</p>
+                  <div className="border border-border/60 rounded-xl overflow-hidden">
+                    <ParamRow name="amount" type="number" required desc="Montant en XOF — minimum 100" />
+                    <ParamRow name="phone" type="string" required desc="Numéro du payeur au format international : +22697000000" />
+                    <ParamRow name="operator" type="string" required desc="Code opérateur : MTN, ORANGE, WAVE, MOOV, TMONEY, AIRTEL, VODACOM, FREE" />
+                    <ParamRow name="country" type="string" required desc="Code pays ISO : BJ, CI, SN, CM, TG, BF, ML, COD, COG" />
+                    <ParamRow name="description" type="string" required={false} desc="Description de la transaction (visible dans votre tableau de bord)" />
+                    <ParamRow name="customer_name" type="string" required={false} desc="Nom du client (affiché lors du paiement)" />
+                    <ParamRow name="customer_email" type="string" required={false} desc="Email du client pour les reçus" />
+                    <ParamRow name="metadata" type="object" required={false} desc="Données personnalisées retournées dans le webhook (order_id, user_id...)" />
                   </div>
                 </div>
               </div>
 
-              <CodeBlock lang="bash — Exemple de requête" code={`curl -X POST ${BASE_URL}/v1/deposit \\
+              <Card className="border-blue-500/20 bg-blue-500/5">
+                <CardContent className="p-4">
+                  <p className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">Opérateurs supportés par pays</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {OPERATORS.map((op) => (
+                      <div key={op.code} className="flex items-center gap-1.5 text-xs">
+                        <code className="font-mono font-bold text-blue-600 w-16 flex-shrink-0">{op.code}</code>
+                        <span className="text-muted-foreground">{op.countries}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <CodeBlock lang="bash — Exemple" code={`curl -X POST ${BASE_URL}/api/v1/deposit \\
   -H "Authorization: Bearer sk_live_xxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -265,14 +278,14 @@ const client = axios.create({
     "phone": "+22697000000",
     "operator": "MTN",
     "country": "CI",
-    "description": "Paiement commande #1234",
+    "description": "Commande #1234",
     "customer_name": "Jean Dupont",
     "customer_email": "jean@example.com",
-    "metadata": { "order_id": "1234", "product": "Premium" }
+    "metadata": { "order_id": "1234" }
   }'`} />
 
-              <CodeBlock lang="json — Réponse succès (201)" code={`{
-  "id": "txn_9f3a2b1c4d5e6f7a",
+              <CodeBlock lang="json — Réponse (201 Created)" code={`{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "status": "pending",
   "amount": 5000,
   "currency": "XOF",
@@ -280,34 +293,58 @@ const client = axios.create({
   "phone": "+22697000000",
   "country": "CI",
   "reference": "REF-ABCD1234EF56",
-  "description": "Paiement commande #1234",
-  "fees": 250,
-  "net_amount": 4750,
-  "payment_url": "https://pay.solvexpay.com/txn_9f3a2b1c4d5e6f7a",
+  "description": "Commande #1234",
+  "fees": 350,
+  "net_amount": 4650,
+  "payment_url": null,
+  "omnipay_id": 12345,
   "created_at": "2026-03-04T12:00:00.000Z",
-  "metadata": { "order_id": "1234", "product": "Premium" }
+  "metadata": { "order_id": "1234" }
 }`} />
 
-              <CodeBlock lang="javascript — Node.js" code={`const response = await client.post('/v1/deposit', {
-  amount: 5000,
-  phone: '+22697000000',
-  operator: 'MTN',
-  country: 'CI',
-  description: 'Paiement commande #1234',
-  customer_name: 'Jean Dupont',
-  metadata: { order_id: '1234' },
+              <Card className="border-violet-500/20 bg-violet-500/5">
+                <CardContent className="p-4">
+                  <p className="text-xs font-bold text-violet-700 mb-1">Note — Opérateur WAVE</p>
+                  <p className="text-xs text-violet-600">Pour Wave, le champ <code className="bg-violet-100 px-1 rounded font-mono">payment_url</code> contient une URL vers laquelle rediriger le client. Il doit valider le paiement sur cette page Wave avant confirmation.</p>
+                </CardContent>
+              </Card>
+
+              <CodeBlock lang="javascript (Node.js)" code={`const response = await fetch('${BASE_URL}/api/v1/deposit', {
+  method: 'POST',
+  headers: {
+    'Authorization': \`Bearer \${process.env.SOLVEXPAY_API_KEY}\`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    amount: 5000,
+    phone: '+22697000000',
+    operator: 'MTN',
+    country: 'CI',
+    description: 'Commande #1234',
+    customer_name: 'Jean Dupont',
+    metadata: { order_id: '1234' },
+  }),
 });
 
-const { id, status, payment_url } = response.data;
-console.log('Transaction créée:', id, '— Statut:', status);
-// Redirigez l'utilisateur vers payment_url si nécessaire (Wave)`} />
+const data = await response.json();
 
-              <CodeBlock lang="python" code={`import requests
+if (!response.ok) {
+  console.error('Erreur:', data.error.code, data.error.message);
+} else {
+  console.log('Transaction créée:', data.id);
+  console.log('Statut:', data.status); // "pending"
+  // Pour Wave uniquement : rediriger vers data.payment_url
+  if (data.payment_url) {
+    res.redirect(data.payment_url);
+  }
+}`} />
+
+              <CodeBlock lang="python" code={`import requests, os
 
 response = requests.post(
-    f'{BASE_URL}/v1/deposit',
+    '${BASE_URL}/api/v1/deposit',
     headers={
-        'Authorization': f'Bearer {SOLVEXPAY_API_KEY}',
+        'Authorization': f'Bearer {os.environ["SOLVEXPAY_API_KEY"]}',
         'Content-Type': 'application/json',
     },
     json={
@@ -315,65 +352,54 @@ response = requests.post(
         'phone': '+22697000000',
         'operator': 'MTN',
         'country': 'CI',
-        'description': 'Paiement commande #1234',
+        'description': 'Commande #1234',
         'metadata': {'order_id': '1234'},
     }
 )
 
 data = response.json()
-print('Transaction:', data['id'], '— Statut:', data['status'])`} />
-
-              <Card className="border-blue-500/20 bg-blue-500/5">
-                <CardContent className="p-4">
-                  <p className="text-sm font-bold text-blue-700 mb-2">Opérateurs supportés par pays</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {OPERATORS.map((op) => (
-                      <div key={op.code} className="flex items-center gap-2 text-xs">
-                        <code className="font-mono font-bold text-blue-600 w-20 flex-shrink-0">{op.code}</code>
-                        <span className="text-muted-foreground">{op.countries.join(", ")}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+if not response.ok:
+    print('Erreur:', data['error']['code'], data['error']['message'])
+else:
+    print('Transaction créée:', data['id'], '— Statut:', data['status'])`} />
             </section>
 
-            <SectionAnchor id="status" />
-            <section className="space-y-5">
+            {/* STATUT */}
+            <section id="status" className="space-y-5 scroll-mt-20">
               <div>
                 <h2 className="text-xl font-black flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary" /> Vérifier le statut d'une transaction
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Interrogez le statut d'une transaction à tout moment via son identifiant.
+                  Interrogez le statut d'une transaction via son <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">id</code> retourné lors de sa création. Préférez les webhooks pour éviter le polling.
                 </p>
               </div>
 
               <div className="border border-border/60 rounded-xl overflow-hidden">
-                <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
+                <div className="flex items-center gap-3 px-4 py-3 bg-muted/30">
                   <MethodBadge method="GET" />
-                  <code className="text-sm font-mono font-semibold">/v1/transactions/:id</code>
+                  <code className="text-sm font-mono font-semibold">/api/v1/transactions/:id</code>
                 </div>
               </div>
 
-              <CodeBlock lang="bash" code={`curl ${BASE_URL}/v1/transactions/txn_9f3a2b1c4d5e6f7a \\
-  -H "Authorization: Bearer sk_live_xxxxxxxxxxxx"`} />
-
               <div className="grid sm:grid-cols-3 gap-3">
                 {[
-                  { status: "pending", color: "amber", desc: "En attente de confirmation du client sur son téléphone" },
-                  { status: "completed", color: "emerald", desc: "Paiement confirmé et fonds crédités sur votre compte" },
-                  { status: "failed", color: "red", desc: "Paiement échoué (refus, timeout, solde insuffisant...)" },
+                  { status: "pending", color: "amber", desc: "En attente — le client n'a pas encore validé sur son téléphone" },
+                  { status: "completed", color: "emerald", desc: "Confirmé — fonds reçus et crédités sur votre solde SolvexPay" },
+                  { status: "failed", color: "red", desc: "Échoué — refus, timeout ou solde Mobile Money insuffisant" },
                 ].map((s) => (
-                  <div key={s.status} className={`p-3 rounded-xl border border-${s.color}-500/20 bg-${s.color}-500/5`}>
-                    <code className={`text-xs font-mono font-bold text-${s.color}-600`}>{s.status}</code>
+                  <div key={s.status} className="p-3 rounded-xl border border-border/60 bg-muted/20">
+                    <code className={`text-xs font-mono font-bold ${s.color === "amber" ? "text-amber-600" : s.color === "emerald" ? "text-emerald-600" : "text-red-600"}`}>{s.status}</code>
                     <p className="text-xs text-muted-foreground mt-1">{s.desc}</p>
                   </div>
                 ))}
               </div>
 
+              <CodeBlock lang="bash" code={`curl ${BASE_URL}/api/v1/transactions/a1b2c3d4-e5f6-7890-abcd-ef1234567890 \\
+  -H "Authorization: Bearer sk_live_xxxxxxxxxxxx"`} />
+
               <CodeBlock lang="json — Réponse" code={`{
-  "id": "txn_9f3a2b1c4d5e6f7a",
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "status": "completed",
   "amount": 5000,
   "currency": "XOF",
@@ -381,52 +407,51 @@ print('Transaction:', data['id'], '— Statut:', data['status'])`} />
   "phone": "+22697000000",
   "country": "CI",
   "reference": "REF-ABCD1234EF56",
-  "fees": 250,
-  "net_amount": 4750,
-  "completed_at": "2026-03-04T12:01:35.000Z",
+  "description": "Commande #1234",
+  "fees": 350,
+  "net_amount": 4650,
+  "payer_name": "Jean Dupont",
+  "payer_email": "jean@example.com",
   "created_at": "2026-03-04T12:00:00.000Z",
-  "metadata": { "order_id": "1234", "product": "Premium" }
+  "completed_at": "2026-03-04T12:01:35.000Z"
 }`} />
             </section>
 
-            <SectionAnchor id="balance" />
-            <section className="space-y-5">
+            {/* SOLDE */}
+            <section id="balance" className="space-y-5 scroll-mt-20">
               <div>
                 <h2 className="text-xl font-black flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-primary" /> Consulter le solde
                 </h2>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Récupérez le solde disponible sur votre compte SolvexPay.
-                </p>
+                <p className="text-muted-foreground text-sm mt-1">Récupérez le solde disponible sur votre compte SolvexPay (en XOF).</p>
               </div>
 
               <div className="border border-border/60 rounded-xl overflow-hidden">
-                <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
+                <div className="flex items-center gap-3 px-4 py-3 bg-muted/30">
                   <MethodBadge method="GET" />
-                  <code className="text-sm font-mono font-semibold">/v1/balance</code>
+                  <code className="text-sm font-mono font-semibold">/api/v1/balance</code>
                 </div>
               </div>
 
-              <CodeBlock lang="bash" code={`curl ${BASE_URL}/v1/balance \\
+              <CodeBlock lang="bash" code={`curl ${BASE_URL}/api/v1/balance \\
   -H "Authorization: Bearer sk_live_xxxxxxxxxxxx"`} />
 
               <CodeBlock lang="json — Réponse" code={`{
   "balance": 45000,
   "currency": "XOF",
   "available": 45000,
-  "pending": 5000,
   "updated_at": "2026-03-04T12:00:00.000Z"
 }`} />
             </section>
 
-            <SectionAnchor id="webhooks" />
-            <section className="space-y-5">
+            {/* WEBHOOKS */}
+            <section id="webhooks" className="space-y-5 scroll-mt-20">
               <div>
                 <h2 className="text-xl font-black flex items-center gap-2">
                   <Webhook className="h-5 w-5 text-primary" /> Webhooks
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Les webhooks vous notifient automatiquement de chaque changement de statut de transaction. C'est la méthode recommandée pour détecter les paiements confirmés.
+                  SolvexPay envoie une requête HTTP POST à votre URL webhook à chaque changement de statut. C'est la méthode recommandée — plus fiable que le polling.
                 </p>
               </div>
 
@@ -434,23 +459,22 @@ print('Transaction:', data['id'], '— Statut:', data['status'])`} />
                 <CardContent className="p-4 flex items-start gap-3">
                   <ShieldCheck className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-bold text-emerald-700">Vérification obligatoire</p>
-                    <p className="text-xs text-emerald-600 mt-0.5">Vérifiez toujours la signature du webhook avant de traiter l'événement. Ignorez les requêtes avec une signature invalide.</p>
+                    <p className="text-sm font-bold text-emerald-700">Vérifiez toujours la signature</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">Chaque webhook est signé avec votre Webhook Secret (HMAC-SHA256). Ignorez toute requête avec une signature invalide ou absente.</p>
                   </div>
                 </CardContent>
               </Card>
 
               <div>
-                <p className="text-sm font-bold mb-3">Configuration</p>
-                <ol className="space-y-2 text-sm">
+                <p className="text-sm font-bold mb-3">Comment configurer :</p>
+                <ol className="space-y-2">
                   {[
-                    "Créez ou ouvrez une clé API dans la page Clés API",
-                    "Cliquez sur « Configurer URLs & Webhook » sous la clé",
-                    "Renseignez votre URL de webhook (ex: https://monapp.com/webhook/solvexpay)",
+                    "Dans la page Clés API, cliquez « Configurer URLs & Webhook » sous votre clé",
+                    "Renseignez votre URL de webhook (ex: https://monsite.com/api/webhook/solvexpay)",
                     "Copiez votre Webhook Secret et stockez-le dans vos variables d'environnement",
-                    "Vérifiez la signature à chaque requête reçue (voir exemple ci-dessous)",
+                    "Dans votre serveur, vérifiez la signature à chaque requête reçue (voir exemple)",
                   ].map((step, i) => (
-                    <li key={i} className="flex items-start gap-3">
+                    <li key={i} className="flex items-start gap-3 text-sm">
                       <span className="h-5 w-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-bold">{i + 1}</span>
                       <span className="text-muted-foreground">{step}</span>
                     </li>
@@ -462,9 +486,8 @@ print('Transaction:', data['id'], '— Statut:', data['status'])`} />
                 <p className="text-sm font-bold mb-2">Événements envoyés</p>
                 <div className="divide-y divide-border/50 border border-border/60 rounded-xl overflow-hidden">
                   {[
-                    { event: "transaction.completed", desc: "Paiement confirmé et crédité sur votre compte" },
-                    { event: "transaction.failed", desc: "Paiement échoué (refus client, timeout, solde insuffisant)" },
-                    { event: "transaction.pending", desc: "Paiement initié, en attente de confirmation" },
+                    { event: "transaction.completed", desc: "Paiement confirmé — fonds crédités sur votre solde" },
+                    { event: "transaction.failed", desc: "Paiement échoué (refus, timeout, solde Mobile Money insuffisant)" },
                   ].map((e) => (
                     <div key={e.event} className="flex items-center gap-3 px-4 py-2.5 text-xs">
                       <code className="font-mono font-bold text-primary">{e.event}</code>
@@ -474,87 +497,86 @@ print('Transaction:', data['id'], '— Statut:', data['status'])`} />
                 </div>
               </div>
 
-              <CodeBlock lang="json — Payload webhook reçu" code={`{
+              <CodeBlock lang="json — Payload reçu (POST vers votre URL webhook)" code={`{
   "event": "transaction.completed",
   "transaction": {
-    "id": "txn_9f3a2b1c4d5e6f7a",
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "status": "completed",
     "amount": 5000,
     "currency": "XOF",
     "operator": "MTN",
     "phone": "+22697000000",
-    "country": "CI",
     "reference": "REF-ABCD1234EF56",
-    "fees": 250,
-    "net_amount": 4750,
-    "completed_at": "2026-03-04T12:01:35.000Z",
-    "metadata": { "order_id": "1234" }
+    "fees": 350,
+    "net_amount": 4650,
+    "created_at": "2026-03-04T12:00:00.000Z"
   },
-  "signature": "sha256=abc123def456...",
   "timestamp": "2026-03-04T12:01:36.000Z"
-}`} />
-
-              <CodeBlock lang="javascript — Vérification de signature (Node.js)" code={`const crypto = require('crypto');
-
-function verifyWebhookSignature(payload, signature, secret) {
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(JSON.stringify(payload))
-    .digest('hex');
-  return \`sha256=\${expected}\` === signature;
 }
+// Header: x-solvexpay-signature: sha256=abc123def456...`} />
 
-// Dans votre route Express :
-app.post('/webhook/solvexpay', (req, res) => {
+              <CodeBlock lang="javascript — Vérification signature (Express)" code={`const crypto = require('crypto');
+
+app.post('/api/webhook/solvexpay', express.raw({ type: 'application/json' }), (req, res) => {
   const signature = req.headers['x-solvexpay-signature'];
   const secret = process.env.SOLVEXPAY_WEBHOOK_SECRET;
-  
-  if (!verifyWebhookSignature(req.body, signature, secret)) {
+
+  // Vérifier la signature HMAC-SHA256
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', secret)
+    .update(req.body)  // body brut (Buffer), avant JSON.parse
+    .digest('hex');
+
+  if (signature !== expected) {
     return res.status(401).json({ error: 'Signature invalide' });
   }
-  
-  const { event, transaction } = req.body;
-  
+
+  const { event, transaction } = JSON.parse(req.body.toString());
+
   if (event === 'transaction.completed') {
-    // Livrez le service, activez le compte, confirmez la commande...
-    console.log('Paiement confirmé:', transaction.id, transaction.amount, 'XOF');
+    const { id, amount, reference, metadata } = transaction;
+    
+    // Exemple : activer un abonnement, livrer un produit, confirmer une commande
+    console.log(\`Paiement reçu: \${amount} XOF — ref: \${reference}\`);
+    await activerCommande(metadata?.order_id);
   }
-  
+
   res.json({ received: true });
 });`} />
 
-              <CodeBlock lang="python — Vérification de signature" code={`import hmac
-import hashlib
-import json
+              <CodeBlock lang="python — Vérification signature (Flask)" code={`import hmac, hashlib, os
+from flask import Flask, request, jsonify
 
-def verify_signature(payload: dict, signature: str, secret: str) -> bool:
-    expected = hmac.new(
-        secret.encode(),
-        json.dumps(payload, separators=(',', ':')).encode(),
-        hashlib.sha256
-    ).hexdigest()
-    return f"sha256={expected}" == signature
+app = Flask(__name__)
 
-# Dans votre route Flask/Django :
-@app.route('/webhook/solvexpay', methods=['POST'])
+@app.route('/api/webhook/solvexpay', methods=['POST'])
 def webhook():
-    signature = request.headers.get('X-Solvexpay-Signature')
+    signature = request.headers.get('X-Solvexpay-Signature', '')
     secret = os.environ['SOLVEXPAY_WEBHOOK_SECRET']
     
-    if not verify_signature(request.json, signature, secret):
+    # Vérifier avec le body brut (avant parsing)
+    expected = 'sha256=' + hmac.new(
+        secret.encode(),
+        request.get_data(),  # body brut
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(signature, expected):
         return jsonify({'error': 'Signature invalide'}), 401
-    
-    event = request.json['event']
-    transaction = request.json['transaction']
-    
+
+    data = request.get_json()
+    event = data['event']
+    transaction = data['transaction']
+
     if event == 'transaction.completed':
         print(f"Paiement reçu: {transaction['amount']} XOF")
-    
+        # Activer le service, confirmer la commande...
+
     return jsonify({'received': True})`} />
             </section>
 
-            <SectionAnchor id="errors" />
-            <section className="space-y-5">
+            {/* ERREURS */}
+            <section id="errors" className="space-y-5 scroll-mt-20">
               <div>
                 <h2 className="text-xl font-black flex items-center gap-2">
                   <AlertCircle className="h-5 w-5 text-primary" /> Codes d'erreur
@@ -567,19 +589,17 @@ def webhook():
               <CodeBlock lang="json — Format d'une erreur" code={`{
   "error": {
     "code": "INVALID_PHONE",
-    "message": "Le numéro de téléphone est invalide ou le format est incorrect.",
+    "message": "Numéro de téléphone invalide ou format incorrect.",
     "status": 400
   }
 }`} />
 
-              <div className="divide-y divide-border/50 border border-border/60 rounded-xl overflow-hidden">
-                <div className="grid grid-cols-[60px_160px_1fr] gap-3 px-4 py-2.5 bg-muted/30 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <span>HTTP</span>
-                  <span>Code erreur</span>
-                  <span>Description</span>
+              <div className="border border-border/60 rounded-xl overflow-hidden">
+                <div className="grid grid-cols-[60px_170px_1fr] gap-3 px-4 py-2 bg-muted/30 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <span>HTTP</span><span>Code</span><span>Description</span>
                 </div>
                 {ERRORS.map((e) => (
-                  <div key={e.key} className="grid grid-cols-[60px_160px_1fr] gap-3 px-4 py-2.5 text-xs items-start">
+                  <div key={e.key} className="grid grid-cols-[60px_170px_1fr] gap-3 px-4 py-2.5 text-xs border-t border-border/40 items-start">
                     <span className={`font-mono font-bold ${e.code >= 500 ? "text-red-600" : e.code >= 400 ? "text-amber-600" : "text-blue-600"}`}>{e.code}</span>
                     <code className="font-mono text-primary">{e.key}</code>
                     <span className="text-muted-foreground">{e.desc}</span>
@@ -587,36 +607,26 @@ def webhook():
                 ))}
               </div>
 
-              <Card className="border-border/60">
-                <CardContent className="p-5">
-                  <p className="text-sm font-bold mb-3 flex items-center gap-2">
-                    <Code2 className="h-4 w-4 text-primary" /> Gestion des erreurs recommandée
-                  </p>
-                  <CodeBlock lang="javascript" code={`try {
-  const response = await client.post('/v1/deposit', payload);
-  const transaction = response.data;
-  // Traiter le succès...
-} catch (error) {
-  if (error.response) {
-    const { code, message } = error.response.data.error;
-    
-    switch (code) {
-      case 'UNAUTHORIZED':
-        console.error('Clé API invalide ou désactivée');
-        break;
-      case 'INSUFFICIENT_BALANCE':
-        console.error('Solde insuffisant');
-        break;
-      case 'INVALID_PHONE':
-        console.error('Numéro invalide:', message);
-        break;
-      default:
-        console.error('Erreur API:', code, message);
-    }
+              <CodeBlock lang="javascript — Gestion des erreurs" code={`const response = await fetch('${BASE_URL}/api/v1/deposit', {
+  method: 'POST',
+  headers: { 'Authorization': \`Bearer \${API_KEY}\`, 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload),
+});
+
+const data = await response.json();
+
+if (!response.ok) {
+  const { code, message } = data.error;
+  switch (code) {
+    case 'UNAUTHORIZED':     // Clé invalide ou désactivée
+    case 'KYC_REQUIRED':     // KYC non vérifié
+    case 'INVALID_AMOUNT':   // Montant < 100
+    case 'INVALID_PHONE':    // Format téléphone incorrect
+    case 'PROVIDER_UNAVAILABLE': // Opérateur indisponible
+    default:
+      console.error(\`Erreur \${code}: \${message}\`);
   }
 }`} />
-                </CardContent>
-              </Card>
 
               <Card className="border-border/60 bg-muted/20">
                 <CardContent className="p-5 flex items-start gap-4">
@@ -624,11 +634,9 @@ def webhook():
                     <FileText className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="font-bold text-sm">Besoin d'aide ?</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Notre équipe support est disponible 24/7 pour vous aider à intégrer SolvexPay.
-                    </p>
-                    <div className="flex gap-3 mt-3">
+                    <p className="font-bold text-sm">Besoin d'aide pour l'intégration ?</p>
+                    <p className="text-xs text-muted-foreground mt-1">Notre équipe est disponible 24/7 pour vous accompagner.</p>
+                    <div className="flex gap-4 mt-3">
                       <a href="mailto:support@solvexpay.com" className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
                         <ArrowRight className="h-3 w-3" /> support@solvexpay.com
                       </a>

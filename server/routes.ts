@@ -7,6 +7,7 @@ import { z } from "zod";
 import multer from "multer";
 import path from "path";
 import crypto from "crypto";
+import axios from "axios";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -864,6 +865,177 @@ export async function registerRoutes(
     }
   });
 
+  // ─── API V1 — EXTERNAL DEVELOPER ENDPOINTS ──────────────────────────────────
+
+  async function authenticateApiKey(req: any, res: any, next: any) {
+    const authHeader = req.headers.authorization as string | undefined;
+    if (!authHeader || !authHeader.startsWith("Bearer sk_live_")) {
+      return res.status(401).json({
+        error: { code: "UNAUTHORIZED", message: "Clé API manquante ou invalide. Utilisez: Authorization: Bearer sk_live_xxxx", status: 401 }
+      });
+    }
+    const keyValue = authHeader.replace("Bearer ", "").trim();
+    const apiKey = await storage.findApiKeyByFullKey(keyValue);
+    if (!apiKey) {
+      return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API introuvable.", status: 401 } });
+    }
+    if (!apiKey.isActive || (apiKey as any).adminLocked) {
+      return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API désactivée ou verrouillée.", status: 401 } });
+    }
+    await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
+    req.merchantApiKey = apiKey;
+    req.merchantUserId = apiKey.userId;
+    next();
+  }
+
+  app.post("/api/v1/deposit", authenticateApiKey, async (req: any, res) => {
+    try {
+      const { amount, phone, operator, country, description, customer_name, customer_email, metadata } = req.body;
+
+      if (!amount || typeof amount !== "number" || amount < 100) {
+        return res.status(400).json({ error: { code: "INVALID_AMOUNT", message: "Montant invalide (minimum 100 XOF).", status: 400 } });
+      }
+      if (!phone || typeof phone !== "string") {
+        return res.status(400).json({ error: { code: "INVALID_PHONE", message: "Numéro de téléphone requis.", status: 400 } });
+      }
+      if (!operator || typeof operator !== "string") {
+        return res.status(400).json({ error: { code: "INVALID_OPERATOR", message: "Opérateur requis (MTN, ORANGE, WAVE, MOOV, TMONEY, AIRTEL, VODACOM, FREE).", status: 400 } });
+      }
+      if (!country || typeof country !== "string") {
+        return res.status(400).json({ error: { code: "INVALID_COUNTRY", message: "Code pays requis (BJ, CI, SN, CM, TG, BF, ML, COD, COG).", status: 400 } });
+      }
+
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq: eqFn } = await import("drizzle-orm");
+      const [merchantUser] = await db.select().from(usersTable).where(eqFn(usersTable.id, req.merchantUserId));
+      if (!merchantUser) {
+        return res.status(404).json({ error: { code: "NOT_FOUND", message: "Compte marchand introuvable.", status: 404 } });
+      }
+      if (merchantUser.kycStatus !== "verified") {
+        return res.status(403).json({ error: { code: "KYC_REQUIRED", message: "Vérification KYC requise pour utiliser l'API.", status: 403 } });
+      }
+
+      if (!isApiKeyConfigured()) {
+        return res.status(503).json({ error: { code: "PROVIDER_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
+      }
+
+      const reference = generateReference();
+      const fullName = (customer_name || "Client SolvexPay").trim();
+      const nameParts = fullName.split(" ");
+      const firstName = nameParts[0] || "Client";
+      const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
+      const isWave = operator.toLowerCase() === "wave";
+      const appName = (req.merchantApiKey as any).appName || `${merchantUser.firstName || ""} ${merchantUser.lastName || ""}`.trim() || "SolvexPay";
+      const returnUrl = isWave ? `https://solvexpay.com/api/payment/callback?reference=${reference}` : undefined;
+      const feeRate = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7") / 100;
+      const feesAmount = Math.round(amount * feeRate);
+
+      const omniOperator = operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase();
+
+      const depositResponse = await omniPayService.deposit({
+        msisdn: phone,
+        amount,
+        reference,
+        firstName,
+        lastName,
+        operator: omniOperator,
+        returnUrl,
+      });
+
+      const transaction = await storage.createTransaction({
+        userId: req.merchantUserId,
+        type: "deposit",
+        amount: String(amount),
+        currency: "XOF",
+        provider: operator.toUpperCase(),
+        phoneNumber: phone,
+        reference,
+        status: "pending",
+        description: description || `Dépôt via API — ${appName}`,
+        fees: String(feesAmount),
+        payerName: customer_name || undefined,
+        payerEmail: customer_email || undefined,
+        payerCountry: country,
+        payerOperator: operator.toUpperCase(),
+      } as any);
+
+      res.status(201).json({
+        id: transaction.id,
+        status: transaction.status,
+        amount,
+        currency: "XOF",
+        operator: operator.toUpperCase(),
+        phone,
+        country,
+        reference,
+        description: transaction.description,
+        fees: feesAmount,
+        net_amount: amount - feesAmount,
+        payment_url: depositResponse.payment_url || null,
+        omnipay_id: depositResponse.id || null,
+        created_at: transaction.createdAt,
+        metadata: metadata || null,
+      });
+    } catch (error: any) {
+      console.error("API v1 deposit error:", error);
+      if (error.message?.includes("OmniPay") || error.message?.includes("omnipay")) {
+        return res.status(503).json({ error: { code: "PROVIDER_UNAVAILABLE", message: error.message, status: 503 } });
+      }
+      res.status(500).json({ error: { code: "SERVER_ERROR", message: error.message || "Erreur interne.", status: 500 } });
+    }
+  });
+
+  app.get("/api/v1/transactions/:id", authenticateApiKey, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const transaction = await storage.getTransactionById(id);
+      if (!transaction || transaction.userId !== req.merchantUserId) {
+        return res.status(404).json({ error: { code: "NOT_FOUND", message: "Transaction introuvable.", status: 404 } });
+      }
+      res.json({
+        id: transaction.id,
+        status: transaction.status,
+        amount: parseFloat(transaction.amount),
+        currency: transaction.currency,
+        operator: transaction.provider,
+        phone: transaction.phoneNumber,
+        country: (transaction as any).payerCountry || null,
+        reference: transaction.reference,
+        description: transaction.description,
+        fees: transaction.fees ? parseFloat(transaction.fees) : 0,
+        net_amount: transaction.fees
+          ? parseFloat(transaction.amount) - parseFloat(transaction.fees)
+          : parseFloat(transaction.amount),
+        payer_name: (transaction as any).payerName || null,
+        payer_email: (transaction as any).payerEmail || null,
+        created_at: transaction.createdAt,
+        completed_at: transaction.status === "completed" ? (transaction as any).updatedAt || null : null,
+      });
+    } catch (error: any) {
+      console.error("API v1 get transaction error:", error);
+      res.status(500).json({ error: { code: "SERVER_ERROR", message: "Erreur interne.", status: 500 } });
+    }
+  });
+
+  app.get("/api/v1/balance", authenticateApiKey, async (req: any, res) => {
+    try {
+      const wallet = await storage.getWallet(req.merchantUserId);
+      const balance = wallet ? parseFloat(wallet.balanceXOF) : 0;
+      res.json({
+        balance,
+        currency: "XOF",
+        available: balance,
+        updated_at: wallet?.updatedAt || new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error("API v1 balance error:", error);
+      res.status(500).json({ error: { code: "SERVER_ERROR", message: "Erreur interne.", status: 500 } });
+    }
+  });
+
+  // ─── END API V1 ───────────────────────────────────────────────────────────────
+
   app.post("/api/upload", isAuthenticated, upload.single("image"), (req: any, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "Aucun fichier fourni" });
@@ -926,6 +1098,52 @@ export async function registerRoutes(
           console.log(`OmniPay callback: transfer ${reference} failed, balance refunded`);
         } else {
           console.log(`OmniPay callback: payment ${reference} failed`);
+        }
+      }
+
+      // Forward webhook to merchant's configured webhook URLs
+      if (statusStr === "completed" || statusStr === "failed") {
+        try {
+          const merchantApiKeys = await storage.getApiKeys(transaction.userId);
+          const activeKeysWithWebhook = merchantApiKeys.filter(
+            (k) => k.isActive && !k.adminLocked && (k as any).webhookUrl
+          );
+          if (activeKeysWithWebhook.length > 0) {
+            const updatedTx = await storage.getTransactionByReference(reference);
+            const webhookPayload = {
+              event: statusStr === "completed" ? "transaction.completed" : "transaction.failed",
+              transaction: {
+                id: transaction.id,
+                status: statusStr,
+                amount: parseFloat(transaction.amount),
+                currency: transaction.currency,
+                operator: transaction.provider,
+                phone: transaction.phoneNumber,
+                reference: transaction.reference,
+                fees: transaction.fees ? parseFloat(transaction.fees) : 0,
+                net_amount: transaction.fees
+                  ? parseFloat(transaction.amount) - parseFloat(transaction.fees)
+                  : parseFloat(transaction.amount),
+                created_at: transaction.createdAt,
+              },
+              timestamp: new Date().toISOString(),
+            };
+            for (const k of activeKeysWithWebhook) {
+              const webhookUrl = (k as any).webhookUrl as string;
+              const webhookSecret = (k as any).webhookSecret as string | undefined;
+              const bodyStr = JSON.stringify(webhookPayload);
+              const signature = webhookSecret
+                ? `sha256=${crypto.createHmac("sha256", webhookSecret).update(bodyStr).digest("hex")}`
+                : undefined;
+              const headers: Record<string, string> = { "Content-Type": "application/json" };
+              if (signature) headers["x-solvexpay-signature"] = signature;
+              axios.post(webhookUrl, webhookPayload, { headers, timeout: 10000 }).catch((err) => {
+                console.error(`Webhook delivery failed for key ${k.id} to ${webhookUrl}:`, err.message);
+              });
+            }
+          }
+        } catch (webhookErr) {
+          console.error("Webhook forwarding error:", webhookErr);
         }
       }
 

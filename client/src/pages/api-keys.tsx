@@ -81,25 +81,25 @@ function KeyConfigSection({ apiKey }: { apiKey: ApiKey & { webhookSecret?: strin
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-xs font-semibold">URL de redirection</Label>
-          <p className="text-[11px] text-muted-foreground">Après un paiement réussi, l'utilisateur est redirigé ici.</p>
+          <Label className="text-xs font-semibold">URL de redirection (après paiement)</Label>
+          <p className="text-[11px] text-muted-foreground">L'utilisateur est redirigé ici après un paiement réussi.</p>
           <Input
             value={redirectUrl}
             onChange={(e) => setRedirectUrl(e.target.value)}
-            placeholder="https://monapp.com/merci"
+            placeholder="https://monsite.com/paiement-success"
             className="h-8 text-xs"
             data-testid={`input-redirect-url-${apiKey.id}`}
           />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold flex items-center gap-1">
-            <Webhook className="h-3 w-3" /> URL de webhook
+            <Webhook className="h-3 w-3" /> URL de webhook (notification)
           </Label>
-          <p className="text-[11px] text-muted-foreground">Notifications automatiques envoyées à cette URL après chaque transaction.</p>
+          <p className="text-[11px] text-muted-foreground">SolvexPay envoie une notification POST automatique ici après chaque transaction.</p>
           <Input
             value={webhookUrl}
             onChange={(e) => setWebhookUrl(e.target.value)}
-            placeholder="https://monapp.com/webhook"
+            placeholder="https://monsite.com/api/webhook/solvexpay"
             className="h-8 text-xs"
             data-testid={`input-webhook-url-${apiKey.id}`}
           />
