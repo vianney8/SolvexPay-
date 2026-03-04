@@ -474,20 +474,6 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              {/* Countries flags row */}
-              <div className="flex items-center gap-3 pt-2">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">9 pays</span>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {ALL_COUNTRIES.map((c) => (
-                    <div key={c.code} className="group relative">
-                      <span className="text-2xl cursor-default hover:scale-125 inline-block transition-transform duration-200">{c.flag}</span>
-                      <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-medium px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                        {c.name}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
 
             {/* Right — dashboard mockup */}
@@ -569,22 +555,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── STATS ─── */}
-      <section className="py-20 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {stats.map((s) => (
-              <div key={s.label} className="group rounded-3xl border border-border/60 bg-card p-6 text-center hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 transition-all duration-300">
-                <div className={`h-14 w-14 rounded-2xl ${s.bg} flex items-center justify-center mx-auto mb-4`}>
-                  <s.icon className={`h-7 w-7 ${s.color}`} />
-                </div>
-                <p className={`text-4xl font-black ${s.color} mb-1`}><AnimatedCounter target={s.value} suffix={s.suffix} /></p>
-                <p className="text-sm text-muted-foreground font-medium">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ─── DEPOSIT SCREENSHOT ─── */}
       <section className="py-16 px-4 bg-muted/20">
