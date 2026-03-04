@@ -524,6 +524,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/service-fees", async (req, res) => {
+    try {
+      const deposit = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
+      const withdrawal = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7");
+      const transfer = parseFloat((await storage.getSystemSetting("fee_transfer")) || "7");
+      res.json({ deposit, withdrawal, transfer });
+    } catch {
+      res.json({ deposit: 7, withdrawal: 7, transfer: 7 });
+    }
+  });
+
   app.get("/api/payment-methods/public", async (req, res) => {
     try {
       const { db } = await import("./db");

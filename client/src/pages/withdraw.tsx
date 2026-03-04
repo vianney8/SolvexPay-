@@ -78,6 +78,7 @@ export default function WithdrawPage() {
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: allTransactions } = useQuery<any[]>({ queryKey: ["/api/transactions"] });
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
+  const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
 
   function getOperatorStatus(op: string) {
     if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
@@ -89,7 +90,7 @@ export default function WithdrawPage() {
   }
   const balance = parseFloat(String(wallet?.balanceXOF || 0));
   const withdrawAmount = parseFloat(amount) || 0;
-  const feeRate = 0.07;
+  const feeRate = (serviceFees?.withdrawal ?? 7) / 100;
   const fees = Math.round(withdrawAmount * feeRate);
   const netAmount = withdrawAmount - fees;
   const insufficientFunds = withdrawAmount > balance && withdrawAmount > 0;

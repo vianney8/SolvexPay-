@@ -62,9 +62,10 @@ export default function TransferPage() {
   useEffect(() => { setOperator(""); }, [country]);
 
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
+  const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
   const balance = parseFloat(String(wallet?.balanceXOF || 0));
   const transferAmount = parseFloat(amount) || 0;
-  const feeRate = 0.06;
+  const feeRate = (serviceFees?.transfer ?? 7) / 100;
   const fees = Math.round(transferAmount * feeRate);
   const totalDeducted = transferAmount + fees;
   const insufficientFunds = totalDeducted > balance && transferAmount > 0;

@@ -52,14 +52,16 @@ export default function DepositPage() {
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
   const currency = selectedCountry.currency;
   const parsedAmount = parseFloat(amount) || 0;
-  const feeRate = 0.05;
-  const feesAmount = Math.round(parsedAmount * feeRate);
-  const netAmount = parsedAmount - feesAmount;
 
   useEffect(() => { setOperator(""); }, [country]);
 
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
+  const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
+
+  const feeRate = (serviceFees?.deposit ?? 7) / 100;
+  const feesAmount = Math.round(parsedAmount * feeRate);
+  const netAmount = parsedAmount - feesAmount;
   const balance = parseFloat(String(wallet?.balanceXOF || 0));
 
   function getOperatorStatus(op: string) {
