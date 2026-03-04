@@ -514,31 +514,6 @@ export default function SettingsPage() {
                   </form>
                 )}
 
-                {kycStatus === "verified" && (
-                  <div className="space-y-4">
-                    <p className="text-sm font-semibold text-muted-foreground">Documents soumis :</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {(user as any)?.kycDocumentFront && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground font-medium">Recto</p>
-                          <img src={(user as any).kycDocumentFront} alt="Recto" className="rounded-xl border border-border/60 w-full h-32 object-cover" />
-                        </div>
-                      )}
-                      {(user as any)?.kycDocumentBack && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground font-medium">Verso</p>
-                          <img src={(user as any).kycDocumentBack} alt="Verso" className="rounded-xl border border-border/60 w-full h-32 object-cover" />
-                        </div>
-                      )}
-                      {(user as any)?.kycSelfie && (
-                        <div className="space-y-1 sm:col-span-2">
-                          <p className="text-xs text-muted-foreground font-medium">Selfie</p>
-                          <img src={(user as any).kycSelfie} alt="Selfie" className="rounded-xl border border-border/60 w-full h-40 object-cover" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
