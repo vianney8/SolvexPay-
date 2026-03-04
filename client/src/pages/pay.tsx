@@ -83,6 +83,30 @@ export default function PayPage() {
 
   useEffect(() => { setOperator(""); }, [country]);
 
+  const redirectUrl = (paymentLink as any)?.redirectUrl as string | undefined;
+  useEffect(() => {
+    if (verifyStatus === "SUCCESS" && redirectUrl) {
+      const timer = setTimeout(() => { window.location.href = redirectUrl; }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [verifyStatus, redirectUrl]);
+
+  const { data: paymentMethods } = useQuery<any[]>({
+    queryKey: ["/api/payment-methods/public"],
+    queryFn: async () => {
+      const res = await fetch("/api/payment-methods/public");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  function getOperatorStatus(op: string) {
+    if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
+    const pm = paymentMethods.find((m: any) => m.code === op);
+    if (!pm) return { available: true, maintenance: false };
+    return { available: pm.isActive !== false, maintenance: pm.inMaintenance === true };
+  }
+
   const { data: paymentLink, isLoading, error } = useQuery<PaymentLink>({
     queryKey: ["/api/payment-links/public", slug],
     queryFn: async () => {
@@ -198,7 +222,7 @@ export default function PayPage() {
     const statusConfig: Record<string, { icon: any; color: string; bg: string; label: string; sub: string; spin: boolean }> = {
       PENDING: { icon: Loader2, color: "text-amber-500", bg: "bg-amber-50", label: "En attente de confirmation", sub: "Un prompt USSD a été envoyé sur votre téléphone. Confirmez le paiement.", spin: true },
       PROCESSING: { icon: Loader2, color: "text-blue-500", bg: "bg-blue-50", label: "Traitement en cours...", sub: "Votre paiement est en cours de traitement.", spin: true },
-      SUCCESS: { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-50", label: "Paiement confirmé !", sub: "Votre paiement a été effectué avec succès. Merci !", spin: false },
+      SUCCESS: { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-50", label: "Paiement confirmé !", sub: "Votre paiement a été effectué avec succès. Merci !", spin: false, redirect: true },
       FAILED: { icon: XCircle, color: "text-red-500", bg: "bg-red-50", label: "Paiement échoué", sub: "Le paiement n'a pas abouti. Veuillez réessayer.", spin: false },
       CANCELLED: { icon: XCircle, color: "text-gray-400", bg: "bg-gray-50", label: "Paiement annulé", sub: "Le paiement a été annulé.", spin: false },
     };
@@ -207,6 +231,9 @@ export default function PayPage() {
     const displayAmount = customAmount && parseFloat(customAmount) > 0
       ? formatAmount(parseFloat(customAmount))
       : formatAmount(paymentLink.amount);
+
+    const shouldRedirect = verifyStatus === "SUCCESS" && redirectUrl;
+
     return (
       <PageWrapper>
         <div className="bg-white rounded-3xl shadow-lg p-8 text-center space-y-5">
@@ -223,6 +250,9 @@ export default function PayPage() {
             <p className="text-sm font-medium text-gray-700 mt-1">{paymentLink.name}</p>
           </div>
           {pendingReference && <p className="text-xs text-gray-400 font-mono">Réf : {pendingReference}</p>}
+          {shouldRedirect && (
+            <p className="text-xs text-gray-400 animate-pulse" data-testid="text-redirect-notice">Redirection dans 3 secondes...</p>
+          )}
           {["FAILED", "CANCELLED"].includes(verifyStatus) && (
             <Button
               className="w-full h-12 font-bold rounded-2xl"
@@ -351,29 +381,47 @@ export default function PayPage() {
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Opérateur Mobile Money</Label>
               <div className={`grid gap-2 ${selectedCountry.operators.length <= 2 ? "grid-cols-2" : selectedCountry.operators.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
-                {selectedCountry.operators.map((op) => (
-                  <button
-                    key={op}
-                    type="button"
-                    onClick={() => {
-                      setOperator(op);
-                      setTimeout(() => phoneInputRef.current?.focus(), 50);
-                    }}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
-                      operator === op
-                        ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-100"
-                        : "border-gray-200 hover:border-gray-300 bg-white"
-                    }`}
-                    data-testid={`option-pay-operator-${op}`}
-                  >
-                    <div className={`rounded-2xl overflow-hidden transition-transform ${operator === op ? "scale-110" : ""}`}>
-                      <OperatorLogo operator={op} size={52} />
-                    </div>
-                    <span className={`text-[11px] font-bold text-center leading-tight ${operator === op ? "text-blue-700" : "text-gray-500"}`}>
-                      {OPERATOR_LABEL[op] || op}
-                    </span>
-                  </button>
-                ))}
+                {selectedCountry.operators.map((op) => {
+                  const opStatus = getOperatorStatus(op);
+                  const isDisabled = !opStatus.available || opStatus.maintenance;
+                  return (
+                    <button
+                      key={op}
+                      type="button"
+                      onClick={() => {
+                        if (isDisabled) return;
+                        setOperator(op);
+                        setTimeout(() => phoneInputRef.current?.focus(), 50);
+                      }}
+                      disabled={isDisabled}
+                      className={`relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
+                        isDisabled
+                          ? "border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed"
+                          : operator === op
+                          ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-100"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                      data-testid={`option-pay-operator-${op}`}
+                    >
+                      {opStatus.maintenance && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
+                          Maint.
+                        </span>
+                      )}
+                      {!opStatus.available && !opStatus.maintenance && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
+                          Indispo
+                        </span>
+                      )}
+                      <div className={`rounded-2xl overflow-hidden transition-transform ${operator === op ? "scale-110" : ""}`}>
+                        <OperatorLogo operator={op} size={52} />
+                      </div>
+                      <span className={`text-[11px] font-bold text-center leading-tight ${operator === op ? "text-blue-700" : isDisabled ? "text-gray-400" : "text-gray-500"}`}>
+                        {OPERATOR_LABEL[op] || op}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

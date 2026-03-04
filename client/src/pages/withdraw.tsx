@@ -77,6 +77,14 @@ export default function WithdrawPage() {
 
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: allTransactions } = useQuery<any[]>({ queryKey: ["/api/transactions"] });
+  const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
+
+  function getOperatorStatus(op: string) {
+    if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
+    const pm = paymentMethods.find((m: any) => m.code === op);
+    if (!pm) return { available: true, maintenance: false };
+    return { available: pm.isActive !== false, maintenance: pm.inMaintenance === true };
+  }
   const balance = parseFloat(String(wallet?.balanceXOF || 0));
   const withdrawAmount = parseFloat(amount) || 0;
   const feeRate = 0.07;
@@ -233,26 +241,43 @@ export default function WithdrawPage() {
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Opérateur Mobile Money</Label>
                 <div className={`grid gap-3 ${selectedCountry.operators.length <= 2 ? "grid-cols-2" : selectedCountry.operators.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
-                  {selectedCountry.operators.map((op) => (
-                    <button
-                      key={op}
-                      type="button"
-                      onClick={() => setOperator(op)}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
-                        operator === op
-                          ? "border-primary bg-primary/5 shadow-md shadow-primary/10"
-                          : "border-border/50 hover:border-border bg-card hover:bg-muted/20"
-                      }`}
-                      data-testid={`option-withdraw-operator-${op}`}
-                    >
-                      <div className={`rounded-2xl overflow-hidden transition-transform ${operator === op ? "scale-110" : ""}`}>
-                        <OperatorLogo operator={op} size={52} />
-                      </div>
-                      <span className={`text-xs font-bold text-center leading-tight ${operator === op ? "text-primary" : "text-muted-foreground"}`}>
-                        {OPERATOR_LABEL[op] || op}
-                      </span>
-                    </button>
-                  ))}
+                  {selectedCountry.operators.map((op) => {
+                    const opStatus = getOperatorStatus(op);
+                    const isDisabled = !opStatus.available || opStatus.maintenance;
+                    return (
+                      <button
+                        key={op}
+                        type="button"
+                        onClick={() => { if (!isDisabled) setOperator(op); }}
+                        disabled={isDisabled}
+                        className={`relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
+                          isDisabled
+                            ? "border-border/20 bg-muted/30 opacity-60 cursor-not-allowed"
+                            : operator === op
+                            ? "border-primary bg-primary/5 shadow-md shadow-primary/10"
+                            : "border-border/50 hover:border-border bg-card hover:bg-muted/20"
+                        }`}
+                        data-testid={`option-withdraw-operator-${op}`}
+                      >
+                        {opStatus.maintenance && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
+                            Maint.
+                          </span>
+                        )}
+                        {!opStatus.available && !opStatus.maintenance && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
+                            Indispo
+                          </span>
+                        )}
+                        <div className={`rounded-2xl overflow-hidden transition-transform ${operator === op ? "scale-110" : ""}`}>
+                          <OperatorLogo operator={op} size={52} />
+                        </div>
+                        <span className={`text-xs font-bold text-center leading-tight ${operator === op ? "text-primary" : isDisabled ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
+                          {OPERATOR_LABEL[op] || op}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

@@ -521,6 +521,18 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/payment-methods/public", async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { paymentMethods: pmTable } = await import("@shared/schema");
+      const methods = await db.select().from(pmTable);
+      res.json(methods);
+    } catch (error) {
+      console.error("Public payment methods error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   app.get("/api/payment-links/public/:slug", async (req, res) => {
     try {
       const { slug } = req.params;
