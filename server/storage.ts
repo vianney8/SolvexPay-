@@ -4,6 +4,7 @@ import {
   apiKeys, 
   wallets,
   systemSettings,
+  notifications,
   type Transaction, 
   type InsertTransaction,
   type PaymentLink,
@@ -12,6 +13,8 @@ import {
   type InsertApiKey,
   type Wallet,
   type InsertWallet,
+  type Notification,
+  type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -49,6 +52,12 @@ export interface IStorage {
 
   getSystemSetting(key: string): Promise<string | null>;
   setSystemSetting(key: string, value: string): Promise<void>;
+
+  getActiveNotifications(): Promise<Notification[]>;
+  getAllNotifications(): Promise<Notification[]>;
+  createNotification(data: InsertNotification): Promise<Notification>;
+  updateNotification(id: string, data: Partial<Notification>): Promise<Notification | undefined>;
+  deleteNotification(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -228,6 +237,27 @@ export class DatabaseStorage implements IStorage {
       target: systemSettings.key,
       set: { value, updatedAt: new Date() },
     });
+  }
+  async getActiveNotifications(): Promise<Notification[]> {
+    return db.select().from(notifications).where(eq(notifications.isActive, true)).orderBy(desc(notifications.createdAt));
+  }
+
+  async getAllNotifications(): Promise<Notification[]> {
+    return db.select().from(notifications).orderBy(desc(notifications.createdAt));
+  }
+
+  async createNotification(data: InsertNotification): Promise<Notification> {
+    const [notif] = await db.insert(notifications).values(data).returning();
+    return notif;
+  }
+
+  async updateNotification(id: string, data: Partial<Notification>): Promise<Notification | undefined> {
+    const [notif] = await db.update(notifications).set(data).where(eq(notifications.id, id)).returning();
+    return notif;
+  }
+
+  async deleteNotification(id: string): Promise<void> {
+    await db.delete(notifications).where(eq(notifications.id, id));
   }
 }
 

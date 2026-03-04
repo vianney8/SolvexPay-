@@ -23,7 +23,7 @@ import {
   Zap, CalendarDays, BadgeCheck, UserX, Coins, FileText, ArrowUpDown,
   TrendingDown, Building2, ArrowRightLeft, Plus, DollarSign,
   Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
-  Trash2, Smartphone,
+  Trash2, Smartphone, Bell, X, BellOff, BellRing,
 } from "lucide-react";
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
@@ -181,6 +181,7 @@ export default function AdminPage() {
   const [apiKeysSearch, setApiKeysSearch] = useState("");
   const [wdDialog, setWdDialog] = useState(false);
   const [wdForm, setWdForm] = useState({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
+  const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue" });
 
   // Queries
   const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"] });
@@ -214,6 +215,7 @@ export default function AdminPage() {
   });
   const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-links"] });
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({ queryKey: ["/api/admin/api-keys"] });
+  const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({ queryKey: ["/api/admin/notifications"] });
 
   // Mutations
   const blockM = useMutation({
@@ -367,6 +369,31 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
+  const createNotifM = useMutation({
+    mutationFn: (data: { title: string; message: string; color: string }) => apiRequest("POST", "/api/admin/notifications", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] });
+      toast({ title: "Notification envoyée" });
+      setNotifForm({ title: "", message: "", color: "blue" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const toggleNotifM = useMutation({
+    mutationFn: (d: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/admin/notifications/${d.id}`, { isActive: d.isActive }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] }),
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const deleteNotifM = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/notifications/${id}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] });
+      toast({ title: "Notification supprimée" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
   const filteredUsers = (users || []).filter(u =>
     !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase())
   );
@@ -436,6 +463,7 @@ export default function AdminPage() {
                 { v: "fees", label: "Frais", Icon: Percent, badge: 0 },
                 { v: "payments", label: "Moyens de paiement", Icon: CreditCard, badge: 0 },
                 { v: "transactions", label: "Transactions", Icon: ArrowDownUp, badge: pendingWithdrawals.length },
+                { v: "notifications", label: "Notifications", Icon: Bell, badge: (adminNotifications || []).filter((n: any) => n.isActive).length },
                 { v: "settings", label: "Paramètres", Icon: Settings2, badge: 0 },
               ].map(({ v, label, Icon, badge }) => (
                 <TabsTrigger key={v} value={v} className="gap-1.5 text-xs py-2 px-3 rounded-xl whitespace-nowrap relative" data-testid={`tab-${v}`}>
@@ -1494,6 +1522,112 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* ══════════════════════════════════════
+              TAB — NOTIFICATIONS
+          ══════════════════════════════════════ */}
+          <TabsContent value="notifications" className="space-y-4 mt-5">
+            <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 flex items-start gap-3">
+              <BellRing className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-blue-700 dark:text-blue-400">Envoyer une notification</p>
+                <p className="text-xs text-muted-foreground mt-0.5">La notification s'affichera dans le dashboard de tous les utilisateurs. Ils peuvent la fermer avec le bouton ✕.</p>
+              </div>
+            </div>
+
+            <Card className="border-border/50">
+              <CardContent className="pt-5 space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Titre</Label>
+                  <Input
+                    value={notifForm.title}
+                    onChange={e => setNotifForm(p => ({ ...p, title: e.target.value }))}
+                    placeholder="Ex: Maintenance prévue"
+                    className="h-10"
+                    data-testid="input-notif-title"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Message</Label>
+                  <Textarea
+                    value={notifForm.message}
+                    onChange={e => setNotifForm(p => ({ ...p, message: e.target.value }))}
+                    placeholder="Rédigez votre message..."
+                    className="min-h-[80px] resize-none"
+                    data-testid="input-notif-message"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Couleur d'affichage</Label>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setNotifForm(p => ({ ...p, color: "blue" }))}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${notifForm.color === "blue" ? "border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-400" : "border-border text-muted-foreground hover:border-blue-300"}`}
+                      data-testid="btn-color-blue"
+                    >
+                      <div className="h-3 w-3 rounded-full bg-blue-500" />
+                      Bleu — Information
+                    </button>
+                    <button
+                      onClick={() => setNotifForm(p => ({ ...p, color: "red" }))}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${notifForm.color === "red" ? "border-red-500 bg-red-500/10 text-red-700 dark:text-red-400" : "border-border text-muted-foreground hover:border-red-300"}`}
+                      data-testid="btn-color-red"
+                    >
+                      <div className="h-3 w-3 rounded-full bg-red-500" />
+                      Rouge — Urgence
+                    </button>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => createNotifM.mutate(notifForm)}
+                  disabled={createNotifM.isPending || !notifForm.title || !notifForm.message}
+                  className="w-full h-10 font-bold"
+                  data-testid="btn-send-notification"
+                >
+                  <Bell className="h-4 w-4 mr-2" />
+                  {createNotifM.isPending ? "Envoi..." : "Envoyer la notification"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Notifications existantes</p>
+              {notifsLoading ? (
+                <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
+              ) : (adminNotifications || []).length === 0 ? (
+                <div className="text-center py-10 text-sm text-muted-foreground">Aucune notification envoyée</div>
+              ) : (
+                <div className="space-y-2">
+                  {(adminNotifications || []).map((n: any) => (
+                    <div key={n.id} className={`flex items-start gap-3 p-4 rounded-2xl border transition-colors ${n.isActive ? (n.color === "red" ? "border-red-500/30 bg-red-500/5" : "border-blue-500/30 bg-blue-500/5") : "border-border/40 bg-muted/30 opacity-60"}`} data-testid={`row-notif-${n.id}`}>
+                      <div className={`h-2.5 w-2.5 rounded-full mt-1.5 flex-shrink-0 ${n.color === "red" ? "bg-red-500" : "bg-blue-500"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold truncate">{n.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString("fr-FR")}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => toggleNotifM.mutate({ id: n.id, isActive: !n.isActive })}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${n.isActive ? "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                          data-testid={`btn-toggle-notif-${n.id}`}
+                        >
+                          {n.isActive ? "Actif" : "Inactif"}
+                        </button>
+                        <button
+                          onClick={() => deleteNotifM.mutate(n.id)}
+                          className="h-8 w-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center transition-colors"
+                          data-testid={`btn-delete-notif-${n.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           {/* ══════════════════════════════════════

@@ -524,6 +524,59 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/notifications", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const notifs = await storage.getActiveNotifications();
+      res.json(notifs);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/admin/notifications", async (req, res) => {
+    if (!req.isAuthenticated() || !(req.user as any)?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const notifs = await storage.getAllNotifications();
+      res.json(notifs);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.post("/api/admin/notifications", async (req, res) => {
+    if (!req.isAuthenticated() || !(req.user as any)?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const { title, message, color } = req.body;
+      if (!title || !message) return res.status(400).json({ message: "Title and message are required" });
+      const notif = await storage.createNotification({ title, message, color: color || "blue", isActive: true });
+      res.json(notif);
+    } catch {
+      res.status(500).json({ message: "Failed to create notification" });
+    }
+  });
+
+  app.patch("/api/admin/notifications/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !(req.user as any)?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const notif = await storage.updateNotification(req.params.id, req.body);
+      if (!notif) return res.status(404).json({ message: "Not found" });
+      res.json(notif);
+    } catch {
+      res.status(500).json({ message: "Failed to update notification" });
+    }
+  });
+
+  app.delete("/api/admin/notifications/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !(req.user as any)?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+    try {
+      await storage.deleteNotification(req.params.id);
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "Failed to delete notification" });
+    }
+  });
+
   app.get("/api/service-fees", async (req, res) => {
     try {
       const deposit = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");

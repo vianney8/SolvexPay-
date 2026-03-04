@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,8 @@ import {
   TrendingUp,
   TrendingDown,
   CalendarDays,
+  X,
+  Bell,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -56,15 +58,27 @@ function isExpiredPending(tx: Transaction): boolean {
 export default function DashboardPage() {
   const { user } = useAuth();
   const [balanceVisible, setBalanceVisible] = useState(true);
+  const [dismissedNotifs, setDismissedNotifs] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("dismissed_notifs") || "[]"); } catch { return []; }
+  });
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({ queryKey: ["/api/transactions"] });
+  const { data: activeNotifications } = useQuery<any[]>({ queryKey: ["/api/notifications"] });
   const { data: stats } = useQuery<{
     totalDeposits: number; totalWithdrawals: number; transactionCount: number; paymentLinksCount: number;
   }>({ queryKey: ["/api/stats"] });
 
   const recentTransactions = transactions?.slice(0, 5) || [];
   const firstName = user?.firstName || user?.email?.split("@")[0] || "là";
+
+  const visibleNotifications = (activeNotifications || []).filter((n: any) => !dismissedNotifs.includes(n.id));
+
+  function dismissNotif(id: string) {
+    const updated = [...dismissedNotifs, id];
+    setDismissedNotifs(updated);
+    localStorage.setItem("dismissed_notifs", JSON.stringify(updated));
+  }
 
   const depositTx = transactions?.filter(t => t.type === "deposit") || [];
   const withdrawalTx = transactions?.filter(t => t.type === "withdrawal") || [];
@@ -92,6 +106,31 @@ export default function DashboardPage() {
   return (
     <DashboardLayout title="" breadcrumbs={[]}>
       <div className="space-y-6">
+
+        {visibleNotifications.length > 0 && (
+          <div className="space-y-2">
+            {visibleNotifications.map((n: any) => (
+              <div
+                key={n.id}
+                className={`flex items-start gap-3 p-4 rounded-2xl border ${n.color === "red" ? "bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-200" : "bg-blue-500/10 border-blue-500/30 text-blue-800 dark:text-blue-200"}`}
+                data-testid={`banner-notif-${n.id}`}
+              >
+                <Bell className={`h-4 w-4 mt-0.5 flex-shrink-0 ${n.color === "red" ? "text-red-600" : "text-blue-600"}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold">{n.title}</p>
+                  <p className="text-xs mt-0.5 opacity-80">{n.message}</p>
+                </div>
+                <button
+                  onClick={() => dismissNotif(n.id)}
+                  className={`h-6 w-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${n.color === "red" ? "hover:bg-red-500/20" : "hover:bg-blue-500/20"}`}
+                  data-testid={`btn-dismiss-notif-${n.id}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-end justify-between gap-4">
           <div>
