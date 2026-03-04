@@ -93,6 +93,7 @@ Preferred communication style: Simple, everyday language.
 - Sessions stored in PostgreSQL with 7-day TTL
 - Protected routes use `isAuthenticated` middleware
 - User data synced on login via upsert pattern
+- **Admin Credentials (Development):** `vianneyessou@gmail.com` / `123@Aaa.` (Stored in `admin_credentials.txt`)
 
 ### Key Design Decisions
 
