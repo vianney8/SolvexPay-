@@ -317,7 +317,11 @@ export async function registerRoutes(
       }
 
       const currentBalance = parseFloat((wallet.balanceXOF as string) || "0");
-      if (currentBalance < amount) {
+      const transferFeeRate = 0.06;
+      const transferFees = Math.round(amount * transferFeeRate);
+      const totalDeducted = amount + transferFees;
+
+      if (currentBalance < totalDeducted) {
         return res.status(400).json({ message: "Solde insuffisant" });
       }
 
@@ -335,9 +339,6 @@ export async function registerRoutes(
       });
       console.log(`OmniPay transfer response for ${reference}:`, transferResponse);
 
-      const transferFeeRate = 0.06;
-      const transferFees = Math.round(amount * transferFeeRate);
-
       const transaction = await storage.createTransaction({
         userId,
         type: "transfer",
@@ -351,7 +352,7 @@ export async function registerRoutes(
         fees: String(transferFees),
       } as any);
 
-      await storage.updateWalletBalance(userId, currency, -amount);
+      await storage.updateWalletBalance(userId, currency, -totalDeducted);
 
       res.json({
         ...transaction,

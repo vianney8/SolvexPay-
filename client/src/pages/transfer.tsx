@@ -66,8 +66,8 @@ export default function TransferPage() {
   const transferAmount = parseFloat(amount) || 0;
   const feeRate = 0.06;
   const fees = Math.round(transferAmount * feeRate);
-  const netAmount = transferAmount - fees;
-  const insufficientFunds = transferAmount > balance && transferAmount > 0;
+  const totalDeducted = transferAmount + fees;
+  const insufficientFunds = totalDeducted > balance && transferAmount > 0;
 
   const transferMutation = useMutation({
     mutationFn: async (data: { amount: number; phoneNumber: string; operator: string; country: string; firstName?: string; lastName?: string }) => {
@@ -297,17 +297,17 @@ export default function TransferPage() {
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Montant envoyé</span>
-                  <span className="font-semibold">{formatCurrency(transferAmount)} XOF</span>
+                  <span className="text-muted-foreground">Bénéficiaire reçoit</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(transferAmount)} XOF</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Frais de transfert ({feeRate * 100}%)</span>
-                  <span className="text-destructive font-medium">- {formatCurrency(fees)} XOF</span>
+                  <span className="text-destructive font-medium">+ {formatCurrency(fees)} XOF</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm">Bénéficiaire reçoit</span>
-                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`} data-testid="text-transfer-total">{formatCurrency(netAmount)} XOF</span>
+                  <span className="font-bold text-sm">Total débité de votre compte</span>
+                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : "text-foreground"}`} data-testid="text-transfer-total">{formatCurrency(totalDeducted)} XOF</span>
                 </div>
               </CardContent>
             </Card>
@@ -316,7 +316,7 @@ export default function TransferPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20">
             <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Frais de transfert de <strong>{feeRate * 100}%</strong> appliqués sur le montant envoyé. Le bénéficiaire reçoit les fonds instantanément.
+              Frais de transfert de <strong>{feeRate * 100}%</strong> déduits de votre compte en plus du montant. Le bénéficiaire reçoit exactement le montant saisi.
             </p>
           </div>
 
