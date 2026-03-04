@@ -40,8 +40,32 @@ function AuthenticatedRoutes() {
   );
 }
 
+function BlockedPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-6">
+      <div className="max-w-sm w-full text-center space-y-5">
+        <div className="h-20 w-20 rounded-3xl bg-red-500/10 flex items-center justify-center mx-auto">
+          <svg className="h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+        </div>
+        <div>
+          <h1 className="text-2xl font-black text-foreground">Compte suspendu</h1>
+          <p className="text-muted-foreground mt-2 text-sm">Votre compte a été suspendu par l'administrateur. Veuillez contacter le support pour plus d'informations.</p>
+        </div>
+        <a
+          href="mailto:support@solvexpay.com"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-bold rounded-2xl text-sm hover:bg-primary/90 transition-colors"
+        >
+          Contacter le support
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isBlocked } = useAuth();
 
   if (isLoading) {
     return (
@@ -53,6 +77,10 @@ function Router() {
         </div>
       </div>
     );
+  }
+
+  if (isBlocked) {
+    return <BlockedPage />;
   }
 
   return (

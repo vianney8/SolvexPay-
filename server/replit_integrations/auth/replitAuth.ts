@@ -89,6 +89,10 @@ export async function setupAuth(app: Express) {
         return res.status(401).json({ message: "Email ou mot de passe incorrect" });
       }
 
+      if (user.isBlocked) {
+        return res.status(403).json({ message: "Votre compte a été suspendu. Contactez le support.", blocked: true });
+      }
+
       (req.session as any).userId = user.id;
 
       const { passwordHash: _, ...safeUser } = user;
@@ -120,6 +124,10 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = await authStorage.getUser(userId);
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  if (user.isBlocked && !user.isAdmin) {
+    return res.status(403).json({ message: "Votre compte a été suspendu. Contactez le support.", blocked: true });
   }
 
   (req as any).user = user;

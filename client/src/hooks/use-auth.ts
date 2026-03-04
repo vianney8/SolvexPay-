@@ -13,6 +13,14 @@ async function fetchUser(): Promise<SafeUser | null> {
     return null;
   }
 
+  if (response.status === 403) {
+    const data = await response.json().catch(() => ({}));
+    if (data.blocked) {
+      throw Object.assign(new Error("blocked"), { blocked: true });
+    }
+    return null;
+  }
+
   if (!response.ok) {
     throw new Error(`${response.status}: ${response.statusText}`);
   }
@@ -22,12 +30,14 @@ async function fetchUser(): Promise<SafeUser | null> {
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<SafeUser | null>({
+  const { data: user, isLoading, error } = useQuery<SafeUser | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
     staleTime: 1000 * 60 * 5,
   });
+
+  const isBlocked = !!(error && (error as any).blocked);
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
@@ -61,6 +71,7 @@ export function useAuth() {
   return {
     user,
     isLoading,
+    isBlocked,
     isAuthenticated: !!user,
     login: loginMutation,
     register: registerMutation,

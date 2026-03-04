@@ -21,7 +21,7 @@ import {
   BarChart3, Banknote, Lock, Unlock, ChevronDown, ChevronUp,
   Globe, Percent, Eye, CreditCard, Send, Activity, Star, ZapOff,
   Zap, CalendarDays, BadgeCheck, UserX, Coins, FileText, ArrowUpDown,
-  TrendingDown, Building2, Network, ArrowRightLeft, Plus, DollarSign,
+  TrendingDown, Building2, ArrowRightLeft, Plus, DollarSign,
   Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
   Trash2, Smartphone,
 } from "lucide-react";
@@ -292,7 +292,7 @@ export default function AdminPage() {
   });
 
   const pmM = useMutation({
-    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
+    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[] }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] }); toast({ title: "Mis à jour" }); },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
@@ -603,31 +603,6 @@ export default function AdminPage() {
 
                         {isExp && (
                           <div className="mt-4 space-y-3">
-                            {/* Réseau maintenance per user view */}
-                            {(paymentMethods || []).length > 0 && (
-                              <div className="rounded-2xl border border-border/50 overflow-hidden">
-                                <div className="bg-muted/40 px-3 py-2 flex items-center gap-2">
-                                  <Network className="h-3.5 w-3.5 text-cyan-600" />
-                                  <p className="text-xs font-bold">Maintenance des réseaux</p>
-                                </div>
-                                <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                  {(paymentMethods || []).map((pm: any) => (
-                                    <div key={pm.code} className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl border ${pm.inMaintenance ? "border-amber-500/30 bg-amber-500/8" : "border-border/40 bg-muted/30"}`}>
-                                      <div>
-                                        <p className="text-xs font-bold">{pm.name}</p>
-                                        <p className="text-xs text-muted-foreground">{pm.inMaintenance ? "Maintenance" : "Actif"}</p>
-                                      </div>
-                                      <Switch
-                                        checked={pm.inMaintenance}
-                                        onCheckedChange={(v) => pmM.mutate({ code: pm.code, inMaintenance: v })}
-                                        data-testid={`switch-network-maint-${pm.code}-${u.id}`}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
                             {/* Transaction history */}
                             <div className="rounded-2xl border border-border/50 overflow-hidden">
                               <div className="bg-muted/40 px-3 py-2 flex items-center gap-2">
@@ -1067,46 +1042,94 @@ export default function AdminPage() {
           <TabsContent value="payments" className="space-y-4 mt-5">
             <div className="p-4 rounded-2xl bg-cyan-500/5 border border-cyan-500/20 flex items-start gap-3">
               <AlertTriangle className="h-4 w-4 text-cyan-600 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">Désactiver un réseau l'empêche complètement d'être utilisé. Le mode <strong>Maintenance</strong> affiche un message aux utilisateurs.</p>
+              <p className="text-xs text-muted-foreground">
+                <strong>Désactiver</strong> un réseau l'empêche complètement d'être utilisé dans tous les pays.
+                La <strong>maintenance par pays</strong> permet de bloquer un opérateur uniquement dans les pays sélectionnés — ex: MTN Bénin en maintenance, MTN Côte d'Ivoire toujours actif.
+              </p>
             </div>
 
             {pmLoading ? (
-              <div className="grid sm:grid-cols-2 gap-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)}</div>
+              <div className="space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-48 rounded-2xl" />)}</div>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-3">
-                {(paymentMethods || []).map((pm: any) => (
-                  <Card key={pm.code} className={`border-border/50 overflow-hidden ${pm.inMaintenance ? "border-amber-500/30" : !pm.isActive ? "border-red-500/20 opacity-70" : ""}`} data-testid={`card-pm-${pm.code}`}>
-                    <CardContent className="p-0">
-                      <div className={`h-1 ${pm.inMaintenance ? "bg-amber-500" : pm.isActive ? "bg-emerald-500" : "bg-red-500"}`} />
-                      <div className="p-4">
-                        <div className="flex items-start justify-between gap-2 mb-4">
-                          <div>
-                            <p className="font-bold text-sm">{pm.name}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{(pm.countries || []).join(" · ")}</p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            {pm.inMaintenance && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30 text-xs font-semibold"><ZapOff className="h-2.5 w-2.5" />Maintenance</span>}
-                            {!pm.isActive && !pm.inMaintenance && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 border border-red-500/30 text-xs font-semibold">Désactivé</span>}
-                            {pm.isActive && !pm.inMaintenance && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 text-xs font-semibold"><Zap className="h-2.5 w-2.5" />Actif</span>}
-                          </div>
-                        </div>
-                        <div className="space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Switch checked={pm.isActive} onCheckedChange={(v) => pmM.mutate({ code: pm.code, isActive: v })} disabled={pmM.isPending} data-testid={`switch-active-${pm.code}`} />
-                              <span className="text-xs text-muted-foreground">{pm.isActive ? "Activé" : "Désactivé"}</span>
+              <div className="space-y-3">
+                {(paymentMethods || []).map((pm: any) => {
+                  const maintCountries: string[] = pm.maintenanceCountries || [];
+                  const pmCountries: string[] = pm.countries || [];
+                  const hasMaint = pm.inMaintenance || maintCountries.length > 0;
+                  const statusBand = pm.inMaintenance ? "bg-amber-500" : !pm.isActive ? "bg-red-500" : hasMaint ? "bg-amber-400" : "bg-emerald-500";
+
+                  function toggleCountryMaint(countryCode: string) {
+                    const current = maintCountries;
+                    const updated = current.includes(countryCode)
+                      ? current.filter((c: string) => c !== countryCode)
+                      : [...current, countryCode];
+                    pmM.mutate({ code: pm.code, maintenanceCountries: updated });
+                  }
+
+                  return (
+                    <Card key={pm.code} className={`border-border/50 overflow-hidden ${pm.inMaintenance ? "border-amber-500/30" : !pm.isActive ? "border-red-500/20 opacity-70" : hasMaint ? "border-amber-500/20" : ""}`} data-testid={`card-pm-${pm.code}`}>
+                      <CardContent className="p-0">
+                        <div className={`h-1.5 ${statusBand}`} />
+                        <div className="p-4">
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-sm">{pm.name}</p>
+                                {pm.inMaintenance && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30 text-xs font-semibold"><ZapOff className="h-2.5 w-2.5" />Tout en maint.</span>}
+                                {!pm.isActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 border border-red-500/30 text-xs font-semibold">Désactivé</span>}
+                                {pm.isActive && !pm.inMaintenance && !hasMaint && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 text-xs font-semibold"><Zap className="h-2.5 w-2.5" />Actif partout</span>}
+                                {pm.isActive && !pm.inMaintenance && hasMaint && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30 text-xs font-semibold"><ZapOff className="h-2.5 w-2.5" />Maint. partielle</span>}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">{pmCountries.join(" · ")}</p>
                             </div>
-                            <span className="text-xs text-muted-foreground font-semibold">{pm.feeValue}%</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground font-semibold">{pm.feeValue}%</span>
+                              <Switch checked={pm.isActive} onCheckedChange={(v) => pmM.mutate({ code: pm.code, isActive: v })} disabled={pmM.isPending} data-testid={`switch-active-${pm.code}`} />
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Switch checked={pm.inMaintenance} onCheckedChange={(v) => pmM.mutate({ code: pm.code, inMaintenance: v })} disabled={pmM.isPending} data-testid={`switch-maintenance-${pm.code}`} />
-                            <span className="text-xs text-muted-foreground">Mode maintenance</span>
-                          </div>
+
+                          {pm.isActive && (
+                            <div className="border border-border/40 rounded-xl overflow-hidden">
+                              <div className="bg-muted/30 px-3 py-1.5 flex items-center justify-between">
+                                <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5"><ZapOff className="h-3 w-3" />Maintenance par pays</p>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={pm.inMaintenance}
+                                    onCheckedChange={(v) => pmM.mutate({ code: pm.code, inMaintenance: v })}
+                                    disabled={pmM.isPending}
+                                    data-testid={`switch-maintenance-${pm.code}`}
+                                  />
+                                  <span className="text-xs text-muted-foreground">{pm.inMaintenance ? "Tous les pays" : "Sélectif"}</span>
+                                </div>
+                              </div>
+                              {!pm.inMaintenance && (
+                                <div className="p-2 grid grid-cols-3 gap-1.5">
+                                  {pmCountries.map((cc: string) => {
+                                    const cInfo = COUNTRIES.find(c => c.code === cc);
+                                    const isMaint = maintCountries.includes(cc);
+                                    return (
+                                      <button
+                                        key={cc}
+                                        onClick={() => toggleCountryMaint(cc)}
+                                        disabled={pmM.isPending}
+                                        className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${isMaint ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400" : "border-border/40 bg-muted/20 text-muted-foreground hover:bg-muted/40"}`}
+                                        data-testid={`btn-maint-country-${pm.code}-${cc}`}
+                                      >
+                                        <span>{cInfo?.flag || "🌍"}</span>
+                                        <span>{cc}</span>
+                                        {isMaint && <ZapOff className="h-2.5 w-2.5 ml-auto" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>

@@ -706,6 +706,15 @@ export async function registerRoutes(
         return res.status(400).json({ message: "isActive must be a boolean" });
       }
 
+      const { db } = await import("./db");
+      const { apiKeys: akTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const [existing] = await db.select().from(akTable).where(and(eq(akTable.id, id), eq(akTable.userId, req.user.id)));
+      if (!existing) return res.status(404).json({ message: "Clé non trouvée" });
+      if (existing.adminLocked) {
+        return res.status(403).json({ message: "Cette clé a été verrouillée par l'administrateur.", adminLocked: true });
+      }
+
       const apiKey = await storage.updateApiKey(id, { isActive });
       res.json(apiKey);
     } catch (error) {
@@ -1252,13 +1261,14 @@ export async function registerRoutes(
   app.patch("/api/admin/payment-methods/:code", isAdmin, async (req, res) => {
     try {
       const { code } = req.params;
-      const { isActive, inMaintenance, feeValue, feeType } = req.body;
+      const { isActive, inMaintenance, maintenanceCountries, feeValue, feeType } = req.body;
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
       const updateData: any = { updatedAt: new Date() };
       if (isActive !== undefined) updateData.isActive = isActive;
       if (inMaintenance !== undefined) updateData.inMaintenance = inMaintenance;
+      if (maintenanceCountries !== undefined) updateData.maintenanceCountries = maintenanceCountries;
       if (feeValue !== undefined) updateData.feeValue = String(feeValue);
       if (feeType !== undefined) updateData.feeType = feeType;
       const [updated] = await db.update(pmTable).set(updateData).where(eq(pmTable.code, code)).returning();
@@ -1485,7 +1495,8 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { apiKeys: akTable } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
-      const [updated] = await db.update(akTable).set({ isActive: !!isActive }).where(eq(akTable.id, id)).returning();
+      const setActive = !!isActive;
+      const [updated] = await db.update(akTable).set({ isActive: setActive, adminLocked: !setActive }).where(eq(akTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Clé non trouvée" });
       const { keyHash: _, ...safeKey } = updated;
       res.json(safeKey);

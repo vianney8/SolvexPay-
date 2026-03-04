@@ -104,7 +104,9 @@ export default function PayPage() {
     if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
     const pm = paymentMethods.find((m: any) => m.code === op);
     if (!pm) return { available: true, maintenance: false };
-    return { available: pm.isActive !== false, maintenance: pm.inMaintenance === true };
+    const globalMaint = pm.inMaintenance === true;
+    const countryMaint = (pm.maintenanceCountries || []).includes(country);
+    return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint };
   }
 
   const { data: paymentLink, isLoading, error } = useQuery<PaymentLink>({

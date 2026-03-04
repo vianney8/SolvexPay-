@@ -50,6 +50,7 @@ export const apiKeys = pgTable("api_keys", {
   environment: text("environment").notNull().default("live"),
   websiteUrl: text("website_url"),
   isActive: boolean("is_active").notNull().default(true),
+  adminLocked: boolean("admin_locked").notNull().default(false),
   lastUsedAt: timestamp("last_used_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [index("idx_api_keys_user").on(table.userId)]);
@@ -69,6 +70,7 @@ export const paymentMethods = pgTable("payment_methods", {
   category: text("category").notNull().default("mobile_money"),
   isActive: boolean("is_active").notNull().default(true),
   inMaintenance: boolean("in_maintenance").notNull().default(false),
+  maintenanceCountries: text("maintenance_countries").array().default([]),
   feeType: text("fee_type").notNull().default("percentage"),
   feeValue: decimal("fee_value", { precision: 5, scale: 2 }).notNull().default("5"),
   countries: text("countries").array().default([]),

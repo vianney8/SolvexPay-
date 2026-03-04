@@ -181,9 +181,15 @@ export default function ApiKeysPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-bold text-sm">{key.name}</h3>
                           <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20">Production</span>
-                          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${key.isActive ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-red-500/10 text-red-600 border border-red-500/20"}`}>
-                            {key.isActive ? "Active" : "Inactive"}
-                          </span>
+                          {(key as any).adminLocked ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 border border-red-500/20">
+                              <Lock className="h-2.5 w-2.5" />Verrouillée par admin
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${key.isActive ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-red-500/10 text-red-600 border border-red-500/20"}`}>
+                              {key.isActive ? "Active" : "Inactive"}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-4 mt-1 flex-wrap">
                           <span className="text-xs text-muted-foreground">Créée le {key.createdAt && formatDate(key.createdAt)}</span>
@@ -191,11 +197,17 @@ export default function ApiKeysPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
+                        {(key as any).adminLocked ? (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-500/8 border border-red-500/20" title="Verrouillée par l'administrateur">
+                            <Lock className="h-3.5 w-3.5 text-red-500" />
+                          </div>
+                        ) : (
                         <Switch
                           checked={key.isActive}
                           onCheckedChange={(checked) => toggleMutation.mutate({ id: key.id, isActive: checked })}
                           data-testid={`switch-key-${key.id}`}
                         />
+                        )}
                         <Button variant="outline" size="icon" onClick={() => deleteMutation.mutate(key.id)} className="text-destructive border-destructive/20 hover:bg-destructive/5" data-testid={`button-delete-key-${key.id}`}>
                           <Trash2 className="h-4 w-4" />
                         </Button>

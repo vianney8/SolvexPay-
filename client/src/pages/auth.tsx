@@ -148,6 +148,10 @@ export function LoginPage() {
       try {
         const parsed = JSON.parse(message.replace(/^\d+:\s*/, ""));
         errorText = parsed.message || message;
+        if (parsed.blocked) {
+          toast({ title: "Compte suspendu", description: "Votre compte a été suspendu par l'administrateur. Contactez le support.", variant: "destructive" });
+          return;
+        }
       } catch {
         if (message.includes("401")) errorText = "Email ou mot de passe incorrect";
       }
