@@ -213,55 +213,58 @@ export default function DepositPage() {
               </div>
             </div>
 
-            {/* Carte montant + steps */}
+            {/* Carte montant + indicateurs */}
             <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <div className="p-5 text-center">
-                <p className="text-xs text-white/40 font-medium mb-1">Montant déposé</p>
-                <p className="text-2xl font-black text-white tracking-tight" data-testid="text-deposit-amount">{formatCurrency(parsedAmount)} <span className="text-base font-bold text-white/40">{currency}</span></p>
-                <p className="text-xs text-white/30 mt-1">{operator} · {selectedCountry.name}</p>
-              </div>
-              <div className="px-5 pb-5">
-                <div className="flex items-center gap-1">
-                  {steps.map((step, i) => (
-                    <div key={i} className="flex items-center flex-1">
-                      <div className="flex flex-col items-center flex-1">
-                        <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
-                          step.done
-                            ? isSuccess ? "bg-emerald-400 text-white" : isFailed && i === 2 ? "bg-rose-400 text-white" : "bg-amber-400 text-white"
-                            : "bg-white/10 text-white/30"
-                        }`}>
-                          {step.done ? (isFailed && i === 2 ? "✗" : "✓") : ""}
+              <div className="p-5 flex items-stretch gap-4">
+
+                {/* Gauche : montant + étapes */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-white/40 font-medium mb-0.5">Montant déposé</p>
+                  <p className="text-xl font-black text-white tracking-tight" data-testid="text-deposit-amount">{formatCurrency(parsedAmount)} <span className="text-sm font-bold text-white/40">{currency}</span></p>
+                  <p className="text-[11px] text-white/30 mt-0.5 mb-3">{operator} · {selectedCountry.name}</p>
+                  <div className="flex items-center gap-1">
+                    {steps.map((step, i) => (
+                      <div key={i} className="flex items-center flex-1">
+                        <div className="flex flex-col items-center flex-1">
+                          <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-black transition-all ${
+                            step.done
+                              ? isSuccess ? "bg-emerald-400 text-white" : isFailed && i === 2 ? "bg-rose-400 text-white" : "bg-amber-400 text-white"
+                              : "bg-white/10 text-white/30"
+                          }`}>
+                            {step.done ? (isFailed && i === 2 ? "✗" : "✓") : ""}
+                          </div>
+                          <p className="text-[8px] text-white/35 font-semibold mt-0.5 text-center leading-tight">{step.label}</p>
                         </div>
-                        <p className="text-[9px] text-white/40 font-semibold mt-1">{step.label}</p>
+                        {i < steps.length - 1 && (
+                          <div className={`h-0.5 flex-1 mx-1 mb-3 rounded-full ${step.done ? (isSuccess ? "bg-emerald-400/50" : "bg-amber-400/50") : "bg-white/10"}`} />
+                        )}
                       </div>
-                      {i < steps.length - 1 && (
-                        <div className={`h-0.5 flex-1 mx-1 mb-4 rounded-full ${step.done ? (isSuccess ? "bg-emerald-400/50" : "bg-amber-400/50") : "bg-white/10"}`} />
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+
+                {/* Droite : temps + vérifications */}
+                {isPending && (
+                  <div className="flex flex-col justify-center gap-3 pl-4 border-l border-white/10 min-w-[88px]">
+                    <div>
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <Clock className="h-2.5 w-2.5 text-white/30" />
+                        <p className="text-[9px] text-white/35 font-medium">Temps écoulé</p>
+                      </div>
+                      <p className="text-sm font-black text-white/80">{elapsedStr}</p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <p className="text-[9px] text-white/35 font-medium">Vérifications</p>
+                      </div>
+                      <p className="text-sm font-black text-white/80">{verifyCount}</p>
+                    </div>
+                  </div>
+                )}
+
               </div>
             </div>
-
-            {/* Indicateurs temps + vérifications */}
-            {isPending && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <div className="flex items-center justify-center gap-1.5 mb-1">
-                    <Clock className="h-3 w-3 text-white/40" />
-                    <p className="text-[10px] text-white/40 font-medium">Temps écoulé</p>
-                  </div>
-                  <p className="text-base font-black text-white/80">{elapsedStr}</p>
-                </div>
-                <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <div className="flex items-center justify-center gap-1.5 mb-1">
-                    <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <p className="text-[10px] text-white/40 font-medium">Vérifications</p>
-                  </div>
-                  <p className="text-base font-black text-white/80">{verifyCount}</p>
-                </div>
-              </div>
-            )}
 
             {/* Instructions mobile */}
             {isPending && (
