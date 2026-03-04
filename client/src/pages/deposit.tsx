@@ -75,8 +75,10 @@ export default function DepositPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("status") === "callback") {
+      const ref = params.get("reference");
+      if (ref) setPendingReference(ref);
       setPaymentStatus("processing");
-      toast({ title: "Vérification en cours", description: "Nous vérifions votre paiement..." });
+      toast({ title: "Vérification en cours", description: "Nous vérifions votre paiement Wave..." });
     }
   }, []);
 
@@ -87,6 +89,10 @@ export default function DepositPage() {
     },
     onSuccess: (data: any) => {
       setPendingReference(data.sendavaReference || data.reference);
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+        return;
+      }
       setPaymentStatus("processing");
       toast({ title: "Paiement initié", description: "Un prompt USSD a été envoyé sur votre téléphone." });
     },

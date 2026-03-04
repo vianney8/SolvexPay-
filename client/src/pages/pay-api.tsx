@@ -129,6 +129,18 @@ export default function PayApiPage() {
     }
   }, [verifyStatus, redirectUrl]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("status") === "callback") {
+      const ref = params.get("reference");
+      if (ref) {
+        setPendingReference(ref);
+        setPaymentStatus("processing");
+        toast({ title: "Vérification en cours", description: "Nous vérifions votre paiement Wave..." });
+      }
+    }
+  }, []);
+
   const payMutation = useMutation({
     mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName?: string; customerEmail?: string }) => {
       const res = await apiRequest("POST", `/api/payment-api/public/${id}/pay`, data);
@@ -136,8 +148,11 @@ export default function PayApiPage() {
     },
     onSuccess: (data: any) => {
       setPendingReference(data.reference);
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+        return;
+      }
       setPaymentStatus("processing");
-      if (data.paymentUrl) window.open(data.paymentUrl, "_blank");
       toast({ title: "Paiement initié", description: "Confirmez le paiement sur votre téléphone." });
     },
     onError: (err: any) => {

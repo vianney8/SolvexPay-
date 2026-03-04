@@ -1361,7 +1361,7 @@ export async function registerRoutes(
       }
     }
 
-    res.redirect(`/deposit?status=callback`);
+    res.redirect(`/deposit?status=callback&reference=${encodeURIComponent(String(reference || ""))}`);
   });
 
   app.get("/api/settings/webhook-urls", isAuthenticated, async (req, res) => {
