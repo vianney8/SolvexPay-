@@ -74,6 +74,7 @@ const features = [
     color: "from-violet-500 via-purple-500 to-indigo-600",
     badge: "Le plus populaire",
     points: ["Liens sans expiration", "Montant fixe ou libre", "QR Code inclus"],
+    Illustration: PaymentLinkIllustration,
   },
   {
     icon: Smartphone,
@@ -82,6 +83,7 @@ const features = [
     color: "from-emerald-500 via-teal-500 to-cyan-600",
     badge: "10+ réseaux",
     points: ["Confirmation en temps réel", "Webhooks automatiques", "Multi-pays"],
+    Illustration: MobileMoneyIllustration,
   },
   {
     icon: Code2,
@@ -90,6 +92,7 @@ const features = [
     color: "from-amber-500 via-orange-500 to-red-500",
     badge: "Développeurs",
     points: ["Clés API sécurisées", "Documentation complète", "Support technique"],
+    Illustration: ApiGatewayIllustration,
   },
 ];
 
@@ -113,6 +116,236 @@ const faqs = [
   { q: "Comment intégrer l'API dans mon application ?", a: "Après connexion, accédez à 'Clés API' dans votre tableau de bord. Vous y trouverez vos clés et la documentation complète pour intégrer SolvexPay." },
   { q: "Quels pays sont supportés ?", a: "SolvexPay couvre actuellement 9 pays : Bénin, Côte d'Ivoire, Burkina Faso, Togo, Sénégal, Mali, Cameroun, RD Congo et Congo-Brazzaville." },
 ];
+
+function PaymentLinkIllustration() {
+  return (
+    <svg viewBox="0 0 320 208" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      <rect x="108" y="24" width="104" height="160" rx="14" fill="white" fillOpacity="0.18" stroke="white" strokeOpacity="0.4" strokeWidth="2"/>
+      <rect x="116" y="38" width="88" height="132" rx="7" fill="white" fillOpacity="0.12"/>
+      <circle cx="160" cy="32" r="4" fill="white" fillOpacity="0.5"/>
+      <rect x="132" y="52" width="16" height="16" rx="3" fill="white" fillOpacity="0.85"/>
+      <rect x="172" y="52" width="16" height="16" rx="3" fill="white" fillOpacity="0.85"/>
+      <rect x="132" y="88" width="16" height="16" rx="3" fill="white" fillOpacity="0.85"/>
+      <rect x="136" y="56" width="8" height="8" rx="1" fill="white" fillOpacity="0.35"/>
+      <rect x="176" y="56" width="8" height="8" rx="1" fill="white" fillOpacity="0.35"/>
+      <rect x="136" y="92" width="8" height="8" rx="1" fill="white" fillOpacity="0.35"/>
+      <rect x="152" y="56" width="4" height="4" fill="white" fillOpacity="0.55"/>
+      <rect x="160" y="64" width="4" height="4" fill="white" fillOpacity="0.55"/>
+      <rect x="168" y="72" width="4" height="4" fill="white" fillOpacity="0.55"/>
+      <rect x="152" y="80" width="4" height="4" fill="white" fillOpacity="0.55"/>
+      <rect x="160" y="88" width="4" height="4" fill="white" fillOpacity="0.55"/>
+      <rect x="168" y="96" width="4" height="4" fill="white" fillOpacity="0.55"/>
+      <rect x="128" y="116" width="64" height="8" rx="4" fill="white" fillOpacity="0.4"/>
+      <rect x="134" y="130" width="52" height="6" rx="3" fill="white" fillOpacity="0.25"/>
+      <rect x="140" y="142" width="40" height="6" rx="3" fill="white" fillOpacity="0.25"/>
+      <rect x="130" y="155" width="60" height="20" rx="10" fill="white" fillOpacity="0.3"/>
+      <rect x="140" y="161" width="40" height="8" rx="4" fill="white" fillOpacity="0.45"/>
+
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; 0,-7; 0,0" dur="3s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1"/>
+        <rect x="14" y="48" width="78" height="38" rx="19" fill="white" fillOpacity="0.22" stroke="white" strokeOpacity="0.3" strokeWidth="1"/>
+        <circle cx="36" cy="67" r="13" fill="#25D366" fillOpacity="0.95"/>
+        <rect x="29" y="61" width="14" height="12" rx="3" fill="white" fillOpacity="0.9"/>
+        <polygon points="29,73 36,80 43,73" fill="#25D366" fillOpacity="0.95"/>
+        <rect x="54" y="60" width="34" height="5" rx="2.5" fill="white" fillOpacity="0.7"/>
+        <rect x="54" y="69" width="26" height="4" rx="2" fill="white" fillOpacity="0.45"/>
+      </g>
+
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; 0,7; 0,0" dur="3.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1" begin="0.8s"/>
+        <rect x="16" y="128" width="74" height="36" rx="18" fill="white" fillOpacity="0.2" stroke="white" strokeOpacity="0.3" strokeWidth="1"/>
+        <circle cx="36" cy="146" r="13" fill="#EA4335" fillOpacity="0.9"/>
+        <rect x="27" y="140" width="18" height="12" rx="2" fill="white" fillOpacity="0.9"/>
+        <polyline points="27,140 36,148 45,140" stroke="#EA4335" strokeWidth="2" fill="none" strokeOpacity="0.9"/>
+        <rect x="54" y="139" width="30" height="5" rx="2.5" fill="white" fillOpacity="0.7"/>
+        <rect x="54" y="148" width="22" height="4" rx="2" fill="white" fillOpacity="0.45"/>
+      </g>
+
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; 0,-5; 0,0" dur="4.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1" begin="0.3s"/>
+        <rect x="228" y="60" width="72" height="36" rx="18" fill="white" fillOpacity="0.2" stroke="white" strokeOpacity="0.3" strokeWidth="1"/>
+        <circle cx="248" cy="78" r="13" fill="#1877F2" fillOpacity="0.9"/>
+        <text x="248" y="83" textAnchor="middle" fill="white" fontSize="13" fontFamily="sans-serif" fontWeight="bold">f</text>
+        <rect x="266" y="71" width="28" height="5" rx="2.5" fill="white" fillOpacity="0.7"/>
+        <rect x="266" y="80" width="20" height="4" rx="2" fill="white" fillOpacity="0.45"/>
+      </g>
+
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; 0,6; 0,0" dur="3.3s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1" begin="1.2s"/>
+        <rect x="230" y="130" width="68" height="36" rx="18" fill="white" fillOpacity="0.2" stroke="white" strokeOpacity="0.3" strokeWidth="1"/>
+        <circle cx="248" cy="148" r="13" fill="white" fillOpacity="0.35"/>
+        <path d="M242 148 h12 M248 142 v12" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+        <rect x="266" y="141" width="26" height="5" rx="2.5" fill="white" fillOpacity="0.7"/>
+        <rect x="266" y="150" width="18" height="4" rx="2" fill="white" fillOpacity="0.45"/>
+      </g>
+
+      <line x1="108" y1="80" x2="92" y2="70" stroke="white" strokeWidth="1.5" strokeDasharray="5 4" strokeOpacity="0.5">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="108" y1="128" x2="90" y2="148" stroke="white" strokeWidth="1.5" strokeDasharray="5 4" strokeOpacity="0.5">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1.4s" repeatCount="indefinite"/>
+      </line>
+      <line x1="212" y1="90" x2="228" y2="80" stroke="white" strokeWidth="1.5" strokeDasharray="5 4" strokeOpacity="0.5">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1.2s" repeatCount="indefinite"/>
+      </line>
+      <line x1="212" y1="140" x2="230" y2="150" stroke="white" strokeWidth="1.5" strokeDasharray="5 4" strokeOpacity="0.5">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1.3s" repeatCount="indefinite"/>
+      </line>
+    </svg>
+  );
+}
+
+function MobileMoneyIllustration() {
+  return (
+    <svg viewBox="0 0 320 208" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      <g>
+        <rect x="24" y="30" width="78" height="148" rx="12" fill="white" fillOpacity="0.18" stroke="white" strokeOpacity="0.4" strokeWidth="2"/>
+        <rect x="32" y="46" width="62" height="106" rx="6" fill="white" fillOpacity="0.12"/>
+        <circle cx="63" cy="38" r="3.5" fill="white" fillOpacity="0.5"/>
+        <rect x="36" y="54" width="54" height="10" rx="5" fill="white" fillOpacity="0.4"/>
+        <rect x="36" y="70" width="40" height="7" rx="3.5" fill="white" fillOpacity="0.25"/>
+        <rect x="36" y="84" width="54" height="32" rx="6" fill="white" fillOpacity="0.2"/>
+        <text x="63" y="105" textAnchor="middle" fill="white" fontSize="18" fontFamily="sans-serif">📱</text>
+        <rect x="36" y="122" width="30" height="6" rx="3" fill="white" fillOpacity="0.3"/>
+        <rect x="36" y="134" width="44" height="6" rx="3" fill="white" fillOpacity="0.2"/>
+        <rect x="36" y="148" width="54" height="14" rx="7" fill="white" fillOpacity="0.3"/>
+      </g>
+
+      <g>
+        <rect x="218" y="30" width="78" height="148" rx="12" fill="white" fillOpacity="0.18" stroke="white" strokeOpacity="0.4" strokeWidth="2"/>
+        <rect x="226" y="46" width="62" height="106" rx="6" fill="white" fillOpacity="0.12"/>
+        <circle cx="257" cy="38" r="3.5" fill="white" fillOpacity="0.5"/>
+        <rect x="230" y="54" width="54" height="10" rx="5" fill="white" fillOpacity="0.4"/>
+        <rect x="230" y="70" width="40" height="7" rx="3.5" fill="white" fillOpacity="0.25"/>
+        <rect x="230" y="84" width="54" height="32" rx="6" fill="white" fillOpacity="0.2"/>
+        <text x="257" y="105" textAnchor="middle" fill="white" fontSize="18" fontFamily="sans-serif">💰</text>
+        <rect x="230" y="122" width="30" height="6" rx="3" fill="white" fillOpacity="0.3"/>
+        <rect x="230" y="134" width="44" height="6" rx="3" fill="white" fillOpacity="0.2"/>
+        <rect x="230" y="148" width="54" height="14" rx="7" fill="white" fillOpacity="0.3"/>
+      </g>
+
+      <circle cx="160" cy="100" r="28" fill="white" fillOpacity="0.08"/>
+      <circle cx="160" cy="100" r="18" fill="white" fillOpacity="0.15"/>
+      <text x="160" y="107" textAnchor="middle" fill="white" fontSize="20" fontFamily="sans-serif">⚡</text>
+
+      <circle cx="160" cy="100" r="34" stroke="white" strokeOpacity="0.15" strokeWidth="1.5" fill="none">
+        <animate attributeName="r" values="34;46;34" dur="2.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="1;0;1" dur="2.5s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="160" cy="100" r="34" stroke="white" strokeOpacity="0.1" strokeWidth="1" fill="none">
+        <animate attributeName="r" values="34;50;34" dur="2.5s" repeatCount="indefinite" begin="0.6s"/>
+        <animate attributeName="opacity" values="0.8;0;0.8" dur="2.5s" repeatCount="indefinite" begin="0.6s"/>
+      </circle>
+
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; 56,0; 56,0" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1; 0 0 1 1" keyTimes="0; 0.6; 1"/>
+        <animate attributeName="opacity" values="0; 1; 1; 0" dur="1.6s" repeatCount="indefinite" keyTimes="0; 0.1; 0.8; 1"/>
+        <circle cx="112" cy="88" r="11" fill="white" fillOpacity="0.9"/>
+        <text x="112" y="93" textAnchor="middle" fontSize="12" fontFamily="sans-serif">€</text>
+      </g>
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; 56,0; 56,0" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1; 0 0 1 1" keyTimes="0; 0.6; 1" begin="0.5s"/>
+        <animate attributeName="opacity" values="0; 1; 1; 0" dur="1.6s" repeatCount="indefinite" keyTimes="0; 0.1; 0.8; 1" begin="0.5s"/>
+        <circle cx="112" cy="112" r="11" fill="white" fillOpacity="0.9"/>
+        <text x="112" y="117" textAnchor="middle" fontSize="12" fontFamily="sans-serif">$</text>
+      </g>
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; 56,0; 56,0" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1; 0 0 1 1" keyTimes="0; 0.6; 1" begin="1s"/>
+        <animate attributeName="opacity" values="0; 1; 1; 0" dur="1.6s" repeatCount="indefinite" keyTimes="0; 0.1; 0.8; 1" begin="1s"/>
+        <circle cx="112" cy="100" r="11" fill="white" fillOpacity="0.9"/>
+        <text x="112" y="105" textAnchor="middle" fontSize="12" fontFamily="sans-serif">F</text>
+      </g>
+
+      <path d="M 118 104 Q 160 78 202 104" stroke="white" strokeOpacity="0.3" strokeWidth="1.5" fill="none" strokeDasharray="6 4">
+        <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite"/>
+      </path>
+      <path d="M 118 104 Q 160 130 202 104" stroke="white" strokeOpacity="0.3" strokeWidth="1.5" fill="none" strokeDasharray="6 4">
+        <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.3s" repeatCount="indefinite"/>
+      </path>
+
+      <g transform="translate(0, 172)">
+        <rect x="60" y="0" width="200" height="24" rx="12" fill="white" fillOpacity="0.12"/>
+        <rect x="64" y="4" width="20" height="16" rx="8" fill="white" fillOpacity="0.5"/>
+        <rect x="68" y="4" width="20" height="16" rx="8" fill="white" fillOpacity="0.5">
+          <animate attributeName="x" values="68;88;108;128;148;168;188;208;68" dur="3s" repeatCount="indefinite" calcMode="discrete"/>
+        </rect>
+        <rect x="88" y="4" width="16" height="16" rx="8" fill="white" fillOpacity="0.3"/>
+        <rect x="108" y="4" width="16" height="16" rx="8" fill="white" fillOpacity="0.3"/>
+        <rect x="128" y="4" width="16" height="16" rx="8" fill="white" fillOpacity="0.3"/>
+        <rect x="148" y="4" width="16" height="16" rx="8" fill="white" fillOpacity="0.3"/>
+        <rect x="168" y="4" width="16" height="16" rx="8" fill="white" fillOpacity="0.3"/>
+        <rect x="188" y="4" width="16" height="16" rx="8" fill="white" fillOpacity="0.3"/>
+        <rect x="208" y="4" width="16" height="16" rx="8" fill="white" fillOpacity="0.3"/>
+      </g>
+    </svg>
+  );
+}
+
+function ApiGatewayIllustration() {
+  return (
+    <svg viewBox="0 0 320 208" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      <rect x="120" y="64" width="80" height="80" rx="16" fill="white" fillOpacity="0.2" stroke="white" strokeOpacity="0.45" strokeWidth="2"/>
+      <rect x="132" y="76" width="56" height="6" rx="3" fill="white" fillOpacity="0.6"/>
+      <rect x="132" y="88" width="40" height="5" rx="2.5" fill="white" fillOpacity="0.4"/>
+      <rect x="132" y="99" width="48" height="5" rx="2.5" fill="white" fillOpacity="0.4"/>
+      <rect x="132" y="110" width="34" height="5" rx="2.5" fill="white" fillOpacity="0.4"/>
+      <rect x="132" y="121" width="44" height="5" rx="2.5" fill="white" fillOpacity="0.4"/>
+      <rect x="132" y="133" width="20" height="10" rx="5" fill="white" fillOpacity="0.55"/>
+      <rect x="165" y="133" width="20" height="10" rx="5" fill="white" fillOpacity="0.25"/>
+      <circle cx="160" cy="18" r="18" fill="white" fillOpacity="0.2" stroke="white" strokeOpacity="0.4" strokeWidth="1.5"/>
+      <text x="160" y="24" textAnchor="middle" fill="white" fontSize="16" fontFamily="monospace" fontWeight="bold">{"{ }"}</text>
+      <circle cx="32" cy="104" r="18" fill="white" fillOpacity="0.2" stroke="white" strokeOpacity="0.4" strokeWidth="1.5"/>
+      <text x="32" y="109" textAnchor="middle" fill="white" fontSize="14" fontFamily="sans-serif">📱</text>
+      <circle cx="32" cy="170" r="18" fill="white" fillOpacity="0.2" stroke="white" strokeOpacity="0.4" strokeWidth="1.5"/>
+      <text x="32" y="175" textAnchor="middle" fill="white" fontSize="14" fontFamily="sans-serif">🛒</text>
+      <circle cx="288" cy="104" r="18" fill="white" fillOpacity="0.2" stroke="white" strokeOpacity="0.4" strokeWidth="1.5"/>
+      <text x="288" y="109" textAnchor="middle" fill="white" fontSize="14" fontFamily="sans-serif">🌐</text>
+      <circle cx="288" cy="170" r="18" fill="white" fillOpacity="0.2" stroke="white" strokeOpacity="0.4" strokeWidth="1.5"/>
+      <text x="288" y="175" textAnchor="middle" fill="white" fontSize="14" fontFamily="sans-serif">📊</text>
+
+      <line x1="50" y1="104" x2="120" y2="104" stroke="white" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="5 4">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="50" y1="170" x2="120" y2="144" stroke="white" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="5 4">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1.3s" repeatCount="indefinite"/>
+      </line>
+      <line x1="200" y1="104" x2="270" y2="104" stroke="white" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="5 4">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="0.9s" repeatCount="indefinite"/>
+      </line>
+      <line x1="200" y1="144" x2="270" y2="170" stroke="white" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="5 4">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1.2s" repeatCount="indefinite"/>
+      </line>
+      <line x1="160" y1="36" x2="160" y2="64" stroke="white" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="5 4">
+        <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="0.8s" repeatCount="indefinite"/>
+      </line>
+
+      <circle r="5" fill="white" fillOpacity="0.9">
+        <animateMotion path="M 50,104 L 120,104" dur="1s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;1;0" dur="1s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="5" fill="white" fillOpacity="0.9">
+        <animateMotion path="M 200,104 L 270,104" dur="0.9s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;1;0" dur="0.9s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="4" fill="white" fillOpacity="0.9">
+        <animateMotion path="M 50,170 L 120,144" dur="1.3s" repeatCount="indefinite" begin="0.3s"/>
+        <animate attributeName="opacity" values="0;1;1;0" dur="1.3s" repeatCount="indefinite" begin="0.3s"/>
+      </circle>
+      <circle r="4" fill="white" fillOpacity="0.9">
+        <animateMotion path="M 200,144 L 270,170" dur="1.2s" repeatCount="indefinite" begin="0.5s"/>
+        <animate attributeName="opacity" values="0;1;1;0" dur="1.2s" repeatCount="indefinite" begin="0.5s"/>
+      </circle>
+      <circle r="4" fill="white" fillOpacity="0.9">
+        <animateMotion path="M 160,36 L 160,64" dur="0.8s" repeatCount="indefinite" begin="0.2s"/>
+        <animate attributeName="opacity" values="0;1;1;0" dur="0.8s" repeatCount="indefinite" begin="0.2s"/>
+      </circle>
+
+      <text x="28" y="197" fill="white" fillOpacity="0.6" fontSize="9" fontFamily="monospace">GET /pay</text>
+      <text x="256" y="130" fill="white" fillOpacity="0.6" fontSize="9" fontFamily="monospace">200 OK</text>
+      <text x="140" y="58" fill="white" fillOpacity="0.6" fontSize="9" fontFamily="monospace">webhook</text>
+    </svg>
+  );
+}
 
 function AnimatedCounter({ target, suffix }: { target: string; suffix: string }) {
   const [count, setCount] = useState(0);
@@ -486,14 +719,14 @@ export default function LandingPage() {
             {features.map((f, i) => (
               <div key={f.title} className="group relative rounded-3xl overflow-hidden border border-border/60 bg-card hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-2 transition-all duration-500" data-testid={`card-feature-${i}`}>
                 <div className={`h-52 bg-gradient-to-br ${f.color} relative overflow-hidden`}>
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.25)_0%,_transparent_70%)]" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <f.icon className="h-24 w-24 text-white/15" />
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.2)_0%,_transparent_65%)]" />
+                  <div className="absolute inset-0">
+                    <f.Illustration />
                   </div>
-                  <div className="absolute top-4 right-4">
+                  <div className="absolute top-4 right-4 z-10">
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold text-white bg-white/20 border border-white/25 backdrop-blur-sm">{f.badge}</span>
                   </div>
-                  <div className="absolute bottom-4 left-4">
+                  <div className="absolute bottom-4 left-4 z-10">
                     <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
                       <f.icon className="w-6 h-6 text-white" />
                     </div>
