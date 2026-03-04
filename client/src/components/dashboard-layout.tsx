@@ -80,8 +80,8 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
               </Breadcrumb>
             </div>
 
-            <div className="flex-shrink-0 h-7 w-7 rounded-lg ring-1 ring-blue-100 overflow-hidden bg-white" data-testid="header-logo">
-              <img src={solvexpayIcon} alt="SolvexPay" className="w-full h-full object-cover" style={{ objectPosition: '80% 70%' }} />
+            <div className="flex-shrink-0 h-7 w-7 rounded-lg ring-1 ring-blue-100 overflow-hidden" data-testid="header-logo">
+              <img src={solvexpayIcon} alt="SolvexPay" className="w-full h-full object-cover" style={{ objectPosition: '80% 70%', transform: 'scale(2.8)', transformOrigin: '80% 70%' }} />
             </div>
           </header>
 
