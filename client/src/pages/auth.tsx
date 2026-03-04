@@ -4,66 +4,123 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ArrowRight, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ArrowRight, ChevronDown, CheckCircle2, Smartphone, Globe, Zap } from "lucide-react";
+import { OperatorLogo } from "@/components/operator-logo";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
-import heroBanner from "../assets/images/hero-banner.png";
 
 const countryCodes = [
-  { code: "+229", country: "Bénin", flag: "\u{1F1E7}\u{1F1EF}" },
-  { code: "+225", country: "Côte d'Ivoire", flag: "\u{1F1E8}\u{1F1EE}" },
-  { code: "+226", country: "Burkina Faso", flag: "\u{1F1E7}\u{1F1EB}" },
-  { code: "+228", country: "Togo", flag: "\u{1F1F9}\u{1F1EC}" },
-  { code: "+221", country: "Sénégal", flag: "\u{1F1F8}\u{1F1F3}" },
+  { code: "+229", country: "Bénin", flag: "🇧🇯" },
+  { code: "+225", country: "Côte d'Ivoire", flag: "🇨🇮" },
+  { code: "+226", country: "Burkina Faso", flag: "🇧🇫" },
+  { code: "+228", country: "Togo", flag: "🇹🇬" },
+  { code: "+221", country: "Sénégal", flag: "🇸🇳" },
+  { code: "+223", country: "Mali", flag: "🇲🇱" },
+  { code: "+237", country: "Cameroun", flag: "🇨🇲" },
+  { code: "+243", country: "RD Congo", flag: "🇨🇩" },
+  { code: "+242", country: "Congo-Brazza.", flag: "🇨🇬" },
 ];
+
+const operators = ["MTN", "Orange", "Wave", "Moov", "TMoney", "Airtel", "Vodacom", "Free"];
 
 function AuthPanel() {
   return (
-    <div className="hidden lg:flex flex-col justify-between h-full p-10 relative overflow-hidden"
-      style={{ background: "linear-gradient(135deg, hsl(262 60% 10%) 0%, hsl(262 50% 16%) 50%, hsl(240 30% 8%) 100%)" }}>
-      <div className="absolute top-0 right-0 w-80 h-80 rounded-full bg-violet-500/10 blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl" />
+    <div
+      className="hidden lg:flex flex-col justify-between h-full p-10 relative overflow-hidden"
+      style={{ background: "linear-gradient(145deg, hsl(262 80% 12%) 0%, hsl(262 60% 20%) 40%, hsl(200 70% 16%) 100%)" }}
+    >
+      {/* Animated orbs */}
+      <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-violet-500/15 blur-3xl animate-float pointer-events-none" />
+      <div className="absolute bottom-16 left-0 w-72 h-72 rounded-full bg-emerald-500/12 blur-3xl animate-float-delayed pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 rounded-full bg-cyan-500/8 blur-2xl animate-float-slow pointer-events-none" />
 
-      <div className="relative flex items-center gap-3">
+      {/* Grid pattern overlay */}
+      <div
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{ backgroundImage: "linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)", backgroundSize: "40px 40px" }}
+      />
+
+      {/* Logo */}
+      <div className="relative flex items-center gap-3 z-10">
         <div className="relative">
-          <div className="absolute inset-0 rounded-xl bg-violet-500/30 blur-sm" />
-          <img src={solvexpayLogo} alt="SolvexPay" className="relative w-10 h-10 rounded-xl object-cover ring-1 ring-white/20" />
+          <div className="absolute inset-0 rounded-xl bg-violet-400/30 blur-md" />
+          <img src={solvexpayLogo} alt="SolvexPay" className="relative w-11 h-11 rounded-xl object-cover ring-2 ring-white/20 shadow-xl" />
         </div>
-        <span className="font-bold text-2xl text-white">SolvexPay</span>
+        <div>
+          <span className="font-extrabold text-2xl text-white">SolvexPay</span>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs text-emerald-400 font-medium">Système opérationnel</span>
+          </div>
+        </div>
       </div>
 
-      <div className="relative space-y-6">
-        <div className="rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-2xl">
-          <img src={heroBanner} alt="SolvexPay" className="w-full h-48 object-cover opacity-80" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-        </div>
-
-        <div className="space-y-4">
-          <h2 className="text-3xl font-bold text-white leading-tight">
+      {/* Center content */}
+      <div className="relative z-10 space-y-8">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/20 border border-violet-500/30">
+            <Globe className="h-3.5 w-3.5 text-violet-300" />
+            <span className="text-xs font-semibold text-violet-200">9 pays · 10+ opérateurs</span>
+          </div>
+          <h2 className="text-3xl font-extrabold text-white leading-tight">
             Paiements Mobile Money<br />
-            <span className="text-emerald-400">pour toute l'Afrique</span>
+            <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">pour toute l'Afrique</span>
           </h2>
-          <p className="text-white/60 text-sm leading-relaxed">
-            MTN, Orange, Wave, Moov et bien plus. Gérez vos transactions depuis une seule plateforme.
+          <p className="text-white/55 text-sm leading-relaxed max-w-xs">
+            MTN, Orange, Wave, Moov et bien plus. Gérez vos transactions depuis une seule plateforme sécurisée.
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        {/* Operator logos grid */}
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Opérateurs supportés</p>
+          <div className="grid grid-cols-4 gap-3">
+            {operators.map((op) => (
+              <div
+                key={op}
+                className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-white/6 border border-white/10 hover:bg-white/10 transition-colors"
+              >
+                <OperatorLogo operator={op} size={38} />
+                <span className="text-[10px] font-semibold text-white/60 text-center leading-tight">{op}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Countries flags */}
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Pays couverts</p>
+          <div className="flex flex-wrap gap-2">
+            {countryCodes.map((c) => (
+              <div
+                key={c.code}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/6 border border-white/10"
+              >
+                <span className="text-base">{c.flag}</span>
+                <span className="text-xs font-medium text-white/70">{c.country.split("-")[0].trim()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-3">
           {[
-            { value: "5+", label: "Pays" },
-            { value: "10+", label: "Opérateurs" },
-            { value: "99.9%", label: "Uptime" },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-white/6 rounded-xl p-3 text-center border border-white/8">
-              <p className="text-xl font-bold text-white">{stat.value}</p>
-              <p className="text-xs text-white/50 mt-0.5">{stat.label}</p>
+            { value: "9+", label: "Pays", icon: Globe, color: "text-violet-300" },
+            { value: "10+", label: "Opérateurs", icon: Smartphone, color: "text-emerald-300" },
+            { value: "99.9%", label: "Uptime", icon: Zap, color: "text-amber-300" },
+          ].map((s) => (
+            <div key={s.label} className="bg-white/6 rounded-2xl p-3.5 border border-white/8 text-center">
+              <s.icon className={`h-4 w-4 ${s.color} mx-auto mb-1`} />
+              <p className="text-xl font-black text-white">{s.value}</p>
+              <p className="text-xs text-white/45 mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="relative flex items-center gap-2 text-white/40 text-xs">
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        <span>Système opérationnel • Sécurisé par chiffrement TLS</span>
+      <div className="relative z-10 flex items-center gap-2 text-white/35 text-xs">
+        <Lock className="h-3 w-3" />
+        <span>Sécurisé par chiffrement TLS · Conforme KYC/AML</span>
       </div>
     </div>
   );
@@ -102,16 +159,41 @@ export function LoginPage() {
     <div className="min-h-screen flex bg-background">
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
+
+          {/* Top decoration for mobile */}
+          <div className="lg:hidden flex flex-col items-center gap-3 mb-2">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-2xl bg-violet-500/25 blur-lg" />
+              <img src={solvexpayLogo} alt="SolvexPay" className="relative w-14 h-14 rounded-2xl object-cover ring-2 ring-violet-200 shadow-xl" />
+            </div>
+            <span className="font-extrabold text-2xl bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+          </div>
+
           <div className="space-y-2">
-            <Link href="/" className="inline-flex items-center gap-2.5 group">
+            <Link href="/" className="hidden lg:inline-flex items-center gap-2.5 group">
               <div className="relative">
                 <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
                 <img src={solvexpayLogo} alt="SolvexPay" className="relative w-10 h-10 rounded-xl object-cover" data-testid="img-login-logo" />
               </div>
               <span className="font-bold text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
             </Link>
-            <h1 className="text-3xl font-bold text-foreground mt-4" data-testid="text-login-title">Bon retour 👋</h1>
-            <p className="text-muted-foreground">Connectez-vous à votre compte pour continuer.</p>
+
+            <div className="space-y-1 mt-2">
+              <h1 className="text-3xl font-extrabold text-foreground" data-testid="text-login-title">Bon retour 👋</h1>
+              <p className="text-muted-foreground text-sm">Connectez-vous à votre compte pour continuer.</p>
+            </div>
+          </div>
+
+          {/* Colorful operator bar */}
+          <div className="flex items-center gap-2 p-3 rounded-2xl bg-gradient-to-r from-violet-50 to-emerald-50 border border-violet-100/80">
+            <div className="flex -space-x-1.5">
+              {["MTN", "Orange", "Wave", "Moov"].map((op) => (
+                <div key={op} className="ring-2 ring-white rounded-full overflow-hidden flex-shrink-0">
+                  <OperatorLogo operator={op} size={26} />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs font-semibold text-violet-700 flex-1">MTN, Orange, Wave, Moov et 6 autres opérateurs</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -125,7 +207,7 @@ export function LoginPage() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
-                  className="pl-10 h-11 border-border/70 bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="pl-10 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
                   data-testid="input-email"
                 />
               </div>
@@ -141,7 +223,7 @@ export function LoginPage() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
-                  className="pl-10 pr-11 h-11 border-border/70 bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="pl-10 pr-11 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
                   data-testid="input-password"
                 />
                 <button
@@ -157,19 +239,14 @@ export function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full h-11 font-semibold text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-[1.01] transition-all"
+              className="w-full h-12 font-bold text-base shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:scale-[1.01] transition-all rounded-xl"
               disabled={login.isPending}
               data-testid="button-submit-login"
             >
               {login.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Connexion...
-                </>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Connexion...</>
               ) : (
-                <span className="flex items-center gap-2 justify-center">
-                  Se connecter <ArrowRight className="h-4 w-4" />
-                </span>
+                <span className="flex items-center gap-2 justify-center">Se connecter <ArrowRight className="h-4 w-4" /></span>
               )}
             </Button>
           </form>
@@ -252,20 +329,44 @@ export function RegisterPage() {
     }
   };
 
+  const selectedCountry = countryCodes.find(c => c.code === countryCode)!;
+
   return (
     <div className="min-h-screen flex bg-background">
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 overflow-y-auto">
-        <div className="w-full max-w-md space-y-7 py-4">
+        <div className="w-full max-w-md space-y-6 py-4">
+
+          {/* Top decoration for mobile */}
+          <div className="lg:hidden flex flex-col items-center gap-2 mb-1">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-2xl bg-violet-500/25 blur-lg" />
+              <img src={solvexpayLogo} alt="SolvexPay" className="relative w-12 h-12 rounded-2xl object-cover ring-2 ring-violet-200 shadow-xl" />
+            </div>
+            <span className="font-extrabold text-xl bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+          </div>
+
           <div className="space-y-2">
-            <Link href="/" className="inline-flex items-center gap-2.5 group">
+            <Link href="/" className="hidden lg:inline-flex items-center gap-2.5 group">
               <div className="relative">
                 <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
                 <img src={solvexpayLogo} alt="SolvexPay" className="relative w-10 h-10 rounded-xl object-cover" data-testid="img-register-logo" />
               </div>
               <span className="font-bold text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
             </Link>
-            <h1 className="text-3xl font-bold text-foreground mt-4" data-testid="text-register-title">Créer un compte</h1>
-            <p className="text-muted-foreground">Commencez à accepter des paiements en Afrique.</p>
+            <div className="space-y-1 mt-2">
+              <h1 className="text-3xl font-extrabold text-foreground" data-testid="text-register-title">Créer un compte</h1>
+              <p className="text-muted-foreground text-sm">Commencez à accepter des paiements en Afrique.</p>
+            </div>
+          </div>
+
+          {/* Colorful country flags bar */}
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-violet-50 via-emerald-50 to-amber-50 border border-violet-100/80">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Disponible dans 9 pays</p>
+            <div className="flex flex-wrap gap-1.5">
+              {countryCodes.map((c) => (
+                <span key={c.code} className="text-lg" title={c.country}>{c.flag}</span>
+              ))}
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -279,7 +380,7 @@ export function RegisterPage() {
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   required
-                  className="pl-10 h-11 border-border/70 bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="pl-10 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
                   data-testid="input-fullname"
                 />
               </div>
@@ -295,7 +396,7 @@ export function RegisterPage() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
-                  className="pl-10 h-11 border-border/70 bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="pl-10 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
                   data-testid="input-email"
                 />
               </div>
@@ -308,30 +409,31 @@ export function RegisterPage() {
                   <button
                     type="button"
                     onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                    className="flex items-center gap-1.5 border border-border/70 rounded-lg px-3 h-11 text-sm bg-background hover:bg-muted/50 transition-colors min-w-[110px]"
+                    className="flex items-center gap-1.5 border border-border/70 rounded-xl px-3 h-12 text-sm bg-background hover:bg-muted/50 transition-colors min-w-[120px]"
                     data-testid="button-country-code"
                   >
-                    <span className="text-base">{countryCodes.find(c => c.code === countryCode)?.flag}</span>
-                    <span className="font-medium text-sm">{countryCode}</span>
+                    <span className="text-base">{selectedCountry?.flag}</span>
+                    <span className="font-semibold text-sm">{countryCode}</span>
                     <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
                   </button>
                   {showCountryDropdown && (
-                    <div className="absolute top-full left-0 mt-1 bg-popover border border-popover-border rounded-xl shadow-xl z-50 min-w-[240px] py-1.5 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-1 bg-popover border border-popover-border rounded-2xl shadow-2xl z-50 min-w-[260px] py-2 overflow-hidden max-h-72 overflow-y-auto">
                       {countryCodes.map((cc) => {
                         const isSelected = cc.code === countryCode;
                         return (
                           <button
                             key={cc.code}
                             type="button"
-                            className={`w-full text-left px-3 py-2.5 text-sm flex items-center gap-2.5 transition-colors ${
+                            className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${
                               isSelected ? "bg-primary/10 text-primary font-semibold" : "hover:bg-muted text-foreground"
                             }`}
                             onClick={() => { setCountryCode(cc.code); setShowCountryDropdown(false); }}
                             data-testid={`option-country-${cc.code}`}
                           >
+                            <span className="text-xl flex-shrink-0">{cc.flag}</span>
+                            <span className="flex-1">{cc.country}</span>
+                            <span className="text-xs text-muted-foreground font-mono">{cc.code}</span>
                             {isSelected && <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-primary" />}
-                            <span className="text-base">{cc.flag}</span>
-                            <span>{cc.country} ({cc.code})</span>
                           </button>
                         );
                       })}
@@ -344,7 +446,7 @@ export function RegisterPage() {
                   value={formData.phone}
                   onChange={(e) => { const val = e.target.value.replace(/[^0-9\s]/g, ""); setFormData({ ...formData, phone: val }); }}
                   required
-                  className="flex-1 h-11 border-border/70 bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="flex-1 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
                   data-testid="input-phone"
                 />
               </div>
@@ -360,18 +462,16 @@ export function RegisterPage() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
-                  className="pl-10 pr-11 h-11 border-border/70 bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="pl-10 pr-11 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
                   data-testid="input-password"
                 />
                 <button type="button" className="absolute right-3.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => setShowPassword(!showPassword)} data-testid="button-toggle-password">
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              <div className="flex items-center gap-1.5 pt-0.5">
-                <div className={`flex items-center gap-1 text-xs ${passwordChecks.minLength ? "text-emerald-600" : "text-muted-foreground"}`}>
-                  <CheckCircle2 className="w-3 h-3" />
-                  6 caractères minimum
-                </div>
+              <div className={`flex items-center gap-1.5 pt-0.5 text-xs ${passwordChecks.minLength ? "text-emerald-600" : "text-muted-foreground"}`}>
+                <CheckCircle2 className="w-3 h-3" />
+                6 caractères minimum
               </div>
             </div>
 
@@ -385,7 +485,7 @@ export function RegisterPage() {
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
-                  className="pl-10 pr-11 h-11 border-border/70 bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="pl-10 pr-11 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
                   data-testid="input-confirm-password"
                 />
                 <button type="button" className="absolute right-3.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => setShowConfirm(!showConfirm)} data-testid="button-toggle-confirm">
@@ -399,7 +499,7 @@ export function RegisterPage() {
 
             <Button
               type="submit"
-              className="w-full h-11 font-semibold text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-[1.01] transition-all mt-2"
+              className="w-full h-12 font-bold text-base shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:scale-[1.01] transition-all mt-2 rounded-xl"
               disabled={register.isPending}
               data-testid="button-submit-register"
             >
