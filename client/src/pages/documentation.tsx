@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -98,6 +99,10 @@ function ParamRow({ name, type, required, desc }: { name: string; type: string; 
 }
 
 function DocContent({ activeSection, setActiveSection }: { activeSection: string; setActiveSection: (s: string) => void }) {
+  const { data: contactLinks } = useQuery<Record<string, string>>({ queryKey: ["/api/support-links"] });
+  const supportEmail = contactLinks?.support_link_email?.replace("mailto:", "") || "support@solvexpay.com";
+  const supportWhatsApp = contactLinks?.support_link_whatsapp_direct || "https://wa.me/22891840498";
+  const supportEmailHref = contactLinks?.support_link_email || "mailto:support@solvexpay.com";
   return (
     <div className="max-w-5xl">
         <div className="flex gap-8">
@@ -636,10 +641,10 @@ if (!response.ok) {
                     <p className="font-bold text-sm">Besoin d'aide pour l'intégration ?</p>
                     <p className="text-xs text-muted-foreground mt-1">Notre équipe est disponible 24/7 pour vous accompagner.</p>
                     <div className="flex gap-4 mt-3">
-                      <a href="mailto:support@solvexpay.com" className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
-                        <ArrowRight className="h-3 w-3" /> support@solvexpay.com
+                      <a href={supportEmailHref} className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
+                        <ArrowRight className="h-3 w-3" /> {supportEmail}
                       </a>
-                      <a href="https://wa.me/22891840498" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:underline">
+                      <a href={supportWhatsApp} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:underline">
                         <ArrowRight className="h-3 w-3" /> WhatsApp 24/7
                       </a>
                     </div>

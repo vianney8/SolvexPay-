@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -379,8 +380,20 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   );
 }
 
+const CONTACT_DEFAULTS: Record<string, string> = {
+  support_link_whatsapp_direct: "https://wa.me/22891840498",
+  support_link_whatsapp_group: "https://chat.whatsapp.com/FeGmjzHa1VG7v4VGo0Rxbd",
+  support_link_email: "mailto:support@solvexpay.com",
+  support_link_whatsapp_channel: "https://whatsapp.com/channel/0029Vb3WFkb2ZjCZTb0Dq11F",
+  support_link_facebook: "https://www.facebook.com/profile.php?id=61574706268491",
+};
+
 export default function LandingPage() {
   const [activeCountry, setActiveCountry] = useState(0);
+  const { data: contactLinks } = useQuery<Record<string, string>>({
+    queryKey: ["/api/support-links"],
+  });
+  const cl = (key: string) => contactLinks?.[key] || CONTACT_DEFAULTS[key];
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
 
@@ -943,7 +956,7 @@ export default function LandingPage() {
                 <h3 className="text-lg font-bold text-foreground mb-2">Support Direct</h3>
                 <p className="text-sm text-muted-foreground mb-5 leading-relaxed">Contactez notre équipe directement sur WhatsApp pour une assistance personnalisée.</p>
                 <a
-                  href="https://wa.me/message/LIEN_A_VENIR"
+                  href={cl("support_link_whatsapp_direct")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-green-500 text-white text-sm font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-500/25"
@@ -964,7 +977,7 @@ export default function LandingPage() {
                 <h3 className="text-lg font-bold text-foreground mb-2">Groupe Communauté</h3>
                 <p className="text-sm text-muted-foreground mb-5 leading-relaxed">Rejoignez notre groupe WhatsApp et échangez avec d'autres marchands SolvexPay.</p>
                 <a
-                  href="https://chat.whatsapp.com/LIEN_A_VENIR"
+                  href={cl("support_link_whatsapp_group")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/25"
@@ -985,7 +998,7 @@ export default function LandingPage() {
                 <h3 className="text-lg font-bold text-foreground mb-2">Chaîne Officielle</h3>
                 <p className="text-sm text-muted-foreground mb-5 leading-relaxed">Suivez notre chaîne WhatsApp pour les dernières actualités et mises à jour SolvexPay.</p>
                 <a
-                  href="https://whatsapp.com/channel/LIEN_A_VENIR"
+                  href={cl("support_link_whatsapp_channel")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-500 text-white text-sm font-bold hover:bg-violet-600 transition-colors shadow-lg shadow-violet-500/25"
@@ -1002,7 +1015,7 @@ export default function LandingPage() {
             <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-card border border-border/60 shadow-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Email :</span>
-              <a href="mailto:support@solvexpay.com" className="text-sm font-bold text-violet-600 hover:underline">support@solvexpay.com</a>
+              <a href={cl("support_link_email")} className="text-sm font-bold text-violet-600 hover:underline">{cl("support_link_email").replace("mailto:", "")}</a>
               <span className="text-muted-foreground/40">·</span>
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Réponse en moins de 2h</span>
@@ -1108,7 +1121,7 @@ export default function LandingPage() {
                   { label: "Documentation", href: "/documentation" },
                   { label: "Guide de démarrage", href: "/documentation" },
                   { label: "Référence API", href: "/documentation" },
-                  { label: "Support", href: "https://wa.me/22891840498" },
+                  { label: "Support", href: cl("support_link_whatsapp_direct") },
                 ].map((item) => (
                   <li key={item.label}>
                     <a href={item.href} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{item.label}</a>
@@ -1120,12 +1133,12 @@ export default function LandingPage() {
               <p className="text-sm font-bold text-foreground uppercase tracking-wider">Support</p>
               <ul className="space-y-2.5">
                 <li>
-                  <a href="mailto:support@solvexpay.com" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    <Mail className="h-3.5 w-3.5 flex-shrink-0" /><span>support@solvexpay.com</span>
+                  <a href={cl("support_link_email")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    <Mail className="h-3.5 w-3.5 flex-shrink-0" /><span>{cl("support_link_email").replace("mailto:", "")}</span>
                   </a>
                 </li>
                 <li>
-                  <a href="https://wa.me/22891840498" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  <a href={cl("support_link_whatsapp_direct")} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                     <MessageCircle className="h-3.5 w-3.5 flex-shrink-0" /><span>WhatsApp 24/7</span>
                   </a>
                 </li>
@@ -1133,7 +1146,7 @@ export default function LandingPage() {
                   <Globe className="h-3.5 w-3.5 flex-shrink-0" /><span>9 pays couverts</span>
                 </li>
               </ul>
-              <a href="https://wa.me/22891840498" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 hover:text-green-700 transition-colors">
+              <a href={cl("support_link_whatsapp_direct")} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 hover:text-green-700 transition-colors">
                 <MessageCircle className="h-3.5 w-3.5" /> Nous contacter
               </a>
             </div>
