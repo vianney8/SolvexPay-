@@ -81,8 +81,8 @@ export default function WithdrawPage() {
   const withdrawAmount = parseFloat(amount) || 0;
   const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
   const fees = Math.round(withdrawAmount * feeRate);
-  const totalDebit = withdrawAmount + fees;
-  const insufficientFunds = totalDebit > balance && withdrawAmount > 0;
+  const netAmount = withdrawAmount - fees;
+  const insufficientFunds = withdrawAmount > balance && withdrawAmount > 0;
 
   const recentWithdrawals = allTransactions
     ?.filter((t: any) => t.type === "withdrawal")
@@ -307,12 +307,12 @@ export default function WithdrawPage() {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Frais ({feeRate * 100}%)</span>
-                  <span className="text-destructive font-medium">+ {formatCurrency(fees)} {currency}</span>
+                  <span className="text-destructive font-medium">- {formatCurrency(fees)} {currency}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm">Total débité</span>
-                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : ""}`} data-testid="text-withdraw-total">{formatCurrency(totalDebit)} {currency}</span>
+                  <span className="font-bold text-sm">Vous recevrez</span>
+                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`} data-testid="text-withdraw-total">{formatCurrency(netAmount)} {currency}</span>
                 </div>
               </CardContent>
             </Card>

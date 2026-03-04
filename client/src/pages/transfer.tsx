@@ -66,8 +66,8 @@ export default function TransferPage() {
   const transferAmount = parseFloat(amount) || 0;
   const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
   const fees = Math.round(transferAmount * feeRate);
-  const totalDebit = transferAmount + fees;
-  const insufficientFunds = totalDebit > balance && transferAmount > 0;
+  const netAmount = transferAmount - fees;
+  const insufficientFunds = transferAmount > balance && transferAmount > 0;
 
   const transferMutation = useMutation({
     mutationFn: async (data: { amount: number; phoneNumber: string; operator: string; country: string; firstName?: string; lastName?: string }) => {
@@ -299,12 +299,12 @@ export default function TransferPage() {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Frais ({feeRate * 100}%{["BF", "COG"].includes(country) ? " — taux spécial" : ""})</span>
-                  <span className="text-destructive font-medium">+ {formatCurrency(fees)} XOF</span>
+                  <span className="text-destructive font-medium">- {formatCurrency(fees)} XOF</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm">Total débité</span>
-                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : ""}`} data-testid="text-transfer-total">{formatCurrency(totalDebit)} XOF</span>
+                  <span className="font-bold text-sm">Bénéficiaire reçoit</span>
+                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`} data-testid="text-transfer-total">{formatCurrency(netAmount)} XOF</span>
                 </div>
               </CardContent>
             </Card>

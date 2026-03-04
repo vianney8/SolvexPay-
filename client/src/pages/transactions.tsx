@@ -44,7 +44,8 @@ function getTypeLabel(tx: Transaction) {
 
 function getDisplayProvider(tx: Transaction) {
   if (!tx.provider) return null;
-  if (tx.provider.toLowerCase() === "omnipay") return null;
+  if (tx.provider.toLowerCase() === "omnipay") return "OmniPay";
+  if (tx.provider.toLowerCase() === "admin") return "Admin";
   return tx.provider;
 }
 
@@ -179,7 +180,7 @@ export default function TransactionsPage() {
   const filteredTransactions = transactions?.filter((tx) => {
     const matchesSearch =
       tx.reference.toLowerCase().includes(search.toLowerCase()) ||
-      (tx.provider?.toLowerCase().includes(search.toLowerCase()) && tx.provider.toLowerCase() !== "omnipay") ||
+      tx.provider?.toLowerCase().includes(search.toLowerCase()) ||
       tx.phoneNumber?.toLowerCase().includes(search.toLowerCase()) ||
       tx.description?.toLowerCase().includes(search.toLowerCase());
     const matchesType = typeFilter === "all" || tx.type === typeFilter;
