@@ -77,6 +77,21 @@ export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit
 export type PaymentMethod = typeof paymentMethods.$inferSelect;
 export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
 
+export const feeConfigs = pgTable("fee_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(),
+  country: text("country").notNull().default("default"),
+  feeRate: decimal("fee_rate", { precision: 5, scale: 2 }).notNull().default("5"),
+  minAmount: decimal("min_amount", { precision: 12, scale: 2 }).default("0"),
+  maxAmount: decimal("max_amount", { precision: 12, scale: 2 }),
+  isActive: boolean("is_active").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [index("idx_fee_configs_type_country").on(table.type, table.country)]);
+
+export const insertFeeConfigSchema = createInsertSchema(feeConfigs).omit({ id: true });
+export type FeeConfig = typeof feeConfigs.$inferSelect;
+export type InsertFeeConfig = z.infer<typeof insertFeeConfigSchema>;
+
 // Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,

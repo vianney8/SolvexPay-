@@ -1148,6 +1148,161 @@ export async function registerRoutes(
     }
   });
 
+  // OmniPay balance
+  app.get("/api/admin/omnipay/balance", isAdmin, async (req, res) => {
+    try {
+      const balances = await omniPayService.getBalance();
+      res.json(balances);
+    } catch (error) {
+      console.error("Admin OmniPay balance error:", error);
+      res.status(500).json({ message: "Impossible de récupérer le solde OmniPay" });
+    }
+  });
+
+  // All wallets for admin view
+  app.get("/api/admin/wallets", isAdmin, async (req, res) => {
+    try {
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { desc } = await import("drizzle-orm");
+      const allUsers = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
+      const result = await Promise.all(allUsers.map(async (u) => {
+        const wallet = await storage.getWallet(u.id);
+        const { passwordHash: _, ...safe } = u;
+        return { ...safe, wallet };
+      }));
+      res.json(result);
+    } catch (error) {
+      console.error("Admin wallets error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // Admin deposit into a user wallet via OmniPay
+  app.post("/api/admin/wallets/:userId/deposit", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { amount, phoneNumber, operator, motif, firstName, lastName } = req.body;
+      if (!amount || !phoneNumber) return res.status(400).json({ message: "Montant et téléphone requis" });
+      const reference = generateReference();
+      const depositResult = await omniPayService.deposit({
+        msisdn: phoneNumber.replace(/^\+/, "").replace(/^00/, ""),
+        amount: parseFloat(amount),
+        reference,
+        firstName: firstName || "Admin",
+        lastName: lastName || "Dépôt",
+        operator: operator || undefined,
+      });
+      if (depositResult.success !== 1) {
+        return res.status(400).json({ message: depositResult.message || "Erreur OmniPay" });
+      }
+      let wallet = await storage.getWallet(userId);
+      if (!wallet) wallet = await storage.createWallet(userId);
+      await storage.updateWalletBalance(userId, "XOF", parseFloat(amount));
+      const tx = await storage.createTransaction({
+        userId,
+        type: "deposit",
+        amount: String(amount),
+        currency: "XOF",
+        provider: operator || "omnipay",
+        phoneNumber,
+        reference,
+        status: "completed",
+        description: `Dépôt admin via OmniPay: ${motif || "Alimentation wallet"}`,
+      });
+      res.json({ success: true, transaction: tx, omnipayRef: depositResult.reference });
+    } catch (error) {
+      console.error("Admin wallet deposit error:", error);
+      res.status(500).json({ message: "Erreur lors du dépôt" });
+    }
+  });
+
+  // Migrate funds from one wallet to another (internal)
+  app.post("/api/admin/wallets/migrate", isAdmin, async (req, res) => {
+    try {
+      const { fromUserId, toUserId, amount, motif } = req.body;
+      if (!fromUserId || !toUserId || !amount) return res.status(400).json({ message: "Paramètres manquants" });
+      if (fromUserId === toUserId) return res.status(400).json({ message: "Les wallets doivent être différents" });
+      const fromWallet = await storage.getWallet(fromUserId);
+      if (!fromWallet || parseFloat(fromWallet.balanceXOF) < parseFloat(amount)) {
+        return res.status(400).json({ message: "Solde insuffisant dans le wallet source" });
+      }
+      const reference = generateReference();
+      await storage.updateWalletBalance(fromUserId, "XOF", -parseFloat(amount));
+      let toWallet = await storage.getWallet(toUserId);
+      if (!toWallet) toWallet = await storage.createWallet(toUserId);
+      await storage.updateWalletBalance(toUserId, "XOF", parseFloat(amount));
+      await storage.createTransaction({ userId: fromUserId, type: "transfer", amount: String(amount), currency: "XOF", provider: "admin", phoneNumber: "", reference, status: "completed", description: `Migration admin vers ${toUserId}: ${motif || ""}` });
+      await storage.createTransaction({ userId: toUserId, type: "deposit", amount: String(amount), currency: "XOF", provider: "admin", phoneNumber: "", reference: generateReference(), status: "completed", description: `Migration admin depuis ${fromUserId}: ${motif || ""}` });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin wallet migrate error:", error);
+      res.status(500).json({ message: "Erreur lors de la migration" });
+    }
+  });
+
+  // All KYC submissions
+  app.get("/api/admin/kyc", isAdmin, async (req, res) => {
+    try {
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { inArray, desc } = await import("drizzle-orm");
+      const kycUsers = await db.select().from(usersTable).where(inArray(usersTable.kycStatus as any, ["pending", "verified", "rejected"])).orderBy(desc(usersTable.updatedAt));
+      const result = kycUsers.map(u => { const { passwordHash: _, ...safe } = u; return safe; });
+      res.json(result);
+    } catch (error) {
+      console.error("Admin KYC list error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // Fee configs
+  app.get("/api/admin/fee-configs", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { feeConfigs: fcTable } = await import("@shared/schema");
+      const configs = await db.select().from(fcTable);
+      if (configs.length === 0) {
+        const types = ["deposit", "withdrawal", "transfer"];
+        const countries = ["default", "BJ", "CI", "BF", "TG", "SN", "ML", "CM", "COD", "COG"];
+        const defaults = types.flatMap(type => countries.map(country => ({
+          type,
+          country,
+          feeRate: country === "BF" || country === "COG" ? "6" : "5",
+          minAmount: "100",
+          maxAmount: null,
+          isActive: true,
+        })));
+        const inserted = await db.insert(fcTable).values(defaults as any).returning();
+        return res.json(inserted);
+      }
+      res.json(configs);
+    } catch (error) {
+      console.error("Admin fee configs error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/fee-configs/:id", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { feeRate, minAmount, maxAmount, isActive } = req.body;
+      const { db } = await import("./db");
+      const { feeConfigs: fcTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const updateData: any = { updatedAt: new Date() };
+      if (feeRate !== undefined) updateData.feeRate = String(feeRate);
+      if (minAmount !== undefined) updateData.minAmount = String(minAmount);
+      if (maxAmount !== undefined) updateData.maxAmount = maxAmount ? String(maxAmount) : null;
+      if (isActive !== undefined) updateData.isActive = isActive;
+      const [updated] = await db.update(fcTable).set(updateData).where(eq(fcTable.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Admin fee config update error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   // ─── END ADMIN ROUTES ──────────────────────────────────────────────────────
 
   app.use("/uploads", (await import("express")).default.static(uploadDir));

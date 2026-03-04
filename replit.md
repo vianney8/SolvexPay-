@@ -1,4 +1,4 @@
-# SolvexPay - Pan-African Payment Aggregator
+# SolvexPay - Pan-African Payment Gateway
 
 ## Overview
 

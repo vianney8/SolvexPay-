@@ -19,363 +19,352 @@ import {
   Users, ArrowDownUp, TrendingUp, Wallet, Shield, KeyRound, PenLine,
   AlertTriangle, CheckCircle2, Clock, XCircle, Search, RefreshCw,
   BarChart3, Banknote, Lock, Unlock, ChevronDown, ChevronUp,
-  Globe, Settings, Percent, Eye, ArrowRight, CreditCard, Send,
-  Activity, Star, ZapOff, Zap, TrendingDown, CalendarDays,
-  BadgeCheck, UserX, Building2, Coins, FileText, ArrowUpDown,
+  Globe, Percent, Eye, CreditCard, Send, Activity, Star, ZapOff,
+  Zap, CalendarDays, BadgeCheck, UserX, Coins, FileText, ArrowUpDown,
+  TrendingDown, Building2, Network, ArrowRightLeft, Plus, DollarSign,
+  Layers, Settings2, MapPin,
 } from "lucide-react";
-import { Link } from "wouter";
 
-function fmt(amount: number, currency = "XOF") {
-  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount) + " " + currency;
-}
-
-function fmtDate(date: string | null | undefined) {
-  if (!date) return "—";
-  return new Date(date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-function KycBadge({ status }: { status: string }) {
-  if (status === "verified") return <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs"><BadgeCheck className="h-3 w-3 mr-1" />Vérifié</Badge>;
-  if (status === "pending") return <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs"><Clock className="h-3 w-3 mr-1" />En attente</Badge>;
-  if (status === "rejected") return <Badge className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 text-xs"><XCircle className="h-3 w-3 mr-1" />Rejeté</Badge>;
-  return <Badge variant="outline" className="text-xs">Non démarré</Badge>;
-}
-
-function TxStatusBadge({ status }: { status: string }) {
-  if (status === "completed") return <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs">Complété</Badge>;
-  if (status === "pending") return <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs">En attente</Badge>;
-  if (status === "failed") return <Badge className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 text-xs">Échoué</Badge>;
-  return <Badge variant="outline" className="text-xs">{status}</Badge>;
-}
-
-function TypeBadge({ type }: { type: string }) {
-  if (type === "deposit") return <Badge className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30 text-xs">Dépôt</Badge>;
-  if (type === "withdrawal") return <Badge className="bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30 text-xs">Retrait</Badge>;
-  if (type === "transfer") return <Badge className="bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30 text-xs">Transfert</Badge>;
-  return <Badge variant="outline" className="text-xs">{type}</Badge>;
-}
-
-const PERIOD_OPTIONS = [
-  { value: "day", label: "24h" },
-  { value: "week", label: "7 jours" },
-  { value: "month", label: "Ce mois" },
+const COUNTRIES = [
+  { code: "BJ", name: "Bénin", flag: "🇧🇯" },
+  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮" },
+  { code: "BF", name: "Burkina Faso", flag: "🇧🇫" },
+  { code: "TG", name: "Togo", flag: "🇹🇬" },
+  { code: "SN", name: "Sénégal", flag: "🇸🇳" },
+  { code: "ML", name: "Mali", flag: "🇲🇱" },
+  { code: "CM", name: "Cameroun", flag: "🇨🇲" },
+  { code: "COD", name: "RD Congo", flag: "🇨🇩" },
+  { code: "COG", name: "Congo", flag: "🇨🇬" },
 ];
+
+const TX_TYPES = ["deposit", "withdrawal", "transfer"];
+const TX_TYPE_LABELS: Record<string, string> = { deposit: "Dépôt", withdrawal: "Retrait", transfer: "Transfert" };
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " XOF";
+}
+function fmtDate(d: string | null | undefined) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function KycChip({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string; Icon: any }> = {
+    verified: { label: "Vérifié", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30", Icon: BadgeCheck },
+    pending: { label: "En attente", cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30", Icon: Clock },
+    rejected: { label: "Rejeté", cls: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30", Icon: XCircle },
+    not_started: { label: "Non soumis", cls: "bg-slate-500/15 text-slate-500 border-slate-500/30", Icon: UserX },
+  };
+  const { label, cls, Icon } = map[status] || map.not_started;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold ${cls}`}>
+      <Icon className="h-3 w-3" />{label}
+    </span>
+  );
+}
+
+function TxChip({ status }: { status: string }) {
+  if (status === "completed") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">Complété</span>;
+  if (status === "pending") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">En attente</span>;
+  if (status === "failed") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30">Échoué</span>;
+  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-slate-500/15 text-slate-500 border-slate-500/30">{status}</span>;
+}
+
+function TypeChip({ type }: { type: string }) {
+  const map: Record<string, string> = {
+    deposit: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
+    withdrawal: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30",
+    transfer: "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30",
+  };
+  return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold ${map[type] || "bg-slate-500/15 text-slate-500 border-slate-500/30"}`}>{TX_TYPE_LABELS[type] || type}</span>;
+}
+
+const PERIOD_OPTS = [{ v: "day", l: "24h" }, { v: "week", l: "7j" }, { v: "month", l: "Ce mois" }];
 
 export default function AdminPage() {
   const { toast } = useToast();
 
   const [userSearch, setUserSearch] = useState("");
-  const [txSearch, setTxSearch] = useState("");
-  const [txStatusFilter, setTxStatusFilter] = useState("all");
-  const [txTypeFilter, setTxTypeFilter] = useState("all");
-  const [statsPeriod, setStatsPeriod] = useState("month");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [txSearch, setTxSearch] = useState("");
+  const [txStatus, setTxStatus] = useState("all");
+  const [txType, setTxType] = useState("all");
+  const [statsPeriod, setStatsPeriod] = useState("month");
+  const [feeTypeTab, setFeeTypeTab] = useState("deposit");
 
-  const [kycDialog, setKycDialog] = useState<{ open: boolean; userId: string; userName: string; current: string } | null>(null);
+  // Dialogs
+  const [kycDialog, setKycDialog] = useState<{ userId: string; name: string; status: string } | null>(null);
   const [kycAction, setKycAction] = useState<"verified" | "rejected">("verified");
-  const [kycRejectionReason, setKycRejectionReason] = useState("");
-
-  const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; userId: string; userName: string } | null>(null);
-  const [newPassword, setNewPassword] = useState("");
-
-  const [balanceDialog, setBalanceDialog] = useState<{ open: boolean; userId: string; userName: string; currentBalance: number } | null>(null);
-  const [balanceAmount, setBalanceAmount] = useState("");
-  const [balanceMotif, setBalanceMotif] = useState("");
-
-  const [feeDialog, setFeeDialog] = useState<{ open: boolean; userId: string; userName: string; current: string | null } | null>(null);
-  const [customFee, setCustomFee] = useState("");
-
-  const [txStatusDialog, setTxStatusDialog] = useState<{ open: boolean; txId: string; current: string } | null>(null);
+  const [kycReason, setKycReason] = useState("");
+  const [pwdDialog, setPwdDialog] = useState<{ userId: string; name: string } | null>(null);
+  const [pwd, setPwd] = useState("");
+  const [balDialog, setBalDialog] = useState<{ userId: string; name: string; bal: number } | null>(null);
+  const [balAmount, setBalAmount] = useState("");
+  const [balMotif, setBalMotif] = useState("");
+  const [depositDialog, setDepositDialog] = useState<{ userId: string; name: string } | null>(null);
+  const [depositData, setDepositData] = useState({ amount: "", phone: "", operator: "", motif: "" });
+  const [migrateDialog, setMigrateDialog] = useState(false);
+  const [migrateData, setMigrateData] = useState({ fromUserId: "", toUserId: "", amount: "", motif: "" });
+  const [txEditDialog, setTxEditDialog] = useState<{ id: string; status: string } | null>(null);
   const [newTxStatus, setNewTxStatus] = useState("completed");
+  const [feeEditDialog, setFeeEditDialog] = useState<{ id: string; feeRate: string; type: string; country: string } | null>(null);
+  const [feeRate, setFeeRate] = useState("");
 
-  const [pmFeeDialog, setPmFeeDialog] = useState<{ open: boolean; code: string; current: string } | null>(null);
-  const [pmFeeValue, setPmFeeValue] = useState("");
-
-  const { data: stats, isLoading: statsLoading } = useQuery<any>({ queryKey: ["/api/admin/stats"] });
-  const { data: periodStats, isLoading: periodStatsLoading } = useQuery<any>({
+  // Queries
+  const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"] });
+  const { data: periodStats, isLoading: pLoading } = useQuery<any>({
     queryKey: ["/api/admin/stats/period", statsPeriod],
-    queryFn: async () => {
-      const res = await fetch(`/api/admin/stats/period?period=${statsPeriod}`, { credentials: "include" });
-      return res.json();
-    },
+    queryFn: () => fetch(`/api/admin/stats/period?period=${statsPeriod}`, { credentials: "include" }).then(r => r.json()),
   });
   const { data: users, isLoading: usersLoading } = useQuery<any[]>({ queryKey: ["/api/admin/users"] });
+  const { data: kycList, isLoading: kycLoading } = useQuery<any[]>({ queryKey: ["/api/admin/kyc"] });
   const { data: allTx, isLoading: txLoading } = useQuery<any[]>({ queryKey: ["/api/admin/transactions"] });
-  const { data: bigUsers, isLoading: bigUsersLoading } = useQuery<any[]>({ queryKey: ["/api/admin/big-users"] });
-  const { data: commissions, isLoading: commissionsLoading } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
+  const { data: wallets, isLoading: walletsLoading } = useQuery<any[]>({ queryKey: ["/api/admin/wallets"] });
+  const { data: omnipayBalance, isLoading: omniLoading, refetch: refetchOmni } = useQuery<any>({
+    queryKey: ["/api/admin/omnipay/balance"],
+    retry: 1,
+    staleTime: 30000,
+  });
   const { data: paymentMethods, isLoading: pmLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-methods"] });
-  const { data: userTxData } = useQuery<any[]>({
+  const { data: feeConfigs, isLoading: feeLoading } = useQuery<any[]>({ queryKey: ["/api/admin/fee-configs"] });
+  const { data: commissions, isLoading: comLoading } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
+  const { data: userTxList } = useQuery<any[]>({
     queryKey: ["/api/admin/users", expandedUserId, "transactions"],
     enabled: !!expandedUserId,
-    queryFn: async () => {
-      const res = await fetch(`/api/admin/users/${expandedUserId}/transactions`, { credentials: "include" });
-      return res.json();
-    },
+    queryFn: () => fetch(`/api/admin/users/${expandedUserId}/transactions`, { credentials: "include" }).then(r => r.json()),
   });
 
-  const blockMutation = useMutation({
-    mutationFn: (data: { userId: string; isBlocked: boolean }) =>
-      apiRequest("PATCH", `/api/admin/users/${data.userId}/block`, { isBlocked: data.isBlocked }),
+  // Mutations
+  const blockM = useMutation({
+    mutationFn: (d: { userId: string; isBlocked: boolean }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/block`, { isBlocked: d.isBlocked }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: "Statut mis à jour" }); },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
-  const kycMutation = useMutation({
-    mutationFn: (data: { userId: string; kycStatus: string; rejectionReason?: string }) =>
-      apiRequest("PATCH", `/api/admin/users/${data.userId}/kyc`, { kycStatus: data.kycStatus, rejectionReason: data.rejectionReason }),
+  const kycM = useMutation({
+    mutationFn: (d: { userId: string; kycStatus: string; rejectionReason?: string }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/kyc`, d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Statut KYC mis à jour" });
-      setKycDialog(null);
-      setKycRejectionReason("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/kyc"] });
+      toast({ title: "KYC mis à jour" });
+      setKycDialog(null); setKycReason("");
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
-  const feeMutation = useMutation({
-    mutationFn: (data: { userId: string; customFeeRate: string | null }) =>
-      apiRequest("PATCH", `/api/admin/users/${data.userId}/fee`, { customFeeRate: data.customFeeRate }),
+  const pwdM = useMutation({
+    mutationFn: (d: { userId: string; password: string }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/password`, { password: d.password }),
+    onSuccess: () => { toast({ title: "Mot de passe modifié" }); setPwdDialog(null); setPwd(""); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const balM = useMutation({
+    mutationFn: (d: { userId: string; amount: number; motif: string }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/balance`, d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Commission mise à jour" });
-      setFeeDialog(null);
-      setCustomFee("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
+      toast({ title: "Solde ajusté" }); setBalDialog(null); setBalAmount(""); setBalMotif("");
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
-  const changePasswordMutation = useMutation({
-    mutationFn: (data: { userId: string; password: string }) =>
-      apiRequest("PATCH", `/api/admin/users/${data.userId}/password`, { password: data.password }),
+  const depositM = useMutation({
+    mutationFn: (d: { userId: string; amount: string; phoneNumber: string; operator: string; motif: string }) =>
+      apiRequest("POST", `/api/admin/wallets/${d.userId}/deposit`, d),
     onSuccess: () => {
-      toast({ title: "Mot de passe modifié" });
-      setPasswordDialog(null);
-      setNewPassword("");
-    },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
-  });
-
-  const adjustBalanceMutation = useMutation({
-    mutationFn: (data: { userId: string; amount: number; motif: string }) =>
-      apiRequest("PATCH", `/api/admin/users/${data.userId}/balance`, { amount: data.amount, motif: data.motif }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Solde ajusté" });
-      setBalanceDialog(null);
-      setBalanceAmount("");
-      setBalanceMotif("");
-    },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
-  });
-
-  const toggleAdminMutation = useMutation({
-    mutationFn: (data: { userId: string; isAdmin: boolean }) =>
-      apiRequest("PATCH", `/api/admin/users/${data.userId}/toggle-admin`, { isAdmin: data.isAdmin }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: "Rôle mis à jour" }); },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
-  });
-
-  const updateTxStatusMutation = useMutation({
-    mutationFn: (data: { txId: string; status: string }) =>
-      apiRequest("PATCH", `/api/admin/transactions/${data.txId}/status`, { status: data.status }),
-    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
-      toast({ title: "Statut mis à jour" });
-      setTxStatusDialog(null);
+      toast({ title: "Dépôt effectué via OmniPay" }); setDepositDialog(null); setDepositData({ amount: "", phone: "", operator: "", motif: "" });
+    },
+    onError: (e: any) => toast({ title: "Erreur OmniPay", description: e?.message, variant: "destructive" }),
+  });
+
+  const migrateM = useMutation({
+    mutationFn: (d: any) => apiRequest("POST", "/api/admin/wallets/migrate", d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
+      toast({ title: "Migration effectuée" }); setMigrateDialog(false); setMigrateData({ fromUserId: "", toUserId: "", amount: "", motif: "" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
-  const pmMutation = useMutation({
-    mutationFn: (data: { code: string; isActive?: boolean; inMaintenance?: boolean; feeValue?: string }) =>
-      apiRequest("PATCH", `/api/admin/payment-methods/${data.code}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] });
-      toast({ title: "Moyen de paiement mis à jour" });
-      setPmFeeDialog(null);
-    },
+  const txStatusM = useMutation({
+    mutationFn: (d: { txId: string; status: string }) => apiRequest("PATCH", `/api/admin/transactions/${d.txId}/status`, { status: d.status }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] }); toast({ title: "Statut mis à jour" }); setTxEditDialog(null); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const pmM = useMutation({
+    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] }); toast({ title: "Mis à jour" }); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const feeM = useMutation({
+    mutationFn: (d: { id: string; feeRate: string }) => apiRequest("PATCH", `/api/admin/fee-configs/${d.id}`, { feeRate: d.feeRate }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-configs"] }); toast({ title: "Frais mis à jour" }); setFeeEditDialog(null); },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
   const filteredUsers = (users || []).filter(u =>
-    userSearch === "" ||
-    u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    u.firstName?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    u.lastName?.toLowerCase().includes(userSearch.toLowerCase())
+    !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase())
   );
 
   const filteredTx = (allTx || []).filter(tx => {
-    const matchSearch = txSearch === "" ||
-      tx.reference?.toLowerCase().includes(txSearch.toLowerCase()) ||
-      tx.phoneNumber?.includes(txSearch) ||
-      tx.description?.toLowerCase().includes(txSearch.toLowerCase()) ||
-      tx.userId?.includes(txSearch);
-    const matchStatus = txStatusFilter === "all" || tx.status === txStatusFilter;
-    const matchType = txTypeFilter === "all" || tx.type === txTypeFilter;
-    return matchSearch && matchStatus && matchType;
+    const m = !txSearch || [tx.reference, tx.phoneNumber, tx.description].join(" ").toLowerCase().includes(txSearch.toLowerCase());
+    return m && (txStatus === "all" || tx.status === txStatus) && (txType === "all" || tx.type === txType);
   });
 
-  const pendingKyc = (users || []).filter(u => u.kycStatus === "pending");
-  const blockedUsers = (users || []).filter(u => u.isBlocked);
+  const pendingKyc = (kycList || []).filter((u: any) => u.kycStatus === "pending");
+  const pendingWithdrawals = (allTx || []).filter(t => t.type === "withdrawal" && t.status === "pending");
+
+  const feeByTypeCountry = (feeConfigs || []).filter((f: any) => f.type === feeTypeTab);
+  const totalWalletBalance = (wallets || []).reduce((s: number, u: any) => s + parseFloat(u.wallet?.balanceXOF || "0"), 0);
 
   return (
     <DashboardLayout title="Administration" breadcrumbs={[{ label: "Administration" }]}>
       <div className="space-y-5">
 
-        <div
-          className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
-          style={{ background: "linear-gradient(135deg, hsl(0 80% 38%) 0%, hsl(14 90% 46%) 60%, hsl(30 85% 52%) 100%)" }}
-        >
-          <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
-          <div className="relative flex items-center justify-between gap-3">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                <Shield className="h-6 w-6" />
+        {/* ═══ HEADER HERO ═══ */}
+        <div className="relative rounded-3xl overflow-hidden" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #0e7490 100%)" }}>
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 20% 50%, #818cf8 0%, transparent 50%), radial-gradient(circle at 80% 20%, #06b6d4 0%, transparent 40%)" }} />
+          <div className="relative p-5 text-white">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 flex-shrink-0">
+                  <Shield className="h-7 w-7 text-cyan-300" />
+                </div>
+                <div>
+                  <p className="font-black text-xl text-white leading-tight">Administration SolvexPay</p>
+                  <p className="text-white/60 text-xs mt-0.5">Panneau de contrôle global de la plateforme</p>
+                </div>
               </div>
-              <div>
-                <p className="font-black text-lg leading-tight">Tableau de bord Admin</p>
-                <p className="text-white/70 text-xs mt-0.5">SolvexPay — Gestion globale de la plateforme</p>
-              </div>
-            </div>
-            <div className="hidden sm:grid grid-cols-3 gap-3 text-center flex-shrink-0">
-              <div className="bg-white/10 rounded-xl px-3 py-2">
-                <p className="text-white/60 text-xs">Marchands</p>
-                <p className="font-black text-xl" data-testid="stat-users">{statsLoading ? "—" : stats?.userCount}</p>
-              </div>
-              <div className="bg-white/10 rounded-xl px-3 py-2">
-                <p className="text-white/60 text-xs">KYC en attente</p>
-                <p className="font-black text-xl text-amber-300">{usersLoading ? "—" : pendingKyc.length}</p>
-              </div>
-              <div className="bg-white/10 rounded-xl px-3 py-2">
-                <p className="text-white/60 text-xs">Bloqués</p>
-                <p className="font-black text-xl text-red-300">{usersLoading ? "—" : blockedUsers.length}</p>
+              <div className="hidden md:flex items-center gap-3">
+                {[
+                  { label: "Utilisateurs", value: stats?.userCount, color: "text-cyan-300" },
+                  { label: "KYC en attente", value: pendingKyc.length, color: "text-amber-300" },
+                  { label: "Retraits pendants", value: pendingWithdrawals.length, color: "text-rose-300" },
+                ].map((s, i) => (
+                  <div key={i} className="text-center bg-white/8 backdrop-blur-sm rounded-2xl px-4 py-2.5 border border-white/10">
+                    <p className={`font-black text-2xl ${s.color}`} data-testid={`header-stat-${i}`}>{s.value ?? "—"}</p>
+                    <p className="text-white/50 text-xs">{s.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
 
         <Tabs defaultValue="overview">
-          <TabsList className="w-full grid grid-cols-4 lg:grid-cols-7 gap-1 h-auto p-1">
-            <TabsTrigger value="overview" className="gap-1.5 text-xs py-2" data-testid="tab-overview"><BarChart3 className="h-3.5 w-3.5" />Vue d'ensemble</TabsTrigger>
-            <TabsTrigger value="merchants" className="gap-1.5 text-xs py-2" data-testid="tab-merchants"><Users className="h-3.5 w-3.5" />Marchands</TabsTrigger>
-            <TabsTrigger value="transactions" className="gap-1.5 text-xs py-2" data-testid="tab-transactions"><ArrowDownUp className="h-3.5 w-3.5" />Transactions</TabsTrigger>
-            <TabsTrigger value="payment-methods" className="gap-1.5 text-xs py-2" data-testid="tab-payment-methods"><CreditCard className="h-3.5 w-3.5" />Moyens</TabsTrigger>
-            <TabsTrigger value="commissions" className="gap-1.5 text-xs py-2" data-testid="tab-commissions"><Coins className="h-3.5 w-3.5" />Commissions</TabsTrigger>
-            <TabsTrigger value="withdrawals" className="gap-1.5 text-xs py-2" data-testid="tab-withdrawals"><Send className="h-3.5 w-3.5" />Retraits</TabsTrigger>
-            <TabsTrigger value="vip" className="gap-1.5 text-xs py-2" data-testid="tab-vip"><Star className="h-3.5 w-3.5" />VIP</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto">
+            <TabsList className="inline-flex w-max min-w-full gap-1 p-1.5 bg-muted/60 rounded-2xl h-auto">
+              {[
+                { v: "overview", label: "Vue d'ensemble", Icon: BarChart3 },
+                { v: "users", label: "Utilisateurs", Icon: Users },
+                { v: "kyc", label: "KYC", Icon: BadgeCheck },
+                { v: "wallets", label: "Wallets & Solde", Icon: Wallet },
+                { v: "fees", label: "Frais", Icon: Percent },
+                { v: "payments", label: "Moyens de paiement", Icon: CreditCard },
+                { v: "transactions", label: "Transactions", Icon: ArrowDownUp },
+              ].map(({ v, label, Icon }) => (
+                <TabsTrigger key={v} value={v} className="gap-1.5 text-xs py-2 px-3 rounded-xl whitespace-nowrap" data-testid={`tab-${v}`}>
+                  <Icon className="h-3.5 w-3.5 flex-shrink-0" />{label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
-          {/* ═══════════════════════════════════════════
-              TAB 1: VUE D'ENSEMBLE
-          ═══════════════════════════════════════════ */}
+          {/* ══════════════════════════════════════
+              TAB 1 — VUE D'ENSEMBLE
+          ══════════════════════════════════════ */}
           <TabsContent value="overview" className="space-y-5 mt-5">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-bold">Période :</p>
-              <div className="flex gap-1.5">
-                {PERIOD_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setStatsPeriod(opt.value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${statsPeriod === opt.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                    data-testid={`button-period-${opt.value}`}
-                  >
-                    {opt.label}
-                  </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-bold text-muted-foreground">Période :</p>
+              <div className="flex gap-1">
+                {PERIOD_OPTS.map(o => (
+                  <button key={o.v} onClick={() => setStatsPeriod(o.v)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${statsPeriod === o.v ? "bg-indigo-600 text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                    data-testid={`btn-period-${o.v}`}>{o.l}</button>
                 ))}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                { label: "Transactions", value: periodStats?.total, icon: ArrowDownUp, color: "text-violet-600", bg: "bg-violet-500/10" },
-                { label: "Volume", value: periodStats ? fmt(periodStats.volume) : "—", icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-                { label: "Taux de succès", value: periodStats ? `${periodStats.successRate}%` : "—", icon: CheckCircle2, color: "text-blue-600", bg: "bg-blue-500/10" },
-                { label: "Frais collectés", value: periodStats ? fmt(periodStats.fees) : "—", icon: Coins, color: "text-amber-600", bg: "bg-amber-500/10" },
+                { label: "Transactions", val: periodStats?.total, icon: ArrowDownUp, grad: "from-indigo-500 to-violet-600" },
+                { label: "Volume", val: periodStats ? fmt(periodStats.volume) : "—", icon: TrendingUp, grad: "from-emerald-500 to-teal-600" },
+                { label: "Succès", val: periodStats ? `${periodStats.successRate}%` : "—", icon: CheckCircle2, grad: "from-cyan-500 to-blue-600" },
+                { label: "Frais", val: periodStats ? fmt(periodStats.fees) : "—", icon: Coins, grad: "from-amber-500 to-orange-600" },
               ].map((item, i) => (
-                <Card key={i} className="border-border/60">
-                  <CardContent className="p-4">
-                    <div className={`h-9 w-9 rounded-xl ${item.bg} flex items-center justify-center mb-3`}>
-                      <item.icon className={`h-4.5 w-4.5 ${item.color}`} />
+                <Card key={i} className="border-0 overflow-hidden shadow-sm" data-testid={`overview-card-${i}`}>
+                  <CardContent className="p-0">
+                    <div className={`h-1.5 bg-gradient-to-r ${item.grad}`} />
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-muted-foreground font-medium">{item.label}</p>
+                        <div className={`h-8 w-8 rounded-xl bg-gradient-to-br ${item.grad} flex items-center justify-center`}>
+                          <item.icon className="h-4 w-4 text-white" />
+                        </div>
+                      </div>
+                      <div className="text-xl font-black text-foreground">{pLoading ? <Skeleton className="h-7 w-20" /> : (item.val ?? 0)}</div>
                     </div>
-                    <p className="text-xl font-black text-foreground" data-testid={`stat-period-${item.label.toLowerCase().replace(/ /g, "-")}`}>
-                      {periodStatsLoading ? <Skeleton className="h-7 w-16" /> : item.value ?? "0"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.label}</p>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-4">
-              <Card className="border-border/60 lg:col-span-2">
+            <div className="grid lg:grid-cols-5 gap-4">
+              <Card className="lg:col-span-3 border-border/50">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <ArrowDownUp className="h-4 w-4 text-primary" />Répartition des transactions
-                  </CardTitle>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2"><Layers className="h-4 w-4 text-indigo-500" />Répartition</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {periodStatsLoading ? <Skeleton className="h-24 w-full" /> : (
-                    <>
-                      {[
-                        { label: "Dépôts", count: periodStats?.deposits?.count || 0, volume: periodStats?.deposits?.volume || 0, color: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
-                        { label: "Retraits", count: periodStats?.withdrawals?.count || 0, volume: periodStats?.withdrawals?.volume || 0, color: "bg-orange-500", text: "text-orange-600 dark:text-orange-400" },
-                        { label: "Transferts", count: periodStats?.transfers?.count || 0, volume: periodStats?.transfers?.volume || 0, color: "bg-violet-500", text: "text-violet-600 dark:text-violet-400" },
-                      ].map((item) => {
-                        const total = (periodStats?.total || 0);
-                        const pct = total > 0 ? Math.round((item.count / total) * 100) : 0;
-                        return (
-                          <div key={item.label}>
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-xs font-semibold text-muted-foreground">{item.label}</span>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-xs font-bold ${item.text}`}>{item.count} tx</span>
-                                <span className="text-xs text-muted-foreground">{fmt(item.volume)}</span>
-                              </div>
-                            </div>
-                            <div className="h-2 rounded-full bg-muted overflow-hidden">
-                              <div className={`h-full rounded-full ${item.color} transition-all duration-700`} style={{ width: `${pct}%` }} />
-                            </div>
+                <CardContent className="space-y-4">
+                  {[
+                    { label: "Dépôts", count: periodStats?.deposits?.count || 0, vol: periodStats?.deposits?.volume || 0, color: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+                    { label: "Retraits", count: periodStats?.withdrawals?.count || 0, vol: periodStats?.withdrawals?.volume || 0, color: "bg-orange-500", text: "text-orange-600 dark:text-orange-400" },
+                    { label: "Transferts", count: periodStats?.transfers?.count || 0, vol: periodStats?.transfers?.volume || 0, color: "bg-violet-500", text: "text-violet-600 dark:text-violet-400" },
+                  ].map(item => {
+                    const total = periodStats?.total || 0;
+                    const pct = total > 0 ? Math.round((item.count / total) * 100) : 0;
+                    return (
+                      <div key={item.label}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-semibold">{item.label}</span>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-xs font-bold ${item.text}`}>{item.count} tx</span>
+                            <span className="text-xs text-muted-foreground">{fmt(item.vol)}</span>
+                            <span className="text-xs font-bold w-8 text-right">{pct}%</span>
                           </div>
-                        );
-                      })}
-                    </>
-                  )}
+                        </div>
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                          <div className={`h-full rounded-full ${item.color} transition-all duration-700`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </CardContent>
               </Card>
 
-              <Card className="border-border/60">
+              <Card className="lg:col-span-2 border-border/50">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-primary" />Statuts
-                  </CardTitle>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2"><Coins className="h-4 w-4 text-amber-500" />Revenus plateforme</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {[
-                    { label: "Complétées", value: periodStats?.completed, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-                    { label: "En attente", value: periodStats?.pending, icon: Clock, color: "text-amber-600", bg: "bg-amber-500/10" },
-                    { label: "Échouées", value: periodStats?.failed, icon: XCircle, color: "text-red-600", bg: "bg-red-500/10" },
-                  ].map((item) => (
-                    <div key={item.label} className={`flex items-center gap-3 p-3 rounded-xl ${item.bg}`}>
-                      <item.icon className={`h-4 w-4 ${item.color} flex-shrink-0`} />
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">{item.label}</p>
-                        <p className={`font-black text-lg leading-none ${item.color}`}>
-                          {periodStatsLoading ? "—" : item.value ?? 0}
-                        </p>
-                      </div>
+                    { label: "Frais ce mois", val: fmt(commissions?.monthFees || 0), color: "text-emerald-600" },
+                    { label: "Frais mois dernier", val: fmt(commissions?.lastMonthFees || 0), color: "text-muted-foreground" },
+                    { label: "Frais totaux", val: fmt(commissions?.totalFees || 0), color: "text-indigo-600" },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
+                      <span className="text-xs text-muted-foreground">{item.label}</span>
+                      <span className={`text-sm font-black ${item.color}`}>{comLoading ? "—" : item.val}</span>
                     </div>
                   ))}
-
-                  <Separator />
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Total marchands</span>
-                      <span className="font-bold">{stats?.userCount}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Soldes totaux</span>
-                      <span className="font-bold text-emerald-600">{fmt(stats?.totalWalletBalance || 0)}</span>
-                    </div>
+                  <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-xs text-muted-foreground">Revenu net estimé</p>
+                    <p className="text-lg font-black text-amber-600">{comLoading ? "—" : fmt(Math.max(0, commissions?.estimatedNetRevenue || 0))}</p>
+                    <p className="text-xs text-muted-foreground">après coût OmniPay ~2%</p>
                   </div>
                 </CardContent>
               </Card>
@@ -385,303 +374,454 @@ export default function AdminPage() {
               <Card className="border-amber-500/30 bg-amber-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
                     <p className="text-sm font-bold text-amber-700 dark:text-amber-400">{pendingKyc.length} demande(s) KYC en attente</p>
                   </div>
-                  <div className="space-y-2">
-                    {pendingKyc.slice(0, 3).map(u => (
-                      <div key={u.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-500/10">
-                        <p className="text-xs font-semibold">{u.firstName} {u.lastName} — {u.email}</p>
-                        <button
-                          onClick={() => { setKycDialog({ open: true, userId: u.id, userName: `${u.firstName} ${u.lastName}`, current: u.kycStatus }); setKycAction("verified"); }}
-                          className="text-xs text-amber-700 dark:text-amber-400 font-bold hover:underline flex-shrink-0"
-                        >
+                  <div className="flex flex-wrap gap-2">
+                    {pendingKyc.slice(0, 4).map((u: any) => (
+                      <div key={u.id} className="flex items-center gap-2 bg-amber-500/10 rounded-xl px-3 py-1.5">
+                        <span className="text-xs font-semibold">{u.firstName} {u.lastName}</span>
+                        <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); }}
+                          className="text-xs text-amber-700 dark:text-amber-400 font-bold hover:underline">
                           Traiter →
                         </button>
                       </div>
                     ))}
-                    {pendingKyc.length > 3 && <p className="text-xs text-muted-foreground text-center">+ {pendingKyc.length - 3} autres dans l'onglet Marchands</p>}
                   </div>
                 </CardContent>
               </Card>
             )}
           </TabsContent>
 
-          {/* ═══════════════════════════════════════════
-              TAB 2: MARCHANDS
-          ═══════════════════════════════════════════ */}
-          <TabsContent value="merchants" className="space-y-4 mt-5">
+          {/* ══════════════════════════════════════
+              TAB 2 — UTILISATEURS
+          ══════════════════════════════════════ */}
+          <TabsContent value="users" className="space-y-4 mt-5">
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par email, prénom, nom..."
-                value={userSearch}
-                onChange={e => setUserSearch(e.target.value)}
-                className="pl-10 h-10 border-border/70"
-                data-testid="input-search-users"
-              />
+              <Input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Rechercher utilisateur..." className="pl-10 h-10" data-testid="input-search-users" />
             </div>
 
             {usersLoading ? (
-              <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-36 w-full rounded-2xl" />)}</div>
+              <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)}</div>
             ) : (
               <div className="space-y-3">
-                {filteredUsers.map(user => {
-                  const isExpanded = expandedUserId === user.id;
-                  const balance = parseFloat(user.wallet?.balanceXOF || "0");
+                {filteredUsers.map((u: any) => {
+                  const bal = parseFloat(u.wallet?.balanceXOF || "0");
+                  const isExp = expandedUserId === u.id;
+                  const initials = ((u.firstName?.[0] || "") + (u.lastName?.[0] || u.email?.[0] || "?")).toUpperCase();
                   return (
-                    <Card key={user.id} className={`border-border/60 overflow-hidden ${user.isBlocked ? "border-red-500/30 bg-red-500/3" : ""}`} data-testid={`card-user-${user.id}`}>
+                    <Card key={u.id} className={`border-border/50 overflow-hidden ${u.isBlocked ? "border-red-500/30" : ""}`} data-testid={`card-user-${u.id}`}>
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-sm ${user.isBlocked ? "bg-red-500/15 text-red-600" : "bg-primary/10 text-primary"}`}>
-                            {(user.firstName?.[0] || user.email?.[0] || "?").toUpperCase()}
+                          <div className={`h-11 w-11 rounded-2xl flex items-center justify-center text-sm font-black flex-shrink-0 ${u.isBlocked ? "bg-red-500/20 text-red-600" : "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400"}`}>
+                            {initials}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                              <p className="font-bold text-sm" data-testid={`text-username-${user.id}`}>{user.firstName} {user.lastName}</p>
-                              {user.isAdmin && <Badge className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 text-xs"><Shield className="h-3 w-3 mr-1" />Admin</Badge>}
-                              {user.isBlocked && <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30 text-xs"><Lock className="h-3 w-3 mr-1" />Bloqué</Badge>}
-                              <KycBadge status={user.kycStatus || "not_started"} />
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <p className="font-bold text-sm" data-testid={`text-user-name-${u.id}`}>{u.firstName} {u.lastName}</p>
+                              <KycChip status={u.kycStatus || "not_started"} />
+                              {u.isAdmin && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-rose-500/15 text-rose-600 border-rose-500/30"><Shield className="h-3 w-3" />Admin</span>}
+                              {u.isBlocked && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-red-500/15 text-red-600 border-red-500/30"><Lock className="h-3 w-3" />Bloqué</span>}
                             </div>
-                            <p className="text-xs text-muted-foreground">{user.email}</p>
-                            <p className="text-xs text-muted-foreground">{user.phone || "Pas de téléphone"} · Inscrit {fmtDate(user.createdAt)}</p>
+                            <p className="text-xs text-muted-foreground">{u.email}</p>
+                            <p className="text-xs text-muted-foreground">{u.phone || "—"}</p>
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="text-xs text-muted-foreground">Solde</p>
-                            <p className="font-black text-base text-foreground" data-testid={`text-balance-${user.id}`}>{fmt(balance)}</p>
-                            {user.customFeeRate && <p className="text-xs text-violet-600 font-semibold">Frais: {user.customFeeRate}%</p>}
+                            <p className="font-black text-base" data-testid={`text-balance-${u.id}`}>{fmt(bal)}</p>
                           </div>
                         </div>
 
-                        <Separator className="my-3" />
-
-                        <div className="flex gap-1.5 flex-wrap">
-                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1 px-2"
-                            onClick={() => { setKycDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, current: user.kycStatus }); setKycAction("verified"); }}
-                            data-testid={`button-kyc-${user.id}`}
-                          >
-                            <BadgeCheck className="h-3 w-3" />KYC
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1 px-2"
-                            onClick={() => { setFeeDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, current: user.customFeeRate || null }); setCustomFee(user.customFeeRate || ""); }}
-                            data-testid={`button-fee-${user.id}`}
-                          >
-                            <Percent className="h-3 w-3" />Frais
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1 px-2"
-                            onClick={() => { setPasswordDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}` }); setNewPassword(""); }}
-                            data-testid={`button-change-password-${user.id}`}
-                          >
-                            <KeyRound className="h-3 w-3" />MDP
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1 px-2"
-                            onClick={() => { setBalanceDialog({ open: true, userId: user.id, userName: `${user.firstName} ${user.lastName}`, currentBalance: balance }); setBalanceAmount(""); setBalanceMotif(""); }}
-                            data-testid={`button-adjust-balance-${user.id}`}
-                          >
-                            <PenLine className="h-3 w-3" />Solde
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={user.isBlocked ? "default" : "outline"}
-                            className={`h-7 text-xs gap-1 px-2 ${user.isBlocked ? "bg-emerald-600 hover:bg-emerald-700" : "border-red-500/40 text-red-600 hover:bg-red-500/5"}`}
-                            onClick={() => blockMutation.mutate({ userId: user.id, isBlocked: !user.isBlocked })}
-                            disabled={blockMutation.isPending}
-                            data-testid={`button-block-${user.id}`}
-                          >
-                            {user.isBlocked ? <><Unlock className="h-3 w-3" />Débloquer</> : <><Lock className="h-3 w-3" />Bloquer</>}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={user.isAdmin ? "destructive" : "outline"}
-                            className="h-7 text-xs gap-1 px-2"
-                            onClick={() => toggleAdminMutation.mutate({ userId: user.id, isAdmin: !user.isAdmin })}
-                            disabled={toggleAdminMutation.isPending}
-                            data-testid={`button-toggle-admin-${user.id}`}
-                          >
-                            <Shield className="h-3 w-3" />{user.isAdmin ? "Retirer admin" : "Admin"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 text-xs gap-1 px-2 text-muted-foreground"
-                            onClick={() => setExpandedUserId(isExpanded ? null : user.id)}
-                            data-testid={`button-history-${user.id}`}
-                          >
-                            <FileText className="h-3 w-3" />Historique
-                            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                          </Button>
+                        <div className="flex gap-1.5 flex-wrap mt-3">
+                          <button onClick={() => { setPwdDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}` }); setPwd(""); }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-500/10 hover:bg-slate-500/15 text-xs font-semibold text-muted-foreground transition-colors"
+                            data-testid={`btn-pwd-${u.id}`}><KeyRound className="h-3.5 w-3.5" />MDP</button>
+                          <button onClick={() => { setBalDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, bal }); setBalAmount(""); setBalMotif(""); }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-colors"
+                            data-testid={`btn-bal-${u.id}`}><PenLine className="h-3.5 w-3.5" />Solde</button>
+                          <button
+                            onClick={() => blockM.mutate({ userId: u.id, isBlocked: !u.isBlocked })}
+                            disabled={blockM.isPending}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.isBlocked ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
+                            data-testid={`btn-block-${u.id}`}>
+                            {u.isBlocked ? <><Unlock className="h-3.5 w-3.5" />Débloquer</> : <><Lock className="h-3.5 w-3.5" />Bloquer</>}
+                          </button>
+                          <button onClick={() => setExpandedUserId(isExp ? null : u.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 text-xs font-semibold text-indigo-700 dark:text-indigo-400 transition-colors"
+                            data-testid={`btn-expand-${u.id}`}>
+                            <FileText className="h-3.5 w-3.5" />Historique {isExp ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </button>
                         </div>
 
-                        {isExpanded && (
-                          <div className="mt-3 rounded-xl border border-border/60 overflow-hidden">
-                            <div className="bg-muted/40 px-3 py-2 flex items-center gap-2">
-                              <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-                              <p className="text-xs font-bold">Historique des transactions</p>
-                            </div>
-                            {!userTxData ? (
-                              <div className="p-3 text-center text-xs text-muted-foreground">Chargement...</div>
-                            ) : userTxData.length === 0 ? (
-                              <div className="p-3 text-center text-xs text-muted-foreground">Aucune transaction</div>
-                            ) : (
-                              <div className="divide-y divide-border/40 max-h-48 overflow-y-auto">
-                                {userTxData.slice(0, 10).map((tx: any) => (
-                                  <div key={tx.id} className="flex items-center gap-2 px-3 py-2">
-                                    <TypeBadge type={tx.type} />
-                                    <TxStatusBadge status={tx.status} />
-                                    <span className="text-xs font-semibold flex-1">{fmt(parseFloat(tx.amount))}</span>
-                                    <span className="text-xs text-muted-foreground">{fmtDate(tx.createdAt)}</span>
-                                  </div>
-                                ))}
+                        {isExp && (
+                          <div className="mt-4 space-y-3">
+                            {/* Réseau maintenance per user view */}
+                            {(paymentMethods || []).length > 0 && (
+                              <div className="rounded-2xl border border-border/50 overflow-hidden">
+                                <div className="bg-muted/40 px-3 py-2 flex items-center gap-2">
+                                  <Network className="h-3.5 w-3.5 text-cyan-600" />
+                                  <p className="text-xs font-bold">Maintenance des réseaux</p>
+                                </div>
+                                <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {(paymentMethods || []).map((pm: any) => (
+                                    <div key={pm.code} className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl border ${pm.inMaintenance ? "border-amber-500/30 bg-amber-500/8" : "border-border/40 bg-muted/30"}`}>
+                                      <div>
+                                        <p className="text-xs font-bold">{pm.name}</p>
+                                        <p className="text-xs text-muted-foreground">{pm.inMaintenance ? "Maintenance" : "Actif"}</p>
+                                      </div>
+                                      <Switch
+                                        checked={pm.inMaintenance}
+                                        onCheckedChange={(v) => pmM.mutate({ code: pm.code, inMaintenance: v })}
+                                        data-testid={`switch-network-maint-${pm.code}-${u.id}`}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
-                          </div>
-                        )}
 
-                        {user.kycStatus === "rejected" && user.kycRejectionReason && (
-                          <div className="mt-3 p-2 rounded-lg bg-red-500/8 border border-red-500/20">
-                            <p className="text-xs text-red-600 dark:text-red-400"><strong>Motif de rejet :</strong> {user.kycRejectionReason}</p>
+                            {/* Transaction history */}
+                            <div className="rounded-2xl border border-border/50 overflow-hidden">
+                              <div className="bg-muted/40 px-3 py-2 flex items-center gap-2">
+                                <Activity className="h-3.5 w-3.5 text-indigo-500" />
+                                <p className="text-xs font-bold">Transactions récentes</p>
+                              </div>
+                              {!userTxList ? (
+                                <div className="p-4 text-center text-xs text-muted-foreground">Chargement...</div>
+                              ) : userTxList.length === 0 ? (
+                                <div className="p-4 text-center text-xs text-muted-foreground">Aucune transaction</div>
+                              ) : (
+                                <div className="divide-y divide-border/30 max-h-52 overflow-y-auto">
+                                  {userTxList.slice(0, 10).map((tx: any) => (
+                                    <div key={tx.id} className="flex items-center gap-2 px-3 py-2">
+                                      <TypeChip type={tx.type} />
+                                      <TxChip status={tx.status} />
+                                      <span className="text-xs font-bold flex-1">{fmt(parseFloat(tx.amount))}</span>
+                                      <span className="text-xs text-muted-foreground">{fmtDate(tx.createdAt)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {u.kycStatus === "rejected" && u.kycRejectionReason && (
+                              <div className="p-3 rounded-xl bg-red-500/8 border border-red-500/20">
+                                <p className="text-xs text-red-600 dark:text-red-400"><strong>Motif de rejet KYC :</strong> {u.kycRejectionReason}</p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </CardContent>
                     </Card>
                   );
                 })}
-                {filteredUsers.length === 0 && (
-                  <div className="text-center py-12 text-muted-foreground text-sm">Aucun marchand trouvé</div>
+                {filteredUsers.length === 0 && <div className="text-center py-12 text-sm text-muted-foreground">Aucun utilisateur trouvé</div>}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ══════════════════════════════════════
+              TAB 3 — KYC
+          ══════════════════════════════════════ */}
+          <TabsContent value="kyc" className="space-y-4 mt-5">
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "En attente", val: (kycList || []).filter((u: any) => u.kycStatus === "pending").length, color: "text-amber-600", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+                { label: "Vérifiés", val: (kycList || []).filter((u: any) => u.kycStatus === "verified").length, color: "text-emerald-600", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+                { label: "Rejetés", val: (kycList || []).filter((u: any) => u.kycStatus === "rejected").length, color: "text-red-600", bg: "bg-red-500/10", border: "border-red-500/20" },
+              ].map((s, i) => (
+                <div key={i} className={`rounded-2xl ${s.bg} border ${s.border} p-4`}>
+                  <p className={`text-2xl font-black ${s.color}`}>{kycLoading ? "—" : s.val}</p>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {kycLoading ? (
+              <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div>
+            ) : (
+              <div className="space-y-3">
+                {(kycList || []).sort((a: any, b: any) => a.kycStatus === "pending" ? -1 : 1).map((u: any) => (
+                  <Card key={u.id} className={`border-border/50 overflow-hidden ${u.kycStatus === "pending" ? "border-amber-500/40" : ""}`} data-testid={`card-kyc-${u.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${u.kycStatus === "pending" ? "bg-amber-500/15 text-amber-600" : u.kycStatus === "verified" ? "bg-emerald-500/15 text-emerald-600" : "bg-red-500/15 text-red-600"}`}>
+                          {(u.firstName?.[0] || "?").toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-bold text-sm">{u.firstName} {u.lastName}</p>
+                            <KycChip status={u.kycStatus} />
+                          </div>
+                          <p className="text-xs text-muted-foreground">{u.email}</p>
+                          <p className="text-xs text-muted-foreground">Soumis : {fmtDate(u.updatedAt)}</p>
+                          {u.kycStatus === "rejected" && u.kycRejectionReason && (
+                            <p className="text-xs text-red-500 mt-1"><strong>Motif :</strong> {u.kycRejectionReason}</p>
+                          )}
+                        </div>
+                        {u.kycStatus === "pending" && (
+                          <div className="flex gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); }}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-colors"
+                              data-testid={`btn-kyc-approve-${u.id}`}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />Approuver
+                            </button>
+                            <button
+                              onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("rejected"); }}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-500/15 text-red-600 text-xs font-bold hover:bg-red-500/25 transition-colors"
+                              data-testid={`btn-kyc-reject-${u.id}`}
+                            >
+                              <XCircle className="h-3.5 w-3.5" />Rejeter
+                            </button>
+                          </div>
+                        )}
+                        {u.kycStatus !== "pending" && (
+                          <button
+                            onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); }}
+                            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-muted/50"
+                            data-testid={`btn-kyc-edit-${u.id}`}
+                          >
+                            <PenLine className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {(kycList || []).length === 0 && !kycLoading && (
+                  <Card className="border-border/50 border-dashed">
+                    <CardContent className="py-12 text-center">
+                      <BadgeCheck className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
+                      <p className="font-semibold text-sm">Aucune demande KYC</p>
+                      <p className="text-xs text-muted-foreground mt-1">Toutes les demandes ont été traitées</p>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
             )}
           </TabsContent>
 
-          {/* ═══════════════════════════════════════════
-              TAB 3: TRANSACTIONS
-          ═══════════════════════════════════════════ */}
-          <TabsContent value="transactions" className="space-y-4 mt-5">
-            <div className="flex gap-2 flex-wrap">
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Référence, téléphone, user ID..." value={txSearch} onChange={e => setTxSearch(e.target.value)} className="pl-10 h-10 border-border/70" data-testid="input-search-transactions" />
-              </div>
-              <Select value={txStatusFilter} onValueChange={setTxStatusFilter}>
-                <SelectTrigger className="w-36 h-10" data-testid="select-tx-status-filter"><SelectValue placeholder="Statut" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous statuts</SelectItem>
-                  <SelectItem value="pending">En attente</SelectItem>
-                  <SelectItem value="completed">Complété</SelectItem>
-                  <SelectItem value="failed">Échoué</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={txTypeFilter} onValueChange={setTxTypeFilter}>
-                <SelectTrigger className="w-36 h-10" data-testid="select-tx-type-filter"><SelectValue placeholder="Type" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous types</SelectItem>
-                  <SelectItem value="deposit">Dépôt</SelectItem>
-                  <SelectItem value="withdrawal">Retrait</SelectItem>
-                  <SelectItem value="transfer">Transfert</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="text-xs text-muted-foreground font-medium">{filteredTx.length} transaction(s)</div>
-
-            {txLoading ? (
-              <div className="space-y-2">{[1,2,3,4].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}</div>
-            ) : (
-              <Card className="border-border/60 overflow-hidden">
-                <CardContent className="p-0">
-                  {filteredTx.length === 0 ? (
-                    <div className="text-center py-12 text-sm text-muted-foreground">Aucune transaction trouvée</div>
-                  ) : filteredTx.map((tx, i) => (
-                    <div key={tx.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors ${i > 0 ? "border-t border-border/40" : ""}`} data-testid={`row-tx-${tx.id}`}>
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <TypeBadge type={tx.type} />
-                          <TxStatusBadge status={tx.status} />
-                          <span className="text-xs font-mono text-muted-foreground truncate">{tx.reference}</span>
-                        </div>
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className="text-xs text-muted-foreground">{tx.phoneNumber || "—"}</span>
-                          {tx.provider && <span className="text-xs text-muted-foreground">{tx.provider}</span>}
-                          {tx.payerName && <span className="text-xs text-muted-foreground">Client: {tx.payerName}</span>}
-                          <span className="text-xs text-muted-foreground">{fmtDate(tx.createdAt)}</span>
-                        </div>
-                        {tx.description && <p className="text-xs text-muted-foreground truncate max-w-xs">{tx.description}</p>}
+          {/* ══════════════════════════════════════
+              TAB 4 — WALLETS & SOLDE
+          ══════════════════════════════════════ */}
+          <TabsContent value="wallets" className="space-y-4 mt-5">
+            {/* OmniPay Balance */}
+            <Card className="border-0 overflow-hidden shadow-md">
+              <CardContent className="p-0">
+                <div className="p-5" style={{ background: "linear-gradient(135deg, #0c4a6e 0%, #0e7490 60%, #06b6d4 100%)" }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-12 w-12 rounded-2xl bg-white/15 flex items-center justify-center">
+                        <Building2 className="h-6 w-6 text-white" />
                       </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-right">
-                          <p className="font-black text-sm">{fmt(parseFloat(tx.amount))}</p>
-                          {tx.fees && parseFloat(tx.fees) > 0 && <p className="text-xs text-muted-foreground">Frais: {fmt(parseFloat(tx.fees))}</p>}
-                        </div>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground p-0"
-                          onClick={() => { setTxStatusDialog({ open: true, txId: tx.id, current: tx.status }); setNewTxStatus(tx.status); }}
-                          data-testid={`button-edit-tx-${tx.id}`}
-                        >
-                          <PenLine className="h-3.5 w-3.5" />
-                        </Button>
+                      <div>
+                        <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Solde OmniPay</p>
+                        <p className="text-white font-black text-sm">Compte marchand global</p>
                       </div>
                     </div>
-                  ))}
+                    <button onClick={() => refetchOmni()} className="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors" data-testid="btn-refresh-omnipay">
+                      <RefreshCw className="h-4 w-4 text-white" />
+                    </button>
+                  </div>
+                  {omniLoading ? (
+                    <Skeleton className="h-8 w-48 bg-white/20" />
+                  ) : omnipayBalance?.success !== 1 ? (
+                    <p className="text-white/60 text-sm">Solde non disponible</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {(omnipayBalance?.data || []).map((b: any, i: number) => (
+                        <div key={i} className="bg-white/10 rounded-2xl px-3 py-2.5" data-testid={`omnipay-balance-${b.countryCode}`}>
+                          <p className="text-white/60 text-xs">{b.countryName} ({b.currency})</p>
+                          <p className="text-white font-black text-lg">{new Intl.NumberFormat("fr-FR").format(parseFloat(b.amount || "0"))}</p>
+                          {b.pending && parseFloat(b.pending) > 0 && <p className="text-white/50 text-xs">En attente: {b.pending}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Summary + Actions */}
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Card className="border-border/50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-9 w-9 rounded-xl bg-indigo-500/15 flex items-center justify-center"><Wallet className="h-4.5 w-4.5 text-indigo-600" /></div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total wallets utilisateurs</p>
+                      <p className="font-black text-lg text-indigo-600">{walletsLoading ? "—" : fmt(totalWalletBalance)}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{(wallets || []).length} wallets actifs</p>
+                </CardContent>
+              </Card>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setDepositDialog({ userId: "", name: "" })}
+                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors"
+                  data-testid="btn-admin-deposit">
+                  <Plus className="h-5 w-5 text-emerald-600" />
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Dépôt OmniPay</span>
+                </button>
+                <button onClick={() => setMigrateDialog(true)}
+                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/15 transition-colors"
+                  data-testid="btn-admin-migrate">
+                  <ArrowRightLeft className="h-5 w-5 text-violet-600" />
+                  <span className="text-xs font-bold text-violet-700 dark:text-violet-400">Migration</span>
+                </button>
+              </div>
+            </div>
+
+            {/* All Wallets */}
+            {walletsLoading ? (
+              <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
+            ) : (
+              <Card className="border-border/50 overflow-hidden">
+                <CardHeader className="pb-2 px-4 pt-4">
+                  <CardTitle className="text-sm font-bold">Tous les wallets utilisateurs</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-border/30 max-h-96 overflow-y-auto">
+                    {[...(wallets || [])].sort((a: any, b: any) => parseFloat(b.wallet?.balanceXOF || "0") - parseFloat(a.wallet?.balanceXOF || "0")).map((u: any) => {
+                      const bal = parseFloat(u.wallet?.balanceXOF || "0");
+                      return (
+                        <div key={u.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors" data-testid={`row-wallet-${u.id}`}>
+                          <div className="h-8 w-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-xs font-bold text-indigo-600 flex-shrink-0">
+                            {((u.firstName?.[0] || "") + (u.lastName?.[0] || u.email?.[0] || "?")).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">{u.firstName} {u.lastName}</p>
+                            <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <p className={`font-black text-sm ${bal > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>{fmt(bal)}</p>
+                            <button
+                              onClick={() => { setDepositDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}` }); setDepositData({ amount: "", phone: u.phone || "", operator: "", motif: "" }); }}
+                              className="h-7 w-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-center transition-colors"
+                              data-testid={`btn-deposit-wallet-${u.id}`}
+                            >
+                              <Plus className="h-3.5 w-3.5 text-emerald-600" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
             )}
           </TabsContent>
 
-          {/* ═══════════════════════════════════════════
-              TAB 4: MOYENS DE PAIEMENT
-          ═══════════════════════════════════════════ */}
-          <TabsContent value="payment-methods" className="space-y-4 mt-5">
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20">
-              <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                Désactiver un moyen de paiement l'empêche d'être utilisé sur la plateforme. 
-                Le mode <strong>Maintenance</strong> affiche un message aux marchands.
-              </p>
+          {/* ══════════════════════════════════════
+              TAB 5 — FRAIS
+          ══════════════════════════════════════ */}
+          <TabsContent value="fees" className="space-y-4 mt-5">
+            <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-start gap-3">
+              <Percent className="h-4 w-4 text-indigo-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-indigo-700 dark:text-indigo-400">Configuration des frais par type et par pays</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Les frais s'appliquent selon le type d'opération et le pays. BF et COG ont un taux de base plus élevé (6%).</p>
+              </div>
+            </div>
+
+            <div className="flex gap-1.5">
+              {TX_TYPES.map(t => (
+                <button key={t} onClick={() => setFeeTypeTab(t)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${feeTypeTab === t ? "bg-indigo-600 text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                  data-testid={`btn-fee-type-${t}`}>
+                  {t === "deposit" && <Banknote className="h-4 w-4" />}
+                  {t === "withdrawal" && <Send className="h-4 w-4" />}
+                  {t === "transfer" && <ArrowRightLeft className="h-4 w-4" />}
+                  {TX_TYPE_LABELS[t]}
+                </button>
+              ))}
+            </div>
+
+            {feeLoading ? (
+              <div className="space-y-2">{[1,2,3,4].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
+            ) : (
+              <div className="space-y-2">
+                {feeByTypeCountry.map((fc: any) => {
+                  const countryInfo = COUNTRIES.find(c => c.code === fc.country);
+                  return (
+                    <div key={fc.id} className="flex items-center gap-3 p-3.5 rounded-2xl border border-border/50 hover:border-border/80 transition-colors bg-card" data-testid={`row-fee-${fc.id}`}>
+                      <div className="text-xl flex-shrink-0">
+                        {fc.country === "default" ? "🌍" : (countryInfo?.flag || "🏳️")}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold">
+                          {fc.country === "default" ? "Taux par défaut (tous pays)" : (countryInfo?.name || fc.country)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {fc.country === "default" ? "Appliqué si aucun taux spécifique au pays" : `Code: ${fc.country}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="text-right">
+                          <p className={`text-lg font-black ${parseFloat(fc.feeRate) > 5 ? "text-orange-600" : "text-indigo-600"}`}>{fc.feeRate}%</p>
+                          {fc.minAmount && parseFloat(fc.minAmount) > 0 && <p className="text-xs text-muted-foreground">min {fmt(parseFloat(fc.minAmount))}</p>}
+                        </div>
+                        <button
+                          onClick={() => { setFeeEditDialog({ id: fc.id, feeRate: fc.feeRate, type: fc.type, country: fc.country }); setFeeRate(fc.feeRate); }}
+                          className="h-8 w-8 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 flex items-center justify-center transition-colors"
+                          data-testid={`btn-edit-fee-${fc.id}`}
+                        >
+                          <PenLine className="h-3.5 w-3.5 text-indigo-600" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {feeByTypeCountry.length === 0 && <div className="text-center py-8 text-sm text-muted-foreground">Chargement des configurations...</div>}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ══════════════════════════════════════
+              TAB 6 — MOYENS DE PAIEMENT
+          ══════════════════════════════════════ */}
+          <TabsContent value="payments" className="space-y-4 mt-5">
+            <div className="p-4 rounded-2xl bg-cyan-500/5 border border-cyan-500/20 flex items-start gap-3">
+              <AlertTriangle className="h-4 w-4 text-cyan-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-muted-foreground">Désactiver un réseau l'empêche complètement d'être utilisé. Le mode <strong>Maintenance</strong> affiche un message aux utilisateurs.</p>
             </div>
 
             {pmLoading ? (
-              <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}</div>
+              <div className="grid sm:grid-cols-2 gap-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)}</div>
             ) : (
               <div className="grid sm:grid-cols-2 gap-3">
                 {(paymentMethods || []).map((pm: any) => (
-                  <Card key={pm.code} className={`border-border/60 ${!pm.isActive ? "opacity-60" : ""} ${pm.inMaintenance ? "border-amber-500/30 bg-amber-500/5" : ""}`} data-testid={`card-pm-${pm.code}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div>
-                          <p className="font-bold text-sm">{pm.name}</p>
-                          <p className="text-xs text-muted-foreground">{(pm.countries || []).join(", ")}</p>
+                  <Card key={pm.code} className={`border-border/50 overflow-hidden ${pm.inMaintenance ? "border-amber-500/30" : !pm.isActive ? "border-red-500/20 opacity-70" : ""}`} data-testid={`card-pm-${pm.code}`}>
+                    <CardContent className="p-0">
+                      <div className={`h-1 ${pm.inMaintenance ? "bg-amber-500" : pm.isActive ? "bg-emerald-500" : "bg-red-500"}`} />
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-4">
+                          <div>
+                            <p className="font-bold text-sm">{pm.name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{(pm.countries || []).join(" · ")}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            {pm.inMaintenance && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30 text-xs font-semibold"><ZapOff className="h-2.5 w-2.5" />Maintenance</span>}
+                            {!pm.isActive && !pm.inMaintenance && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 border border-red-500/30 text-xs font-semibold">Désactivé</span>}
+                            {pm.isActive && !pm.inMaintenance && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 text-xs font-semibold"><Zap className="h-2.5 w-2.5" />Actif</span>}
+                          </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1.5">
-                          {pm.inMaintenance && <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-xs"><ZapOff className="h-3 w-3 mr-1" />Maintenance</Badge>}
-                          {!pm.isActive && !pm.inMaintenance && <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-xs">Désactivé</Badge>}
-                          {pm.isActive && !pm.inMaintenance && <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-xs">Actif</Badge>}
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Switch checked={pm.isActive} onCheckedChange={(v) => pmM.mutate({ code: pm.code, isActive: v })} disabled={pmM.isPending} data-testid={`switch-active-${pm.code}`} />
+                              <span className="text-xs text-muted-foreground">{pm.isActive ? "Activé" : "Désactivé"}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-semibold">{pm.feeValue}%</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Switch checked={pm.inMaintenance} onCheckedChange={(v) => pmM.mutate({ code: pm.code, inMaintenance: v })} disabled={pmM.isPending} data-testid={`switch-maintenance-${pm.code}`} />
+                            <span className="text-xs text-muted-foreground">Mode maintenance</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={pm.isActive}
-                            onCheckedChange={(v) => pmMutation.mutate({ code: pm.code, isActive: v })}
-                            disabled={pmMutation.isPending}
-                            data-testid={`switch-pm-active-${pm.code}`}
-                          />
-                          <span className="text-xs text-muted-foreground">{pm.isActive ? "Actif" : "Inactif"}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={pm.inMaintenance}
-                            onCheckedChange={(v) => pmMutation.mutate({ code: pm.code, inMaintenance: v })}
-                            disabled={pmMutation.isPending}
-                            data-testid={`switch-pm-maintenance-${pm.code}`}
-                          />
-                          <span className="text-xs text-muted-foreground">Maintenance</span>
-                        </div>
-                        <button
-                          className="text-xs text-primary hover:underline font-semibold ml-auto flex items-center gap-1"
-                          onClick={() => { setPmFeeDialog({ open: true, code: pm.code, current: pm.feeValue }); setPmFeeValue(pm.feeValue); }}
-                          data-testid={`button-pm-fee-${pm.code}`}
-                        >
-                          <Percent className="h-3 w-3" />{pm.feeValue}%
-                        </button>
                       </div>
                     </CardContent>
                   </Card>
@@ -690,384 +830,314 @@ export default function AdminPage() {
             )}
           </TabsContent>
 
-          {/* ═══════════════════════════════════════════
-              TAB 5: COMMISSIONS & REVENUS
-          ═══════════════════════════════════════════ */}
-          <TabsContent value="commissions" className="space-y-4 mt-5">
-            <div
-              className="relative rounded-2xl p-5 text-white overflow-hidden"
-              style={{ background: "linear-gradient(135deg, hsl(142 71% 30%) 0%, hsl(162 60% 38%) 100%)" }}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
-              <div className="relative">
-                <p className="text-white/70 text-xs font-medium uppercase tracking-wider mb-1">Revenus plateforme totaux</p>
-                <p className="text-3xl font-black" data-testid="text-total-fees">
-                  {commissionsLoading ? "—" : fmt(commissions?.totalFees || 0)}
-                </p>
-                <p className="text-white/60 text-xs mt-1">Frais encaissés depuis le début</p>
-              </div>
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Card className="border-border/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" />Ce mois-ci</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Volume traité</span>
-                    <span className="font-bold text-sm" data-testid="text-month-volume">{commissionsLoading ? "—" : fmt(commissions?.monthVolume || 0)}</span>
+          {/* ══════════════════════════════════════
+              TAB 7 — TRANSACTIONS
+          ══════════════════════════════════════ */}
+          <TabsContent value="transactions" className="space-y-4 mt-5">
+            {pendingWithdrawals.length > 0 && (
+              <Card className="border-amber-500/30 bg-amber-500/5 overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="bg-amber-500/10 px-4 py-2.5 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    <p className="text-sm font-bold text-amber-700 dark:text-amber-400">{pendingWithdrawals.length} retrait(s) en attente de validation</p>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Frais collectés</span>
-                    <span className="font-bold text-sm text-emerald-600" data-testid="text-month-fees">{commissionsLoading ? "—" : fmt(commissions?.monthFees || 0)}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Mois dernier (frais)</span>
-                    <span className="font-bold text-sm">{commissionsLoading ? "—" : fmt(commissions?.lastMonthFees || 0)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2"><Coins className="h-4 w-4 text-amber-600" />Répartition estimée</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Frais totaux collectés</span>
-                    <span className="font-bold text-sm">{commissionsLoading ? "—" : fmt(commissions?.totalFees || 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Coût OmniPay estimé (2%)</span>
-                    <span className="font-bold text-sm text-red-500">- {commissionsLoading ? "—" : fmt(commissions?.estimatedOmniPayCut || 0)}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-xs font-bold">Revenu net SolvexPay</span>
-                    <span className="font-black text-base text-emerald-600" data-testid="text-net-revenue">{commissionsLoading ? "—" : fmt(Math.max(0, commissions?.estimatedNetRevenue || 0))}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="border-border/60">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-bold flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" />Statistiques globales</CardTitle>
-              </CardHeader>
-              <CardContent className="grid sm:grid-cols-3 gap-4">
-                {[
-                  { label: "Volume total traité", value: fmt(commissions?.totalVolume || 0), icon: ArrowDownUp, color: "text-violet-600", bg: "bg-violet-500/10" },
-                  { label: "Transactions réussies", value: commissions?.completedTxCount ?? "—", icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-                  { label: "Taux de frais moyen", value: commissions?.totalVolume > 0 ? `${((commissions.totalFees / commissions.totalVolume) * 100).toFixed(2)}%` : "—", icon: Percent, color: "text-amber-600", bg: "bg-amber-500/10" },
-                ].map((item, i) => (
-                  <div key={i} className={`rounded-xl ${item.bg} p-4`}>
-                    <item.icon className={`h-5 w-5 ${item.color} mb-2`} />
-                    <p className={`text-xl font-black ${item.color}`}>{commissionsLoading ? "—" : item.value}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.label}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* ═══════════════════════════════════════════
-              TAB 6: RETRAITS & RÈGLEMENTS
-          ═══════════════════════════════════════════ */}
-          <TabsContent value="withdrawals" className="space-y-4 mt-5">
-            {(() => {
-              const pendingWithdrawals = (allTx || []).filter(tx => tx.type === "withdrawal" && tx.status === "pending");
-              const completedWithdrawals = (allTx || []).filter(tx => tx.type === "withdrawal" && tx.status === "completed");
-              const failedWithdrawals = (allTx || []).filter(tx => tx.type === "withdrawal" && tx.status === "failed");
-              return (
-                <>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: "En attente", value: pendingWithdrawals.length, color: "text-amber-600", bg: "bg-amber-500/10", icon: Clock },
-                      { label: "Validés", value: completedWithdrawals.length, color: "text-emerald-600", bg: "bg-emerald-500/10", icon: CheckCircle2 },
-                      { label: "Rejetés", value: failedWithdrawals.length, color: "text-red-600", bg: "bg-red-500/10", icon: XCircle },
-                    ].map((item) => (
-                      <div key={item.label} className={`rounded-2xl ${item.bg} p-4`}>
-                        <item.icon className={`h-5 w-5 ${item.color} mb-2`} />
-                        <p className={`text-2xl font-black ${item.color}`}>{txLoading ? "—" : item.value}</p>
-                        <p className="text-xs text-muted-foreground">{item.label}</p>
+                  <div className="divide-y divide-border/30">
+                    {pendingWithdrawals.map((tx: any) => (
+                      <div key={tx.id} className="flex items-center gap-3 px-4 py-3" data-testid={`row-pending-withdrawal-${tx.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold">{fmt(parseFloat(tx.amount))}</p>
+                          <p className="text-xs text-muted-foreground">{tx.phoneNumber} · {tx.provider || "—"} · {fmtDate(tx.createdAt)}</p>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => txStatusM.mutate({ txId: tx.id, status: "completed" })} disabled={txStatusM.isPending}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-colors"
+                            data-testid={`btn-validate-withdrawal-${tx.id}`}>
+                            <CheckCircle2 className="h-3.5 w-3.5" />Valider
+                          </button>
+                          <button onClick={() => txStatusM.mutate({ txId: tx.id, status: "failed" })} disabled={txStatusM.isPending}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-500/15 text-red-600 text-xs font-bold hover:bg-red-500/25 transition-colors"
+                            data-testid={`btn-reject-withdrawal-${tx.id}`}>
+                            <XCircle className="h-3.5 w-3.5" />Rejeter
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            )}
 
-                  {pendingWithdrawals.length > 0 && (
-                    <div>
-                      <p className="text-sm font-bold mb-3 flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-amber-600" />
-                        Retraits en attente ({pendingWithdrawals.length})
-                      </p>
-                      <Card className="border-amber-500/30 overflow-hidden">
-                        <CardContent className="p-0">
-                          {pendingWithdrawals.map((tx: any, i: number) => (
-                            <div key={tx.id} className={`flex items-center gap-3 px-4 py-3.5 hover:bg-muted/30 ${i > 0 ? "border-t border-border/40" : ""}`} data-testid={`row-withdrawal-${tx.id}`}>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-sm">{fmt(parseFloat(tx.amount))}</p>
-                                <p className="text-xs text-muted-foreground">{tx.phoneNumber} · {tx.provider || "—"} · {fmtDate(tx.createdAt)}</p>
-                                {tx.description && <p className="text-xs text-muted-foreground truncate">{tx.description}</p>}
-                              </div>
-                              <div className="flex gap-1.5 flex-shrink-0">
-                                <Button size="sm" className="h-7 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700"
-                                  onClick={() => updateTxStatusMutation.mutate({ txId: tx.id, status: "completed" })}
-                                  disabled={updateTxStatusMutation.isPending}
-                                  data-testid={`button-approve-withdrawal-${tx.id}`}
-                                >
-                                  <CheckCircle2 className="h-3 w-3" />Valider
-                                </Button>
-                                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-red-500/40 text-red-600 hover:bg-red-500/5"
-                                  onClick={() => updateTxStatusMutation.mutate({ txId: tx.id, status: "failed" })}
-                                  disabled={updateTxStatusMutation.isPending}
-                                  data-testid={`button-reject-withdrawal-${tx.id}`}
-                                >
-                                  <XCircle className="h-3 w-3" />Rejeter
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-
-                  {pendingWithdrawals.length === 0 && (
-                    <Card className="border-border/60 border-dashed">
-                      <CardContent className="py-12 text-center">
-                        <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
-                        <p className="font-semibold text-sm">Aucun retrait en attente</p>
-                        <p className="text-xs text-muted-foreground mt-1">Tous les retraits ont été traités</p>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {completedWithdrawals.length > 0 && (
-                    <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-2">Derniers retraits validés</p>
-                      <Card className="border-border/60 overflow-hidden">
-                        <CardContent className="p-0">
-                          {completedWithdrawals.slice(0, 5).map((tx: any, i: number) => (
-                            <div key={tx.id} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-border/40" : ""}`}>
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold">{fmt(parseFloat(tx.amount))}</p>
-                                <p className="text-xs text-muted-foreground">{tx.phoneNumber} · {fmtDate(tx.createdAt)}</p>
-                              </div>
-                              <TxStatusBadge status={tx.status} />
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </TabsContent>
-
-          {/* ═══════════════════════════════════════════
-              TAB 7: UTILISATEURS VIP
-          ═══════════════════════════════════════════ */}
-          <TabsContent value="vip" className="space-y-4 mt-5">
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
-              <Star className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                Marchands triés par <strong>solde décroissant</strong>. Inclut aussi les marchands avec un fort volume de transactions en 24h.
-              </p>
+            <div className="flex gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input value={txSearch} onChange={e => setTxSearch(e.target.value)} placeholder="Référence, téléphone..." className="pl-10 h-10" data-testid="input-search-tx" />
+              </div>
+              <Select value={txStatus} onValueChange={setTxStatus}>
+                <SelectTrigger className="w-36 h-10" data-testid="select-tx-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous statuts</SelectItem>
+                  <SelectItem value="pending">En attente</SelectItem>
+                  <SelectItem value="completed">Complété</SelectItem>
+                  <SelectItem value="failed">Échoué</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={txType} onValueChange={setTxType}>
+                <SelectTrigger className="w-36 h-10" data-testid="select-tx-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous types</SelectItem>
+                  <SelectItem value="deposit">Dépôts</SelectItem>
+                  <SelectItem value="withdrawal">Retraits</SelectItem>
+                  <SelectItem value="transfer">Transferts</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {bigUsersLoading ? (
-              <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}</div>
+            <p className="text-xs text-muted-foreground font-medium">{filteredTx.length} transaction(s)</p>
+
+            {txLoading ? (
+              <div className="space-y-2">{[1,2,3,4].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
             ) : (
-              <div className="space-y-3">
-                {(bigUsers || []).slice(0, 20).map((u: any, i: number) => {
-                  const balance = parseFloat(u.wallet?.balanceXOF || "0");
-                  const isHighActivity = u.last24hCount >= 5 || u.last24hVolume >= 100000;
-                  return (
-                    <Card key={u.id} className={`border-border/60 overflow-hidden ${isHighActivity ? "border-amber-500/40" : ""}`} data-testid={`card-vip-${u.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-4">
-                          <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-black text-sm flex-shrink-0 ${i < 3 ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground"}`}>
-                            #{i + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-bold text-sm">{u.firstName} {u.lastName}</p>
-                              <KycBadge status={u.kycStatus || "not_started"} />
-                              {isHighActivity && <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-xs"><Zap className="h-3 w-3 mr-1" />Activité élevée</Badge>}
-                              {u.isBlocked && <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-xs"><Lock className="h-3 w-3 mr-1" />Bloqué</Badge>}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{u.email}</p>
-                            <div className="flex items-center gap-3 mt-1 flex-wrap">
-                              <span className="text-xs text-muted-foreground">{u.txCount} transactions</span>
-                              <span className="text-xs text-muted-foreground">Volume total: {fmt(u.totalVolume)}</span>
-                              {u.last24hCount > 0 && <span className="text-xs text-amber-600 font-semibold">{u.last24hCount} tx en 24h ({fmt(u.last24hVolume)})</span>}
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-xs text-muted-foreground">Solde</p>
-                            <p className={`font-black text-base ${balance >= 100000 ? "text-emerald-600" : "text-foreground"}`}>{fmt(balance)}</p>
-                          </div>
+              <Card className="border-border/50 overflow-hidden">
+                <CardContent className="p-0">
+                  {filteredTx.length === 0 ? (
+                    <div className="text-center py-12 text-sm text-muted-foreground">Aucune transaction</div>
+                  ) : filteredTx.map((tx: any, i: number) => (
+                    <div key={tx.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors ${i > 0 ? "border-t border-border/30" : ""}`} data-testid={`row-tx-${tx.id}`}>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <TypeChip type={tx.type} />
+                          <TxChip status={tx.status} />
+                          <span className="text-xs font-mono text-muted-foreground">{tx.reference}</span>
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-                {(bigUsers || []).length === 0 && (
-                  <div className="text-center py-12 text-sm text-muted-foreground">Aucun utilisateur</div>
-                )}
-              </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {tx.phoneNumber && <span className="text-xs text-muted-foreground">{tx.phoneNumber}</span>}
+                          {tx.provider && <span className="text-xs text-muted-foreground">{tx.provider}</span>}
+                          <span className="text-xs text-muted-foreground">{fmtDate(tx.createdAt)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="text-right">
+                          <p className="text-sm font-black">{fmt(parseFloat(tx.amount))}</p>
+                          {tx.fees && parseFloat(tx.fees) > 0 && <p className="text-xs text-muted-foreground">Frais: {fmt(parseFloat(tx.fees))}</p>}
+                        </div>
+                        <button onClick={() => { setTxEditDialog({ id: tx.id, status: tx.status }); setNewTxStatus(tx.status); }}
+                          className="h-8 w-8 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
+                          data-testid={`btn-edit-tx-${tx.id}`}>
+                          <PenLine className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* ═══ KYC DIALOG ═══ */}
-      <Dialog open={!!kycDialog} onOpenChange={(open) => { if (!open) setKycDialog(null); }}>
-        <DialogContent className="max-w-sm rounded-2xl">
+      {/* ════ KYC DIALOG ════ */}
+      <Dialog open={!!kycDialog} onOpenChange={(o) => { if (!o) setKycDialog(null); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-primary" />Mise à jour KYC</DialogTitle>
-            <DialogDescription>Marchand : <strong>{kycDialog?.userName}</strong></DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-indigo-500" />Décision KYC</DialogTitle>
+            <DialogDescription>Utilisateur : <strong>{kycDialog?.name}</strong></DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setKycAction("verified")}
-                className={`p-3 rounded-xl border-2 text-sm font-semibold transition-colors ${kycAction === "verified" ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-border/60 text-muted-foreground"}`}
-                data-testid="button-kyc-approve"
-              >
-                <CheckCircle2 className="h-4 w-4 mx-auto mb-1" />Valider
-              </button>
-              <button
-                onClick={() => setKycAction("rejected")}
-                className={`p-3 rounded-xl border-2 text-sm font-semibold transition-colors ${kycAction === "rejected" ? "border-red-500 bg-red-500/10 text-red-700 dark:text-red-400" : "border-border/60 text-muted-foreground"}`}
-                data-testid="button-kyc-reject"
-              >
-                <XCircle className="h-4 w-4 mx-auto mb-1" />Rejeter
-              </button>
+              {(["verified", "rejected"] as const).map(action => (
+                <button key={action} onClick={() => setKycAction(action)}
+                  className={`p-3 rounded-2xl border-2 text-sm font-bold transition-all ${kycAction === action
+                    ? action === "verified" ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-red-500 bg-red-500/10 text-red-700 dark:text-red-400"
+                    : "border-border/60 text-muted-foreground hover:border-border"}`}
+                  data-testid={`btn-kyc-action-${action}`}>
+                  {action === "verified" ? <><CheckCircle2 className="h-4 w-4 mx-auto mb-1" />Approuver</> : <><XCircle className="h-4 w-4 mx-auto mb-1" />Rejeter</>}
+                </button>
+              ))}
             </div>
             {kycAction === "rejected" && (
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Motif de rejet <span className="text-red-500">*</span></Label>
-                <Textarea
-                  value={kycRejectionReason}
-                  onChange={e => setKycRejectionReason(e.target.value)}
-                  placeholder="Expliquez la raison du rejet (document flou, document expiré, identité non concordante...)"
-                  rows={3}
-                  className="text-sm"
-                  data-testid="textarea-kyc-rejection-reason"
-                />
+                <Textarea value={kycReason} onChange={e => setKycReason(e.target.value)} placeholder="Ex: Document flou, identité non concordante..." rows={3} data-testid="textarea-kyc-reason" />
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setKycDialog(null)} className="h-10">Annuler</Button>
             <Button
-              onClick={() => kycDialog && kycMutation.mutate({ userId: kycDialog.userId, kycStatus: kycAction, rejectionReason: kycAction === "rejected" ? kycRejectionReason : undefined })}
-              disabled={kycMutation.isPending || (kycAction === "rejected" && !kycRejectionReason.trim())}
+              onClick={() => kycDialog && kycM.mutate({ userId: kycDialog.userId, kycStatus: kycAction, rejectionReason: kycAction === "rejected" ? kycReason : undefined })}
+              disabled={kycM.isPending || (kycAction === "rejected" && !kycReason.trim())}
               className={`h-10 ${kycAction === "verified" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
-              data-testid="button-kyc-confirm"
-            >
-              {kycMutation.isPending ? "Enregistrement..." : kycAction === "verified" ? "Valider le KYC" : "Rejeter le KYC"}
+              data-testid="btn-kyc-confirm">
+              {kycM.isPending ? "Enregistrement..." : kycAction === "verified" ? "Approuver" : "Rejeter"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ═══ FEE DIALOG ═══ */}
-      <Dialog open={!!feeDialog} onOpenChange={(open) => { if (!open) setFeeDialog(null); }}>
-        <DialogContent className="max-w-sm rounded-2xl">
+      {/* ════ PASSWORD DIALOG ════ */}
+      <Dialog open={!!pwdDialog} onOpenChange={(o) => { if (!o) setPwdDialog(null); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Percent className="h-5 w-5 text-primary" />Commission personnalisée</DialogTitle>
-            <DialogDescription>Marchand : <strong>{feeDialog?.userName}</strong></DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-indigo-500" />Modifier le mot de passe</DialogTitle>
+            <DialogDescription>{pwdDialog?.name}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-xs text-muted-foreground">Laissez vide pour utiliser les frais standards (5%/6%). Entrez une valeur pour définir un taux personnalisé.</p>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Taux de commission (%)</Label>
-              <div className="relative">
-                <Input type="number" min="0" max="20" step="0.1" value={customFee} onChange={e => setCustomFee(e.target.value)} placeholder="Ex: 3.5 (laisser vide = standard)" className="pr-8 h-11 border-border/70" data-testid="input-custom-fee" />
-                <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setFeeDialog(null)} className="h-10">Annuler</Button>
-            {customFee && <Button variant="outline" onClick={() => feeDialog && feeMutation.mutate({ userId: feeDialog.userId, customFeeRate: null })} disabled={feeMutation.isPending} className="h-10 border-red-500/30 text-red-600">Réinitialiser</Button>}
-            <Button onClick={() => feeDialog && feeMutation.mutate({ userId: feeDialog.userId, customFeeRate: customFee || null })} disabled={feeMutation.isPending} className="h-10" data-testid="button-confirm-fee">
-              {feeMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ═══ PASSWORD DIALOG ═══ */}
-      <Dialog open={!!passwordDialog} onOpenChange={(open) => { if (!open) setPasswordDialog(null); }}>
-        <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary" />Modifier le mot de passe</DialogTitle>
-            <DialogDescription>Marchand : <strong>{passwordDialog?.userName}</strong></DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nouveau mot de passe</Label>
-              <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Min. 6 caractères" className="h-11 border-border/70" data-testid="input-new-password" />
-            </div>
+          <div className="py-2">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nouveau mot de passe</Label>
+            <Input type="password" value={pwd} onChange={e => setPwd(e.target.value)} placeholder="Min. 6 caractères" className="mt-2 h-11" data-testid="input-password" />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPasswordDialog(null)} className="h-10">Annuler</Button>
-            <Button onClick={() => passwordDialog && changePasswordMutation.mutate({ userId: passwordDialog.userId, password: newPassword })} disabled={changePasswordMutation.isPending || newPassword.length < 6} className="h-10" data-testid="button-confirm-password">
-              {changePasswordMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+            <Button variant="outline" onClick={() => setPwdDialog(null)} className="h-10">Annuler</Button>
+            <Button onClick={() => pwdDialog && pwdM.mutate({ userId: pwdDialog.userId, password: pwd })} disabled={pwdM.isPending || pwd.length < 6} className="h-10" data-testid="btn-confirm-password">
+              {pwdM.isPending ? "..." : "Enregistrer"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ═══ BALANCE DIALOG ═══ */}
-      <Dialog open={!!balanceDialog} onOpenChange={(open) => { if (!open) setBalanceDialog(null); }}>
-        <DialogContent className="max-w-sm rounded-2xl">
+      {/* ════ BALANCE DIALOG ════ */}
+      <Dialog open={!!balDialog} onOpenChange={(o) => { if (!o) setBalDialog(null); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><PenLine className="h-5 w-5 text-primary" />Ajuster le solde</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><PenLine className="h-5 w-5 text-indigo-500" />Ajuster le solde</DialogTitle>
+            <DialogDescription>{balDialog?.name} — Solde actuel : <strong>{fmt(balDialog?.bal || 0)}</strong></DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (+crédit / −débit)</Label>
+              <Input type="number" value={balAmount} onChange={e => setBalAmount(e.target.value)} placeholder="Ex: 5000 ou -2000" className="mt-2 h-11" data-testid="input-bal-amount" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Motif <span className="text-red-500">*</span></Label>
+              <Textarea value={balMotif} onChange={e => setBalMotif(e.target.value)} placeholder="Raison de l'ajustement..." rows={2} className="mt-2" data-testid="input-bal-motif" />
+            </div>
+            {balAmount && <div className="rounded-xl bg-muted/50 p-3 text-xs">Nouveau solde : <strong>{fmt((balDialog?.bal || 0) + (parseFloat(balAmount) || 0))}</strong></div>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBalDialog(null)} className="h-10">Annuler</Button>
+            <Button onClick={() => balDialog && balM.mutate({ userId: balDialog.userId, amount: parseFloat(balAmount), motif: balMotif })} disabled={balM.isPending || !balAmount || !balMotif} className="h-10" data-testid="btn-confirm-balance">
+              {balM.isPending ? "..." : "Enregistrer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ DEPOSIT DIALOG ════ */}
+      <Dialog open={!!depositDialog} onOpenChange={(o) => { if (!o) setDepositDialog(null); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-emerald-500" />Dépôt via OmniPay</DialogTitle>
             <DialogDescription>
-              {balanceDialog?.userName} — Solde actuel : <strong>{fmt(balanceDialog?.currentBalance || 0)}</strong>
+              {depositDialog?.name ? `Wallet de ${depositDialog.name}` : "Sélectionner un wallet"}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (+ crédit / − débit)</Label>
-              <Input type="number" value={balanceAmount} onChange={e => setBalanceAmount(e.target.value)} placeholder="Ex: 5000 ou -2000" className="h-11 border-border/70" data-testid="input-balance-amount" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Motif <span className="text-red-500">*</span></Label>
-              <Textarea value={balanceMotif} onChange={e => setBalanceMotif(e.target.value)} placeholder="Raison de l'ajustement..." rows={2} data-testid="input-balance-motif" />
-            </div>
-            {balanceAmount && (
-              <div className="rounded-xl bg-muted/50 p-3 text-xs">
-                Nouveau solde estimé : <strong>{fmt((balanceDialog?.currentBalance || 0) + (parseFloat(balanceAmount) || 0))}</strong>
+          <div className="space-y-3 py-2">
+            {!depositDialog?.userId && (
+              <div>
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Utilisateur</Label>
+                <Select value={depositDialog?.userId || ""} onValueChange={(v) => setDepositDialog(prev => prev ? { ...prev, userId: v, name: (wallets || []).find((u: any) => u.id === v)?.firstName || v } : prev)}>
+                  <SelectTrigger className="mt-2 h-11" data-testid="select-deposit-user"><SelectValue placeholder="Choisir un utilisateur" /></SelectTrigger>
+                  <SelectContent>
+                    {(wallets || []).map((u: any) => <SelectItem key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.email})</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             )}
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (XOF)</Label>
+              <Input type="number" value={depositData.amount} onChange={e => setDepositData(p => ({ ...p, amount: e.target.value }))} placeholder="5000" className="mt-2 h-11" data-testid="input-deposit-amount" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de téléphone</Label>
+              <Input value={depositData.phone} onChange={e => setDepositData(p => ({ ...p, phone: e.target.value }))} placeholder="Ex: 22901234567" className="mt-2 h-11" data-testid="input-deposit-phone" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Opérateur</Label>
+              <Select value={depositData.operator} onValueChange={(v) => setDepositData(p => ({ ...p, operator: v }))}>
+                <SelectTrigger className="mt-2 h-11" data-testid="select-deposit-operator"><SelectValue placeholder="Choisir opérateur" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MTN">MTN Mobile Money</SelectItem>
+                  <SelectItem value="Orange">Orange Money</SelectItem>
+                  <SelectItem value="Moov">Moov Money</SelectItem>
+                  <SelectItem value="Wave">Wave</SelectItem>
+                  <SelectItem value="TMoney">T-Money</SelectItem>
+                  <SelectItem value="Airtel">Airtel Money</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Motif</Label>
+              <Input value={depositData.motif} onChange={e => setDepositData(p => ({ ...p, motif: e.target.value }))} placeholder="Alimentation wallet..." className="mt-2 h-11" data-testid="input-deposit-motif" />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBalanceDialog(null)} className="h-10">Annuler</Button>
-            <Button onClick={() => balanceDialog && adjustBalanceMutation.mutate({ userId: balanceDialog.userId, amount: parseFloat(balanceAmount), motif: balanceMotif })} disabled={adjustBalanceMutation.isPending || !balanceAmount || !balanceMotif} className="h-10" data-testid="button-confirm-balance">
-              {adjustBalanceMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+            <Button variant="outline" onClick={() => setDepositDialog(null)} className="h-10">Annuler</Button>
+            <Button
+              onClick={() => depositDialog && depositM.mutate({ userId: depositDialog.userId, amount: depositData.amount, phoneNumber: depositData.phone, operator: depositData.operator, motif: depositData.motif })}
+              disabled={depositM.isPending || !depositData.amount || !depositData.phone || !depositDialog?.userId}
+              className="h-10 bg-emerald-600 hover:bg-emerald-700" data-testid="btn-confirm-deposit">
+              {depositM.isPending ? "Dépôt en cours..." : "Effectuer le dépôt"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ═══ TX STATUS DIALOG ═══ */}
-      <Dialog open={!!txStatusDialog} onOpenChange={(open) => { if (!open) setTxStatusDialog(null); }}>
-        <DialogContent className="max-w-sm rounded-2xl">
+      {/* ════ MIGRATE DIALOG ════ */}
+      <Dialog open={migrateDialog} onOpenChange={setMigrateDialog}>
+        <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><ArrowUpDown className="h-5 w-5 text-primary" />Modifier le statut</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><ArrowRightLeft className="h-5 w-5 text-violet-500" />Migration de fonds</DialogTitle>
+            <DialogDescription>Transférer des fonds entre wallets utilisateurs</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Wallet source</Label>
+              <Select value={migrateData.fromUserId} onValueChange={(v) => setMigrateData(p => ({ ...p, fromUserId: v }))}>
+                <SelectTrigger className="mt-2 h-11" data-testid="select-migrate-from"><SelectValue placeholder="Wallet source" /></SelectTrigger>
+                <SelectContent>
+                  {(wallets || []).map((u: any) => <SelectItem key={u.id} value={u.id}>{u.firstName} {u.lastName} — {fmt(parseFloat(u.wallet?.balanceXOF || "0"))}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-center"><ArrowRightLeft className="h-5 w-5 text-muted-foreground" /></div>
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Wallet destination</Label>
+              <Select value={migrateData.toUserId} onValueChange={(v) => setMigrateData(p => ({ ...p, toUserId: v }))}>
+                <SelectTrigger className="mt-2 h-11" data-testid="select-migrate-to"><SelectValue placeholder="Wallet destination" /></SelectTrigger>
+                <SelectContent>
+                  {(wallets || []).filter((u: any) => u.id !== migrateData.fromUserId).map((u: any) => <SelectItem key={u.id} value={u.id}>{u.firstName} {u.lastName} — {fmt(parseFloat(u.wallet?.balanceXOF || "0"))}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (XOF)</Label>
+              <Input type="number" value={migrateData.amount} onChange={e => setMigrateData(p => ({ ...p, amount: e.target.value }))} placeholder="Ex: 10000" className="mt-2 h-11" data-testid="input-migrate-amount" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Motif</Label>
+              <Input value={migrateData.motif} onChange={e => setMigrateData(p => ({ ...p, motif: e.target.value }))} placeholder="Raison..." className="mt-2 h-11" data-testid="input-migrate-motif" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMigrateDialog(false)} className="h-10">Annuler</Button>
+            <Button
+              onClick={() => migrateM.mutate(migrateData)}
+              disabled={migrateM.isPending || !migrateData.fromUserId || !migrateData.toUserId || !migrateData.amount}
+              className="h-10 bg-violet-600 hover:bg-violet-700" data-testid="btn-confirm-migrate">
+              {migrateM.isPending ? "Migration..." : "Migrer les fonds"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ TX STATUS DIALOG ════ */}
+      <Dialog open={!!txEditDialog} onOpenChange={(o) => { if (!o) setTxEditDialog(null); }}>
+        <DialogContent className="max-w-xs rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ArrowUpDown className="h-5 w-5 text-indigo-500" />Modifier le statut</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
             <Select value={newTxStatus} onValueChange={setNewTxStatus}>
-              <SelectTrigger className="h-11" data-testid="select-new-tx-status"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-11" data-testid="select-new-status"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="pending">En attente</SelectItem>
                 <SelectItem value="completed">Complété</SelectItem>
@@ -1076,33 +1146,34 @@ export default function AdminPage() {
             </Select>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTxStatusDialog(null)} className="h-10">Annuler</Button>
-            <Button onClick={() => txStatusDialog && updateTxStatusMutation.mutate({ txId: txStatusDialog.txId, status: newTxStatus })} disabled={updateTxStatusMutation.isPending} className="h-10" data-testid="button-confirm-tx-status">
-              {updateTxStatusMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+            <Button variant="outline" onClick={() => setTxEditDialog(null)} className="h-10">Annuler</Button>
+            <Button onClick={() => txEditDialog && txStatusM.mutate({ txId: txEditDialog.id, status: newTxStatus })} disabled={txStatusM.isPending} className="h-10" data-testid="btn-confirm-tx-status">
+              {txStatusM.isPending ? "..." : "Enregistrer"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ═══ PM FEE DIALOG ═══ */}
-      <Dialog open={!!pmFeeDialog} onOpenChange={(open) => { if (!open) setPmFeeDialog(null); }}>
-        <DialogContent className="max-w-sm rounded-2xl">
+      {/* ════ FEE EDIT DIALOG ════ */}
+      <Dialog open={!!feeEditDialog} onOpenChange={(o) => { if (!o) setFeeEditDialog(null); }}>
+        <DialogContent className="max-w-xs rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Percent className="h-5 w-5 text-primary" />Modifier les frais — {pmFeeDialog?.code}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Percent className="h-5 w-5 text-indigo-500" />Modifier le taux</DialogTitle>
+            <DialogDescription>
+              {feeEditDialog?.type ? TX_TYPE_LABELS[feeEditDialog.type] : ""} — {feeEditDialog?.country === "default" ? "Taux par défaut" : COUNTRIES.find(c => c.code === feeEditDialog?.country)?.name || feeEditDialog?.country}
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Taux (%)</Label>
-              <div className="relative">
-                <Input type="number" min="0" max="20" step="0.1" value={pmFeeValue} onChange={e => setPmFeeValue(e.target.value)} placeholder="5" className="pr-8 h-11 border-border/70" data-testid="input-pm-fee" />
-                <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              </div>
+          <div className="py-2">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Taux de commission (%)</Label>
+            <div className="relative mt-2">
+              <Input type="number" min="0" max="20" step="0.1" value={feeRate} onChange={e => setFeeRate(e.target.value)} placeholder="5" className="pr-8 h-11" data-testid="input-fee-rate" />
+              <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPmFeeDialog(null)} className="h-10">Annuler</Button>
-            <Button onClick={() => pmFeeDialog && pmMutation.mutate({ code: pmFeeDialog.code, feeValue: pmFeeValue })} disabled={pmMutation.isPending || !pmFeeValue} className="h-10" data-testid="button-confirm-pm-fee">
-              {pmMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+            <Button variant="outline" onClick={() => setFeeEditDialog(null)} className="h-10">Annuler</Button>
+            <Button onClick={() => feeEditDialog && feeM.mutate({ id: feeEditDialog.id, feeRate })} disabled={feeM.isPending || !feeRate} className="h-10" data-testid="btn-confirm-fee">
+              {feeM.isPending ? "..." : "Enregistrer"}
             </Button>
           </DialogFooter>
         </DialogContent>
