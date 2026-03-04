@@ -66,7 +66,8 @@ const transferSchema = z.object({
 
 const createPaymentLinkSchema = z.object({
   name: z.string().min(1, "Nom requis"),
-  amount: z.number().min(100, "Montant minimum: 100"),
+  amount: z.number().min(0, "Montant invalide"),
+  allowCustomAmount: z.boolean().optional().default(false),
   currency: z.enum(SUPPORTED_CURRENCIES).default("XOF"),
   description: z.string().optional(),
   redirectUrl: z.string().url().optional().or(z.literal("")),
@@ -80,7 +81,8 @@ const createApiKeySchema = z.object({
 
 const updatePaymentLinkSchema = z.object({
   name: z.string().min(1).optional(),
-  amount: z.number().min(100).optional(),
+  amount: z.number().min(0).optional(),
+  allowCustomAmount: z.boolean().optional(),
   description: z.string().optional().nullable(),
   redirectUrl: z.string().url().optional().or(z.literal("")).nullable(),
   imageUrl: z.string().optional().nullable(),
@@ -93,6 +95,7 @@ const publicPaySchema = z.object({
   country: z.string().min(2, "Pays requis"),
   customerName: z.string().optional(),
   customerEmail: z.string().email().optional().or(z.literal("")),
+  customAmount: z.number().min(100).optional(),
 });
 
 export async function registerRoutes(
@@ -458,7 +461,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { name, amount, currency, description, redirectUrl, imageUrl } = validation.data;
+      const { name, amount, currency, description, redirectUrl, imageUrl, allowCustomAmount } = validation.data;
 
       const paymentLink = await storage.createPaymentLink({
         userId,
@@ -468,6 +471,7 @@ export async function registerRoutes(
         description,
         redirectUrl: redirectUrl || null,
         imageUrl: imageUrl || null,
+        allowCustomAmount: allowCustomAmount ?? false,
         slug: generateSlug(),
         isActive: true,
       });
@@ -488,9 +492,10 @@ export async function registerRoutes(
       }
 
       const updateData: any = {};
-      const { name, amount, description, redirectUrl, imageUrl, isActive } = validation.data;
+      const { name, amount, allowCustomAmount, description, redirectUrl, imageUrl, isActive } = validation.data;
       if (name !== undefined) updateData.name = name;
       if (amount !== undefined) updateData.amount = amount.toString();
+      if (allowCustomAmount !== undefined) updateData.allowCustomAmount = allowCustomAmount;
       if (description !== undefined) updateData.description = description;
       if (redirectUrl !== undefined) updateData.redirectUrl = redirectUrl || null;
       if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
@@ -551,7 +556,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { phoneNumber, operator, country, customerName, customerEmail } = validation.data;
+      const { phoneNumber, operator, country, customerName, customerEmail, customAmount } = validation.data;
 
       const paymentLink = await storage.getPaymentLinkBySlug(slug);
       
@@ -577,7 +582,19 @@ export async function registerRoutes(
         ? `https://solvexpay.site/pay/${slug}?status=callback&reference=${reference}`
         : undefined;
 
-      const linkAmount = parseFloat(paymentLink.amount);
+      const fixedAmount = parseFloat(paymentLink.amount);
+      let linkAmount: number;
+      if ((paymentLink as any).allowCustomAmount) {
+        if (!customAmount || customAmount < 100) {
+          return res.status(400).json({ message: "Montant invalide (minimum 100)" });
+        }
+        if (fixedAmount > 0 && customAmount < fixedAmount) {
+          return res.status(400).json({ message: `Montant minimum: ${fixedAmount} XOF` });
+        }
+        linkAmount = customAmount;
+      } else {
+        linkAmount = fixedAmount;
+      }
       const feeRate = ["BF", "COG"].includes(country) ? 0.06 : 0.05;
       const feesAmount = Math.round(linkAmount * feeRate);
 

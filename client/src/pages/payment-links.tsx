@@ -39,7 +39,8 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(editLink?.name || "");
-  const [amount, setAmount] = useState(editLink ? editLink.amount : "");
+  const [amount, setAmount] = useState(editLink && !editLink.allowCustomAmount ? editLink.amount : "");
+  const [allowCustomAmount, setAllowCustomAmount] = useState(editLink?.allowCustomAmount || false);
   const [description, setDescription] = useState(editLink?.description || "");
   const [redirectUrl, setRedirectUrl] = useState(editLink?.redirectUrl || "");
   const [imageUrl, setImageUrl] = useState(editLink?.imageUrl || "");
@@ -92,23 +93,25 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !amount) return;
+    if (!name.trim()) return;
+    if (!allowCustomAmount && !amount) return;
     const payload = {
       name: name.trim(),
-      amount: parseFloat(String(amount)),
+      amount: allowCustomAmount ? (amount ? parseFloat(String(amount)) : 0) : parseFloat(String(amount)),
       currency: "XOF",
+      allowCustomAmount,
       description: description.trim() || undefined,
       redirectUrl: redirectUrl.trim() || undefined,
       imageUrl: imageUrl.trim() || undefined,
     };
     if (editLink) {
-      updateMutation.mutate({ name: payload.name, amount: payload.amount, description: payload.description || null, redirectUrl: payload.redirectUrl || null, imageUrl: payload.imageUrl || null });
+      updateMutation.mutate({ name: payload.name, amount: payload.amount, allowCustomAmount: payload.allowCustomAmount, description: payload.description || null, redirectUrl: payload.redirectUrl || null, imageUrl: payload.imageUrl || null });
     } else {
       createMutation.mutate(payload);
     }
   };
 
-  const previewAmount = amount ? parseFloat(String(amount)) : 0;
+  const previewAmount = !allowCustomAmount && amount ? parseFloat(String(amount)) : 0;
   const fees = previewAmount * 0.04;
   const netAmount = previewAmount - fees;
   const isPending = createMutation.isPending || updateMutation.isPending;
@@ -160,9 +163,26 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom du produit ou service</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: T-shirt, Abonnement mensuel..." required className="h-11 border-border/70" data-testid="input-link-name" />
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (XOF)</Label>
-                <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" placeholder="10 000" min="100" required className="h-11 border-border/70 text-lg font-bold" data-testid="input-link-amount" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (XOF)</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Libre</span>
+                    <Switch checked={allowCustomAmount} onCheckedChange={setAllowCustomAmount} data-testid="switch-custom-amount" />
+                  </div>
+                </div>
+                {allowCustomAmount ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-violet-500/8 border border-violet-500/20">
+                      <Info className="h-4 w-4 text-violet-600 flex-shrink-0" />
+                      <p className="text-xs text-violet-700 dark:text-violet-400 font-medium">Le client choisit lui-même le montant à payer</p>
+                    </div>
+                    <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" placeholder="Montant minimum (optionnel)" min="100" className="h-11 border-border/70" data-testid="input-link-min-amount" />
+                    <p className="text-xs text-muted-foreground">Laissez vide pour aucun minimum</p>
+                  </div>
+                ) : (
+                  <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" placeholder="10 000" min="100" required className="h-11 border-border/70 text-lg font-bold" data-testid="input-link-amount" />
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description (optionnel)</Label>
@@ -406,7 +426,11 @@ export default function PaymentLinksPage() {
                       </Badge>
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      <span className="font-black text-sm text-foreground">{formatCurrency(link.amount)}</span>
+                      {(link as any).allowCustomAmount ? (
+                        <span className="font-black text-sm text-violet-600 dark:text-violet-400">Montant libre{parseFloat(link.amount) > 0 ? ` (min. ${formatCurrency(link.amount)})` : ""}</span>
+                      ) : (
+                        <span className="font-black text-sm text-foreground">{formatCurrency(link.amount)}</span>
+                      )}
                       <span className="text-xs text-muted-foreground">{link.timesUsed} utilisation{parseInt(String(link.timesUsed)) !== 1 ? "s" : ""}</span>
                       {link.createdAt && <span className="text-xs text-muted-foreground hidden sm:inline">{formatDate(link.createdAt)}</span>}
                     </div>

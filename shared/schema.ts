@@ -34,6 +34,7 @@ export const paymentLinks = pgTable("payment_links", {
   redirectUrl: text("redirect_url"),
   imageUrl: text("image_url"),
   slug: text("slug").notNull().unique(),
+  allowCustomAmount: boolean("allow_custom_amount").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   timesUsed: decimal("times_used", { precision: 10, scale: 0 }).notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow(),

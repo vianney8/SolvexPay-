@@ -49,6 +49,7 @@ export default function PayPage() {
   const [operator, setOperator] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
+  const [customAmount, setCustomAmount] = useState("");
 
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
 
@@ -103,6 +104,9 @@ export default function PayPage() {
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || !operator || !country) return;
+    const isCustom = (paymentLink as any)?.allowCustomAmount;
+    const parsedCustom = parseFloat(customAmount);
+    if (isCustom && (!customAmount || parsedCustom < 100)) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     payMutation.mutate({
@@ -111,7 +115,8 @@ export default function PayPage() {
       country,
       customerName: fullName || undefined,
       customerEmail: customerEmail || undefined,
-    });
+      ...(isCustom ? { customAmount: parsedCustom } : {}),
+    } as any);
   };
 
   const PageWrapper = ({ children }: { children: React.ReactNode }) => (
@@ -235,13 +240,40 @@ export default function PayPage() {
         )}
         <div className="p-6 space-y-5">
           <div className="text-center">
-            <p className="text-xs text-gray-400 font-medium mb-0.5">Total à payer</p>
-            <p className="text-4xl font-black text-blue-600 tracking-tight leading-none" data-testid="text-payment-amount">
-              {formatAmount(paymentLink.amount)} <span className="text-xl font-bold text-blue-400">{paymentLink.currency}</span>
-            </p>
-            <p className="text-sm font-bold text-gray-700 mt-1" data-testid="text-payment-name">{paymentLink.name}</p>
-            {(paymentLink as any).merchantName && (
-              <p className="text-xs text-gray-400 mt-0.5" data-testid="text-payment-merchant">par {(paymentLink as any).merchantName}</p>
+            {(paymentLink as any).allowCustomAmount ? (
+              <>
+                <p className="text-sm font-bold text-gray-700 mb-3" data-testid="text-payment-name">{paymentLink.name}</p>
+                {(paymentLink as any).merchantName && (
+                  <p className="text-xs text-gray-400 mb-4" data-testid="text-payment-merchant">à {(paymentLink as any).merchantName}</p>
+                )}
+                <p className="text-xs text-gray-500 font-medium mb-2">Choisissez le montant à payer</p>
+                <div className="flex items-center gap-2 rounded-xl border-2 border-blue-300 bg-blue-50 px-4 py-3 focus-within:border-blue-500 transition-all">
+                  <input
+                    type="number"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    placeholder={parseFloat(paymentLink.amount) > 0 ? `Min. ${formatAmount(paymentLink.amount)}` : "Entrez le montant"}
+                    min={parseFloat(paymentLink.amount) > 0 ? parseFloat(paymentLink.amount) : 100}
+                    className="flex-1 text-3xl font-black text-blue-600 bg-transparent outline-none text-center placeholder:text-blue-300"
+                    data-testid="input-custom-amount"
+                  />
+                  <span className="text-lg font-bold text-blue-400">{paymentLink.currency}</span>
+                </div>
+                {parseFloat(paymentLink.amount) > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">Minimum : {formatAmount(paymentLink.amount)} {paymentLink.currency}</p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-gray-400 font-medium mb-0.5">Total à payer</p>
+                <p className="text-4xl font-black text-blue-600 tracking-tight leading-none" data-testid="text-payment-amount">
+                  {formatAmount(paymentLink.amount)} <span className="text-xl font-bold text-blue-400">{paymentLink.currency}</span>
+                </p>
+                <p className="text-sm font-bold text-gray-700 mt-1" data-testid="text-payment-name">{paymentLink.name}</p>
+                {(paymentLink as any).merchantName && (
+                  <p className="text-xs text-gray-400 mt-0.5" data-testid="text-payment-merchant">à {(paymentLink as any).merchantName}</p>
+                )}
+              </>
             )}
           </div>
 
@@ -388,11 +420,18 @@ export default function PayPage() {
               type="submit"
               className="w-full h-14 text-base font-black rounded-2xl shadow-lg gap-2"
               style={{ background: !phone || !operator ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
-              disabled={payMutation.isPending || !phone || !operator || !country || !firstName.trim() || !lastName.trim()}
+              disabled={
+                payMutation.isPending || !phone || !operator || !country || !firstName.trim() || !lastName.trim() ||
+                ((paymentLink as any).allowCustomAmount && (!customAmount || parseFloat(customAmount) < 100))
+              }
               data-testid="button-confirm-pay"
             >
               {payMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
+              ) : (paymentLink as any).allowCustomAmount && customAmount ? (
+                `Payer ${formatAmount(parseFloat(customAmount))} ${paymentLink.currency}`
+              ) : (paymentLink as any).allowCustomAmount ? (
+                "Entrez un montant pour continuer"
               ) : (
                 `Payer ${formatAmount(paymentLink.amount)} ${paymentLink.currency}`
               )}
