@@ -359,15 +359,6 @@ export function RegisterPage() {
             </div>
           </div>
 
-          {/* Colorful country flags bar */}
-          <div className="p-3 rounded-2xl bg-gradient-to-r from-violet-50 via-emerald-50 to-amber-50 border border-violet-100/80">
-            <div className="flex flex-wrap gap-1.5">
-              {countryCodes.map((c) => (
-                <span key={c.code} className="text-lg" title={c.country}>{c.flag}</span>
-              ))}
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom Complet</label>
