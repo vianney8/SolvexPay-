@@ -465,17 +465,32 @@ export default function LandingPage() {
       <section id="pays" className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
 
-          <div className="flex flex-wrap gap-3 justify-center">
-            {COUNTRIES.map((c) => (
+          <div className="grid grid-cols-4 gap-4">
+            {COUNTRIES.slice(0, 8).map((c) => (
               <div
                 key={c.code}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+                className="flex flex-col items-center justify-center gap-3 p-6 rounded-3xl text-center"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
               >
-                <span className="text-lg">{c.flag}</span>
-                <span>{c.name}</span>
+                <span className="text-5xl">{c.flag}</span>
+                <div>
+                  <p className="text-sm font-bold text-white">{c.name}</p>
+                  <p className="text-xs text-white/40 mt-0.5">{c.currency}</p>
+                </div>
               </div>
             ))}
+          </div>
+          <div className="flex justify-center mt-4">
+            <div
+              className="flex flex-col items-center justify-center gap-3 p-6 rounded-3xl text-center w-[calc(25%-12px)]"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+            >
+              <span className="text-5xl">{COUNTRIES[8].flag}</span>
+              <div>
+                <p className="text-sm font-bold text-white">{COUNTRIES[8].name}</p>
+                <p className="text-xs text-white/40 mt-0.5">{COUNTRIES[8].currency}</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
