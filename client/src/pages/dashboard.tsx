@@ -58,9 +58,7 @@ function isExpiredPending(tx: Transaction): boolean {
 export default function DashboardPage() {
   const { user } = useAuth();
   const [balanceVisible, setBalanceVisible] = useState(true);
-  const [dismissedNotifs, setDismissedNotifs] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem("dismissed_notifs") || "[]"); } catch { return []; }
-  });
+  const [dismissedNotifs, setDismissedNotifs] = useState<string[]>([]);
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({ queryKey: ["/api/transactions"] });
@@ -75,9 +73,7 @@ export default function DashboardPage() {
   const visibleNotifications = (activeNotifications || []).filter((n: any) => !dismissedNotifs.includes(n.id));
 
   function dismissNotif(id: string) {
-    const updated = [...dismissedNotifs, id];
-    setDismissedNotifs(updated);
-    localStorage.setItem("dismissed_notifs", JSON.stringify(updated));
+    setDismissedNotifs(prev => [...prev, id]);
   }
 
   const depositTx = transactions?.filter(t => t.type === "deposit") || [];

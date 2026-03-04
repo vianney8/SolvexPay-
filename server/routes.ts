@@ -579,6 +579,50 @@ export async function registerRoutes(
     }
   });
 
+  const SUPPORT_LINK_KEYS = [
+    "support_link_whatsapp_direct",
+    "support_link_whatsapp_group",
+    "support_link_email",
+    "support_link_whatsapp_channel",
+    "support_link_facebook",
+  ];
+  const SUPPORT_LINK_DEFAULTS: Record<string, string> = {
+    support_link_whatsapp_direct: "https://wa.me/22891840498",
+    support_link_whatsapp_group: "https://chat.whatsapp.com/FeGmjzHa1VG7v4VGo0Rxbd",
+    support_link_email: "mailto:support@solvexpay.site",
+    support_link_whatsapp_channel: "https://whatsapp.com/channel/0029Vb3WFkb2ZjCZTb0Dq11F",
+    support_link_facebook: "https://www.facebook.com/profile.php?id=61574706268491",
+  };
+
+  app.get("/api/support-links", async (req, res) => {
+    try {
+      const links: Record<string, string> = {};
+      for (const key of SUPPORT_LINK_KEYS) {
+        links[key] = (await storage.getSystemSetting(key)) || SUPPORT_LINK_DEFAULTS[key];
+      }
+      res.json(links);
+    } catch {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.put("/api/admin/support-links", isAdmin, async (req: any, res) => {
+    try {
+      for (const key of SUPPORT_LINK_KEYS) {
+        if (req.body[key] !== undefined) {
+          await storage.setSystemSetting(key, String(req.body[key]));
+        }
+      }
+      const links: Record<string, string> = {};
+      for (const key of SUPPORT_LINK_KEYS) {
+        links[key] = (await storage.getSystemSetting(key)) || SUPPORT_LINK_DEFAULTS[key];
+      }
+      res.json(links);
+    } catch {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   app.get("/api/service-fees", async (req, res) => {
     try {
       const deposit = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
