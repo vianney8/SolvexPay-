@@ -112,6 +112,22 @@ function getOmniPayOperatorCode(operator: string, country: string): string {
   return mapping[op]?.[co] ?? op.toLowerCase();
 }
 
+async function checkOperatorMaintenance(operator: string, country: string): Promise<string | null> {
+  try {
+    const { db } = await import("./db");
+    const { paymentMethods: pmTable } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    const [pm] = await db.select().from(pmTable).where(eq(pmTable.code, operator));
+    if (!pm) return null;
+    if (pm.isActive === false) return `L'opérateur ${operator} n'est pas disponible`;
+    if (pm.inMaintenance) return `${operator} est actuellement en maintenance`;
+    if ((pm.maintenanceCountries || []).includes(country)) return `${operator} est en maintenance dans ce pays`;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -532,6 +548,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       const { phoneNumber, operator, country, customerName, customerEmail } = validation.data;
+
+      const maintError = await checkOperatorMaintenance(operator, country);
+      if (maintError) {
+        return res.status(400).json({ message: maintError });
+      }
+
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configuré" });
       }
@@ -802,6 +824,20 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const methods = await db.select().from(pmTable);
+      if (methods.length === 0) {
+        const defaultMethods = [
+          { code: "MTN", name: "MTN Mobile Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "CM", "COG"] },
+          { code: "Orange", name: "Orange Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "BF", "CM", "ML", "SN"] },
+          { code: "Moov", name: "Moov Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "BF", "TG", "ML"] },
+          { code: "Wave", name: "Wave", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "SN"] },
+          { code: "TMoney", name: "T-Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["TG"] },
+          { code: "Free", name: "Free Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["SN"] },
+          { code: "Airtel", name: "Airtel Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["COD", "COG"] },
+          { code: "Vodacom", name: "Vodacom M-Pesa", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["COD"] },
+        ];
+        const inserted = await db.insert(pmTable).values(defaultMethods as any).returning();
+        return res.json(inserted);
+      }
       res.json(methods);
     } catch (error) {
       console.error("Public payment methods error:", error);
@@ -855,6 +891,11 @@ export async function registerRoutes(
 
       if (!paymentLink.isActive) {
         return res.status(400).json({ message: "Ce lien de paiement est inactif" });
+      }
+
+      const maintError = await checkOperatorMaintenance(operator, country);
+      if (maintError) {
+        return res.status(400).json({ message: maintError });
       }
 
       if (!isApiKeyConfigured()) {
