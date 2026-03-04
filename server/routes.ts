@@ -265,14 +265,16 @@ export async function registerRoutes(
 
       const isWave = operator.toLowerCase() === "wave";
 
+      console.log(`Initiating OmniPay withdrawal for reference: ${reference} (Country: ${country}, Operator: ${operator})`);
       const transferResponse = await omniPayService.transfer({
         msisdn: phoneNumber,
         amount,
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
-        operator: isWave ? operator : undefined,
+        operator: operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase(),
       });
+      console.log(`OmniPay withdrawal response for ${reference}:`, transferResponse);
 
       const transaction = await storage.createTransaction({
         userId,
@@ -329,14 +331,16 @@ export async function registerRoutes(
       const reference = generateReference();
       const isWave = operator.toLowerCase() === "wave";
 
+      console.log(`Initiating OmniPay transfer for reference: ${reference} (Country: ${country}, Operator: ${operator})`);
       const transferResponse = await omniPayService.transfer({
         msisdn: phoneNumber,
         amount,
         reference,
         firstName,
         lastName,
-        operator: isWave ? operator : undefined,
+        operator: operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase(),
       });
+      console.log(`OmniPay transfer response for ${reference}:`, transferResponse);
 
       const transaction = await storage.createTransaction({
         userId,

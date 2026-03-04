@@ -176,6 +176,7 @@ class OmniPayService {
 
     const response = await axios.post<OmniPayTransferResponse>(OMNIPAY_BASE_URL, body, {
       headers: { "Content-Type": "application/json" },
+      timeout: 60000,
     });
 
     console.log("OmniPay transfer response:", response.data);
