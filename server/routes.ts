@@ -506,7 +506,18 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Payment link not found" });
       }
 
-      res.json(paymentLink);
+      const { db } = await import("./db");
+      const { eq: eqFn } = await import("drizzle-orm");
+      const { users: usersTable } = await import("@shared/models/auth");
+      const [creator] = await db.select({
+        firstName: usersTable.firstName,
+        lastName: usersTable.lastName,
+        merchantName: usersTable.merchantName,
+      }).from(usersTable).where(eqFn(usersTable.id, paymentLink.userId));
+
+      const displayName = creator?.merchantName || (creator ? `${creator.firstName || ""} ${creator.lastName || ""}`.trim() : "") || "SolvexPay";
+
+      res.json({ ...paymentLink, merchantName: displayName });
     } catch (error) {
       console.error("Error fetching payment link:", error);
       res.status(500).json({ message: "Failed to fetch payment link" });

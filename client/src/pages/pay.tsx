@@ -241,6 +241,9 @@ export default function PayPage() {
                 {formatAmount(paymentLink.amount)} <span className="text-xl font-bold text-blue-400">{paymentLink.currency}</span>
               </p>
               <p className="text-sm font-bold text-gray-700 mt-1 truncate" data-testid="text-payment-name">{paymentLink.name}</p>
+              {(paymentLink as any).merchantName && (
+                <p className="text-xs text-gray-400 mt-0.5 truncate" data-testid="text-payment-merchant">par {(paymentLink as any).merchantName}</p>
+              )}
             </div>
           </div>
 

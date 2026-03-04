@@ -300,17 +300,23 @@ export default function AdminPage() {
           <div className="overflow-x-auto">
             <TabsList className="inline-flex w-max min-w-full gap-1 p-1.5 bg-muted/60 rounded-2xl h-auto">
               {[
-                { v: "overview", label: "Vue d'ensemble", Icon: BarChart3 },
-                { v: "users", label: "Utilisateurs", Icon: Users },
-                { v: "kyc", label: "KYC", Icon: BadgeCheck },
-                { v: "wallets", label: "Wallets & Solde", Icon: Wallet },
-                { v: "links-keys", label: "Liens & API", Icon: Link2 },
-                { v: "fees", label: "Frais", Icon: Percent },
-                { v: "payments", label: "Moyens de paiement", Icon: CreditCard },
-                { v: "transactions", label: "Transactions", Icon: ArrowDownUp },
-              ].map(({ v, label, Icon }) => (
-                <TabsTrigger key={v} value={v} className="gap-1.5 text-xs py-2 px-3 rounded-xl whitespace-nowrap" data-testid={`tab-${v}`}>
+                { v: "overview", label: "Vue d'ensemble", Icon: BarChart3, badge: 0 },
+                { v: "users", label: "Utilisateurs", Icon: Users, badge: 0 },
+                { v: "kyc", label: "KYC", Icon: BadgeCheck, badge: pendingKyc.length },
+                { v: "wallets", label: "Wallets & Solde", Icon: Wallet, badge: 0 },
+                { v: "links-keys", label: "Liens & API", Icon: Link2, badge: 0 },
+                { v: "fees", label: "Frais", Icon: Percent, badge: 0 },
+                { v: "payments", label: "Moyens de paiement", Icon: CreditCard, badge: 0 },
+                { v: "transactions", label: "Transactions", Icon: ArrowDownUp, badge: pendingWithdrawals.length },
+                { v: "settings", label: "Paramètres", Icon: Settings2, badge: 0 },
+              ].map(({ v, label, Icon, badge }) => (
+                <TabsTrigger key={v} value={v} className="gap-1.5 text-xs py-2 px-3 rounded-xl whitespace-nowrap relative" data-testid={`tab-${v}`}>
                   <Icon className="h-3.5 w-3.5 flex-shrink-0" />{label}
+                  {badge > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center leading-none">
+                      {badge > 9 ? "9+" : badge}
+                    </span>
+                  )}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -321,19 +327,14 @@ export default function AdminPage() {
           ══════════════════════════════════════ */}
           <TabsContent value="overview" className="space-y-5 mt-5">
             {/* Total users banner */}
-            <div className="rounded-2xl bg-gradient-to-r from-indigo-600/10 to-cyan-600/10 border border-indigo-500/20 p-4 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-black text-foreground" data-testid="total-users-count">{totalUsersCount}</p>
-                  <p className="text-xs text-muted-foreground">Utilisateurs inscrits sur la plateforme</p>
-                </div>
+            <div className="rounded-2xl bg-gradient-to-r from-indigo-600/10 to-cyan-600/10 border border-indigo-500/20 p-4 flex items-center gap-4">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                <Users className="h-5 w-5 text-white" />
               </div>
-              <Button variant="destructive" size="sm" className="gap-2 rounded-xl flex-shrink-0" onClick={() => setResetStatsDialog(true)} data-testid="btn-reset-stats">
-                <RotateCcw className="h-3.5 w-3.5" />Réinitialiser les stats
-              </Button>
+              <div>
+                <p className="text-2xl font-black text-foreground" data-testid="total-users-count">{totalUsersCount}</p>
+                <p className="text-xs text-muted-foreground">Utilisateurs inscrits sur la plateforme</p>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -601,7 +602,7 @@ export default function AdminPage() {
               <div className="space-y-3">
                 {(kycList || []).sort((a: any, b: any) => a.kycStatus === "pending" ? -1 : 1).map((u: any) => (
                   <Card key={u.id} className={`border-border/50 overflow-hidden ${u.kycStatus === "pending" ? "border-amber-500/40" : ""}`} data-testid={`card-kyc-${u.id}`}>
-                    <CardContent className="p-4">
+                    <CardContent className="p-4 space-y-3">
                       <div className="flex items-start gap-3">
                         <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${u.kycStatus === "pending" ? "bg-amber-500/15 text-amber-600" : u.kycStatus === "verified" ? "bg-emerald-500/15 text-emerald-600" : "bg-red-500/15 text-red-600"}`}>
                           {(u.firstName?.[0] || "?").toUpperCase()}
@@ -613,38 +614,57 @@ export default function AdminPage() {
                           </div>
                           <p className="text-xs text-muted-foreground">{u.email}</p>
                           <p className="text-xs text-muted-foreground">Soumis : {fmtDate(u.updatedAt)}</p>
+                          {u.kycFirstName && <p className="text-xs text-muted-foreground">Nom KYC : <strong>{u.kycFirstName} {u.kycLastName}</strong></p>}
                           {u.kycStatus === "rejected" && u.kycRejectionReason && (
                             <p className="text-xs text-red-500 mt-1"><strong>Motif :</strong> {u.kycRejectionReason}</p>
                           )}
                         </div>
                         {u.kycStatus === "pending" && (
                           <div className="flex gap-1.5 flex-shrink-0">
-                            <button
-                              onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); }}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-colors"
-                              data-testid={`btn-kyc-approve-${u.id}`}
-                            >
+                            <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); }} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-colors" data-testid={`btn-kyc-approve-${u.id}`}>
                               <CheckCircle2 className="h-3.5 w-3.5" />Approuver
                             </button>
-                            <button
-                              onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("rejected"); }}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-500/15 text-red-600 text-xs font-bold hover:bg-red-500/25 transition-colors"
-                              data-testid={`btn-kyc-reject-${u.id}`}
-                            >
+                            <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("rejected"); }} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-500/15 text-red-600 text-xs font-bold hover:bg-red-500/25 transition-colors" data-testid={`btn-kyc-reject-${u.id}`}>
                               <XCircle className="h-3.5 w-3.5" />Rejeter
                             </button>
                           </div>
                         )}
                         {u.kycStatus !== "pending" && (
-                          <button
-                            onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); }}
-                            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-muted/50"
-                            data-testid={`btn-kyc-edit-${u.id}`}
-                          >
+                          <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); }} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-muted/50" data-testid={`btn-kyc-edit-${u.id}`}>
                             <PenLine className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>
+
+                      {/* KYC Photos */}
+                      {(u.kycDocumentFront || u.kycDocumentBack || u.kycSelfie) && (
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                          {u.kycDocumentFront && (
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-muted-foreground font-medium text-center">Recto</p>
+                              <a href={u.kycDocumentFront} target="_blank" rel="noreferrer">
+                                <img src={u.kycDocumentFront} alt="Recto" className="w-full h-20 object-cover rounded-lg border border-border/60 hover:opacity-80 transition-opacity cursor-zoom-in" data-testid={`img-kyc-front-${u.id}`} />
+                              </a>
+                            </div>
+                          )}
+                          {u.kycDocumentBack && (
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-muted-foreground font-medium text-center">Verso</p>
+                              <a href={u.kycDocumentBack} target="_blank" rel="noreferrer">
+                                <img src={u.kycDocumentBack} alt="Verso" className="w-full h-20 object-cover rounded-lg border border-border/60 hover:opacity-80 transition-opacity cursor-zoom-in" data-testid={`img-kyc-back-${u.id}`} />
+                              </a>
+                            </div>
+                          )}
+                          {u.kycSelfie && (
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-muted-foreground font-medium text-center">Selfie</p>
+                              <a href={u.kycSelfie} target="_blank" rel="noreferrer">
+                                <img src={u.kycSelfie} alt="Selfie" className="w-full h-20 object-cover rounded-lg border border-border/60 hover:opacity-80 transition-opacity cursor-zoom-in" data-testid={`img-kyc-selfie-${u.id}`} />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -1113,6 +1133,35 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* ══════════════════════════════════════
+              TAB 9 — PARAMÈTRES ADMIN
+          ══════════════════════════════════════ */}
+          <TabsContent value="settings" className="space-y-5 mt-5">
+            <Card className="border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-rose-500" />
+                  Zone dangereuse
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <p className="font-bold text-sm text-rose-700 dark:text-rose-300">Réinitialiser toutes les statistiques</p>
+                      <p className="text-xs text-rose-600/80 dark:text-rose-400/80">
+                        Supprime toutes les transactions de la plateforme. Les soldes des utilisateurs ne sont pas affectés. Cette action est irréversible.
+                      </p>
+                    </div>
+                    <Button variant="destructive" size="sm" className="gap-2 rounded-xl flex-shrink-0" onClick={() => setResetStatsDialog(true)} data-testid="btn-reset-stats">
+                      <RotateCcw className="h-3.5 w-3.5" />Réinitialiser
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

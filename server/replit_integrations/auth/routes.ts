@@ -9,6 +9,7 @@ const updateProfileSchema = z.object({
   lastName: z.string().optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),
+  merchantName: z.string().optional().nullable(),
 });
 
 const updateWithdrawalAccountSchema = z.object({
@@ -20,6 +21,14 @@ const updateWithdrawalAccountSchema = z.object({
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Mot de passe actuel requis"),
   newPassword: z.string().min(6, "Le mot de passe doit contenir au moins 6 caracteres"),
+});
+
+const kycSubmitSchema = z.object({
+  kycFirstName: z.string().min(1, "Prénom requis"),
+  kycLastName: z.string().min(1, "Nom requis"),
+  kycDocumentFront: z.string().min(1, "Photo recto requise"),
+  kycDocumentBack: z.string().optional().nullable(),
+  kycSelfie: z.string().min(1, "Selfie requis"),
 });
 
 export function registerAuthRoutes(app: Express): void {
@@ -42,10 +51,15 @@ export function registerAuthRoutes(app: Express): void {
       }
 
       const userId = req.user.id;
+      const isVerified = req.user.kycStatus === "verified";
       const updates: any = {};
 
-      if (validation.data.firstName !== undefined) updates.firstName = validation.data.firstName;
-      if (validation.data.lastName !== undefined) updates.lastName = validation.data.lastName;
+      if (!isVerified) {
+        if (validation.data.firstName !== undefined) updates.firstName = validation.data.firstName;
+        if (validation.data.lastName !== undefined) updates.lastName = validation.data.lastName;
+        if (validation.data.phone !== undefined) updates.phone = validation.data.phone;
+      }
+
       if (validation.data.email !== undefined) {
         const existing = await authStorage.getUserByEmail(validation.data.email);
         if (existing && existing.id !== userId) {
@@ -53,7 +67,10 @@ export function registerAuthRoutes(app: Express): void {
         }
         updates.email = validation.data.email;
       }
-      if (validation.data.phone !== undefined) updates.phone = validation.data.phone;
+
+      if (validation.data.merchantName !== undefined) {
+        updates.merchantName = validation.data.merchantName || null;
+      }
 
       const user = await authStorage.upsertUser({ id: userId, ...updates });
       const { passwordHash: _, ...safeUser } = user;
@@ -93,7 +110,23 @@ export function registerAuthRoutes(app: Express): void {
       if (user.kycStatus === "verified") {
         return res.status(400).json({ message: "Votre identité est déjà vérifiée" });
       }
-      const updated = await authStorage.upsertUser({ id: userId, kycStatus: "pending" } as any);
+
+      const validation = kycSubmitSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
+      }
+
+      const { kycFirstName, kycLastName, kycDocumentFront, kycDocumentBack, kycSelfie } = validation.data;
+
+      const updated = await authStorage.upsertUser({
+        id: userId,
+        kycStatus: "pending",
+        kycFirstName,
+        kycLastName,
+        kycDocumentFront,
+        kycDocumentBack: kycDocumentBack || null,
+        kycSelfie,
+      } as any);
       const { passwordHash: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
