@@ -158,7 +158,7 @@ export default function DepositPage() {
     ];
 
     return (
-      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "linear-gradient(145deg, #0f0c29 0%, #1a1040 40%, #0f2027 100%)" }}>
+      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "linear-gradient(145deg, #020617 0%, #0b1d3a 50%, #03111f 100%)" }}>
         <header className="px-4 py-4 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
             <img src={solvexpayLogo} alt="SolvexPay" className="w-7 h-7 rounded-lg object-cover" />
