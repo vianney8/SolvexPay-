@@ -348,7 +348,7 @@ export default function WithdrawPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-500/5 border border-orange-500/20">
             <Info className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Frais de retrait de <strong>{feeRate * 100}%</strong> appliqués sur le montant retiré. Les fonds arrivent en quelques minutes (max 24h selon l'opérateur).
+              Frais de retrait de <strong>{feeRate * 100}%</strong> appliqués sur le montant retiré. Les fonds arrivent automatiquement (max 24h selon l'opérateur).
             </p>
           </div>
 
