@@ -96,6 +96,22 @@ const publicPaySchema = z.object({
   customAmount: z.number().min(100).optional(),
 });
 
+function getOmniPayOperatorCode(operator: string, country: string): string {
+  const op = operator.toUpperCase();
+  const co = country.toUpperCase();
+  const mapping: Record<string, Record<string, string>> = {
+    MOOV:     { BJ: "moov_benin", CI: "moov", TG: "moov_togo", BF: "moov_bf", ML: "moov_ml" },
+    ORANGE:   { CI: "orange", SN: "orange_sn", CM: "orange_cm", BF: "orange_bf", ML: "orange_ml", COD: "orange_cong" },
+    MTN:      { BJ: "mtn", CI: "mtn", CM: "mtn_cm", COG: "mtn" },
+    TMONEY:   { TG: "tmoney" },
+    WAVE:     { CI: "wave", SN: "wave" },
+    FREE:     { SN: "free_sn" },
+    VODACOM:  { COD: "mpesa" },
+    AIRTEL:   { COD: "airtel_money", COG: "airtel" },
+  };
+  return mapping[op]?.[co] ?? op.toLowerCase();
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -169,6 +185,7 @@ export async function registerRoutes(
       const reference = generateReference();
       const isWave = operator.toLowerCase() === "wave";
       const returnUrl = isWave ? `https://solvexpay.com/api/payment/callback?reference=${reference}` : undefined;
+      const omniDepositOperator = getOmniPayOperatorCode(operator, country);
 
       const depositResponse = await omniPayService.deposit({
         msisdn: phoneNumber,
@@ -177,7 +194,7 @@ export async function registerRoutes(
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
         otp,
-        operator: isWave || operator.toLowerCase() === "mixx" ? operator : undefined,
+        operator: omniDepositOperator,
         returnUrl,
       });
 
@@ -274,7 +291,7 @@ export async function registerRoutes(
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
-        operator: operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase(),
+        operator: getOmniPayOperatorCode(operator, country),
       });
       console.log(`OmniPay withdrawal response for ${reference}:`, transferResponse);
 
@@ -345,7 +362,7 @@ export async function registerRoutes(
         reference,
         firstName,
         lastName,
-        operator: operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase(),
+        operator: getOmniPayOperatorCode(operator, country),
       });
       console.log(`OmniPay transfer response for ${reference}:`, transferResponse);
 
@@ -527,7 +544,7 @@ export async function registerRoutes(
       const returnUrl = isWave
         ? `https://solvexpay.com/pay-api/${id}?status=callback&reference=${transaction.reference}`
         : undefined;
-      const omniOperator = operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase();
+      const omniOperator = getOmniPayOperatorCode(operator, country);
       const depositResponse = await omniPayService.deposit({
         msisdn: phoneNumber,
         amount,
@@ -877,7 +894,7 @@ export async function registerRoutes(
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
-        operator: operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase(),
+        operator: getOmniPayOperatorCode(operator, country),
         returnUrl,
       });
       console.log(`Payment response for ${reference}:`, depositResponse);
@@ -1524,7 +1541,8 @@ export async function registerRoutes(
         const resolvedFirstName = txUser?.firstName || "Client";
         const resolvedLastName = txUser?.lastName || "SolvexPay";
 
-        const omnipayOperator = operator.toUpperCase() === "MOOV" ? "MOOV_BENIN" : operator.toUpperCase();
+        const txCountry = (transaction as any).payerCountry || "BJ";
+        const omnipayOperator = getOmniPayOperatorCode(operator, txCountry);
 
         console.log(`Admin: initiating OmniPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${omnipayOperator}, ${amount})`);
         try {
