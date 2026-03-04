@@ -2,33 +2,9 @@
 
 ## Overview
 
-SolvexPay is a pan-African payment aggregation platform that enables businesses to accept Mobile Money payments across multiple African countries. The application provides a merchant dashboard for managing wallets, transactions, payment links, and API keys.
+SolvexPay is a pan-African payment aggregation platform enabling businesses to accept Mobile Money payments across 9 African countries. Built with React/TypeScript frontend, Express.js backend, and PostgreSQL (Neon) with Drizzle ORM.
 
-### SendavaPay SDK Integration (Feb 2026)
-- **API**: SendavaPay SDK API at https://sendavapay.com/api/sdk/*
-- **Auth**: HMAC-SHA256 signature - Headers: `x-api-key` (API key) + `x-signature` (HMAC-SHA256 of JSON payload with API secret)
-- **Mode**: USSD direct - payment prompt sent directly to customer's phone (no redirect/paymentUrl)
-- **Payment fields**: `amount`, `phoneNumber`, `operator`, `country`, `customerName`, `description`, `callbackUrl`
-- **Withdraw fields**: `amount`, `phoneNumber`, `operator`, `country`
-- **Operators**: MTN, Moov, Orange, TMoney, Wave, Vodacom, Airtel (selected by user in frontend)
-- **Countries**: BJ (Benin), BF (Burkina Faso), TG (Togo), CM (Cameroun), CI (Cote d'Ivoire), COD (RDC), COG (Congo Brazzaville)
-- **Currencies**: XOF (UEMOA), XAF (CEMAC), CDF (Congo)
-- **Statuses**: `PENDING`, `PROCESSING`, `SUCCESS`, `FAILED`, `CANCELLED` (UPPERCASE)
-- **Response format**: Flat JSON `{ success, status, txid, reference, amount, fee, currency, message }`
-- **Endpoints**:
-  - POST /api/sdk/payment - Collect payment (USSD direct)
-  - POST /api/sdk/withdraw - Send money to Mobile Money
-  - POST /api/sdk/verify - Verify/confirm a payment
-  - GET /api/sdk/transaction/:id - Get single transaction
-  - GET /api/sdk/transactions - List transactions
-  - GET /api/sdk/balance - Check balance
-- **Secrets**: SENDAVAPAY_API_KEY (format pk_...), SENDAVAPAY_API_SECRET (format ps_..., used for HMAC signature)
-- **Webhook**: POST /api/webhooks/sendavapay - receives payment events with X-SendavaPay-Signature HMAC-SHA256 verification
-- **Callback**: GET /api/payment/callback - redirect URL after payment, redirects to /deposit?status=callback
-- **Polling**: Frontend polls /api/transactions/verify every 5s for pending payments
-- **Webhook URLs endpoint**: GET /api/settings/webhook-urls - returns configured webhook/callback URLs for SendavaPay dashboard setup
-
-## Design System (March 2026 Redesign)
+## Design System
 
 ### Color Palette
 - **Primary**: Violet `262 83% 58%` (buttons, links, accents)
@@ -44,97 +20,132 @@ SolvexPay is a pan-African payment aggregation platform that enables businesses 
 - `.mesh-bg` — subtle mesh background for hero sections
 - `.text-gradient-brand` — animated gradient text
 
-### Pages Redesigned
-All pages use premium gradient cards, polish shadows, and consistent spacing:
-- **Landing** — hero split with floating stats, country flag badges, feature cards with gradient headers
-- **Auth (Login/Register)** — split-screen with decorative dark panel, `AuthPanel` component
-- **Dashboard** — gradient balance card with quick actions, stat cards, recent transactions, mini chart
-- **Transactions** — summary stat cards, filtered list with type/status badges
-- **Wallet** — gradient currency cards for XOF/NGN/GHS/KES, operator grid
-- **Transfer** — step-form with country/operator selection, confirmation screen with fee breakdown
-- **Payment Links** — gradient summary cards, card-per-link layout with image support
-- **Settings** — gradient profile header, tabbed layout (Profil / Sécurité / Intégrations)
-
-## User Preferences
-
-Preferred communication style: Simple, everyday language.
-
 ## System Architecture
 
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript
 - **Routing**: Wouter (lightweight React router)
-- **State Management**: TanStack React Query for server state
-- **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS with custom theme configuration supporting dark/light modes
-- **Build Tool**: Vite with hot module replacement
+- **State Management**: TanStack React Query v5 (object-form only)
+- **UI Components**: shadcn/ui built on Radix UI primitives
+- **Styling**: Tailwind CSS with custom theme
+- **Build Tool**: Vite
 
 ### Backend Architecture
 - **Framework**: Express.js with TypeScript
-- **Runtime**: Node.js with ESM modules
-- **API Pattern**: RESTful endpoints under `/api/*` prefix
-- **Authentication**: Replit Auth integration using OpenID Connect with Passport.js
-- **Session Management**: PostgreSQL-backed sessions via connect-pg-simple
+- **Runtime**: Node.js with ESM modules (tsx)
+- **API Pattern**: RESTful endpoints under `/api/*`
+- **Authentication**: Replit Auth (OIDC + Passport.js)
+- **Session Management**: PostgreSQL-backed sessions (7-day TTL)
 
 ### Data Storage
-- **Database**: PostgreSQL (Neon)
-- **ORM**: Drizzle ORM with drizzle-zod for schema validation
-- **Schema Location**: `shared/schema.ts` contains all table definitions
-- **Tables**: 
-  - `users` - User accounts (managed by Replit Auth)
-  - `sessions` - Session storage for authentication
-  - `wallets` - User wallet balances per currency
-  - `transactions` - Deposit/withdrawal records (`apiKeyId` links API-sourced transactions to the originating API key)
-  - `paymentLinks` - Shareable payment links with unique slugs
-  - `apiKeys` - Developer API keys (`sk_live_` + 48 hex chars) with hashed storage, `appName`, `webhookUrl`, `webhookSecret`
-  - `systemSettings` - Key-value settings for fees, support links (seeded on startup via `server/seed.ts`)
+- **Database**: PostgreSQL (Neon) via `DATABASE_URL`
+- **ORM**: Drizzle ORM with drizzle-zod
+- **Schema**: `shared/schema.ts`
+- **Tables**:
+  - `users` — Replit Auth user accounts
+  - `sessions` — Session storage
+  - `wallets` — User wallet balances (`balanceXOF` column — all currencies converted to XOF)
+  - `transactions` — All financial operations (deposit/withdrawal/transfer)
+  - `paymentLinks` — Shareable payment links with unique slugs
+  - `apiKeys` — Merchant API keys (`sk_live_` prefix, hashed storage)
+  - `paymentMethods` — Operator maintenance/availability config (admin-managed)
+  - `systemSettings` — Key-value settings (fees, support links)
 
-### Payment Provider
-- **OmniPay** — only active provider. Keys: `OMNIPAY_API_KEY`, `OMNIPAY_CALLBACK_KEY`
-- Webhook forwarding: OmniPay callbacks → merchant's configured `webhookUrl` with HMAC-SHA256 `x-solvexpay-signature`
+## Payment Provider
 
-### API Payment Flow (Hosted Page)
-- `POST /api/v1/deposit` (with `sk_live_...` Bearer token):
-  - **With phone + operator**: Direct USSD push → returns `payment_url` from OmniPay (Wave) or null
-  - **Without phone/operator**: Creates pending transaction → returns `payment_url: https://solvexpay.com/pay-api/:id` (hosted SolvexPay page)
-- Hosted page `/pay-api/:id` mirrors `/pay/:slug` — customer fills phone/operator, payment processed, merchant balance credited
-- Transaction labelled "Paiement API" in dashboard with violet "API" badge, payer info visible
+**OmniPay only** — Keys: `OMNIPAY_API_KEY`, `OMNIPAY_CALLBACK_KEY`
 
-### Authentication Flow
-- Replit Auth handles user authentication via OIDC
-- Sessions stored in PostgreSQL with 7-day TTL
-- Protected routes use `isAuthenticated` middleware
-- User data synced on login via upsert pattern
-- **Admin Credentials (Development):** `vianneyessou@gmail.com` / `123@Aaa.` (Stored in `admin_credentials.txt`)
+### Supported Countries & Operators
+| Country | Code | Currency | Operators |
+|---------|------|----------|-----------|
+| Bénin | BJ | XOF | MTN, Moov |
+| Côte d'Ivoire | CI | XOF | Orange, MTN, Moov, Wave |
+| Burkina Faso | BF | XOF | Moov, Orange |
+| Togo | TG | XOF | TMoney, Moov |
+| Sénégal | SN | XOF | Orange, Wave, Free |
+| Mali | ML | XOF | Orange, Moov |
+| Cameroun | CM | XAF | MTN, Orange |
+| RD Congo | COD | CDF | Vodacom, Airtel, Orange |
+| Congo-Brazza. | COG | XAF | Airtel, MTN |
 
-### Key Design Decisions
+### Currency Conversion (all stored in XOF)
+- **XAF → XOF**: 1:1 (same CFA zone)
+- **CDF → XOF**: `Math.floor(amount × 0.22)` (no decimals)
+- Logic in `server/storage.ts` → `updateWalletBalance()`
 
-1. **Monorepo Structure**: Client, server, and shared code colocated with path aliases (`@/`, `@shared/`)
+### OmniPay Quirks
+- `getStatus()` returns `{ success: 0, message: "Transaction successful" }` for completed payments → mapped to `status: 3`
+- `getOmniPayOperatorCode(operator, country)` function maps operator names to OmniPay-specific codes (e.g., Moov BJ → `moov_benin`, Moov TG → `moov_togo`)
 
-2. **Type Safety**: Shared schema between frontend and backend ensures consistent types across the stack
+## API Payment Flow (Mandatory Redirect)
 
-3. **API Key Security**: Keys are hashed before storage; only prefix shown for identification
+All API integrations use a **mandatory redirect flow** to SolvexPay's hosted payment page. No USSD is triggered by the merchant's server.
 
-4. **Multi-Currency Support**: Wallet stores separate balances for each supported currency (XOF, NGN, GHS, KES)
+### Step-by-step:
+1. **Merchant server** calls `POST /api/v1/deposit` or redirects to `GET /api/v1/checkout`
+2. SolvexPay creates a pending transaction and returns `payment_url`
+3. **Merchant MUST redirect** the customer to `payment_url` (= `https://solvexpay.com/pay-api/:id`)
+4. Customer fills in their phone number and selects their operator on the SolvexPay hosted page
+5. OmniPay sends the USSD prompt to the customer's phone
+6. Customer confirms on their phone
+7. SolvexPay credits the merchant wallet and fires the webhook
 
-5. **French Localization**: UI is primarily in French targeting francophone African markets
+### API Endpoints (merchant, requires `sk_live_` key)
+- `GET /api/v1/checkout?key=&amount=&description=&customer_name=&customer_email=&country=` — Direct redirect to hosted page (no JS needed)
+- `POST /api/v1/deposit` — JSON API: returns `{ id, payment_url, status, amount, fees, reference, ... }`
+- `GET /api/v1/transactions/:id` — Check transaction status
+- `GET /api/v1/balance` — Get merchant wallet balance
 
-## External Dependencies
+### Hosted Payment Page (`/pay-api/:id`)
+- Pre-fills country, phone, and operator from transaction data if provided
+- Customer selects operator, enters phone → USSD sent → auto-verification every 5s
+- Wave payments: redirects to Wave checkout URL, returns via `?status=callback&reference=`
+- Maintenance check enforced server-side (cannot pay via maintenance operator)
 
-### Database
-- PostgreSQL (required) - Connection via `DATABASE_URL` environment variable
+## Wave Payment Flow
+- OmniPay returns a `payment_url` (Wave checkout link)
+- All 3 pages (`deposit.tsx`, `pay-api.tsx`, `pay.tsx`) redirect via `window.location.href`
+- After Wave confirmation, OmniPay redirects to `returnUrl` with reference
+- Frontend detects `?status=callback&reference=` and starts polling verify endpoint
 
-### Authentication
-- Replit Auth (OIDC provider) - Uses `ISSUER_URL`, `REPL_ID`, and `SESSION_SECRET` environment variables
+## Verify Endpoint (`/api/transactions/verify`)
+- Polls OmniPay `getStatus()` every 5s from frontend
+- OmniPay "Transaction successful" (`success: 0`) → correctly mapped to `status: 3` (completed)
+- Credits wallet (net of fees) when status becomes "completed"
+- Idempotent: won't double-credit if already completed
 
-### UI Libraries
-- Radix UI primitives for accessible components
-- Lucide React for icons
-- Embla Carousel for carousels
-- React Day Picker for date selection
-- Recharts for data visualization
+## Webhook System
+- Outbound webhooks: fired on `completed`/`failed` status change
+- Signed with HMAC-SHA256 using per-key `webhookSecret` → `x-solvexpay-signature: sha256=...`
+- OmniPay inbound: `POST /api/webhooks/omnipay` with `OMNIPAY_CALLBACK_KEY` verification
 
-### Development Tools
-- Vite for frontend bundling
-- esbuild for server bundling in production
-- Drizzle Kit for database migrations (`npm run db:push`)
+## Maintenance System
+- Admin can set operators to global maintenance or per-country maintenance
+- `paymentMethods` table: `inMaintenance` (boolean) + `maintenanceCountries` (text[])
+- Checked server-side in all public pay routes (payment links + API page)
+- `/api/payment-methods/public` seeds defaults if table empty (same as admin route)
+
+## Fee Structure
+- `fee_api` = 7% (API payments) — admin-editable
+- `fee_deposit` = 7% (dashboard deposits) — admin-editable
+- `fee_withdrawal` = 7%
+- `fee_transfer` = 7%
+
+## Authentication
+- Replit Auth handles OIDC flow
+- Admin: `vianneyessou@gmail.com` (stored in `admin_credentials.txt`)
+- KYC required to use API endpoints
+
+## Key Files
+- `server/routes.ts` — All API routes
+- `server/services/omnipay.ts` — OmniPay integration + status mapping
+- `server/storage.ts` — DB operations + currency conversion
+- `client/src/pages/deposit.tsx` — Dashboard deposit page
+- `client/src/pages/pay-api.tsx` — Hosted API payment page
+- `client/src/pages/pay.tsx` — Payment links page
+- `client/src/pages/documentation.tsx` — In-app API documentation
+- `shared/schema.ts` — Database schema
+
+## User Preferences
+- Communication style: Simple, everyday language (French)
+- No emojis unless requested

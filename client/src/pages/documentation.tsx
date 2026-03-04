@@ -236,16 +236,59 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
                   <ArrowDownToLine className="h-5 w-5 text-primary" /> Initier un paiement
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Toutes les intégrations SolvexPay passent par la <strong>page de paiement hébergée</strong>. L'utilisateur est redirigé vers une page SolvexPay sécurisée pour saisir ses informations Mobile Money — aucune gestion de formulaire côté marchand.
+                  Toutes les intégrations SolvexPay utilisent un <strong>flux de redirection obligatoire</strong> vers la page de paiement hébergée SolvexPay. C'est sur cette page que le client saisit son numéro de téléphone et choisit son opérateur — le prompt USSD lui est ensuite envoyé directement.
                 </p>
               </div>
+
+              {/* Flux visuel obligatoire */}
+              <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="p-5">
+                  <p className="text-xs font-bold uppercase tracking-wider text-primary mb-4">Flux de paiement — Étapes obligatoires</p>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    {[
+                      { num: "1", title: "Votre serveur", desc: "Appelle l'API SolvexPay avec le montant" },
+                      { num: "2", title: "Redirection obligatoire", desc: "Redirigez le client vers payment_url" },
+                      { num: "3", title: "Page SolvexPay", desc: "Le client saisit son téléphone et opérateur" },
+                      { num: "4", title: "Prompt USSD", desc: "Le client confirme sur son téléphone" },
+                      { num: "5", title: "Webhook", desc: "Votre serveur reçoit la confirmation" },
+                    ].map((step, i, arr) => (
+                      <div key={step.num} className="flex sm:flex-col items-center gap-2 sm:gap-1 flex-1">
+                        <div className="flex sm:flex-col items-center gap-1 w-full">
+                          <div className="h-8 w-8 rounded-full bg-primary text-white text-xs font-black flex items-center justify-center flex-shrink-0">{step.num}</div>
+                          <div className="text-center hidden sm:block">
+                            <p className="text-xs font-bold mt-1">{step.title}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{step.desc}</p>
+                          </div>
+                          <div className="sm:hidden">
+                            <p className="text-xs font-bold">{step.title}</p>
+                            <p className="text-[10px] text-muted-foreground leading-tight">{step.desc}</p>
+                          </div>
+                        </div>
+                        {i < arr.length - 1 && (
+                          <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0 rotate-90 sm:rotate-0 hidden sm:block" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-red-500/20 bg-red-500/5">
+                <CardContent className="p-4 flex items-start gap-3">
+                  <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-red-700">Redirection OBLIGATOIRE vers payment_url</p>
+                    <p className="text-xs text-red-600 mt-0.5">Après chaque appel API, vous devez impérativement rediriger votre client vers l'URL <code className="bg-red-100 px-1 rounded font-mono">payment_url</code> retournée. C'est sur la page SolvexPay que le client saisit son numéro Mobile Money et reçoit son prompt USSD. Aucun USSD n'est envoyé par votre serveur.</p>
+                  </div>
+                </CardContent>
+              </Card>
 
               <Card className="border-emerald-500/20 bg-emerald-500/5">
                 <CardContent className="p-4 flex items-start gap-3">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-bold text-emerald-700">Méthode recommandée — Redirection directe (sans code JS)</p>
-                    <p className="text-xs text-emerald-600 mt-0.5">Construisez simplement une URL et redirigez votre utilisateur. SolvexPay gère tout : saisie du numéro, opérateur, confirmation USSD et vérification automatique.</p>
+                    <p className="text-sm font-bold text-emerald-700">Méthode simple — Redirection directe (sans JavaScript)</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">Construisez une URL avec votre clé API et redirigez directement. Aucun appel API séparé nécessaire — idéal pour les intégrations rapides.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -295,8 +338,8 @@ app.get('/payer', (req, res) => {
 });`} />
 
               <div className="border-t border-border/60 pt-5">
-                <p className="text-sm font-bold mb-3">Méthode avancée — API JSON (POST)</p>
-                <p className="text-xs text-muted-foreground mb-4">Pour les intégrations serveur-à-serveur. Récupérez le <code className="bg-muted px-1 rounded font-mono">payment_url</code> et redirigez votre utilisateur vers cette URL.</p>
+                <p className="text-sm font-bold mb-1">Méthode API JSON (POST) — Intégration serveur</p>
+                <p className="text-xs text-muted-foreground mb-4">Créez le paiement depuis votre serveur, obtenez le <code className="bg-muted px-1 rounded font-mono">payment_url</code> et redirigez obligatoirement votre client vers cette URL. Les paramètres optionnels pré-remplissent le formulaire sur la page SolvexPay.</p>
 
                 <div className="border border-border/60 rounded-xl overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
@@ -306,12 +349,17 @@ app.get('/payer', (req, res) => {
                   <div className="p-4">
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Paramètres (body JSON)</p>
                     <div className="border border-border/60 rounded-xl overflow-hidden">
-                      <ParamRow name="amount" type="number" required desc="Montant en XOF — minimum 100" />
-                      <ParamRow name="description" type="string" required={false} desc="Description de la transaction" />
-                      <ParamRow name="customer_name" type="string" required={false} desc="Nom du client (pré-rempli sur la page)" />
+                      <ParamRow name="amount" type="number" required desc="Montant — minimum 100 XOF" />
+                      <ParamRow name="description" type="string" required={false} desc="Description de la transaction (affichée sur la page de paiement)" />
+                      <ParamRow name="customer_name" type="string" required={false} desc="Nom du client — pré-rempli sur la page SolvexPay" />
                       <ParamRow name="customer_email" type="string" required={false} desc="Email du client" />
-                      <ParamRow name="country" type="string" required={false} desc="Code pays ISO pour pré-sélectionner le pays" />
-                      <ParamRow name="metadata" type="object" required={false} desc="Données personnalisées retournées dans le webhook" />
+                      <ParamRow name="country" type="string" required={false} desc="Code pays ISO (BJ, CI, SN…) — pré-sélectionne le pays sur la page" />
+                      <ParamRow name="phone" type="string" required={false} desc="Numéro de téléphone — pré-rempli sur la page (le client peut modifier)" />
+                      <ParamRow name="operator" type="string" required={false} desc="Opérateur (MTN, Orange, Wave…) — pré-sélectionné sur la page" />
+                      <ParamRow name="metadata" type="object" required={false} desc="Données libres retournées dans le webhook (order_id, user_id…)" />
+                    </div>
+                    <div className="mt-3 p-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
+                      <p className="text-xs text-amber-700 font-semibold">⚠ Après cet appel, redirigez impérativement votre client vers <code className="bg-amber-100 px-1 rounded font-mono">data.payment_url</code>. Aucun USSD n'est envoyé par votre serveur — c'est la page SolvexPay qui gère la confirmation Mobile Money.</p>
                     </div>
                   </div>
                 </div>
