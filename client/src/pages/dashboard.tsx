@@ -26,10 +26,13 @@ import {
   CalendarDays,
   X,
   Bell,
+  Globe,
+  ExternalLink,
+  Repeat2,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import type { Transaction, Wallet as WalletType } from "@shared/schema";
+import type { Transaction, Wallet as WalletType, PaymentLink } from "@shared/schema";
 
 function formatCurrency(amount: string | number) {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -39,6 +42,18 @@ function formatCurrency(amount: string | number) {
 function formatDate(date: string | Date) {
   return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(date));
 }
+
+const COUNTRY_INFO: Record<string, { name: string; flag: string }> = {
+  BJ: { name: "Bénin", flag: "🇧🇯" },
+  CI: { name: "Côte d'Ivoire", flag: "🇨🇮" },
+  SN: { name: "Sénégal", flag: "🇸🇳" },
+  CM: { name: "Cameroun", flag: "🇨🇲" },
+  TG: { name: "Togo", flag: "🇹🇬" },
+  BF: { name: "Burkina Faso", flag: "🇧🇫" },
+  ML: { name: "Mali", flag: "🇲🇱" },
+  COD: { name: "RD Congo", flag: "🇨🇩" },
+  COG: { name: "Congo", flag: "🇨🇬" },
+};
 
 const quickActions = [
   { label: "Dépôt", icon: Wallet, href: "/deposit", gradient: "from-emerald-400/40 to-teal-400/30", ring: "border-emerald-300/30" },
@@ -65,6 +80,7 @@ export default function DashboardPage() {
   const { data: stats } = useQuery<{
     totalDeposits: number; totalWithdrawals: number; transactionCount: number; paymentLinksCount: number;
   }>({ queryKey: ["/api/stats"] });
+  const { data: paymentLinks } = useQuery<PaymentLink[]>({ queryKey: ["/api/payment-links"] });
 
   const recentTransactions = transactions?.slice(0, 5) || [];
   const firstName = user?.firstName || user?.email?.split("@")[0] || "là";
@@ -97,6 +113,24 @@ export default function DashboardPage() {
   const thisMonthWithdrawals = thisMonthTx.filter(t => t.type === "withdrawal" || t.type === "transfer").reduce((s, t) => s + parseFloat(t.amount), 0);
   const avgTicket = completedDeposits.length > 0 ? Math.round(completedDeposits.reduce((s, t) => s + parseFloat(t.amount), 0) / completedDeposits.length) : 0;
   const growthPct = lastMonthReceived > 0 ? Math.round(((thisMonthReceived - lastMonthReceived) / lastMonthReceived) * 100) : null;
+
+  const countryStats = completedDeposits.reduce((acc, t) => {
+    const country = (t as any).payerCountry as string | null;
+    if (!country) return acc;
+    if (!acc[country]) acc[country] = { amount: 0, count: 0 };
+    acc[country].amount += parseFloat(t.amount);
+    acc[country].count += 1;
+    return acc;
+  }, {} as Record<string, { amount: number; count: number }>);
+  const topCountries = Object.entries(countryStats)
+    .sort(([, a], [, b]) => b.amount - a.amount)
+    .slice(0, 3);
+  const maxCountryAmount = topCountries[0]?.[1]?.amount || 1;
+
+  const topLinks = [...(paymentLinks || [])]
+    .filter(l => parseFloat(String(l.timesUsed)) > 0)
+    .sort((a, b) => parseFloat(String(b.timesUsed)) - parseFloat(String(a.timesUsed)))
+    .slice(0, 3);
 
   return (
     <DashboardLayout title="" breadcrumbs={[]}>
@@ -398,6 +432,126 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* ── Top pays & Liens performants ── */}
+        <div className="grid sm:grid-cols-2 gap-4">
+
+          {/* Top 3 pays */}
+          <Card className="border-border/60">
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Globe className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold">Pays d'encaissement</p>
+                  <p className="text-xs text-muted-foreground">Top 3 par volume reçu</p>
+                </div>
+              </div>
+
+              {topCountries.length === 0 ? (
+                <div className="py-6 text-center">
+                  <Globe className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground">Aucun encaissement avec pays enregistré</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {topCountries.map(([code, data], idx) => {
+                    const info = COUNTRY_INFO[code];
+                    const pct = Math.round((data.amount / maxCountryAmount) * 100);
+                    const medals = ["🥇", "🥈", "🥉"];
+                    return (
+                      <div key={code} className="space-y-1.5" data-testid={`country-stat-${code}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{medals[idx]}</span>
+                            <span className="text-base">{info?.flag || "🌍"}</span>
+                            <span className="text-sm font-semibold">{info?.name || code}</span>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(data.amount)} XOF</p>
+                            <p className="text-xs text-muted-foreground">{data.count} paiement{data.count > 1 ? "s" : ""}</p>
+                          </div>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${idx === 0 ? "bg-gradient-to-r from-amber-400 to-yellow-500" : idx === 1 ? "bg-gradient-to-r from-slate-400 to-slate-500" : "bg-gradient-to-r from-orange-400 to-amber-600"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Top liens de paiement */}
+          <Card className="border-border/60">
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-fuchsia-500/10 flex items-center justify-center">
+                  <Repeat2 className="h-4 w-4 text-fuchsia-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold">Liens les plus utilisés</p>
+                  <p className="text-xs text-muted-foreground">Top 3 par nombre de paiements</p>
+                </div>
+              </div>
+
+              {topLinks.length === 0 ? (
+                <div className="py-6 text-center">
+                  <Link2 className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground">Aucun lien utilisé pour l'instant</p>
+                  <Link href="/payment-links">
+                    <Button size="sm" variant="outline" className="mt-3 text-xs gap-1.5">
+                      <Plus className="h-3 w-3" /> Créer un lien
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {topLinks.map((link, idx) => {
+                    const uses = parseFloat(String(link.timesUsed));
+                    const estimated = uses * parseFloat(String(link.amount));
+                    const medals = ["🥇", "🥈", "🥉"];
+                    const maxUses = parseFloat(String(topLinks[0].timesUsed)) || 1;
+                    const pct = Math.round((uses / maxUses) * 100);
+                    return (
+                      <div key={link.id} className="space-y-1.5" data-testid={`link-stat-${link.id}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-base flex-shrink-0">{medals[idx]}</span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate">{link.name}</p>
+                              <p className="text-xs text-muted-foreground">{uses} utilisation{uses > 1 ? "s" : ""} · {formatCurrency(link.amount)} XOF</p>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-sm font-black text-fuchsia-600 dark:text-fuchsia-400">{formatCurrency(estimated)} XOF</p>
+                            <Link href="/payment-links">
+                              <span className="text-xs text-muted-foreground hover:text-primary flex items-center gap-0.5 justify-end cursor-pointer">
+                                <ExternalLink className="h-2.5 w-2.5" /> voir
+                              </span>
+                            </Link>
+                          </div>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-fuchsia-500 to-pink-500 transition-all duration-700"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
         </div>
       </div>
     </DashboardLayout>
