@@ -233,36 +233,93 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
             <section id="deposit" className="space-y-5 scroll-mt-20">
               <div>
                 <h2 className="text-xl font-black flex items-center gap-2">
-                  <ArrowDownToLine className="h-5 w-5 text-primary" /> Initier un dépôt
+                  <ArrowDownToLine className="h-5 w-5 text-primary" /> Initier un paiement
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Demande au client de payer via son téléphone Mobile Money. Il reçoit une notification push (MTN, Orange...) ou est redirigé vers une page Wave.
+                  Toutes les intégrations SolvexPay passent par la <strong>page de paiement hébergée</strong>. L'utilisateur est redirigé vers une page SolvexPay sécurisée pour saisir ses informations Mobile Money — aucune gestion de formulaire côté marchand.
                 </p>
               </div>
 
+              <Card className="border-emerald-500/20 bg-emerald-500/5">
+                <CardContent className="p-4 flex items-start gap-3">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-emerald-700">Méthode recommandée — Redirection directe (sans code JS)</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">Construisez simplement une URL et redirigez votre utilisateur. SolvexPay gère tout : saisie du numéro, opérateur, confirmation USSD et vérification automatique.</p>
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="border border-border/60 rounded-xl overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
-                  <MethodBadge method="POST" />
-                  <code className="text-sm font-mono font-semibold">/api/v1/deposit</code>
+                  <MethodBadge method="GET" />
+                  <code className="text-sm font-mono font-semibold">/api/v1/checkout</code>
                 </div>
                 <div className="p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Paramètres (body JSON)</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Paramètres (query string)</p>
                   <div className="border border-border/60 rounded-xl overflow-hidden">
+                    <ParamRow name="key" type="string" required desc="Votre clé API : sk_live_xxxx" />
                     <ParamRow name="amount" type="number" required desc="Montant en XOF — minimum 100" />
-                    <ParamRow name="phone" type="string" required desc="Numéro du payeur au format international : +22697000000" />
-                    <ParamRow name="operator" type="string" required desc="Code opérateur : MTN, ORANGE, WAVE, MOOV, TMONEY, AIRTEL, VODACOM, FREE" />
-                    <ParamRow name="country" type="string" required desc="Code pays ISO : BJ, CI, SN, CM, TG, BF, ML, COD, COG" />
-                    <ParamRow name="description" type="string" required={false} desc="Description de la transaction (visible dans votre tableau de bord)" />
-                    <ParamRow name="customer_name" type="string" required={false} desc="Nom du client (affiché lors du paiement)" />
-                    <ParamRow name="customer_email" type="string" required={false} desc="Email du client pour les reçus" />
-                    <ParamRow name="metadata" type="object" required={false} desc="Données personnalisées retournées dans le webhook (order_id, user_id...)" />
+                    <ParamRow name="description" type="string" required={false} desc="Description de la transaction" />
+                    <ParamRow name="customer_name" type="string" required={false} desc="Nom du client (pré-rempli sur la page)" />
+                    <ParamRow name="customer_email" type="string" required={false} desc="Email du client" />
+                    <ParamRow name="country" type="string" required={false} desc="Code pays ISO pour pré-sélectionner le pays (BJ, CI, SN...)" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">→ Réponse : redirection HTTP 302 vers la page de paiement SolvexPay. L'utilisateur voit directement le formulaire de paiement.</p>
+                </div>
+              </div>
+
+              <CodeBlock lang="html — Intégration la plus simple (lien direct)" code={`<!-- Bouton de paiement — aucun JavaScript requis -->
+<a href="https://solvexpay.com/api/v1/checkout?key=sk_live_xxxx&amount=5000&description=Commande+1234&customer_name=Jean+Dupont">
+  Payer 5 000 XOF
+</a>
+
+<!-- Ou avec un formulaire -->
+<form action="https://solvexpay.com/api/v1/checkout" method="GET">
+  <input type="hidden" name="key" value="sk_live_xxxx" />
+  <input type="hidden" name="amount" value="5000" />
+  <input type="hidden" name="description" value="Commande #1234" />
+  <button type="submit">Payer maintenant</button>
+</form>`} />
+
+              <CodeBlock lang="javascript (Node.js) — Génération côté serveur" code={`// Sur votre serveur : générez l'URL et redirigez
+app.get('/payer', (req, res) => {
+  const params = new URLSearchParams({
+    key: process.env.SOLVEXPAY_API_KEY,
+    amount: '5000',
+    description: 'Commande #1234',
+    customer_name: req.user.name,
+    customer_email: req.user.email,
+  });
+  res.redirect(\`https://solvexpay.com/api/v1/checkout?\${params}\`);
+});`} />
+
+              <div className="border-t border-border/60 pt-5">
+                <p className="text-sm font-bold mb-3">Méthode avancée — API JSON (POST)</p>
+                <p className="text-xs text-muted-foreground mb-4">Pour les intégrations serveur-à-serveur. Récupérez le <code className="bg-muted px-1 rounded font-mono">payment_url</code> et redirigez votre utilisateur vers cette URL.</p>
+
+                <div className="border border-border/60 rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
+                    <MethodBadge method="POST" />
+                    <code className="text-sm font-mono font-semibold">/api/v1/deposit</code>
+                  </div>
+                  <div className="p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Paramètres (body JSON)</p>
+                    <div className="border border-border/60 rounded-xl overflow-hidden">
+                      <ParamRow name="amount" type="number" required desc="Montant en XOF — minimum 100" />
+                      <ParamRow name="description" type="string" required={false} desc="Description de la transaction" />
+                      <ParamRow name="customer_name" type="string" required={false} desc="Nom du client (pré-rempli sur la page)" />
+                      <ParamRow name="customer_email" type="string" required={false} desc="Email du client" />
+                      <ParamRow name="country" type="string" required={false} desc="Code pays ISO pour pré-sélectionner le pays" />
+                      <ParamRow name="metadata" type="object" required={false} desc="Données personnalisées retournées dans le webhook" />
+                    </div>
                   </div>
                 </div>
               </div>
 
               <Card className="border-blue-500/20 bg-blue-500/5">
                 <CardContent className="p-4">
-                  <p className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">Opérateurs supportés par pays</p>
+                  <p className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">Pays supportés</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                     {OPERATORS.map((op) => (
                       <div key={op.code} className="flex items-center gap-1.5 text-xs">
@@ -274,46 +331,7 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
                 </CardContent>
               </Card>
 
-              <CodeBlock lang="bash — Exemple" code={`curl -X POST ${BASE_URL}/api/v1/deposit \\
-  -H "Authorization: Bearer sk_live_xxxxxxxxxxxx" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "amount": 5000,
-    "phone": "+22697000000",
-    "operator": "MTN",
-    "country": "CI",
-    "description": "Commande #1234",
-    "customer_name": "Jean Dupont",
-    "customer_email": "jean@example.com",
-    "metadata": { "order_id": "1234" }
-  }'`} />
-
-              <CodeBlock lang="json — Réponse (201 Created)" code={`{
-  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "status": "pending",
-  "amount": 5000,
-  "currency": "XOF",
-  "operator": "MTN",
-  "phone": "+22697000000",
-  "country": "CI",
-  "reference": "REF-ABCD1234EF56",
-  "description": "Commande #1234",
-  "fees": 350,
-  "net_amount": 4650,
-  "payment_url": null,
-  "omnipay_id": 12345,
-  "created_at": "2026-03-04T12:00:00.000Z",
-  "metadata": { "order_id": "1234" }
-}`} />
-
-              <Card className="border-violet-500/20 bg-violet-500/5">
-                <CardContent className="p-4">
-                  <p className="text-xs font-bold text-violet-700 mb-1">Note — Opérateur WAVE</p>
-                  <p className="text-xs text-violet-600">Pour Wave, le champ <code className="bg-violet-100 px-1 rounded font-mono">payment_url</code> contient une URL vers laquelle rediriger le client. Il doit valider le paiement sur cette page Wave avant confirmation.</p>
-                </CardContent>
-              </Card>
-
-              <CodeBlock lang="javascript (Node.js)" code={`const response = await fetch('${BASE_URL}/api/v1/deposit', {
+              <CodeBlock lang="javascript (Node.js) — POST /api/v1/deposit" code={`const response = await fetch('${BASE_URL}/api/v1/deposit', {
   method: 'POST',
   headers: {
     'Authorization': \`Bearer \${process.env.SOLVEXPAY_API_KEY}\`,
@@ -321,11 +339,10 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
   },
   body: JSON.stringify({
     amount: 5000,
-    phone: '+22697000000',
-    operator: 'MTN',
-    country: 'CI',
     description: 'Commande #1234',
     customer_name: 'Jean Dupont',
+    customer_email: 'jean@example.com',
+    country: 'CI',              // facultatif — pré-sélectionne le pays
     metadata: { order_id: '1234' },
   }),
 });
@@ -335,12 +352,8 @@ const data = await response.json();
 if (!response.ok) {
   console.error('Erreur:', data.error.code, data.error.message);
 } else {
-  console.log('Transaction créée:', data.id);
-  console.log('Statut:', data.status); // "pending"
-  // Pour Wave uniquement : rediriger vers data.payment_url
-  if (data.payment_url) {
-    res.redirect(data.payment_url);
-  }
+  // OBLIGATOIRE : rediriger l'utilisateur vers la page de paiement SolvexPay
+  res.redirect(data.payment_url);
 }`} />
 
               <CodeBlock lang="python" code={`import requests, os
@@ -353,10 +366,10 @@ response = requests.post(
     },
     json={
         'amount': 5000,
-        'phone': '+22697000000',
-        'operator': 'MTN',
-        'country': 'CI',
         'description': 'Commande #1234',
+        'customer_name': 'Jean Dupont',
+        'customer_email': 'jean@example.com',
+        'country': 'CI',        # facultatif
         'metadata': {'order_id': '1234'},
     }
 )
@@ -365,7 +378,8 @@ data = response.json()
 if not response.ok:
     print('Erreur:', data['error']['code'], data['error']['message'])
 else:
-    print('Transaction créée:', data['id'], '— Statut:', data['status'])`} />
+    # OBLIGATOIRE : rediriger l'utilisateur vers la page de paiement SolvexPay
+    return redirect(data['payment_url'])  # Flask/Django`} />
             </section>
 
             {/* STATUT */}
@@ -611,10 +625,10 @@ def webhook():
                 ))}
               </div>
 
-              <CodeBlock lang="javascript — Gestion des erreurs" code={`const response = await fetch('${BASE_URL}/api/v1/deposit', {
+              <CodeBlock lang="javascript — Gestion des erreurs (POST /api/v1/deposit)" code={`const response = await fetch('${BASE_URL}/api/v1/deposit', {
   method: 'POST',
   headers: { 'Authorization': \`Bearer \${API_KEY}\`, 'Content-Type': 'application/json' },
-  body: JSON.stringify(payload),
+  body: JSON.stringify({ amount: 5000, description: 'Commande #1234' }),
 });
 
 const data = await response.json();
@@ -625,11 +639,12 @@ if (!response.ok) {
     case 'UNAUTHORIZED':     // Clé invalide ou désactivée
     case 'KYC_REQUIRED':     // KYC non vérifié
     case 'INVALID_AMOUNT':   // Montant < 100
-    case 'INVALID_PHONE':    // Format téléphone incorrect
-    case 'PROVIDER_UNAVAILABLE': // Opérateur indisponible
     default:
       console.error(\`Erreur \${code}: \${message}\`);
   }
+} else {
+  // Toujours rediriger vers payment_url — jamais de paiement direct
+  res.redirect(data.payment_url);
 }`} />
 
               <Card className="border-border/60 bg-muted/20">

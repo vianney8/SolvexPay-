@@ -1024,6 +1024,62 @@ export async function registerRoutes(
     next();
   }
 
+  // ── Checkout redirect : GET /api/v1/checkout?key=sk_live_...&amount=...&description=... ──
+  app.get("/api/v1/checkout", async (req: any, res) => {
+    try {
+      const { key, amount: amountStr, description, customer_name, customer_email, country, metadata } = req.query as Record<string, string>;
+
+      if (!key) return res.status(400).send("Paramètre 'key' manquant.");
+      const apiKey = await storage.findApiKeyByFullKey(key.trim());
+      if (!apiKey || !apiKey.isActive || (apiKey as any).adminLocked) {
+        return res.status(401).send("Clé API invalide ou désactivée.");
+      }
+
+      const amount = parseFloat(amountStr);
+      if (!amountStr || isNaN(amount) || amount < 100) {
+        return res.status(400).send("Paramètre 'amount' invalide (minimum 100).");
+      }
+
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq: eqFn } = await import("drizzle-orm");
+      const [merchantUser] = await db.select().from(usersTable).where(eqFn(usersTable.id, apiKey.userId));
+      if (!merchantUser || merchantUser.kycStatus !== "verified") {
+        return res.status(403).send("KYC non vérifié ou compte introuvable.");
+      }
+
+      await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
+
+      const appName = (apiKey as any).appName || `${merchantUser.firstName || ""} ${merchantUser.lastName || ""}`.trim() || "SolvexPay";
+      const feeRate = parseFloat((await storage.getSystemSetting("fee_api")) || "7") / 100;
+      const feesAmount = Math.round(amount * feeRate);
+      const reference = generateReference();
+
+      const transaction = await storage.createTransaction({
+        userId: apiKey.userId,
+        type: "deposit",
+        amount: String(amount),
+        currency: "XOF",
+        provider: null,
+        phoneNumber: null,
+        reference,
+        status: "pending",
+        description: description || `Paiement via API — ${appName}`,
+        fees: String(feesAmount),
+        payerName: customer_name || null,
+        payerEmail: customer_email || null,
+        payerCountry: country || null,
+        payerOperator: null,
+        apiKeyId: apiKey.id,
+      } as any);
+
+      return res.redirect(`/pay-api/${transaction.id}`);
+    } catch (err: any) {
+      console.error("API v1 checkout redirect error:", err);
+      return res.status(500).send("Erreur serveur.");
+    }
+  });
+
   app.post("/api/v1/deposit", authenticateApiKey, async (req: any, res) => {
     try {
       const { amount, phone, operator, country, description, customer_name, customer_email, metadata } = req.body;
