@@ -266,31 +266,31 @@ export default function PayPage() {
 
             {/* ── ICÔNE ANIMÉE ── */}
             <div className="flex flex-col items-center gap-6">
-              <div className="relative flex items-center justify-center h-40 w-40" style={{ overflow: "visible" }}>
+              <div className="relative flex items-center justify-center h-24 w-24" style={{ overflow: "visible" }}>
                 {isPending && (
                   <>
-                    <div className="absolute h-40 w-40 rounded-full border border-amber-400/20 animate-ping" style={{ animationDuration: "2s" }} />
-                    <div className="absolute h-32 w-32 rounded-full border border-amber-400/30 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.5s" }} />
-                    <div className="absolute h-24 w-24 rounded-full bg-amber-400/10" />
+                    <div className="absolute h-24 w-24 rounded-full border border-amber-400/20 animate-ping" style={{ animationDuration: "2s" }} />
+                    <div className="absolute h-20 w-20 rounded-full border border-amber-400/30 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.5s" }} />
+                    <div className="absolute h-16 w-16 rounded-full bg-amber-400/10" />
                   </>
                 )}
                 {isSuccess && (
                   <>
-                    <div className="absolute h-40 w-40 rounded-full border border-emerald-400/20 animate-ping" style={{ animationDuration: "2s" }} />
-                    <div className="absolute h-32 w-32 rounded-full bg-emerald-400/10" />
+                    <div className="absolute h-24 w-24 rounded-full border border-emerald-400/20 animate-ping" style={{ animationDuration: "2s" }} />
+                    <div className="absolute h-20 w-20 rounded-full bg-emerald-400/10" />
                   </>
                 )}
                 {isFailed && (
-                  <div className="absolute h-32 w-32 rounded-full bg-rose-400/10" />
+                  <div className="absolute h-20 w-20 rounded-full bg-rose-400/10" />
                 )}
-                <div className={`relative h-20 w-20 rounded-full flex items-center justify-center shadow-2xl ${
+                <div className={`relative h-14 w-14 rounded-full flex items-center justify-center shadow-2xl ${
                   isSuccess ? "bg-gradient-to-br from-emerald-400 to-teal-500"
                   : isFailed ? "bg-gradient-to-br from-rose-500 to-red-600"
                   : "bg-gradient-to-br from-amber-400 to-orange-500"
                 }`}>
-                  {isPending && <Loader2 className="h-9 w-9 text-white animate-spin" />}
-                  {isSuccess && <CheckCircle2 className="h-9 w-9 text-white" />}
-                  {isFailed && <XCircle className="h-9 w-9 text-white" />}
+                  {isPending && <Loader2 className="h-6 w-6 text-white animate-spin" />}
+                  {isSuccess && <CheckCircle2 className="h-6 w-6 text-white" />}
+                  {isFailed && <XCircle className="h-6 w-6 text-white" />}
                 </div>
               </div>
 
