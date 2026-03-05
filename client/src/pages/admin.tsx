@@ -176,15 +176,6 @@ function TxChip({ status }: { status: string }) {
   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-slate-500/15 text-slate-500 border-slate-500/30">{status}</span>;
 }
 
-function TypeChip({ type }: { type: string }) {
-  const map: Record<string, string> = {
-    deposit: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
-    withdrawal: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30",
-    transfer: "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30",
-  };
-  return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold ${map[type] || "bg-slate-500/15 text-slate-500 border-slate-500/30"}`}>{TX_TYPE_LABELS[type] || type}</span>;
-}
-
 const PERIOD_OPTS = [{ v: "day", l: "24h" }, { v: "week", l: "7j" }, { v: "month", l: "Ce mois" }];
 
 function WithdrawalModeCard() {
