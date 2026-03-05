@@ -4,9 +4,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ArrowRight, ChevronDown, CheckCircle2, Smartphone, Globe, Zap } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ArrowRight, ChevronDown, CheckCircle2, Smartphone, Globe, Zap, ShieldCheck, RefreshCw } from "lucide-react";
 import { OperatorLogo } from "@/components/operator-logo";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
+import { apiRequest } from "@/lib/queryClient";
+import { useQueryClient } from "@tanstack/react-query";
 
 const countryCodes = [
   { code: "+229", country: "Bénin", flag: "🇧🇯" },
@@ -126,12 +128,146 @@ function AuthPanel() {
   );
 }
 
+function VerifyEmailStep({ userId, email, onSuccess }: { userId: string; email: string; onSuccess: (user: any) => void }) {
+  const { toast } = useToast();
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.trim().length !== 6) {
+      toast({ title: "Erreur", description: "Entrez le code à 6 chiffres reçu par email", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/auth/verify-email", { userId, code: code.trim() });
+      const user = await res.json();
+      onSuccess(user);
+    } catch (error: any) {
+      const message = error?.message || "";
+      let errorText = "Code invalide. Réessayez.";
+      try {
+        const parsed = JSON.parse(message.replace(/^\d+:\s*/, ""));
+        errorText = parsed.message || errorText;
+      } catch {}
+      toast({ title: "Erreur", description: errorText, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await apiRequest("POST", "/api/auth/resend-verification", { userId });
+      toast({ title: "Code envoyé", description: "Un nouveau code a été envoyé à votre email." });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de renvoyer le code. Réessayez plus tard.", variant: "destructive" });
+    } finally {
+      setResending(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex bg-background">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+        <div className="w-full max-w-md space-y-8">
+          <div className="lg:hidden flex flex-col items-center gap-3 mb-2">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-2xl bg-violet-500/25 blur-lg" />
+              <img src={solvexpayLogo} alt="SolvexPay" className="relative w-14 h-14 rounded-2xl object-cover ring-2 ring-violet-200 shadow-xl" />
+            </div>
+            <span className="font-extrabold text-2xl bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+          </div>
+
+          <div className="space-y-2">
+            <Link href="/" className="hidden lg:inline-flex items-center gap-2.5 group">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                <img src={solvexpayLogo} alt="SolvexPay" className="relative w-10 h-10 rounded-xl object-cover" />
+              </div>
+              <span className="font-bold text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+            </Link>
+            <div className="space-y-1 mt-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-violet-100 dark:bg-violet-900/30">
+                  <ShieldCheck className="h-6 w-6 text-violet-600" />
+                </div>
+                <h1 className="text-3xl font-extrabold text-foreground" data-testid="text-verify-title">Vérification email</h1>
+              </div>
+              <p className="text-muted-foreground text-sm mt-2">
+                Un code à 6 chiffres a été envoyé à <strong className="text-foreground">{email}</strong>. Vérifiez votre boîte de réception.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleVerify} className="space-y-5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Code de vérification</label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                placeholder="123456"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                maxLength={6}
+                required
+                className="h-14 text-center text-2xl font-mono font-bold tracking-[0.5em] border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
+                data-testid="input-verification-code"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">Valable 15 minutes. Vérifiez aussi vos spams.</p>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-12 font-bold text-base shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:scale-[1.01] transition-all rounded-xl"
+              disabled={loading || code.length !== 6}
+              data-testid="button-submit-verify"
+            >
+              {loading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Vérification...</>
+              ) : (
+                <span className="flex items-center gap-2 justify-center">Confirmer le code <ArrowRight className="h-4 w-4" /></span>
+              )}
+            </Button>
+          </form>
+
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground mb-2">Vous n'avez pas reçu le code ?</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-xl"
+              onClick={handleResend}
+              disabled={resending}
+              data-testid="button-resend-code"
+            >
+              {resending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Renvoyer le code
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden lg:flex lg:w-1/2 relative">
+        <AuthPanel />
+      </div>
+    </div>
+  );
+}
+
 export function LoginPage() {
   const [, navigate] = useLocation();
   const { login } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const [verificationData, setVerificationData] = useState<{ userId: string; email: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,7 +276,7 @@ export function LoginPage() {
       return;
     }
     try {
-      await login.mutateAsync(formData);
+      const data = await login.mutateAsync(formData);
       navigate("/dashboard");
     } catch (error: any) {
       const message = error?.message || "Erreur de connexion";
@@ -152,12 +288,29 @@ export function LoginPage() {
           toast({ title: "Compte suspendu", description: "Votre compte a été suspendu par l'administrateur. Contactez le support.", variant: "destructive" });
           return;
         }
+        if (parsed.requiresVerification) {
+          setVerificationData({ userId: parsed.userId, email: parsed.email });
+          return;
+        }
       } catch {
         if (message.includes("401")) errorText = "Email ou mot de passe incorrect";
       }
       toast({ title: "Erreur", description: errorText, variant: "destructive" });
     }
   };
+
+  if (verificationData) {
+    return (
+      <VerifyEmailStep
+        userId={verificationData.userId}
+        email={verificationData.email}
+        onSuccess={(user) => {
+          queryClient.setQueryData(["/api/auth/user"], user);
+          navigate("/dashboard");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -277,10 +430,12 @@ export function RegisterPage() {
   const [, navigate] = useLocation();
   const { register } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [countryCode, setCountryCode] = useState("+229");
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [verificationData, setVerificationData] = useState<{ userId: string; email: string } | null>(null);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -312,14 +467,18 @@ export function RegisterPage() {
       return;
     }
     try {
-      await register.mutateAsync({
+      const data = await register.mutateAsync({
         fullName: formData.fullName,
         email: formData.email,
         phone: `${countryCode}${formData.phone}`,
         password: formData.password,
       });
-      toast({ title: "Bienvenue !", description: "Votre compte a été créé avec succès" });
-      navigate("/dashboard");
+      if (data?.requiresVerification) {
+        setVerificationData({ userId: data.userId, email: data.email });
+      } else {
+        toast({ title: "Bienvenue !", description: "Votre compte a été créé avec succès" });
+        navigate("/dashboard");
+      }
     } catch (error: any) {
       const message = error?.message || "Erreur lors de l'inscription";
       let errorText = message;
@@ -332,6 +491,19 @@ export function RegisterPage() {
       toast({ title: "Erreur", description: errorText, variant: "destructive" });
     }
   };
+
+  if (verificationData) {
+    return (
+      <VerifyEmailStep
+        userId={verificationData.userId}
+        email={verificationData.email}
+        onSuccess={(user) => {
+          queryClient.setQueryData(["/api/auth/user"], user);
+          navigate("/dashboard");
+        }}
+      />
+    );
+  }
 
   const selectedCountry = countryCodes.find(c => c.code === countryCode)!;
 

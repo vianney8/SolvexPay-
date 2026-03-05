@@ -55,7 +55,9 @@ export function useAuth() {
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(["/api/auth/user"], data);
+      if (!data.requiresVerification) {
+        queryClient.setQueryData(["/api/auth/user"], data);
+      }
     },
   });
 

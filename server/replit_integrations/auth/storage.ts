@@ -7,6 +7,8 @@ export interface IAuthStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   createUser(user: UpsertUser): Promise<User>;
+  updateUserVerificationCode(userId: string, code: string, expiry: Date): Promise<void>;
+  markEmailVerified(userId: string): Promise<void>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -41,6 +43,20 @@ class AuthStorage implements IAuthStorage {
       .values(userData)
       .returning();
     return user;
+  }
+
+  async updateUserVerificationCode(userId: string, code: string, expiry: Date): Promise<void> {
+    await db
+      .update(users)
+      .set({ emailVerificationCode: code, emailVerificationExpiry: expiry, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ emailVerified: true, emailVerificationCode: null, emailVerificationExpiry: null, updatedAt: new Date() })
+      .where(eq(users.id, userId));
   }
 }
 

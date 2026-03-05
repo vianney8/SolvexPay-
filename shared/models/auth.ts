@@ -38,6 +38,9 @@ export const users = pgTable("users", {
   withdrawalCountry: varchar("withdrawal_country"),
   withdrawalOperator: varchar("withdrawal_operator"),
   withdrawalPhone: varchar("withdrawal_phone"),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  emailVerificationCode: varchar("email_verification_code"),
+  emailVerificationExpiry: timestamp("email_verification_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
