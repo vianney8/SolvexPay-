@@ -293,7 +293,12 @@ export default function KycPage() {
                   <FileUploadField label="Pièce d'identité (verso)" fieldName="doc-back" value={kycDocumentBack} onUploaded={setKycDocumentBack} />
                 </div>
 
-                <FileUploadField label="Selfie avec la pièce d'identité" fieldName="selfie" value={kycSelfie} onUploaded={setKycSelfie} />
+                <div className="space-y-2">
+                  <FileUploadField label="Selfie avec la pièce d'identité" fieldName="selfie" value={kycSelfie} onUploaded={setKycSelfie} />
+                  <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                    Prenez une photo de vous en tenant votre pièce d'identité bien visible dans la main, face à la caméra.
+                  </p>
+                </div>
 
                 <Button
                   type="submit"
