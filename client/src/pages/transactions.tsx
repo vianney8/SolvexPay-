@@ -56,6 +56,7 @@ function getDisplayProvider(tx: Transaction) {
 
 function isExpiredPending(tx: Transaction) {
   if (tx.status !== "pending") return false;
+  if (tx.type === "withdrawal") return false;
   const created = tx.createdAt ? new Date(tx.createdAt).getTime() : 0;
   return Date.now() - created > 12 * 60 * 1000;
 }
@@ -200,8 +201,8 @@ export default function TransactionsPage() {
     return matchesSearch && matchesType && matchesStatus;
   }) || [];
 
-  const completed = transactions?.filter(t => t.status === "completed").length || 0;
-  const pending = transactions?.filter(t => t.status === "pending").length || 0;
+  const completed = transactions?.filter(t => getEffectiveStatus(t) === "completed").length || 0;
+  const pending = transactions?.filter(t => getEffectiveStatus(t) === "pending").length || 0;
 
   const summaryCards = [
     { label: "Total", value: transactions?.length || 0, icon: Activity, color: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
