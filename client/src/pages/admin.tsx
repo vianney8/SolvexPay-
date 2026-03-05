@@ -28,15 +28,8 @@ import {
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
   const [broken, setBroken] = useState(false);
-  const isBase64 = src.startsWith("data:");
-  const openFull = () => {
-    if (isBase64) {
-      const win = window.open();
-      if (win) { win.document.write(`<img src="${src}" style="max-width:100%;height:auto;" />`); }
-    } else {
-      window.open(src, "_blank", "noopener,noreferrer");
-    }
-  };
+  const [open, setOpen] = useState(false);
+
   if (broken) {
     return (
       <div className="w-full h-20 rounded-lg border border-border/60 bg-muted/50 flex flex-col items-center justify-center gap-1 text-muted-foreground">
@@ -46,14 +39,38 @@ function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: str
     );
   }
   return (
-    <img
-      src={src}
-      alt={alt}
-      onClick={openFull}
-      onError={() => setBroken(true)}
-      className="w-full h-20 object-cover rounded-lg border border-border/60 hover:opacity-80 transition-opacity cursor-zoom-in"
-      data-testid={testId}
-    />
+    <>
+      <img
+        src={src}
+        alt={alt}
+        onClick={() => setOpen(true)}
+        onError={() => setBroken(true)}
+        className="w-full h-20 object-cover rounded-lg border border-border/60 hover:opacity-80 transition-opacity cursor-zoom-in"
+        data-testid={testId}
+      />
+      {open && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/85 flex items-center justify-center p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setOpen(false)}
+              className="absolute -top-10 right-0 text-white/80 hover:text-white flex items-center gap-1.5 text-sm font-medium transition-colors"
+              data-testid="btn-close-kyc-lightbox"
+            >
+              <X className="h-5 w-5" /> Fermer
+            </button>
+            <img
+              src={src}
+              alt={alt}
+              className="w-full max-h-[80vh] object-contain rounded-xl shadow-2xl"
+            />
+            <p className="text-center text-white/60 text-xs mt-3">{alt}</p>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
