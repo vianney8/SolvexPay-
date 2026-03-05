@@ -1122,12 +1122,6 @@ export default function AdminPage() {
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-colors"
                             data-testid={`btn-bal-${u.id}`}><PenLine className="h-3.5 w-3.5" />Solde</button>
                           <button
-                            onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus || "not_started" }); setKycAction(u.kycStatus === "verified" ? "not_started" : "verified"); setKycReason(""); }}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.kycStatus === "verified" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/15"}`}
-                            data-testid={`btn-kyc-${u.id}`}>
-                            <BadgeCheck className="h-3.5 w-3.5" />{u.kycStatus === "verified" ? "KYC ✓" : "KYC"}
-                          </button>
-                          <button
                             onClick={() => blockM.mutate({ userId: u.id, isBlocked: !u.isBlocked })}
                             disabled={blockM.isPending}
                             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.isBlocked ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
@@ -1138,6 +1132,12 @@ export default function AdminPage() {
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 text-xs font-semibold text-indigo-700 dark:text-indigo-400 transition-colors"
                             data-testid={`btn-expand-${u.id}`}>
                             <FileText className="h-3.5 w-3.5" />Historique {isExp ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </button>
+                          <button
+                            onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus || "not_started" }); setKycAction(u.kycStatus === "verified" ? "not_started" : "verified"); setKycReason(""); }}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.kycStatus === "verified" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-violet-500/10 text-violet-700 dark:text-violet-400 hover:bg-violet-500/15"}`}
+                            data-testid={`btn-kyc-${u.id}`}>
+                            <BadgeCheck className="h-3.5 w-3.5" />{u.kycStatus === "verified" ? "Retirer vérif." : "Vérifier"}
                           </button>
                         </div>
 
@@ -1242,26 +1242,23 @@ export default function AdminPage() {
                       </div>
 
                       {/* KYC Photos */}
-                      {(u.kycDocumentFront || u.kycDocumentBack || u.kycSelfie) && (
+                      {true && (
                         <div className="grid grid-cols-3 gap-2 pt-1">
-                          {u.kycDocumentFront && (
-                            <div className="space-y-1">
-                              <p className="text-[10px] text-muted-foreground font-medium text-center">Recto</p>
-                              <KycImage src={u.kycDocumentFront} alt="Recto" testId={`img-kyc-front-${u.id}`} />
+                          {[
+                            { src: u.kycDocumentFront, label: "Recto", testId: `img-kyc-front-${u.id}` },
+                            { src: u.kycDocumentBack, label: "Verso", testId: `img-kyc-back-${u.id}` },
+                            { src: u.kycSelfie, label: "Selfie", testId: `img-kyc-selfie-${u.id}` },
+                          ].map(({ src, label, testId }) => (
+                            <div key={label} className="space-y-1">
+                              <p className="text-[10px] text-muted-foreground font-medium text-center">{label}</p>
+                              {src
+                                ? <KycImage src={src} alt={label} testId={testId} />
+                                : <div className="w-full aspect-[4/3] rounded-xl bg-muted/50 border border-border/40 flex items-center justify-center" data-testid={testId}>
+                                    <p className="text-[10px] text-muted-foreground font-medium">Non fourni</p>
+                                  </div>
+                              }
                             </div>
-                          )}
-                          {u.kycDocumentBack && (
-                            <div className="space-y-1">
-                              <p className="text-[10px] text-muted-foreground font-medium text-center">Verso</p>
-                              <KycImage src={u.kycDocumentBack} alt="Verso" testId={`img-kyc-back-${u.id}`} />
-                            </div>
-                          )}
-                          {u.kycSelfie && (
-                            <div className="space-y-1">
-                              <p className="text-[10px] text-muted-foreground font-medium text-center">Selfie</p>
-                              <KycImage src={u.kycSelfie} alt="Selfie" testId={`img-kyc-selfie-${u.id}`} />
-                            </div>
-                          )}
+                          ))}
                         </div>
                       )}
                     </CardContent>
