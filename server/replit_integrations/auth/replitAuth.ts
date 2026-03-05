@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import { authStorage } from "./storage";
 import { registerSchema, loginSchema } from "@shared/models/auth";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../../services/resend";
+import { sanitizeUser } from "./userUtils";
 
 const RESEND_WINDOW_MS = 25 * 60 * 1000;
 const RESEND_MAX = 5;
@@ -151,8 +152,7 @@ export async function setupAuth(app: Express) {
 
       if (user.emailVerified) {
         (req.session as any).userId = user.id;
-        const { passwordHash: _, ...safeUser } = user;
-        return res.json(safeUser);
+        return res.json(sanitizeUser(user));
       }
 
       if (!user.emailVerificationCode || !user.emailVerificationExpiry) {
@@ -171,8 +171,7 @@ export async function setupAuth(app: Express) {
 
       const updatedUser = await authStorage.getUser(user.id);
       (req.session as any).userId = user.id;
-      const { passwordHash: _, ...safeUser } = updatedUser!;
-      res.json(safeUser);
+      res.json(sanitizeUser(updatedUser!));
     } catch (error) {
       console.error("Verify email error:", error);
       res.status(500).json({ message: "Erreur lors de la vérification" });
@@ -307,8 +306,7 @@ export async function setupAuth(app: Express) {
 
       (req.session as any).userId = user.id;
       const updatedUser = await authStorage.getUser(user.id);
-      const { passwordHash: _, ...safeUser } = updatedUser!;
-      res.json(safeUser);
+      res.json(sanitizeUser(updatedUser!));
     } catch (error) {
       console.error("Reset password error:", error);
       res.status(500).json({ message: "Erreur lors de la réinitialisation" });
@@ -357,8 +355,7 @@ export async function setupAuth(app: Express) {
 
       (req.session as any).userId = user.id;
 
-      const { passwordHash: _, ...safeUser } = user;
-      res.json(safeUser);
+      res.json(sanitizeUser(user));
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Erreur lors de la connexion" });

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import bcrypt from "bcryptjs";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
+import { sanitizeUser } from "./userUtils";
 import { z } from "zod";
 
 const updateProfileSchema = z.object({
@@ -36,8 +37,7 @@ export function registerAuthRoutes(app: Express): void {
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const { passwordHash: _, ...safeUser } = user;
-      res.json(safeUser);
+      res.json(sanitizeUser(user));
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -74,8 +74,7 @@ export function registerAuthRoutes(app: Express): void {
       }
 
       const user = await authStorage.upsertUser({ id: userId, ...updates });
-      const { passwordHash: _, ...safeUser } = user;
-      res.json(safeUser);
+      res.json(sanitizeUser(user));
     } catch (error) {
       console.error("Error updating profile:", error);
       res.status(500).json({ message: "Erreur lors de la mise a jour du profil" });
@@ -95,8 +94,7 @@ export function registerAuthRoutes(app: Express): void {
         withdrawalOperator: validation.data.operator,
         withdrawalPhone: validation.data.phone,
       } as any);
-      const { passwordHash: _, ...safeUser } = user;
-      res.json(safeUser);
+      res.json(sanitizeUser(user));
     } catch (error) {
       console.error("Error updating withdrawal account:", error);
       res.status(500).json({ message: "Erreur lors de la mise à jour du compte de retrait" });
@@ -129,8 +127,7 @@ export function registerAuthRoutes(app: Express): void {
         kycDocumentBack: kycDocumentBack || null,
         kycSelfie,
       } as any);
-      const { passwordHash: _, ...safeUser } = updated;
-      res.json(safeUser);
+      res.json(sanitizeUser(updated));
     } catch (error) {
       console.error("Error submitting KYC:", error);
       res.status(500).json({ message: "Erreur lors de la soumission KYC" });
