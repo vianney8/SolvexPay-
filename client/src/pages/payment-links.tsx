@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -46,20 +47,8 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
   const [imageUrl, setImageUrl] = useState(editLink?.imageUrl || "");
   const [imagePreview, setImagePreview] = useState(editLink?.imageUrl || "");
   const [uploading, setUploading] = useState(false);
-  const [merchantName, setMerchantName] = useState("");
-  const [initialized, setInitialized] = useState(false);
-
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
   const feeRate = (serviceFees?.deposit ?? 7) / 100;
-
-  const { data: userData } = useQuery<any>({ queryKey: ["/api/auth/user"] });
-
-  useEffect(() => {
-    if (userData && !initialized) {
-      setMerchantName(userData.merchantName || "");
-      setInitialized(true);
-    }
-  }, [userData, initialized]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => apiRequest("POST", "/api/payment-links", data),
@@ -109,16 +98,6 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
     e.preventDefault();
     if (!name.trim()) return;
     if (!allowCustomAmount && !amount) return;
-
-    if (merchantName.trim() !== (userData?.merchantName || "")) {
-      try {
-        await apiRequest("PATCH", "/api/auth/user", { merchantName: merchantName.trim() || null });
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      } catch {
-        toast({ title: "Erreur", description: "Impossible de mettre à jour le nom marchand.", variant: "destructive" });
-        return;
-      }
-    }
 
     const payload = {
       name: name.trim(),
@@ -214,14 +193,6 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
                 <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Décrivez votre produit pour vos clients..." rows={3} className="border-border/70 resize-none" data-testid="input-link-description" />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom marchand (optionnel)</Label>
-                <div className="relative">
-                  <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={merchantName} onChange={(e) => setMerchantName(e.target.value)} placeholder="Ex: Ma Boutique, Mon Service..." className="pl-10 h-11 border-border/70" data-testid="input-link-merchant-name" />
-                </div>
-                <p className="text-xs text-muted-foreground">Affiché sur la page de paiement de vos clients. S'applique à tous vos liens.</p>
-              </div>
-              <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">URL de redirection (optionnel)</Label>
                 <Input value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} type="url" placeholder="https://votre-site.com/merci" className="h-11 border-border/70" data-testid="input-link-redirect" />
                 <p className="text-xs text-muted-foreground">Redirigez vos clients après paiement réussi</p>
@@ -308,8 +279,40 @@ export default function PaymentLinksPage() {
   const [editingLink, setEditingLink] = useState<PaymentLink | null>(null);
   const [search, setSearch] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [merchantName, setMerchantName] = useState("");
+  const [merchantNameInitialized, setMerchantNameInitialized] = useState(false);
+  const [savingMerchantName, setSavingMerchantName] = useState(false);
 
+  const { data: userData } = useQuery<any>({ queryKey: ["/api/auth/user"] });
   const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({ queryKey: ["/api/payment-links"] });
+
+  useEffect(() => {
+    if (userData && !merchantNameInitialized) {
+      setMerchantName(userData.merchantName || "");
+      setMerchantNameInitialized(true);
+    }
+  }, [userData, merchantNameInitialized]);
+
+  const handleSaveMerchantName = async () => {
+    if (userData?.kycStatus !== "verified") {
+      toast({
+        title: "Compte non vérifié",
+        description: "Vous devez vérifier votre identité (KYC) avant de configurer votre nom marchand.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSavingMerchantName(true);
+    try {
+      await apiRequest("PATCH", "/api/auth/user", { merchantName: merchantName.trim() || null });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Nom marchand enregistré", description: "Il sera affiché sur toutes vos pages de paiement." });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'enregistrer le nom marchand.", variant: "destructive" });
+    } finally {
+      setSavingMerchantName(false);
+    }
+  };
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/payment-links/${id}`, { isActive }),
@@ -398,6 +401,37 @@ export default function PaymentLinksPage() {
             </div>
           </div>
         </div>
+
+        <Card className="border-border/60">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Store className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-bold leading-none">Nom marchand</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Affiché sur toutes vos pages de paiement</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={merchantName}
+                onChange={(e) => setMerchantName(e.target.value)}
+                placeholder="Ex: Ma Boutique, Mon Service..."
+                className="h-10 border-border/70 flex-1"
+                data-testid="input-merchant-name"
+              />
+              <Button
+                onClick={handleSaveMerchantName}
+                disabled={savingMerchantName || merchantName === (userData?.merchantName || "")}
+                className="h-10 px-4 font-semibold shrink-0"
+                data-testid="button-save-merchant-name"
+              >
+                {savingMerchantName ? "..." : "Enregistrer"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
