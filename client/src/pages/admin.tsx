@@ -1039,51 +1039,51 @@ export default function AdminPage() {
               };
               const DEFAULT_META = { name: "", flag: "🌍", gradient: "from-slate-500 to-slate-600", border: "border-slate-400/40", text: "text-slate-400" };
 
-              const rows = (countriesStats?.txByCountry ?? []).map((c) => ({
+              const userRows = (countriesStats?.usersByWithdrawal ?? []).map((c: any) => ({
                 code: c.country ?? "??",
-                txCount: c.txCount ?? 0,
-                uniqueUsers: c.uniqueUsers ?? 0,
-                totalVolume: c.totalVolume ?? 0,
+                count: c.count ?? 0,
                 meta: COUNTRY_META[c.country ?? ""] ?? { ...DEFAULT_META, name: c.country ?? "Inconnu" },
               }));
 
-              const maxTx = rows.length > 0 ? rows[0].txCount : 1;
+              const maxUsers = userRows.length > 0 ? userRows[0].count : 1;
+              const totalUsers = userRows.reduce((sum: number, r: any) => sum + r.count, 0);
 
               return (
                 <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
                   <div className="bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 px-5 py-3 flex items-center gap-2">
                     <span className="text-lg">🌍</span>
-                    <p className="text-white font-bold text-sm">Activité par Pays</p>
-                    <span className="ml-auto text-xs text-white/70">{rows.length} pays actif{rows.length !== 1 ? "s" : ""}</span>
+                    <p className="text-white font-bold text-sm">Inscrits par Pays</p>
+                    <span className="ml-auto text-xs text-white/70">{totalUsers} utilisateur{totalUsers !== 1 ? "s" : ""} · {userRows.length} pays</span>
                   </div>
 
-                  {rows.length === 0 ? (
+                  {userRows.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground text-sm">
-                      Aucune transaction avec pays enregistré pour le moment.
+                      Aucun utilisateur avec pays enregistré pour le moment.
                     </div>
                   ) : (
-                    <div className="p-4 space-y-3">
-                      {rows.map((row, idx) => {
-                        const barPct = Math.round((row.txCount / maxTx) * 100);
+                    <div className="p-4 space-y-2.5">
+                      {userRows.map((row: any, idx: number) => {
+                        const barPct = Math.round((row.count / maxUsers) * 100);
                         const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
+                        const pct = totalUsers > 0 ? ((row.count / totalUsers) * 100).toFixed(1) : "0";
                         return (
-                          <div key={row.code} className={`rounded-xl border ${row.meta.border} bg-gradient-to-r ${row.meta.gradient} bg-opacity-5 p-3`} data-testid={`country-row-${row.code}`}>
+                          <div key={row.code} className={`rounded-xl border ${row.meta.border} p-3`} data-testid={`country-row-${row.code}`}>
                             <div className="flex items-center gap-3 mb-2">
                               <span className="text-2xl leading-none">{row.meta.flag}</span>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   {medal && <span className="text-base leading-none">{medal}</span>}
                                   <p className="text-sm font-bold text-foreground truncate">{row.meta.name || row.code}</p>
-                                  <span className="text-[10px] font-mono text-muted-foreground ml-auto shrink-0">{row.code}</span>
+                                  <span className="text-[10px] font-mono text-muted-foreground ml-auto shrink-0">{pct}%</span>
                                 </div>
-                                <div className="flex items-center gap-3 mt-0.5">
-                                  <span className={`text-xs font-semibold ${row.meta.text}`}>{row.txCount} transaction{row.txCount !== 1 ? "s" : ""}</span>
-                                  <span className="text-xs text-muted-foreground">{row.uniqueUsers} utilisateur{row.uniqueUsers !== 1 ? "s" : ""}</span>
-                                  <span className="text-xs text-muted-foreground ml-auto">{fmt(Math.round(row.totalVolume))} XOF</span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className={`text-xs font-semibold ${row.meta.text}`}>
+                                    {row.count} utilisateur{row.count !== 1 ? "s" : ""}
+                                  </span>
                                 </div>
                               </div>
                             </div>
-                            <div className="w-full bg-white/10 dark:bg-black/20 rounded-full h-1.5 overflow-hidden">
+                            <div className="w-full bg-muted/40 rounded-full h-1.5 overflow-hidden">
                               <div
                                 className={`h-1.5 rounded-full bg-gradient-to-r ${row.meta.gradient} transition-all duration-700`}
                                 style={{ width: `${barPct}%` }}
