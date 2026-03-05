@@ -2150,38 +2150,62 @@ export async function registerRoutes(
   app.get("/api/admin/liquidity-analysis", isAdmin, async (_req, res) => {
     try {
       const { db } = await import("./db");
-      const { sql, eq, and, isNotNull } = await import("drizzle-orm");
-      const { transactions: txTable, wallets: walletsTable } = await import("@shared/schema");
-      const { users: usersTable } = await import("@shared/models/auth");
+      const { sql } = await import("drizzle-orm");
 
-      const walletsByCountry = await db
-        .select({
-          country: usersTable.withdrawalCountry,
-          totalBalance: sql<number>`coalesce(sum(${walletsTable.balanceXOF}::numeric), 0)::float`,
-          userCount: sql<number>`count(distinct ${usersTable.id})::int`,
-        })
-        .from(usersTable)
-        .innerJoin(walletsTable, eq(walletsTable.userId, usersTable.id))
-        .where(isNotNull(usersTable.withdrawalCountry))
-        .groupBy(usersTable.withdrawalCountry)
-        .orderBy(sql`sum(${walletsTable.balanceXOF}::numeric) desc`);
+      const caseExpr = `
+        CASE
+          WHEN u.withdrawal_country IS NOT NULL THEN u.withdrawal_country
+          WHEN u.phone LIKE '+229%' THEN 'BJ'
+          WHEN u.phone LIKE '+225%' THEN 'CI'
+          WHEN u.phone LIKE '+221%' THEN 'SN'
+          WHEN u.phone LIKE '+228%' THEN 'TG'
+          WHEN u.phone LIKE '+237%' THEN 'CM'
+          WHEN u.phone LIKE '+224%' THEN 'GN'
+          WHEN u.phone LIKE '+223%' THEN 'ML'
+          WHEN u.phone LIKE '+226%' THEN 'BF'
+          WHEN u.phone LIKE '+227%' THEN 'NE'
+          WHEN u.phone LIKE '+243%' THEN 'COD'
+          WHEN u.phone LIKE '+242%' THEN 'COG'
+          ELSE NULL
+        END
+      `;
 
-      const pendingByCountry = await db
-        .select({
-          country: usersTable.withdrawalCountry,
-          pendingAmount: sql<number>`coalesce(sum(${txTable.amount}::numeric), 0)::float`,
-          pendingCount: sql<number>`count(*)::int`,
-        })
-        .from(txTable)
-        .innerJoin(usersTable, eq(usersTable.id, txTable.userId))
-        .where(and(
-          eq(txTable.type, "withdrawal"),
-          eq(txTable.status, "pending"),
-          isNotNull(usersTable.withdrawalCountry),
-        ))
-        .groupBy(usersTable.withdrawalCountry);
+      const walletRows = await db.execute(sql.raw(`
+        WITH effective AS (
+          SELECT (${caseExpr}) AS country, w.balance_xof, u.id
+          FROM users u
+          INNER JOIN wallets w ON w.user_id = u.id
+        )
+        SELECT
+          country,
+          COALESCE(SUM(balance_xof::numeric), 0)::float AS "totalBalance",
+          COUNT(DISTINCT id)::int AS "userCount"
+        FROM effective
+        WHERE country IS NOT NULL
+        GROUP BY country
+        ORDER BY "totalBalance" DESC
+      `));
 
-      res.json({ walletsByCountry, pendingByCountry });
+      const pendingRows = await db.execute(sql.raw(`
+        WITH effective AS (
+          SELECT (${caseExpr}) AS country, t.amount
+          FROM transactions t
+          INNER JOIN users u ON u.id = t.user_id
+          WHERE t.type = 'withdrawal' AND t.status = 'pending'
+        )
+        SELECT
+          country,
+          COALESCE(SUM(amount::numeric), 0)::float AS "pendingAmount",
+          COUNT(*)::int AS "pendingCount"
+        FROM effective
+        WHERE country IS NOT NULL
+        GROUP BY country
+      `));
+
+      res.json({
+        walletsByCountry: walletRows.rows,
+        pendingByCountry: pendingRows.rows,
+      });
     } catch (error) {
       console.error("Liquidity analysis error:", error);
       res.status(500).json({ message: "Erreur serveur" });
