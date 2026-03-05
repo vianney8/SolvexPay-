@@ -27,19 +27,42 @@ function FileUploadField({ label, fieldName, value, onUploaded, required }: { la
   const ref = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
+  const compressImage = (file: File): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX = 1600;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+          else { width = Math.round((width * MAX) / height); height = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Compression échouée")), "image/jpeg", 0.82);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Lecture image échouée")); };
+      img.src = url;
+    });
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
+      const compressed = await compressImage(file);
       const fd = new FormData();
-      fd.append("image", file);
+      fd.append("image", compressed, file.name.replace(/\.[^.]+$/, ".jpg"));
       const res = await fetch("/api/upload", { method: "POST", body: fd, credentials: "include" });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || res.statusText); }
       const data = await res.json();
       if (data.imageUrl) { onUploaded(data.imageUrl); toast({ title: "Photo téléchargée" }); }
       else toast({ title: "Erreur", description: "Impossible de télécharger", variant: "destructive" });
-    } catch {
-      toast({ title: "Erreur", description: "Erreur de téléchargement", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err?.message || "Erreur de téléchargement", variant: "destructive" });
     } finally { setUploading(false); }
   };
 
