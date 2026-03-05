@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   User, Mail, Lock, Eye, EyeOff, Save, Loader2, Shield,
-  Smartphone, Upload, BadgeCheck, AlertTriangle, Store,
+  Smartphone, Upload, BadgeCheck, AlertTriangle,
   ChevronRight,
 } from "lucide-react";
 
@@ -399,19 +399,6 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
-                      <Separator />
-
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                          <Store className="h-3.5 w-3.5" />Nom marchand (optionnel)
-                        </Label>
-                        <div className="relative">
-                          <Store className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                          <Input value={merchantName} onChange={(e) => setMerchantName(e.target.value)} placeholder="Ex: Ma Boutique En Ligne" className="pl-10 h-11 border-border/70" data-testid="input-merchant-name" />
-                        </div>
-                        <p className="text-xs text-muted-foreground">Ce nom s'affichera sur vos liens de paiement.</p>
-                      </div>
-
                       <Button type="submit" className="gap-2 h-11 font-semibold shadow-lg shadow-primary/20" disabled={profileMutation.isPending} data-testid="button-save-profile">
                         {profileMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         Enregistrer les modifications
@@ -545,28 +532,28 @@ export default function SettingsPage() {
                     <form onSubmit={handleKycSubmit} className="space-y-5 mt-5">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Prénom <span className="text-rose-500">*</span></Label>
+                          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Prénom</Label>
                           <Input value={kycFirstName} onChange={e => setKycFirstName(e.target.value)} placeholder="Prénom sur document" className="h-11 border-border/70" required data-testid="input-kyc-firstname" />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom <span className="text-rose-500">*</span></Label>
+                          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom</Label>
                           <Input value={kycLastName} onChange={e => setKycLastName(e.target.value)} placeholder="Nom sur document" className="h-11 border-border/70" required data-testid="input-kyc-lastname" />
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de la pièce d'identité <span className="text-rose-500">*</span></Label>
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de la pièce d'identité</Label>
                         <Input value={kycDocumentNumber} onChange={e => setKycDocumentNumber(e.target.value)} placeholder="Ex : BJ12345678" className="h-11 border-border/70 font-mono" required data-testid="input-kyc-document-number" />
                       </div>
 
                       <Separator />
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <FileUploadField label="Pièce d'identité (recto)" fieldName="doc-front" value={kycDocumentFront} onUploaded={setKycDocumentFront} required />
+                        <FileUploadField label="Pièce d'identité (recto)" fieldName="doc-front" value={kycDocumentFront} onUploaded={setKycDocumentFront} />
                         <FileUploadField label="Pièce d'identité (verso)" fieldName="doc-back" value={kycDocumentBack} onUploaded={setKycDocumentBack} />
                       </div>
 
-                      <FileUploadField label="Selfie avec la pièce d'identité" fieldName="selfie" value={kycSelfie} onUploaded={setKycSelfie} required />
+                      <FileUploadField label="Selfie avec la pièce d'identité" fieldName="selfie" value={kycSelfie} onUploaded={setKycSelfie} />
 
                       <Button type="submit" className="w-full gap-2 h-11 font-semibold" disabled={kycMutation.isPending || !kycDocumentFront || !kycSelfie || !kycFirstName || !kycLastName || !kycDocumentNumber} data-testid="button-submit-kyc">
                         {kycMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}

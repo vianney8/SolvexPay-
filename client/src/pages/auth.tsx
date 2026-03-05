@@ -588,7 +588,7 @@ export function RegisterPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de Téléphone <span className="text-rose-500">*</span></label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de Téléphone</label>
               <div className="flex gap-2">
                 <div className="relative">
                   <button
