@@ -74,7 +74,6 @@ const transferSchema = z.object({
 
 const createPaymentLinkSchema = z.object({
   name: z.string().min(1, "Nom requis"),
-  merchantName: z.string().optional().nullable(),
   amount: z.number().min(0, "Montant invalide"),
   allowCustomAmount: z.boolean().optional().default(false),
   currency: z.enum(SUPPORTED_CURRENCIES).default("XOF"),
@@ -98,7 +97,6 @@ const updateApiKeySchema = z.object({
 
 const updatePaymentLinkSchema = z.object({
   name: z.string().min(1).optional(),
-  merchantName: z.string().optional().nullable(),
   amount: z.number().min(0).optional(),
   allowCustomAmount: z.boolean().optional(),
   description: z.string().optional().nullable(),
@@ -687,12 +685,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { name, merchantName, amount, currency, description, redirectUrl, imageUrl, allowCustomAmount } = validation.data;
+      const { name, amount, currency, description, redirectUrl, imageUrl, allowCustomAmount } = validation.data;
 
       const paymentLink = await storage.createPaymentLink({
         userId,
         name,
-        merchantName: merchantName || null,
         amount: amount.toString(),
         currency,
         description,
@@ -719,9 +716,8 @@ export async function registerRoutes(
       }
 
       const updateData: any = {};
-      const { name, merchantName, amount, allowCustomAmount, description, redirectUrl, imageUrl, isActive } = validation.data;
+      const { name, amount, allowCustomAmount, description, redirectUrl, imageUrl, isActive } = validation.data;
       if (name !== undefined) updateData.name = name;
-      if (merchantName !== undefined) updateData.merchantName = merchantName || null;
       if (amount !== undefined) updateData.amount = amount.toString();
       if (allowCustomAmount !== undefined) updateData.allowCustomAmount = allowCustomAmount;
       if (description !== undefined) updateData.description = description;
@@ -921,8 +917,7 @@ export async function registerRoutes(
         merchantName: usersTable.merchantName,
       }).from(usersTable).where(eqFn(usersTable.id, paymentLink.userId));
 
-      const userDisplayName = creator?.merchantName || (creator ? `${creator.firstName || ""} ${creator.lastName || ""}`.trim() : "") || "SolvexPay";
-      const displayName = (paymentLink as any).merchantName || userDisplayName;
+      const displayName = creator?.merchantName || (creator ? `${creator.firstName || ""} ${creator.lastName || ""}`.trim() : "") || "SolvexPay";
 
       res.json({ ...paymentLink, merchantName: displayName });
     } catch (error) {
