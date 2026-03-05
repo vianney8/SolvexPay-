@@ -156,6 +156,7 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   const [userSearch, setUserSearch] = useState("");
+  const [userSort, setUserSort] = useState<"default" | "balance_desc" | "balance_asc">("default");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [txSearch, setTxSearch] = useState("");
   const [txStatus, setTxStatus] = useState("all");
@@ -425,9 +426,13 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
-  const filteredUsers = (users || []).filter(u =>
-    !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase())
-  );
+  const filteredUsers = (users || [])
+    .filter(u => !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase()))
+    .sort((a, b) => {
+      if (userSort === "balance_desc") return parseFloat(b.wallet?.balanceXOF || "0") - parseFloat(a.wallet?.balanceXOF || "0");
+      if (userSort === "balance_asc") return parseFloat(a.wallet?.balanceXOF || "0") - parseFloat(b.wallet?.balanceXOF || "0");
+      return 0;
+    });
 
   const filteredTx = (allTx || []).filter(tx => {
     const m = !txSearch || [tx.reference, tx.phoneNumber, tx.description].join(" ").toLowerCase().includes(txSearch.toLowerCase());
@@ -1047,9 +1052,31 @@ export default function AdminPage() {
               TAB 2 — UTILISATEURS
           ══════════════════════════════════════ */}
           <TabsContent value="users" className="space-y-4 mt-5">
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Rechercher utilisateur..." className="pl-10 h-10" data-testid="input-search-users" />
+            <div className="flex gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Rechercher utilisateur..." className="pl-10 h-10" data-testid="input-search-users" />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Trier par solde :</span>
+                {[
+                  { v: "balance_desc" as const, label: "Plus grand" },
+                  { v: "balance_asc" as const, label: "Plus petit" },
+                  { v: "default" as const, label: "Par défaut" },
+                ].map(opt => (
+                  <button
+                    key={opt.v}
+                    onClick={() => setUserSort(opt.v)}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${userSort === opt.v ? "bg-indigo-600 text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                    data-testid={`btn-sort-users-${opt.v}`}
+                  >
+                    {opt.v === "balance_desc" && <ChevronDown className="h-3 w-3" />}
+                    {opt.v === "balance_asc" && <ChevronUp className="h-3 w-3" />}
+                    {opt.v === "default" && <ArrowUpDown className="h-3 w-3" />}
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {usersLoading ? (
