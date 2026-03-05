@@ -120,12 +120,12 @@ function getOmniPayOperatorCode(operator: string, country: string): string {
   const mapping: Record<string, Record<string, string>> = {
     MOOV:     { BJ: "moov_benin", CI: "moov", TG: "moov_togo", BF: "moov_bf", ML: "moov_ml" },
     ORANGE:   { CI: "orange", SN: "orange_sn", CM: "orange_cm", BF: "orange_bf", ML: "orange_ml", COD: "orange_cong" },
-    MTN:      { BJ: "mtn", CI: "mtn", CM: "mtn_cm", COG: "mtn" },
+    MTN:      { BJ: "mtn", CI: "mtn", CM: "mtn_cm", COG: "" },
     TMONEY:   { TG: "tmoney" },
     WAVE:     { CI: "wave", SN: "wave" },
     FREE:     { SN: "free_sn" },
-    VODACOM:  { COD: "mpesa" },
-    AIRTEL:   { COD: "airtel_money", COG: "airtel" },
+    VODACOM:  { COD: "" },
+    AIRTEL:   { COD: "", COG: "" },
   };
   return mapping[op]?.[co] ?? op.toLowerCase();
 }

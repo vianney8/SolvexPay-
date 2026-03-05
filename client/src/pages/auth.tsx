@@ -163,8 +163,11 @@ function VerifyEmailStep({ userId, email, onSuccess }: { userId: string; email: 
     try {
       await apiRequest("POST", "/api/auth/resend-verification", { userId });
       toast({ title: "Code envoyé", description: "Un nouveau code a été envoyé à votre email." });
-    } catch {
-      toast({ title: "Erreur", description: "Impossible de renvoyer le code. Réessayez plus tard.", variant: "destructive" });
+    } catch (error: any) {
+      const message = error?.message || "";
+      let errorText = "Impossible de renvoyer le code. Réessayez plus tard.";
+      try { const p = JSON.parse(message.replace(/^\d+:\s*/, "")); errorText = p.message || errorText; } catch {}
+      toast({ title: "Erreur", description: errorText, variant: "destructive" });
     } finally {
       setResending(false);
     }

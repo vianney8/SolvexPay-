@@ -8,6 +8,25 @@ import { authStorage } from "./storage";
 import { registerSchema, loginSchema } from "@shared/models/auth";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../../services/resend";
 
+const RESEND_WINDOW_MS = 25 * 60 * 1000;
+const RESEND_MAX = 5;
+const resendTracker = new Map<string, { count: number; windowStart: number }>();
+
+function checkResendLimit(key: string): { allowed: boolean; minutesLeft: number } {
+  const now = Date.now();
+  const entry = resendTracker.get(key);
+  if (!entry || now - entry.windowStart >= RESEND_WINDOW_MS) {
+    resendTracker.set(key, { count: 1, windowStart: now });
+    return { allowed: true, minutesLeft: 0 };
+  }
+  if (entry.count >= RESEND_MAX) {
+    const minutesLeft = Math.ceil((RESEND_WINDOW_MS - (now - entry.windowStart)) / 60000);
+    return { allowed: false, minutesLeft };
+  }
+  entry.count++;
+  return { allowed: true, minutesLeft: 0 };
+}
+
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -176,6 +195,14 @@ export async function setupAuth(app: Express) {
         return res.status(400).json({ message: "Email déjà vérifié" });
       }
 
+      const limit = checkResendLimit(`verify:${userId}`);
+      if (!limit.allowed) {
+        return res.status(429).json({
+          message: `Limite atteinte. Vous avez déjà demandé ${RESEND_MAX} codes. Réessayez dans ${limit.minutesLeft} minute(s).`,
+          minutesLeft: limit.minutesLeft,
+        });
+      }
+
       const code = generateVerificationCode();
       const expiry = new Date(Date.now() + 15 * 60 * 1000);
       await authStorage.updateUserVerificationCode(user.id, code, expiry);
@@ -196,6 +223,14 @@ export async function setupAuth(app: Express) {
       const user = await authStorage.getUserByEmail(email);
       if (!user) {
         return res.json({ success: true });
+      }
+
+      const limit = checkResendLimit(`reset:${user.id}`);
+      if (!limit.allowed) {
+        return res.status(429).json({
+          message: `Limite atteinte. Vous avez déjà demandé ${RESEND_MAX} codes. Réessayez dans ${limit.minutesLeft} minute(s).`,
+          minutesLeft: limit.minutesLeft,
+        });
       }
 
       const code = generateVerificationCode();
