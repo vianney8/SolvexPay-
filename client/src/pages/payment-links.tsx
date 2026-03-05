@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -22,7 +22,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Plus, Link2, Copy, ExternalLink, Trash2, Search,
   Globe, Activity, ArrowLeft, ImagePlus,
-  Info, Pencil, Upload, X, CheckCircle2, Lock,
+  Info, Pencil, Upload, X, CheckCircle2, Lock, Store,
 } from "lucide-react";
 import type { PaymentLink } from "@shared/schema";
 
@@ -46,9 +46,20 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
   const [imageUrl, setImageUrl] = useState(editLink?.imageUrl || "");
   const [imagePreview, setImagePreview] = useState(editLink?.imageUrl || "");
   const [uploading, setUploading] = useState(false);
+  const [merchantName, setMerchantName] = useState("");
+  const [initialized, setInitialized] = useState(false);
 
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
   const feeRate = (serviceFees?.deposit ?? 7) / 100;
+
+  const { data: userData } = useQuery<any>({ queryKey: ["/api/auth/user"] });
+
+  useEffect(() => {
+    if (userData && !initialized) {
+      setMerchantName(userData.merchantName || "");
+      setInitialized(true);
+    }
+  }, [userData, initialized]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => apiRequest("POST", "/api/payment-links", data),
@@ -94,10 +105,21 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     if (!allowCustomAmount && !amount) return;
+
+    if (merchantName.trim() !== (userData?.merchantName || "")) {
+      try {
+        await apiRequest("PATCH", "/api/auth/user", { merchantName: merchantName.trim() || null });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      } catch {
+        toast({ title: "Erreur", description: "Impossible de mettre à jour le nom marchand.", variant: "destructive" });
+        return;
+      }
+    }
+
     const payload = {
       name: name.trim(),
       amount: allowCustomAmount ? (amount ? parseFloat(String(amount)) : 0) : parseFloat(String(amount)),
@@ -190,6 +212,14 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description (optionnel)</Label>
                 <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Décrivez votre produit pour vos clients..." rows={3} className="border-border/70 resize-none" data-testid="input-link-description" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom marchand (optionnel)</Label>
+                <div className="relative">
+                  <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input value={merchantName} onChange={(e) => setMerchantName(e.target.value)} placeholder="Ex: Ma Boutique, Mon Service..." className="pl-10 h-11 border-border/70" data-testid="input-link-merchant-name" />
+                </div>
+                <p className="text-xs text-muted-foreground">Affiché sur la page de paiement de vos clients. S'applique à tous vos liens.</p>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">URL de redirection (optionnel)</Label>
