@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -75,7 +76,7 @@ export default function WithdrawPage() {
 
   useEffect(() => { setOperator(""); }, [country]);
 
-  const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
+  const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: allTransactions } = useQuery<any[]>({ queryKey: ["/api/transactions"] });
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
@@ -193,11 +194,17 @@ export default function WithdrawPage() {
             </div>
             <div className="text-right flex-shrink-0">
               <p className="text-white/60 text-xs">Solde disponible</p>
-              <p className="font-black text-xl" data-testid="text-current-balance">{formatCurrency(balance)} XOF</p>
-              {balance > 0 && (
-                <button type="button" onClick={() => setAmount(String(Math.floor(balance * 0.99)))} className="text-white/70 text-xs underline hover:text-white mt-0.5" data-testid="button-max-amount">
-                  Max
-                </button>
+              {walletLoading ? (
+                <Skeleton className="h-7 w-28 bg-white/20 rounded-lg" />
+              ) : (
+                <>
+                  <p className="font-black text-xl" data-testid="text-current-balance">{formatCurrency(balance)} XOF</p>
+                  {balance > 0 && (
+                    <button type="button" onClick={() => setAmount(String(Math.floor(balance * 0.99)))} className="text-white/70 text-xs underline hover:text-white mt-0.5" data-testid="button-max-amount">
+                      Max
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

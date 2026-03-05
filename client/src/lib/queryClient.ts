@@ -7,6 +7,20 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+export function getErrorMessage(error: unknown, fallback = "Une erreur est survenue."): string {
+  if (!error) return fallback;
+  if (typeof error === "string") return error || fallback;
+  if (error instanceof Error) {
+    try {
+      const parsed = JSON.parse(error.message.replace(/^\d+:\s*/, "") || "{}");
+      return parsed.message || error.message || fallback;
+    } catch {
+      return error.message.replace(/^\d+:\s*/, "") || fallback;
+    }
+  }
+  return fallback;
+}
+
 export async function apiRequest(
   method: string,
   url: string,

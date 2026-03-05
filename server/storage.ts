@@ -30,6 +30,7 @@ export interface IStorage {
   getTransactionByReference(reference: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string): Promise<Transaction | undefined>;
+  updateTransactionStatusIfPending(id: string, newStatus: string): Promise<Transaction | undefined>;
   
   getPaymentLinks(userId: string): Promise<PaymentLink[]>;
   getPaymentLinkBySlug(slug: string): Promise<PaymentLink | undefined>;
@@ -127,6 +128,15 @@ export class DatabaseStorage implements IStorage {
       .update(transactions)
       .set({ status })
       .where(eq(transactions.id, id))
+      .returning();
+    return tx;
+  }
+
+  async updateTransactionStatusIfPending(id: string, newStatus: string): Promise<Transaction | undefined> {
+    const [tx] = await db
+      .update(transactions)
+      .set({ status: newStatus })
+      .where(and(eq(transactions.id, id), eq(transactions.status, "pending")))
       .returning();
     return tx;
   }

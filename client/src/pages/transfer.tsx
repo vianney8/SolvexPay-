@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -61,7 +62,7 @@ export default function TransferPage() {
 
   useEffect(() => { setOperator(""); }, [country]);
 
-  const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
+  const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
   const balance = parseFloat(String(wallet?.balanceXOF || 0));
   const transferAmount = parseFloat(amount) || 0;
@@ -173,7 +174,11 @@ export default function TransferPage() {
             </div>
             <div className="text-right flex-shrink-0">
               <p className="text-white/60 text-xs">Solde</p>
-              <p className="font-black text-xl" data-testid="text-transfer-balance">{formatCurrency(balance)} XOF</p>
+              {walletLoading ? (
+                <Skeleton className="h-7 w-28 bg-white/20 rounded-lg" />
+              ) : (
+                <p className="font-black text-xl" data-testid="text-transfer-balance">{formatCurrency(balance)} XOF</p>
+              )}
             </div>
           </div>
         </div>

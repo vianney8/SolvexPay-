@@ -3,9 +3,42 @@ import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { randomInt } from "crypto";
+import rateLimit from "express-rate-limit";
 import { authStorage } from "./storage";
 import { registerSchema, loginSchema } from "@shared/models/auth";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../../services/resend";
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: "Trop de tentatives de connexion. Réessayez dans 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { message: "Trop d'inscriptions depuis cette adresse. Réessayez dans 1 heure." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const codeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: "Trop de tentatives. Réessayez dans 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { message: "Trop de demandes de réinitialisation. Réessayez dans 1 heure." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
@@ -38,7 +71,7 @@ export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
 
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", registerLimiter, async (req, res) => {
     try {
       const validation = registerSchema.safeParse(req.body);
       if (!validation.success) {
@@ -85,7 +118,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/verify-email", async (req, res) => {
+  app.post("/api/auth/verify-email", codeLimiter, async (req, res) => {
     try {
       const { userId, code } = req.body;
       if (!userId || !code) {
@@ -127,7 +160,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/resend-verification", async (req, res) => {
+  app.post("/api/auth/resend-verification", codeLimiter, async (req, res) => {
     try {
       const { userId } = req.body;
       if (!userId) {
@@ -155,7 +188,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  app.post("/api/auth/forgot-password", forgotPasswordLimiter, async (req, res) => {
     try {
       const { email } = req.body;
       if (!email) return res.status(400).json({ message: "Email requis" });
@@ -183,7 +216,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/verify-reset-code", async (req, res) => {
+  app.post("/api/auth/verify-reset-code", codeLimiter, async (req, res) => {
     try {
       const { userId, code } = req.body;
       if (!userId || !code) return res.status(400).json({ message: "Données manquantes" });
@@ -210,7 +243,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/reset-password", async (req, res) => {
+  app.post("/api/auth/reset-password", codeLimiter, async (req, res) => {
     try {
       const { userId, code, newPassword } = req.body;
       if (!userId || !code || !newPassword) return res.status(400).json({ message: "Données manquantes" });
@@ -247,7 +280,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", loginLimiter, async (req, res) => {
     try {
       const validation = loginSchema.safeParse(req.body);
       if (!validation.success) {

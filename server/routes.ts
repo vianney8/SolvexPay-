@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import rateLimit from "express-rate-limit";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
 import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, type OmniPayCallbackPayload } from "./services/omnipay";
@@ -9,6 +10,22 @@ import multer from "multer";
 import path from "path";
 import crypto from "crypto";
 import axios from "axios";
+
+const paymentLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { message: "Trop de requêtes de paiement. Attendez 1 minute avant de réessayer." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const verifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { message: "Trop de vérifications. Attendez 1 minute." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -125,7 +142,7 @@ async function checkOperatorMaintenance(operator: string, country: string): Prom
     if ((pm.maintenanceCountries || []).includes(country)) return `${operator} est en maintenance dans ce pays`;
     return null;
   } catch {
-    return null;
+    return `Service temporairement indisponible. Réessayez dans quelques instants.`;
   }
 }
 
@@ -174,7 +191,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/deposit", isAuthenticated, async (req: any, res) => {
+  app.post("/api/transactions/deposit", isAuthenticated, paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
       
@@ -242,7 +259,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/withdraw", isAuthenticated, async (req: any, res) => {
+  app.post("/api/transactions/withdraw", isAuthenticated, paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
       if (req.user.kycStatus !== "verified") {
@@ -337,7 +354,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/transfer", isAuthenticated, async (req: any, res) => {
+  app.post("/api/transactions/transfer", isAuthenticated, paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
       if (req.user.kycStatus !== "verified") {
@@ -408,7 +425,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/verify", isAuthenticated, async (req: any, res) => {
+  app.post("/api/transactions/verify", isAuthenticated, verifyLimiter, async (req: any, res) => {
     try {
       const { reference } = req.body;
       if (!reference) {
@@ -419,10 +436,10 @@ export async function registerRoutes(
       const statusStr = omnipayStatusToString(result.status ?? 0);
 
       const transaction = await storage.getTransactionByReference(reference);
-      if (transaction && transaction.status === "pending") {
+      if (transaction) {
         if (statusStr === "completed") {
-          await storage.updateTransactionStatus(transaction.id, "completed");
-          if (transaction.type === "deposit") {
+          const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
+          if (updated && transaction.type === "deposit") {
             const grossAmount = parseFloat(transaction.amount);
             const txFees = parseFloat((transaction as any).fees || "0") || 0;
             const netAmount = grossAmount - txFees;
@@ -433,8 +450,8 @@ export async function registerRoutes(
             );
           }
         } else if (statusStr === "failed") {
-          await storage.updateTransactionStatus(transaction.id, "failed");
-          if (transaction.type === "withdrawal") {
+          const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+          if (updated && transaction.type === "withdrawal") {
             await storage.updateWalletBalance(
               transaction.userId,
               transaction.currency,
@@ -452,7 +469,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/payment-links/verify-public", async (req, res) => {
+  app.post("/api/payment-links/verify-public", verifyLimiter, async (req, res) => {
     try {
       const { reference } = req.body;
       if (!reference) {
@@ -463,10 +480,10 @@ export async function registerRoutes(
       const statusStr = omnipayStatusToString(result.status ?? 0);
 
       const transaction = await storage.getTransactionByReference(reference);
-      if (transaction && transaction.status === "pending") {
+      if (transaction) {
         if (statusStr === "completed") {
-          await storage.updateTransactionStatus(transaction.id, "completed");
-          if (transaction.type === "deposit") {
+          const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
+          if (updated && transaction.type === "deposit") {
             const grossAmt = parseFloat(transaction.amount);
             const txFees2 = parseFloat((transaction as any).fees || "0") || 0;
             const netAmt = grossAmt - txFees2;
@@ -477,7 +494,7 @@ export async function registerRoutes(
             );
           }
         } else if (statusStr === "failed") {
-          await storage.updateTransactionStatus(transaction.id, "failed");
+          await storage.updateTransactionStatusIfPending(transaction.id, "failed");
         }
       }
 
@@ -599,7 +616,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/payment-api/public/:id/verify", async (req, res) => {
+  app.post("/api/payment-api/public/:id/verify", verifyLimiter, async (req, res) => {
     try {
       const { id } = req.params;
       const transaction = await storage.getTransactionById(id);
@@ -613,13 +630,15 @@ export async function registerRoutes(
       const result = await omniPayService.getStatus(transaction.reference);
       const statusStr = omnipayStatusToString(result.status ?? 0);
       if (statusStr === "completed") {
-        await storage.updateTransactionStatus(transaction.id, "completed");
-        const grossAmt = parseFloat(transaction.amount);
-        const txFees = parseFloat((transaction as any).fees || "0") || 0;
-        const netAmt = grossAmt - txFees;
-        await storage.updateWalletBalance(transaction.userId, transaction.currency, netAmt > 0 ? netAmt : grossAmt);
+        const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
+        if (updated) {
+          const grossAmt = parseFloat(transaction.amount);
+          const txFees = parseFloat((transaction as any).fees || "0") || 0;
+          const netAmt = grossAmt - txFees;
+          await storage.updateWalletBalance(transaction.userId, transaction.currency, netAmt > 0 ? netAmt : grossAmt);
+        }
       } else if (statusStr === "failed") {
-        await storage.updateTransactionStatus(transaction.id, "failed");
+        await storage.updateTransactionStatusIfPending(transaction.id, "failed");
       }
       const publicStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
       res.json({ success: result.success, status: publicStatus });
@@ -2263,13 +2282,33 @@ export async function registerRoutes(
       if (!fromWallet || parseFloat(fromWallet.balanceXOF) < parseFloat(amount)) {
         return res.status(400).json({ message: "Solde insuffisant dans le wallet source" });
       }
-      const reference = generateReference();
-      await storage.updateWalletBalance(fromUserId, "XOF", -parseFloat(amount));
-      let toWallet = await storage.getWallet(toUserId);
-      if (!toWallet) toWallet = await storage.createWallet(toUserId);
-      await storage.updateWalletBalance(toUserId, "XOF", parseFloat(amount));
-      await storage.createTransaction({ userId: fromUserId, type: "transfer", amount: String(amount), currency: "XOF", provider: "admin", phoneNumber: "", reference, status: "completed", description: `Migration admin vers ${toUserId}: ${motif || ""}` });
-      await storage.createTransaction({ userId: toUserId, type: "deposit", amount: String(amount), currency: "XOF", provider: "admin", phoneNumber: "", reference: generateReference(), status: "completed", description: `Migration admin depuis ${fromUserId}: ${motif || ""}` });
+
+      const { db: dbClient } = await import("./db");
+      const { wallets: walletsTable, transactions: txTable } = await import("@shared/schema");
+      const { eq: eqFn, sql: sqlRaw, and: andFn } = await import("drizzle-orm");
+
+      await dbClient.transaction(async (trx) => {
+        await trx.update(walletsTable)
+          .set({ balanceXOF: sqlRaw`${walletsTable.balanceXOF} - ${parseFloat(amount)}`, updatedAt: new Date() })
+          .where(andFn(eqFn(walletsTable.userId, fromUserId), sqlRaw`${walletsTable.balanceXOF} >= ${parseFloat(amount)}`));
+
+        const [existingToWallet] = await trx.select().from(walletsTable).where(eqFn(walletsTable.userId, toUserId));
+        if (!existingToWallet) {
+          await trx.insert(walletsTable).values({ userId: toUserId });
+        }
+
+        await trx.update(walletsTable)
+          .set({ balanceXOF: sqlRaw`${walletsTable.balanceXOF} + ${parseFloat(amount)}`, updatedAt: new Date() })
+          .where(eqFn(walletsTable.userId, toUserId));
+
+        const refFrom = generateReference();
+        const refTo = generateReference();
+        await trx.insert(txTable).values([
+          { userId: fromUserId, type: "transfer", amount: String(amount), currency: "XOF", provider: "admin", phoneNumber: "", reference: refFrom, status: "completed", description: `Migration admin vers ${toUserId}: ${motif || ""}` },
+          { userId: toUserId, type: "deposit", amount: String(amount), currency: "XOF", provider: "admin", phoneNumber: "", reference: refTo, status: "completed", description: `Migration admin depuis ${fromUserId}: ${motif || ""}` },
+        ]);
+      });
+
       res.json({ success: true });
     } catch (error) {
       console.error("Admin wallet migrate error:", error);

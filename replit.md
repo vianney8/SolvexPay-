@@ -112,7 +112,7 @@ All API integrations use a **mandatory redirect flow** to SolvexPay's hosted pay
 - Polls OmniPay `getStatus()` every 5s from frontend
 - OmniPay "Transaction successful" (`success: 0`) → correctly mapped to `status: 3` (completed)
 - Credits wallet (net of fees) when status becomes "completed"
-- Idempotent: won't double-credit if already completed
+- **Atomic**: uses `updateTransactionStatusIfPending()` (conditional SQL WHERE status='pending') to prevent double-crediting in concurrent requests
 
 ## Webhook System
 - Outbound webhooks: fired on `completed`/`failed` status change
@@ -130,6 +130,26 @@ All API integrations use a **mandatory redirect flow** to SolvexPay's hosted pay
 - `fee_deposit` = 7% (dashboard deposits) — admin-editable
 - `fee_withdrawal` = 7%
 - `fee_transfer` = 7%
+
+## Security
+
+### Rate Limiting (express-rate-limit)
+- **Auth routes**: login (10/15min), register (5/1h), codes (10/15min), forgot-password (5/1h)
+- **Payment routes**: deposit/withdraw/transfer (10/1min), verify (30/1min)
+
+### Security Headers (helmet)
+- Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, etc.
+
+### CORS
+- Configured via `ALLOWED_ORIGINS` env var (comma-separated list)
+- In development: all origins allowed
+
+### Atomic Operations
+- Verify routes: use `updateTransactionStatusIfPending()` to prevent double-crediting
+- Admin migration: wrapped in DB transaction (`db.transaction()`)
+
+### checkOperatorMaintenance
+- On DB error: returns blocking message (not null) — fails safe
 
 ## Authentication
 - Replit Auth handles OIDC flow
