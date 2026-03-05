@@ -221,6 +221,7 @@ export default function AdminPage() {
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({ queryKey: ["/api/admin/api-keys"] });
   const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({ queryKey: ["/api/admin/notifications"] });
   const { data: supportLinks, isLoading: supportLinksLoading } = useQuery<Record<string, string>>({ queryKey: ["/api/support-links"] });
+  const { data: countriesStats } = useQuery<{ txByCountry: any[]; usersByWithdrawal: any[] }>({ queryKey: ["/api/admin/stats/countries"] });
 
   // Mutations
   const blockM = useMutation({
@@ -832,6 +833,84 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* ── ACTIVITÉ PAR PAYS ── */}
+            {(() => {
+              const COUNTRY_META: Record<string, { name: string; flag: string; gradient: string; border: string; text: string }> = {
+                CM:  { name: "Cameroun",        flag: "🇨🇲", gradient: "from-green-500 to-emerald-600",  border: "border-green-400/40",   text: "text-green-400" },
+                SN:  { name: "Sénégal",         flag: "🇸🇳", gradient: "from-yellow-500 to-orange-500", border: "border-yellow-400/40",  text: "text-yellow-400" },
+                CI:  { name: "Côte d'Ivoire",   flag: "🇨🇮", gradient: "from-orange-500 to-red-500",    border: "border-orange-400/40",  text: "text-orange-400" },
+                BF:  { name: "Burkina Faso",    flag: "🇧🇫", gradient: "from-red-500 to-rose-600",      border: "border-red-400/40",     text: "text-red-400" },
+                ML:  { name: "Mali",            flag: "🇲🇱", gradient: "from-lime-500 to-green-600",    border: "border-lime-400/40",    text: "text-lime-400" },
+                GN:  { name: "Guinée",          flag: "🇬🇳", gradient: "from-red-400 to-yellow-500",   border: "border-red-300/40",     text: "text-red-300" },
+                BJ:  { name: "Bénin",           flag: "🇧🇯", gradient: "from-teal-500 to-cyan-600",    border: "border-teal-400/40",    text: "text-teal-400" },
+                NE:  { name: "Niger",           flag: "🇳🇪", gradient: "from-amber-500 to-orange-600", border: "border-amber-400/40",   text: "text-amber-400" },
+                TG:  { name: "Togo",            flag: "🇹🇬", gradient: "from-sky-500 to-blue-600",     border: "border-sky-400/40",     text: "text-sky-400" },
+                COD: { name: "Congo (RDC)",     flag: "🇨🇩", gradient: "from-blue-500 to-indigo-600",  border: "border-blue-400/40",    text: "text-blue-400" },
+                COG: { name: "Congo (Brazza)",  flag: "🇨🇬", gradient: "from-violet-500 to-purple-600",border: "border-violet-400/40",  text: "text-violet-400" },
+                GH:  { name: "Ghana",           flag: "🇬🇭", gradient: "from-yellow-600 to-red-600",   border: "border-yellow-500/40",  text: "text-yellow-500" },
+                NG:  { name: "Nigéria",         flag: "🇳🇬", gradient: "from-emerald-500 to-green-700",border: "border-emerald-400/40", text: "text-emerald-400" },
+              };
+              const DEFAULT_META = { name: "", flag: "🌍", gradient: "from-slate-500 to-slate-600", border: "border-slate-400/40", text: "text-slate-400" };
+
+              const rows = (countriesStats?.txByCountry ?? []).map((c) => ({
+                code: c.country ?? "??",
+                txCount: c.txCount ?? 0,
+                uniqueUsers: c.uniqueUsers ?? 0,
+                totalVolume: c.totalVolume ?? 0,
+                meta: COUNTRY_META[c.country ?? ""] ?? { ...DEFAULT_META, name: c.country ?? "Inconnu" },
+              }));
+
+              const maxTx = rows.length > 0 ? rows[0].txCount : 1;
+
+              return (
+                <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
+                  <div className="bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 px-5 py-3 flex items-center gap-2">
+                    <span className="text-lg">🌍</span>
+                    <p className="text-white font-bold text-sm">Activité par Pays</p>
+                    <span className="ml-auto text-xs text-white/70">{rows.length} pays actif{rows.length !== 1 ? "s" : ""}</span>
+                  </div>
+
+                  {rows.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground text-sm">
+                      Aucune transaction avec pays enregistré pour le moment.
+                    </div>
+                  ) : (
+                    <div className="p-4 space-y-3">
+                      {rows.map((row, idx) => {
+                        const barPct = Math.round((row.txCount / maxTx) * 100);
+                        const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
+                        return (
+                          <div key={row.code} className={`rounded-xl border ${row.meta.border} bg-gradient-to-r ${row.meta.gradient} bg-opacity-5 p-3`} data-testid={`country-row-${row.code}`}>
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-2xl leading-none">{row.meta.flag}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  {medal && <span className="text-base leading-none">{medal}</span>}
+                                  <p className="text-sm font-bold text-foreground truncate">{row.meta.name || row.code}</p>
+                                  <span className="text-[10px] font-mono text-muted-foreground ml-auto shrink-0">{row.code}</span>
+                                </div>
+                                <div className="flex items-center gap-3 mt-0.5">
+                                  <span className={`text-xs font-semibold ${row.meta.text}`}>{row.txCount} transaction{row.txCount !== 1 ? "s" : ""}</span>
+                                  <span className="text-xs text-muted-foreground">{row.uniqueUsers} utilisateur{row.uniqueUsers !== 1 ? "s" : ""}</span>
+                                  <span className="text-xs text-muted-foreground ml-auto">{fmt(Math.round(row.totalVolume))} XOF</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="w-full bg-white/10 dark:bg-black/20 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className={`h-1.5 rounded-full bg-gradient-to-r ${row.meta.gradient} transition-all duration-700`}
+                                style={{ width: `${barPct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </TabsContent>
 
           {/* ══════════════════════════════════════

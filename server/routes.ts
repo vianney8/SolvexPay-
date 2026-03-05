@@ -2111,6 +2111,42 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/stats/countries", isAdmin, async (_req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { sql, ne, isNotNull } = await import("drizzle-orm");
+      const { transactions: txTable } = await import("@shared/schema");
+      const { users: usersTable } = await import("@shared/models/auth");
+
+      const txByCountry = await db
+        .select({
+          country: txTable.payerCountry,
+          txCount: sql<number>`count(*)::int`,
+          uniqueUsers: sql<number>`count(distinct ${txTable.userId})::int`,
+          totalVolume: sql<number>`sum(${txTable.amount}::numeric)::float`,
+        })
+        .from(txTable)
+        .where(isNotNull(txTable.payerCountry))
+        .groupBy(txTable.payerCountry)
+        .orderBy(sql`count(*) desc`);
+
+      const usersByWithdrawal = await db
+        .select({
+          country: usersTable.withdrawalCountry,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(usersTable)
+        .where(isNotNull(usersTable.withdrawalCountry))
+        .groupBy(usersTable.withdrawalCountry)
+        .orderBy(sql`count(*) desc`);
+
+      res.json({ txByCountry, usersByWithdrawal });
+    } catch (error) {
+      console.error("Stats countries error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   app.patch("/api/admin/payment-methods/:code", isAdmin, async (req, res) => {
     try {
       const { code } = req.params;
