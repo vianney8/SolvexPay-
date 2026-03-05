@@ -1076,6 +1076,10 @@ export default function AdminPage() {
                             </div>
                             <p className="text-xs text-muted-foreground">{u.email}</p>
                             <p className="text-xs text-muted-foreground">{u.phone || "—"}</p>
+                            <p className="text-[10px] text-muted-foreground/70 flex items-center gap-1 mt-0.5" data-testid={`text-created-${u.id}`}>
+                              <CalendarDays className="h-3 w-3" />
+                              Inscrit le {u.createdAt ? new Date(u.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                            </p>
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="text-xs text-muted-foreground">Solde</p>
