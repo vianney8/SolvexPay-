@@ -1,4 +1,5 @@
 import { Switch, Route } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -22,6 +23,18 @@ import PayApiPage from "@/pages/pay-api";
 import AdminPage from "@/pages/admin";
 import SupportPage from "@/pages/support";
 import DocumentationPage from "@/pages/documentation";
+
+const PREFETCH_KEYS = [
+  ["/api/wallet"],
+  ["/api/stats"],
+  ["/api/transactions"],
+  ["/api/payment-links"],
+  ["/api/notifications"],
+  ["/api/service-fees"],
+  ["/api/support-links"],
+  ["/api/payment-methods/public"],
+  ["/api/api-keys"],
+];
 
 function AuthenticatedRoutes() {
   return (
@@ -69,6 +82,13 @@ function BlockedPage() {
 
 function Router() {
   const { user, isLoading, isBlocked } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    PREFETCH_KEYS.forEach((key) => {
+      queryClient.prefetchQuery({ queryKey: key, staleTime: Infinity });
+    });
+  }, [user?.id]);
 
   if (isLoading) {
     return (
