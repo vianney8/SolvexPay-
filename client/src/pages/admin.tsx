@@ -164,7 +164,7 @@ export default function AdminPage() {
   const [statsPeriod, setStatsPeriod] = useState("month");
   // Dialogs
   const [kycDialog, setKycDialog] = useState<{ userId: string; name: string; status: string } | null>(null);
-  const [kycAction, setKycAction] = useState<"verified" | "rejected">("verified");
+  const [kycAction, setKycAction] = useState<"verified" | "rejected" | "not_started">("verified");
   const [kycReason, setKycReason] = useState("");
   const [pwdDialog, setPwdDialog] = useState<{ userId: string; name: string } | null>(null);
   const [pwd, setPwd] = useState("");
@@ -1122,6 +1122,12 @@ export default function AdminPage() {
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-colors"
                             data-testid={`btn-bal-${u.id}`}><PenLine className="h-3.5 w-3.5" />Solde</button>
                           <button
+                            onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus || "not_started" }); setKycAction(u.kycStatus === "verified" ? "not_started" : "verified"); setKycReason(""); }}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.kycStatus === "verified" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/15"}`}
+                            data-testid={`btn-kyc-${u.id}`}>
+                            <BadgeCheck className="h-3.5 w-3.5" />{u.kycStatus === "verified" ? "KYC ✓" : "KYC"}
+                          </button>
+                          <button
                             onClick={() => blockM.mutate({ userId: u.id, isBlocked: !u.isBlocked })}
                             disabled={blockM.isPending}
                             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.isBlocked ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
@@ -1218,16 +1224,21 @@ export default function AdminPage() {
                             <p className="text-xs text-red-500 mt-1"><strong>Motif :</strong> {u.kycRejectionReason}</p>
                           )}
                         </div>
-                        {u.kycStatus === "pending" && (
-                          <div className="flex gap-1.5 flex-shrink-0">
-                            <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); }} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-colors" data-testid={`btn-kyc-approve-${u.id}`}>
-                              <CheckCircle2 className="h-3.5 w-3.5" />Approuver
-                            </button>
-                            <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("rejected"); }} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-500/15 text-red-600 text-xs font-bold hover:bg-red-500/25 transition-colors" data-testid={`btn-kyc-reject-${u.id}`}>
-                              <XCircle className="h-3.5 w-3.5" />Rejeter
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          {u.kycStatus === "pending" && (
+                            <>
+                              <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("verified"); setKycReason(""); }} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-colors" data-testid={`btn-kyc-approve-${u.id}`}>
+                                <CheckCircle2 className="h-3.5 w-3.5" />Approuver
+                              </button>
+                              <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction("rejected"); setKycReason(""); }} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-500/15 text-red-600 text-xs font-bold hover:bg-red-500/25 transition-colors" data-testid={`btn-kyc-reject-${u.id}`}>
+                                <XCircle className="h-3.5 w-3.5" />Rejeter
+                              </button>
+                            </>
+                          )}
+                          <button onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus }); setKycAction(u.kycStatus === "verified" ? "not_started" : "verified"); setKycReason(""); }} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-500/10 text-muted-foreground text-xs font-bold hover:bg-slate-500/15 transition-colors" data-testid={`btn-kyc-modify-${u.id}`}>
+                            <BadgeCheck className="h-3.5 w-3.5" />Modifier
+                          </button>
+                        </div>
                       </div>
 
                       {/* KYC Photos */}
@@ -2107,24 +2118,36 @@ export default function AdminPage() {
       </div>
 
       {/* ════ KYC DIALOG ════ */}
-      <Dialog open={!!kycDialog} onOpenChange={(o) => { if (!o) setKycDialog(null); }}>
+      <Dialog open={!!kycDialog} onOpenChange={(o) => { if (!o) { setKycDialog(null); setKycReason(""); } }}>
         <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-indigo-500" />Décision KYC</DialogTitle>
-            <DialogDescription>Utilisateur : <strong>{kycDialog?.name}</strong></DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-indigo-500" />Statut de vérification</DialogTitle>
+            <DialogDescription>Compte : <strong>{kycDialog?.name}</strong></DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-2">
-              {(["verified", "rejected"] as const).map(action => (
-                <button key={action} onClick={() => setKycAction(action)}
-                  className={`p-3 rounded-2xl border-2 text-sm font-bold transition-all ${kycAction === action
-                    ? action === "verified" ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-red-500 bg-red-500/10 text-red-700 dark:text-red-400"
-                    : "border-border/60 text-muted-foreground hover:border-border"}`}
-                  data-testid={`btn-kyc-action-${action}`}>
-                  {action === "verified" ? <><CheckCircle2 className="h-4 w-4 mx-auto mb-1" />Approuver</> : <><XCircle className="h-4 w-4 mx-auto mb-1" />Rejeter</>}
-                </button>
-              ))}
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={() => setKycAction("verified")}
+                className={`p-3 rounded-2xl border-2 text-xs font-bold transition-all text-center ${kycAction === "verified" ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-border/60 text-muted-foreground hover:border-border"}`}
+                data-testid="btn-kyc-action-verified">
+                <CheckCircle2 className="h-4 w-4 mx-auto mb-1" />Vérifié
+              </button>
+              <button onClick={() => setKycAction("rejected")}
+                className={`p-3 rounded-2xl border-2 text-xs font-bold transition-all text-center ${kycAction === "rejected" ? "border-red-500 bg-red-500/10 text-red-700 dark:text-red-400" : "border-border/60 text-muted-foreground hover:border-border"}`}
+                data-testid="btn-kyc-action-rejected">
+                <XCircle className="h-4 w-4 mx-auto mb-1" />Rejeté
+              </button>
+              <button onClick={() => setKycAction("not_started")}
+                className={`p-3 rounded-2xl border-2 text-xs font-bold transition-all text-center ${kycAction === "not_started" ? "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400" : "border-border/60 text-muted-foreground hover:border-border"}`}
+                data-testid="btn-kyc-action-not_started">
+                <AlertTriangle className="h-4 w-4 mx-auto mb-1" />Non vérifié
+              </button>
             </div>
+            {kycAction === "not_started" && (
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-700 dark:text-amber-400">Le statut KYC de cet utilisateur sera réinitialisé. Il devra soumettre à nouveau ses documents.</p>
+              </div>
+            )}
             {kycAction === "rejected" && (
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Motif de rejet <span className="text-muted-foreground text-xs font-normal">(optionnel)</span></Label>
@@ -2134,13 +2157,13 @@ export default function AdminPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setKycDialog(null)} className="h-10">Annuler</Button>
+            <Button variant="outline" onClick={() => { setKycDialog(null); setKycReason(""); }} className="h-10">Annuler</Button>
             <Button
               onClick={() => kycDialog && kycM.mutate({ userId: kycDialog.userId, kycStatus: kycAction, rejectionReason: kycAction === "rejected" ? kycReason : undefined })}
               disabled={kycM.isPending}
-              className={`h-10 ${kycAction === "verified" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
+              className={`h-10 ${kycAction === "verified" ? "bg-emerald-600 hover:bg-emerald-700" : kycAction === "not_started" ? "bg-amber-600 hover:bg-amber-700" : "bg-red-600 hover:bg-red-700"}`}
               data-testid="btn-kyc-confirm">
-              {kycM.isPending ? "Enregistrement..." : kycAction === "verified" ? "Approuver" : "Rejeter"}
+              {kycM.isPending ? "Enregistrement..." : kycAction === "verified" ? "Marquer comme vérifié" : kycAction === "not_started" ? "Réinitialiser" : "Rejeter"}
             </Button>
           </DialogFooter>
         </DialogContent>
