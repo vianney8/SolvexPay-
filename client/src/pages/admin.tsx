@@ -1137,7 +1137,7 @@ export default function AdminPage() {
                             onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus || "not_started" }); setKycAction(u.kycStatus === "verified" ? "not_started" : "verified"); setKycReason(""); }}
                             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.kycStatus === "verified" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-violet-500/10 text-violet-700 dark:text-violet-400 hover:bg-violet-500/15"}`}
                             data-testid={`btn-kyc-${u.id}`}>
-                            <BadgeCheck className="h-3.5 w-3.5" />{u.kycStatus === "verified" ? "Retirer vérif." : "Vérifier"}
+                            <BadgeCheck className="h-3.5 w-3.5" />Vérification KYC
                           </button>
                         </div>
 
