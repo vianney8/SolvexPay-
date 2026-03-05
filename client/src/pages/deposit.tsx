@@ -61,7 +61,8 @@ export default function DepositPage() {
   const feeRate = (serviceFees?.deposit ?? 7) / 100;
   const feesAmount = Math.round(parsedAmount * feeRate);
   const netAmount = parsedAmount - feesAmount;
-  const balance = parseFloat(String(wallet?.balanceXOF || 0));
+  const balanceXOF = parseFloat(String(wallet?.balanceXOF || 0));
+  const balance = currency === "CDF" ? Math.floor(balanceXOF / 0.22) : balanceXOF;
 
   function getOperatorStatus(op: string) {
     if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
@@ -323,7 +324,7 @@ export default function DepositPage() {
             </div>
             <div className="text-right flex-shrink-0">
               <p className="text-white/60 text-xs">Solde</p>
-              <p className="font-black text-xl" data-testid="text-current-balance">{formatCurrency(balance)} XOF</p>
+              <p className="font-black text-xl" data-testid="text-current-balance">{formatCurrency(balance)} {currency}</p>
             </div>
           </div>
         </div>

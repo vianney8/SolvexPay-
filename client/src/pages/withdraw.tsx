@@ -89,12 +89,14 @@ export default function WithdrawPage() {
     const countryMaint = (pm.maintenanceCountries || []).includes(country);
     return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint };
   }
-  const balance = parseFloat(String(wallet?.balanceXOF || 0));
+  const balanceXOF = parseFloat(String(wallet?.balanceXOF || 0));
+  const balance = currency === "CDF" ? Math.floor(balanceXOF / 0.22) : balanceXOF;
   const withdrawAmount = parseFloat(amount) || 0;
   const feeRate = (serviceFees?.withdrawal ?? 7) / 100;
-  const fees = Math.round(withdrawAmount * feeRate);
-  const netAmount = withdrawAmount - fees;
-  const insufficientFunds = withdrawAmount > balance && withdrawAmount > 0;
+  const withdrawAmountXOF = currency === "CDF" ? Math.floor(withdrawAmount * 0.22) : withdrawAmount;
+  const fees = Math.round(withdrawAmountXOF * feeRate);
+  const netAmount = withdrawAmount - (currency === "CDF" ? Math.round(withdrawAmount * feeRate) : fees);
+  const insufficientFunds = withdrawAmountXOF > balanceXOF && withdrawAmount > 0;
 
   const recentWithdrawals = allTransactions
     ?.filter((t: any) => t.type === "withdrawal")
@@ -198,7 +200,7 @@ export default function WithdrawPage() {
                 <Skeleton className="h-7 w-28 bg-white/20 rounded-lg" />
               ) : (
                 <>
-                  <p className="font-black text-xl" data-testid="text-current-balance">{formatCurrency(balance)} XOF</p>
+                  <p className="font-black text-xl" data-testid="text-current-balance">{formatCurrency(balance)} {currency}</p>
                   {balance > 0 && (
                     <button type="button" onClick={() => setAmount(String(Math.floor(balance * 0.99)))} className="text-white/70 text-xs underline hover:text-white mt-0.5" data-testid="button-max-amount">
                       Max
@@ -333,7 +335,7 @@ export default function WithdrawPage() {
                 {insufficientFunds && (
                   <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/5 border border-destructive/20 mb-2">
                     <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-destructive font-semibold">Solde insuffisant. Disponible : {formatCurrency(balance)} XOF</p>
+                    <p className="text-xs text-destructive font-semibold">Solde insuffisant. Disponible : {formatCurrency(balance)} {currency}</p>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">

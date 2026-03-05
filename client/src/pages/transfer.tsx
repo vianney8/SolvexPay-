@@ -64,12 +64,16 @@ export default function TransferPage() {
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
-  const balance = parseFloat(String(wallet?.balanceXOF || 0));
+  const currency = selectedCountry.currency;
+  const balanceXOF = parseFloat(String(wallet?.balanceXOF || 0));
+  const balance = currency === "CDF" ? Math.floor(balanceXOF / 0.22) : balanceXOF;
   const transferAmount = parseFloat(amount) || 0;
   const feeRate = (serviceFees?.transfer ?? 7) / 100;
-  const fees = Math.round(transferAmount * feeRate);
-  const totalDeducted = transferAmount + fees;
-  const insufficientFunds = totalDeducted > balance && transferAmount > 0;
+  const transferAmountXOF = currency === "CDF" ? Math.floor(transferAmount * 0.22) : transferAmount;
+  const fees = Math.round(transferAmountXOF * feeRate);
+  const feesDisplay = currency === "CDF" ? Math.round(transferAmount * feeRate) : fees;
+  const totalDeducted = transferAmount + feesDisplay;
+  const insufficientFunds = (transferAmountXOF + Math.round(transferAmountXOF * feeRate)) > balanceXOF && transferAmount > 0;
 
   const transferMutation = useMutation({
     mutationFn: async (data: { amount: number; phoneNumber: string; operator: string; country: string; firstName?: string; lastName?: string }) => {
@@ -128,7 +132,7 @@ export default function TransferPage() {
                 </p>
               </div>
               <div className="bg-muted/40 rounded-2xl p-5 space-y-2 text-sm text-left">
-                <div className="flex justify-between"><span className="text-muted-foreground">Montant</span><span className="font-bold">{formatCurrency(transferAmount)} XOF</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Montant</span><span className="font-bold">{formatCurrency(transferAmount)} {currency}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Opérateur</span><span className="font-semibold flex items-center gap-1.5"><OperatorLogo operator={operator} size={18} />{OPERATOR_LABEL[operator] || operator}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Pays</span><span className="font-semibold">{selectedCountry.flag} {selectedCountry.name}</span></div>
                 {recipientName && <div className="flex justify-between"><span className="text-muted-foreground">Bénéficiaire</span><span className="font-semibold">{recipientName}</span></div>}
@@ -177,7 +181,7 @@ export default function TransferPage() {
               {walletLoading ? (
                 <Skeleton className="h-7 w-28 bg-white/20 rounded-lg" />
               ) : (
-                <p className="font-black text-xl" data-testid="text-transfer-balance">{formatCurrency(balance)} XOF</p>
+                <p className="font-black text-xl" data-testid="text-transfer-balance">{formatCurrency(balance)} {currency}</p>
               )}
             </div>
           </div>
@@ -278,7 +282,7 @@ export default function TransferPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (XOF)</Label>
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant ({currency})</Label>
                 <Input
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
@@ -299,21 +303,21 @@ export default function TransferPage() {
                 {insufficientFunds && (
                   <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/5 border border-destructive/20 mb-2">
                     <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-destructive font-semibold">Solde insuffisant. Disponible : {formatCurrency(balance)} XOF</p>
+                    <p className="text-xs text-destructive font-semibold">Solde insuffisant. Disponible : {formatCurrency(balance)} {currency}</p>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Bénéficiaire reçoit</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(transferAmount)} XOF</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(transferAmount)} {currency}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Frais de transfert ({Math.round(feeRate * 100)}%)</span>
-                  <span className="text-destructive font-medium">+ {formatCurrency(fees)} XOF</span>
+                  <span className="text-destructive font-medium">+ {formatCurrency(feesDisplay)} {currency}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sm">Total débité de votre compte</span>
-                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : "text-foreground"}`} data-testid="text-transfer-total">{formatCurrency(totalDeducted)} XOF</span>
+                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : "text-foreground"}`} data-testid="text-transfer-total">{formatCurrency(totalDeducted)} {currency}</span>
                 </div>
               </CardContent>
             </Card>
@@ -336,7 +340,7 @@ export default function TransferPage() {
             {transferMutation.isPending ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Envoi en cours...</>
             ) : (
-              <><Zap className="h-4 w-4" /> Transférer {transferAmount > 0 ? `${formatCurrency(transferAmount)} XOF` : ""}</>
+              <><Zap className="h-4 w-4" /> Transférer {transferAmount > 0 ? `${formatCurrency(transferAmount)} ${currency}` : ""}</>
             )}
           </Button>
         </form>

@@ -130,6 +130,20 @@ function getOmniPayOperatorCode(operator: string, country: string): string {
   return mapping[op]?.[co] ?? op.toLowerCase();
 }
 
+function getCountryCurrency(country: string): string {
+  const XAF_COUNTRIES = ["CM", "COG"];
+  const CDF_COUNTRIES = ["COD"];
+  const c = country.toUpperCase();
+  if (XAF_COUNTRIES.includes(c)) return "XAF";
+  if (CDF_COUNTRIES.includes(c)) return "CDF";
+  return "XOF";
+}
+
+function toXOFEquivalent(amount: number, currency: string): number {
+  if (currency === "CDF") return Math.floor(amount * 0.22);
+  return Math.floor(amount);
+}
+
 async function checkOperatorMaintenance(operator: string, country: string): Promise<string | null> {
   try {
     const { db } = await import("./db");
@@ -271,7 +285,8 @@ export async function registerRoutes(
       }
       
       const { amount, phoneNumber, operator, country } = validation.data;
-      const currency = "XOF";
+      const localCurrency = getCountryCurrency(country);
+      const amountXOF = toXOFEquivalent(amount, localCurrency);
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configuré" });
@@ -282,9 +297,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Aucun portefeuille trouvé" });
       }
 
-      const balanceKey = `balance${currency}` as keyof typeof wallet;
-      const currentBalance = parseFloat((wallet[balanceKey] as string) || "0");
-      if (currentBalance < amount) {
+      const currentBalance = parseFloat(String(wallet.balanceXOF || "0"));
+      if (currentBalance < amountXOF) {
         return res.status(400).json({ message: "Solde insuffisant" });
       }
 
@@ -292,14 +306,14 @@ export async function registerRoutes(
       const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
 
       const withdrawalFeeRate = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7") / 100;
-      const withdrawalFees = Math.round(amount * withdrawalFeeRate);
+      const withdrawalFees = Math.round(amountXOF * withdrawalFeeRate);
 
       if (withdrawalMode === "manual") {
         const transaction = await storage.createTransaction({
           userId,
           type: "withdrawal",
           amount: amount.toString(),
-          currency,
+          currency: localCurrency,
           provider: operator,
           phoneNumber,
           reference,
@@ -307,7 +321,7 @@ export async function registerRoutes(
           description: `Retrait vers ${phoneNumber} via ${operator}`,
           fees: String(withdrawalFees),
         } as any);
-        await storage.updateWalletBalance(userId, currency, -amount);
+        await storage.updateWalletBalance(userId, localCurrency, -amount);
         return res.json({ ...transaction, mode: "manual" });
       }
 
@@ -333,7 +347,7 @@ export async function registerRoutes(
         userId,
         type: "withdrawal",
         amount: amount.toString(),
-        currency,
+        currency: localCurrency,
         provider: operator,
         phoneNumber,
         reference,
@@ -342,7 +356,7 @@ export async function registerRoutes(
         fees: String(withdrawalFees),
       } as any);
 
-      await storage.updateWalletBalance(userId, currency, -amount);
+      await storage.updateWalletBalance(userId, localCurrency, -amount);
 
       res.json({
         ...transaction,
@@ -366,7 +380,8 @@ export async function registerRoutes(
       }
 
       const { amount, phoneNumber, operator, country, firstName, lastName } = validation.data;
-      const currency = "XOF";
+      const localCurrency = getCountryCurrency(country);
+      const amountXOF = toXOFEquivalent(amount, localCurrency);
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configure" });
@@ -379,10 +394,10 @@ export async function registerRoutes(
 
       const currentBalance = parseFloat((wallet.balanceXOF as string) || "0");
       const transferFeeRate = parseFloat((await storage.getSystemSetting("fee_transfer")) || "7") / 100;
-      const transferFees = Math.round(amount * transferFeeRate);
-      const totalDeducted = amount + transferFees;
+      const transferFees = Math.round(amountXOF * transferFeeRate);
+      const totalDeductedXOF = amountXOF + transferFees;
 
-      if (currentBalance < totalDeducted) {
+      if (currentBalance < totalDeductedXOF) {
         return res.status(400).json({ message: "Solde insuffisant" });
       }
 
@@ -404,7 +419,7 @@ export async function registerRoutes(
         userId,
         type: "transfer",
         amount: amount.toString(),
-        currency,
+        currency: localCurrency,
         provider: "omnipay",
         phoneNumber,
         reference,
@@ -413,7 +428,7 @@ export async function registerRoutes(
         fees: String(transferFees),
       } as any);
 
-      await storage.updateWalletBalance(userId, currency, -totalDeducted);
+      await storage.updateWalletBalance(userId, "XOF", -totalDeductedXOF);
 
       res.json({
         ...transaction,
