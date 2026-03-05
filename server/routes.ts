@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
 import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, type OmniPayCallbackPayload } from "./services/omnipay";
+import { testResendConnection } from "./services/resend";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -722,6 +723,25 @@ export async function registerRoutes(
       res.json(notifs);
     } catch {
       res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.post("/api/admin/test-email", isAdmin, async (req: any, res) => {
+    try {
+      const { to } = req.body;
+      const targetEmail = to || req.user?.email;
+      if (!targetEmail) {
+        return res.status(400).json({ message: "Adresse email manquante" });
+      }
+      const result = await testResendConnection(targetEmail);
+      if (result.success) {
+        res.json({ success: true, message: `Email de test envoyé à ${targetEmail}`, id: result.id });
+      } else {
+        res.status(500).json({ success: false, message: result.error });
+      }
+    } catch (error: any) {
+      console.error("[Admin] Test email error:", error?.message);
+      res.status(500).json({ success: false, message: error?.message || "Erreur lors du test" });
     }
   });
 

@@ -73,8 +73,9 @@ export async function setupAuth(app: Express) {
 
       try {
         await sendVerificationEmail(email, code, firstName);
-      } catch (emailErr) {
-        console.error("Failed to send verification email:", emailErr);
+        console.log(`[Email] Verification email sent to ${email}`);
+      } catch (emailErr: any) {
+        console.error("[Email] Failed to send verification email:", emailErr?.message || emailErr);
       }
 
       res.status(201).json({ requiresVerification: true, email, userId: user.id });

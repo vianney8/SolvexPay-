@@ -27,12 +27,14 @@ async function getCredentials() {
     .then((data) => data.items?.[0]);
 
   if (!connectionSettings || !connectionSettings.settings.api_key) {
-    throw new Error("Resend not connected");
+    throw new Error("Resend not connected: API key not configured in the Resend connector.");
   }
+
+  const fromEmail = (connectionSettings.settings.from_email as string) || "";
 
   return {
     apiKey: connectionSettings.settings.api_key as string,
-    fromEmail: (connectionSettings.settings.from_email as string) || "SolvexPay <noreply@solvexpay.com>",
+    fromEmail,
   };
 }
 
@@ -46,7 +48,14 @@ async function getUncachableResendClient() {
 
 export async function sendVerificationEmail(to: string, code: string, firstName: string) {
   const { client, fromEmail } = await getUncachableResendClient();
-  await client.emails.send({
+
+  if (!fromEmail) {
+    throw new Error(
+      "Resend 'from_email' not configured. Please set a verified sender address in the Resend connector settings."
+    );
+  }
+
+  const { data, error } = await client.emails.send({
     from: fromEmail,
     to,
     subject: "Votre code de vérification - SolvexPay",
@@ -95,4 +104,34 @@ export async function sendVerificationEmail(to: string, code: string, firstName:
       </html>
     `,
   });
+
+  if (error) {
+    console.error("[Resend] API error:", JSON.stringify(error));
+    throw new Error(`Resend API error: ${error.message || JSON.stringify(error)}`);
+  }
+
+  console.log(`[Resend] Email sent successfully. ID: ${data?.id}`);
+  return data;
+}
+
+export async function testResendConnection(to: string) {
+  const { client, fromEmail } = await getUncachableResendClient();
+  console.log(`[Resend] Testing with from_email: "${fromEmail}"`);
+
+  if (!fromEmail) {
+    return { success: false, error: "from_email not configured in Resend connector" };
+  }
+
+  const { data, error } = await client.emails.send({
+    from: fromEmail,
+    to,
+    subject: "Test de connexion - SolvexPay",
+    html: "<p>Ce message confirme que Resend est correctement configuré pour SolvexPay.</p>",
+  });
+
+  if (error) {
+    return { success: false, error: error.message || JSON.stringify(error) };
+  }
+
+  return { success: true, id: data?.id };
 }
