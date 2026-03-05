@@ -469,7 +469,11 @@ export function RegisterPage() {
       toast({ title: "Erreur", description: "Le nom complet doit contenir au moins 2 caractères", variant: "destructive" });
       return;
     }
-    if (formData.phone.length < 8) {
+    if (!formData.phone.trim()) {
+      toast({ title: "Erreur", description: "Le numéro de téléphone est obligatoire", variant: "destructive" });
+      return;
+    }
+    if (formData.phone.replace(/\s/g, "").length < 8) {
       toast({ title: "Erreur", description: "Numéro de téléphone invalide (8 chiffres minimum)", variant: "destructive" });
       return;
     }
@@ -584,7 +588,7 @@ export function RegisterPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de Téléphone</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de Téléphone <span className="text-rose-500">*</span></label>
               <div className="flex gap-2">
                 <div className="relative">
                   <button

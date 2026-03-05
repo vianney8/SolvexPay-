@@ -8,7 +8,7 @@ const updateProfileSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().optional(),
   email: z.string().email().optional(),
-  phone: z.string().optional(),
+  phone: z.string().min(8, "Numéro de téléphone invalide (8 chiffres minimum)").optional(),
   merchantName: z.string().optional().nullable(),
 });
 

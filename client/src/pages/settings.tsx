@@ -214,6 +214,16 @@ export default function SettingsPage() {
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isVerified) {
+      if (!firstName.trim()) {
+        toast({ title: "Erreur", description: "Le prénom est obligatoire", variant: "destructive" });
+        return;
+      }
+      if (!phoneNumber.trim() || phoneNumber.replace(/\s/g, "").length < 8) {
+        toast({ title: "Erreur", description: "Le numéro de téléphone est obligatoire (8 chiffres minimum)", variant: "destructive" });
+        return;
+      }
+    }
     const payload: any = { email, merchantName: merchantName || null };
     if (!isVerified) { payload.firstName = firstName; payload.lastName = lastName; payload.phone = `${selectedCode}${phoneNumber}`; }
     profileMutation.mutate(payload);
@@ -371,7 +381,9 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de téléphone</Label>
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Numéro de téléphone {!isVerified && <span className="text-rose-500 ml-0.5">*</span>}
+                        </Label>
                         <div className="flex gap-2">
                           <Select value={selectedCode} onValueChange={setSelectedCode} disabled={isVerified}>
                             <SelectTrigger className="w-[130px] h-11 border-border/70 disabled:opacity-60" data-testid="button-settings-country-code">
@@ -383,7 +395,7 @@ export default function SettingsPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <Input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9\s]/g, ""))} placeholder="97 00 00 00" className="flex-1 h-11 border-border/70 disabled:opacity-60" disabled={isVerified} data-testid="input-settings-phone" />
+                          <Input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9\s]/g, ""))} placeholder="97 00 00 00" className="flex-1 h-11 border-border/70 disabled:opacity-60" disabled={isVerified} required={!isVerified} data-testid="input-settings-phone" />
                         </div>
                       </div>
 
