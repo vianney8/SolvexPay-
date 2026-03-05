@@ -88,6 +88,64 @@ const COUNTRIES = [
 
 const TX_TYPE_LABELS: Record<string, string> = { deposit: "Dépôt", withdrawal: "Retrait", transfer: "Transfert" };
 
+function getTxSourceInfo(tx: any): { label: string; extra: string | null; colorKey: string } {
+  const desc: string = tx.description || "";
+  const type: string = tx.type || "";
+
+  if (type === "transfer") return { label: "Transfert", extra: null, colorKey: "violet" };
+
+  if (type === "withdrawal") {
+    if (tx.provider === "admin") return { label: "Ajust. Admin", extra: null, colorKey: "slate" };
+    return { label: "Retrait", extra: null, colorKey: "orange" };
+  }
+
+  if (type === "deposit") {
+    if (tx.provider === "admin") return { label: "Ajust. Admin", extra: null, colorKey: "emerald" };
+    if (tx.apiKeyId) {
+      const m = desc.match(/^Activation compte (.+?) —/) || desc.match(/^Dépôt via API — (.+)/) || desc.match(/via API — (.+)/);
+      return { label: "Dépôt API", extra: m ? m[1].trim() : null, colorKey: "indigo" };
+    }
+    if (desc.startsWith("Paiement via lien:")) {
+      const linkName = desc.replace("Paiement via lien:", "").trim();
+      return { label: "Dépôt Lien", extra: linkName || null, colorKey: "blue" };
+    }
+    return { label: "Dépôt", extra: null, colorKey: "sky" };
+  }
+
+  return { label: TX_TYPE_LABELS[type] || type, extra: null, colorKey: "slate" };
+}
+
+const COLOR_CLASSES: Record<string, { chip: string; badge: string }> = {
+  violet:  { chip: "bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/30", badge: "bg-violet-500/20 text-violet-700 dark:text-violet-300" },
+  orange:  { chip: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30", badge: "bg-orange-500/20 text-orange-700 dark:text-orange-300" },
+  indigo:  { chip: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/30", badge: "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300" },
+  blue:    { chip: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30", badge: "bg-blue-500/20 text-blue-700 dark:text-blue-300" },
+  sky:     { chip: "bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30", badge: "bg-sky-500/20 text-sky-700 dark:text-sky-300" },
+  emerald: { chip: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", badge: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300" },
+  slate:   { chip: "bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30", badge: "bg-slate-500/20 text-slate-600 dark:text-slate-300" },
+};
+
+function TypeChip({ type, tx }: { type: string; tx?: any }) {
+  if (!tx) {
+    const map: Record<string, string> = {
+      deposit: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
+      withdrawal: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30",
+      transfer: "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30",
+    };
+    return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold ${map[type] || "bg-slate-500/15 text-slate-500 border-slate-500/30"}`}>{TX_TYPE_LABELS[type] || type}</span>;
+  }
+
+  const { label, extra, colorKey } = getTxSourceInfo(tx);
+  const colors = COLOR_CLASSES[colorKey] || COLOR_CLASSES.slate;
+
+  return (
+    <span className="inline-flex items-center gap-1 flex-wrap">
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-semibold ${colors.chip}`}>{label}</span>
+      {extra && <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium max-w-[120px] truncate ${colors.badge}`}>{extra}</span>}
+    </span>
+  );
+}
+
 function fmt(n: number) {
   return new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " XOF";
 }
@@ -459,7 +517,9 @@ export default function AdminPage() {
     });
 
   const filteredTx = (allTx || []).filter(tx => {
-    const m = !txSearch || [tx.reference, tx.phoneNumber, tx.description].join(" ").toLowerCase().includes(txSearch.toLowerCase());
+    const { label, extra } = getTxSourceInfo(tx);
+    const searchFields = [tx.reference, tx.phoneNumber, tx.description, tx.userDisplayName, tx.userEmail, tx.payerName, tx.payerEmail, tx.provider, label, extra].filter(Boolean).join(" ");
+    const m = !txSearch || searchFields.toLowerCase().includes(txSearch.toLowerCase());
     return m && (txStatus === "all" || tx.status === txStatus) && (txType === "all" || tx.type === txType);
   });
 
@@ -1460,7 +1520,7 @@ export default function AdminPage() {
                                 <div className="divide-y divide-border/30 max-h-52 overflow-y-auto">
                                   {userTxList.slice(0, 10).map((tx: any) => (
                                     <div key={tx.id} className="flex items-center gap-2 px-3 py-2">
-                                      <TypeChip type={tx.type} />
+                                      <TypeChip type={tx.type} tx={tx} />
                                       <TxChip status={tx.status} />
                                       <span className="text-xs font-bold flex-1">{fmt(parseFloat(tx.amount))}</span>
                                       <span className="text-xs text-muted-foreground">{fmtDate(tx.createdAt)}</span>
@@ -2157,7 +2217,7 @@ export default function AdminPage() {
             <div className="flex gap-2 flex-wrap">
               <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={txSearch} onChange={e => setTxSearch(e.target.value)} placeholder="Référence, téléphone..." className="pl-10 h-10" data-testid="input-search-tx" />
+                <Input value={txSearch} onChange={e => setTxSearch(e.target.value)} placeholder="Référence, téléphone, nom, API, lien..." className="pl-10 h-10" data-testid="input-search-tx" />
               </div>
               <Select value={txStatus} onValueChange={setTxStatus}>
                 <SelectTrigger className="w-36 h-10" data-testid="select-tx-status"><SelectValue /></SelectTrigger>
@@ -2192,7 +2252,7 @@ export default function AdminPage() {
                     <div key={tx.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors ${i > 0 ? "border-t border-border/30" : ""}`} data-testid={`row-tx-${tx.id}`}>
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <TypeChip type={tx.type} />
+                          <TypeChip type={tx.type} tx={tx} />
                           <TxChip status={tx.status} />
                           <span className="text-xs font-mono text-muted-foreground">{tx.reference}</span>
                         </div>
