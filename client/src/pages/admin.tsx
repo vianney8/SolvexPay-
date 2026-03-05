@@ -199,7 +199,13 @@ export default function AdminPage() {
   const { data: omnipayBalance, isLoading: omniLoading, refetch: refetchOmni } = useQuery<any>({
     queryKey: ["/api/admin/omnipay/balance"],
     retry: 1,
-    staleTime: 30000,
+    staleTime: 10000,
+    refetchInterval: 10000,
+  });
+  const { data: liquidityData } = useQuery<{ walletsByCountry: any[]; pendingByCountry: any[] }>({
+    queryKey: ["/api/admin/liquidity-analysis"],
+    refetchInterval: 10000,
+    staleTime: 8000,
   });
   const { data: paymentMethods, isLoading: pmLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-methods"] });
   const { data: commissions, isLoading: comLoading, refetch: refetchCommissions } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
@@ -531,6 +537,169 @@ export default function AdminPage() {
                 <p className="text-xs text-muted-foreground">Utilisateurs inscrits sur la plateforme</p>
               </div>
             </div>
+
+            {/* ── ANALYSE DE LIQUIDITÉ OMNIPAY ── */}
+            {(() => {
+              const COUNTRY_MAP: Record<string, { name: string; flag: string; omniCode: string; color: string; gradient: string; border: string }> = {
+                BJ:  { name: "Bénin",           flag: "🇧🇯", omniCode: "BEN", color: "text-teal-400",   gradient: "from-teal-500 to-cyan-600",     border: "border-teal-500/30" },
+                CI:  { name: "Côte d'Ivoire",   flag: "🇨🇮", omniCode: "CIV", color: "text-orange-400", gradient: "from-orange-500 to-red-500",    border: "border-orange-500/30" },
+                SN:  { name: "Sénégal",         flag: "🇸🇳", omniCode: "SEN", color: "text-yellow-400", gradient: "from-yellow-500 to-orange-500", border: "border-yellow-500/30" },
+                TG:  { name: "Togo",            flag: "🇹🇬", omniCode: "TGO", color: "text-sky-400",    gradient: "from-sky-500 to-blue-600",      border: "border-sky-500/30" },
+                CM:  { name: "Cameroun",        flag: "🇨🇲", omniCode: "CMR", color: "text-green-400",  gradient: "from-green-500 to-emerald-600", border: "border-green-500/30" },
+                GN:  { name: "Guinée",          flag: "🇬🇳", omniCode: "GIN", color: "text-red-400",    gradient: "from-red-500 to-rose-600",      border: "border-red-500/30" },
+                ML:  { name: "Mali",            flag: "🇲🇱", omniCode: "MLI", color: "text-lime-400",   gradient: "from-lime-500 to-green-600",    border: "border-lime-500/30" },
+                BF:  { name: "Burkina Faso",    flag: "🇧🇫", omniCode: "BFA", color: "text-red-300",    gradient: "from-red-400 to-rose-500",      border: "border-red-400/30" },
+                NE:  { name: "Niger",           flag: "🇳🇪", omniCode: "NER", color: "text-amber-400",  gradient: "from-amber-500 to-orange-600", border: "border-amber-500/30" },
+                COD: { name: "Congo (RDC)",     flag: "🇨🇩", omniCode: "COD", color: "text-blue-400",   gradient: "from-blue-500 to-indigo-600",  border: "border-blue-500/30" },
+                COG: { name: "Congo (Brazza)",  flag: "🇨🇬", omniCode: "COG", color: "text-violet-400", gradient: "from-violet-500 to-purple-600",border: "border-violet-500/30" },
+              };
+
+              const omniBalances: Record<string, number> = {};
+              ((omnipayBalance?.balance) ?? []).forEach((b: any) => {
+                omniBalances[b.countryCode] = b.amount ?? 0;
+              });
+
+              const pendingMap: Record<string, { amount: number; count: number }> = {};
+              (liquidityData?.pendingByCountry ?? []).forEach((p: any) => {
+                pendingMap[p.country] = { amount: p.pendingAmount ?? 0, count: p.pendingCount ?? 0 };
+              });
+
+              const rows = (liquidityData?.walletsByCountry ?? []).map((w: any) => {
+                const meta = COUNTRY_MAP[w.country] ?? { name: w.country, flag: "🌍", omniCode: "??", color: "text-slate-400", gradient: "from-slate-500 to-slate-600", border: "border-slate-500/30" };
+                const omniBalance = omniBalances[meta.omniCode] ?? 0;
+                const pending = pendingMap[w.country] ?? { amount: 0, count: 0 };
+                const totalNeeded = (w.totalBalance ?? 0) + pending.amount;
+                const shortfall = Math.max(0, totalNeeded - omniBalance);
+                const surplus = Math.max(0, omniBalance - totalNeeded);
+                const coverage = totalNeeded > 0 ? Math.min(100, Math.round((omniBalance / totalNeeded) * 100)) : 100;
+                const status = shortfall > 0 ? (shortfall > totalNeeded * 0.5 ? "critical" : "warning") : "ok";
+                return { code: w.country, meta, omniBalance, totalNeeded, userBalance: w.totalBalance ?? 0, userCount: w.userCount ?? 0, pending, shortfall, surplus, coverage, status };
+              }).sort((a, b) => b.shortfall - a.shortfall || b.totalNeeded - a.totalNeeded);
+
+              const totalShortfall = rows.reduce((s, r) => s + r.shortfall, 0);
+              const criticalCount = rows.filter(r => r.status === "critical").length;
+              const warningCount = rows.filter(r => r.status === "warning").length;
+
+              const statusBg: Record<string, string> = {
+                critical: "bg-red-500/10 border-red-500/40",
+                warning: "bg-amber-500/10 border-amber-500/40",
+                ok: "bg-emerald-500/5 border-emerald-500/20",
+              };
+              const statusText: Record<string, string> = {
+                critical: "text-red-400",
+                warning: "text-amber-400",
+                ok: "text-emerald-400",
+              };
+              const statusLabel: Record<string, string> = {
+                critical: "CRITIQUE",
+                warning: "ATTENTION",
+                ok: "OK",
+              };
+
+              return (
+                <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm" data-testid="liquidity-section">
+                  <div className="bg-gradient-to-r from-rose-600 via-orange-600 to-amber-600 px-5 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🏦</span>
+                      <p className="text-white font-bold text-sm">Analyse de Liquidité OmniPay</p>
+                      <span className="text-xs text-white/60 hidden sm:block">— Mis à jour toutes les 10s</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {criticalCount > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-black rounded-full px-2 py-0.5">{criticalCount} CRITIQUE</span>
+                      )}
+                      {warningCount > 0 && (
+                        <span className="bg-amber-500 text-white text-[10px] font-black rounded-full px-2 py-0.5">{warningCount} ATTENTION</span>
+                      )}
+                      {totalShortfall > 0 && (
+                        <span className="bg-white/15 text-white text-[10px] font-bold rounded-lg px-2 py-0.5">
+                          Total à ajouter : {fmt(Math.ceil(totalShortfall))} XOF
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {rows.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-sm">
+                      Aucun utilisateur avec pays de retrait configuré pour le moment.
+                    </div>
+                  ) : (
+                    <div className="p-4 space-y-3">
+                      {rows.map((row) => (
+                        <div key={row.code} className={`rounded-xl border p-3.5 ${statusBg[row.status]}`} data-testid={`liquidity-row-${row.code}`}>
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-2xl">{row.meta.flag}</span>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-bold text-foreground">{row.meta.name}</p>
+                                  <span className={`text-[10px] font-black rounded-full px-1.5 py-0.5 ${statusText[row.status]} bg-current/10`}
+                                    style={{ backgroundColor: row.status === "critical" ? "rgb(239 68 68 / 0.15)" : row.status === "warning" ? "rgb(245 158 11 / 0.15)" : "rgb(16 185 129 / 0.15)" }}>
+                                    {statusLabel[row.status]}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">{row.userCount} utilisateur{row.userCount !== 1 ? "s" : ""} · code {row.meta.omniCode}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              {row.shortfall > 0 ? (
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground font-medium">À ajouter dans OmniPay</p>
+                                  <p className="text-base font-black text-red-400" data-testid={`shortfall-${row.code}`}>+{fmt(Math.ceil(row.shortfall))} XOF</p>
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground font-medium">Excédent disponible</p>
+                                  <p className="text-base font-black text-emerald-400" data-testid={`shortfall-${row.code}`}>0 XOF</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+                            <div className="bg-background/40 rounded-lg p-2">
+                              <p className="text-[10px] text-muted-foreground">Solde OmniPay</p>
+                              <p className="text-xs font-bold text-foreground">{fmt(row.omniBalance)} XOF</p>
+                            </div>
+                            <div className="bg-background/40 rounded-lg p-2">
+                              <p className="text-[10px] text-muted-foreground">Wallets utilisateurs</p>
+                              <p className="text-xs font-bold text-foreground">{fmt(Math.round(row.userBalance))} XOF</p>
+                            </div>
+                            <div className="bg-background/40 rounded-lg p-2">
+                              <p className="text-[10px] text-muted-foreground">Retraits en attente</p>
+                              <p className={`text-xs font-bold ${row.pending.count > 0 ? "text-amber-400" : "text-foreground"}`}>
+                                {fmt(Math.round(row.pending.amount))} XOF
+                                {row.pending.count > 0 && <span className="text-[9px] ml-0.5">({row.pending.count})</span>}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                              <span>Couverture OmniPay</span>
+                              <span className={`font-bold ${row.coverage < 50 ? "text-red-400" : row.coverage < 100 ? "text-amber-400" : "text-emerald-400"}`}>
+                                {row.coverage}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-white/10 dark:bg-black/20 rounded-full h-2 overflow-hidden">
+                              <div
+                                className={`h-2 rounded-full bg-gradient-to-r ${row.coverage < 50 ? "from-red-500 to-rose-600" : row.coverage < 100 ? "from-amber-500 to-orange-500" : `${row.meta.gradient}`} transition-all duration-700`}
+                                style={{ width: `${row.coverage}%` }}
+                              />
+                            </div>
+                            {row.shortfall > 0 && (
+                              <p className="text-[10px] text-red-400 mt-1.5 font-medium">
+                                ⚠ Rechargez le wallet {row.meta.name} de <strong>+{fmt(Math.ceil(row.shortfall))} XOF</strong> dans OmniPay pour couvrir tous les retraits
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ── RÉSUMÉ FINANCIER ── */}
             <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">

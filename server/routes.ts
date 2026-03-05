@@ -2147,6 +2147,47 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/liquidity-analysis", isAdmin, async (_req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { sql, eq, and, isNotNull } = await import("drizzle-orm");
+      const { transactions: txTable, wallets: walletsTable } = await import("@shared/schema");
+      const { users: usersTable } = await import("@shared/models/auth");
+
+      const walletsByCountry = await db
+        .select({
+          country: usersTable.withdrawalCountry,
+          totalBalance: sql<number>`coalesce(sum(${walletsTable.balanceXOF}::numeric), 0)::float`,
+          userCount: sql<number>`count(distinct ${usersTable.id})::int`,
+        })
+        .from(usersTable)
+        .innerJoin(walletsTable, eq(walletsTable.userId, usersTable.id))
+        .where(isNotNull(usersTable.withdrawalCountry))
+        .groupBy(usersTable.withdrawalCountry)
+        .orderBy(sql`sum(${walletsTable.balanceXOF}::numeric) desc`);
+
+      const pendingByCountry = await db
+        .select({
+          country: usersTable.withdrawalCountry,
+          pendingAmount: sql<number>`coalesce(sum(${txTable.amount}::numeric), 0)::float`,
+          pendingCount: sql<number>`count(*)::int`,
+        })
+        .from(txTable)
+        .innerJoin(usersTable, eq(usersTable.id, txTable.userId))
+        .where(and(
+          eq(txTable.type, "withdrawal"),
+          eq(txTable.status, "pending"),
+          isNotNull(usersTable.withdrawalCountry),
+        ))
+        .groupBy(usersTable.withdrawalCountry);
+
+      res.json({ walletsByCountry, pendingByCountry });
+    } catch (error) {
+      console.error("Liquidity analysis error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   app.patch("/api/admin/payment-methods/:code", isAdmin, async (req, res) => {
     try {
       const { code } = req.params;
