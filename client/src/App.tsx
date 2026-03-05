@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
-import { LoginPage, RegisterPage } from "@/pages/auth";
+import { LoginPage, RegisterPage, ForgotPasswordPage } from "@/pages/auth";
 import DashboardPage from "@/pages/dashboard";
 import TransactionsPage from "@/pages/transactions";
 import PaymentLinksPage from "@/pages/payment-links";
@@ -98,6 +98,7 @@ function Router() {
           <Route path="/" component={LandingPage} />
           <Route path="/login" component={LoginPage} />
           <Route path="/register" component={RegisterPage} />
+          <Route path="/forgot-password" component={ForgotPasswordPage} />
           <Route component={LandingPage} />
         </>
       )}

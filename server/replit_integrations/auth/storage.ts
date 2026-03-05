@@ -9,6 +9,8 @@ export interface IAuthStorage {
   createUser(user: UpsertUser): Promise<User>;
   updateUserVerificationCode(userId: string, code: string, expiry: Date): Promise<void>;
   markEmailVerified(userId: string): Promise<void>;
+  setPasswordResetCode(userId: string, code: string, expiry: Date): Promise<void>;
+  resetPassword(userId: string, passwordHash: string): Promise<void>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -56,6 +58,20 @@ class AuthStorage implements IAuthStorage {
     await db
       .update(users)
       .set({ emailVerified: true, emailVerificationCode: null, emailVerificationExpiry: null, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+  async setPasswordResetCode(userId: string, code: string, expiry: Date): Promise<void> {
+    await db
+      .update(users)
+      .set({ passwordResetCode: code, passwordResetExpiry: expiry, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+  async resetPassword(userId: string, passwordHash: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ passwordHash, passwordResetCode: null, passwordResetExpiry: null, updatedAt: new Date() })
       .where(eq(users.id, userId));
   }
 }

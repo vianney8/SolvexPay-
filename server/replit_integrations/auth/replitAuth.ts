@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { randomInt } from "crypto";
 import { authStorage } from "./storage";
 import { registerSchema, loginSchema } from "@shared/models/auth";
-import { sendVerificationEmail } from "../../services/resend";
+import { sendVerificationEmail, sendPasswordResetEmail } from "../../services/resend";
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
@@ -152,6 +152,98 @@ export async function setupAuth(app: Express) {
     } catch (error) {
       console.error("Resend verification error:", error);
       res.status(500).json({ message: "Erreur lors de l'envoi du code" });
+    }
+  });
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email requis" });
+
+      const user = await authStorage.getUserByEmail(email);
+      if (!user) {
+        return res.json({ success: true });
+      }
+
+      const code = generateVerificationCode();
+      const expiry = new Date(Date.now() + 15 * 60 * 1000);
+      await authStorage.setPasswordResetCode(user.id, code, expiry);
+
+      try {
+        await sendPasswordResetEmail(email, code, user.firstName || "");
+        console.log(`[Email] Password reset email sent to ${email}`);
+      } catch (emailErr: any) {
+        console.error("[Email] Failed to send password reset email:", emailErr?.message);
+      }
+
+      res.json({ success: true, userId: user.id });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Erreur lors de l'envoi du code" });
+    }
+  });
+
+  app.post("/api/auth/verify-reset-code", async (req, res) => {
+    try {
+      const { userId, code } = req.body;
+      if (!userId || !code) return res.status(400).json({ message: "Données manquantes" });
+
+      const user = await authStorage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "Utilisateur introuvable" });
+
+      if (!user.passwordResetCode || !user.passwordResetExpiry) {
+        return res.status(400).json({ message: "Aucun code trouvé. Recommencez la procédure." });
+      }
+
+      if (new Date() > new Date(user.passwordResetExpiry)) {
+        return res.status(400).json({ message: "Le code a expiré. Recommencez la procédure.", expired: true });
+      }
+
+      if (user.passwordResetCode !== String(code).trim()) {
+        return res.status(400).json({ message: "Code incorrect. Vérifiez votre email et réessayez." });
+      }
+
+      res.json({ success: true, userId });
+    } catch (error) {
+      console.error("Verify reset code error:", error);
+      res.status(500).json({ message: "Erreur lors de la vérification" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { userId, code, newPassword } = req.body;
+      if (!userId || !code || !newPassword) return res.status(400).json({ message: "Données manquantes" });
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Le mot de passe doit contenir au moins 6 caractères" });
+      }
+
+      const user = await authStorage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "Utilisateur introuvable" });
+
+      if (!user.passwordResetCode || !user.passwordResetExpiry) {
+        return res.status(400).json({ message: "Session expirée. Recommencez la procédure." });
+      }
+
+      if (new Date() > new Date(user.passwordResetExpiry)) {
+        return res.status(400).json({ message: "Le code a expiré. Recommencez la procédure." });
+      }
+
+      if (user.passwordResetCode !== String(code).trim()) {
+        return res.status(400).json({ message: "Code invalide." });
+      }
+
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await authStorage.resetPassword(user.id, passwordHash);
+
+      (req.session as any).userId = user.id;
+      const updatedUser = await authStorage.getUser(user.id);
+      const { passwordHash: _, ...safeUser } = updatedUser!;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Erreur lors de la réinitialisation" });
     }
   });
 

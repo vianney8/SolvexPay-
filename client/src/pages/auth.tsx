@@ -400,6 +400,12 @@ export function LoginPage() {
               </div>
             </div>
 
+            <div className="flex justify-end">
+              <Link href="/forgot-password" className="text-xs text-primary font-semibold hover:underline" data-testid="link-forgot-password">
+                Mot de passe oublié ?
+              </Link>
+            </div>
+
             <Button
               type="submit"
               className="w-full h-12 font-bold text-base shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:scale-[1.01] transition-all rounded-xl"
@@ -700,6 +706,241 @@ export function RegisterPage() {
         </div>
       </div>
 
+      <div className="hidden lg:flex lg:w-1/2 relative">
+        <AuthPanel />
+      </div>
+    </div>
+  );
+}
+
+export function ForgotPasswordPage() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [step, setStep] = useState<"email" | "code" | "newPassword">("email");
+  const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState("");
+  const [verifiedCode, setVerifiedCode] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSendCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/auth/forgot-password", { email });
+      const data = await res.json();
+      setUserId(data.userId || "");
+      setStep("code");
+      toast({ title: "Code envoyé", description: "Vérifiez votre boîte mail et vos spams." });
+    } catch (error: any) {
+      const message = error?.message || "";
+      let errorText = "Erreur lors de l'envoi du code";
+      try { const p = JSON.parse(message.replace(/^\d+:\s*/, "")); errorText = p.message || errorText; } catch {}
+      toast({ title: "Erreur", description: errorText, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.trim().length !== 6) {
+      toast({ title: "Erreur", description: "Entrez le code à 6 chiffres reçu par email", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/auth/verify-reset-code", { userId, code: code.trim() });
+      const data = await res.json();
+      if (data.success) {
+        setVerifiedCode(code.trim());
+        setStep("newPassword");
+      }
+    } catch (error: any) {
+      const message = error?.message || "";
+      let errorText = "Code invalide. Réessayez.";
+      try { const p = JSON.parse(message.replace(/^\d+:\s*/, "")); errorText = p.message || errorText; } catch {}
+      toast({ title: "Erreur", description: errorText, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast({ title: "Erreur", description: "Le mot de passe doit contenir au moins 6 caractères", variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Erreur", description: "Les mots de passe ne correspondent pas", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/auth/reset-password", { userId, code: verifiedCode, newPassword });
+      const user = await res.json();
+      queryClient.setQueryData(["/api/auth/user"], user);
+      toast({ title: "Mot de passe modifié !", description: "Vous êtes maintenant connecté." });
+      navigate("/dashboard");
+    } catch (error: any) {
+      const message = error?.message || "";
+      let errorText = "Erreur lors de la réinitialisation";
+      try { const p = JSON.parse(message.replace(/^\d+:\s*/, "")); errorText = p.message || errorText; } catch {}
+      toast({ title: "Erreur", description: errorText, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const steps = ["email", "code", "newPassword"] as const;
+  const stepTitles = { email: "Mot de passe oublié", code: "Vérification", newPassword: "Nouveau mot de passe" };
+  const stepSubtitles = {
+    email: "Entrez votre adresse email pour recevoir un code de réinitialisation.",
+    code: `Un code à 6 chiffres a été envoyé à ${email}.`,
+    newPassword: "Choisissez un nouveau mot de passe pour votre compte.",
+  };
+
+  return (
+    <div className="min-h-screen flex bg-background">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+        <div className="w-full max-w-md space-y-8">
+
+          <div className="lg:hidden flex flex-col items-center gap-3 mb-2">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-2xl bg-violet-500/25 blur-lg" />
+              <img src={solvexpayLogo} alt="SolvexPay" className="relative w-14 h-14 rounded-2xl object-cover ring-2 ring-violet-200 shadow-xl" />
+            </div>
+            <span className="font-extrabold text-2xl bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+          </div>
+
+          <div className="space-y-3">
+            <Link href="/login" className="hidden lg:inline-flex items-center gap-2.5 group">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                <img src={solvexpayLogo} alt="SolvexPay" className="relative w-10 h-10 rounded-xl object-cover" />
+              </div>
+              <span className="font-bold text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+            </Link>
+
+            <div className="flex items-center gap-2 pt-1">
+              {steps.map((s, i) => (
+                <div key={s} className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    step === s ? "bg-primary text-primary-foreground" :
+                    steps.indexOf(step) > i ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {steps.indexOf(step) > i ? "✓" : i + 1}
+                  </div>
+                  {i < 2 && <div className={`h-0.5 w-8 rounded transition-all ${steps.indexOf(step) > i ? "bg-emerald-500" : "bg-muted"}`} />}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-1">
+              <h1 className="text-3xl font-extrabold text-foreground">{stepTitles[step]}</h1>
+              <p className="text-muted-foreground text-sm">{stepSubtitles[step]}</p>
+              {step === "code" && (
+                <div className="mt-3 flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/40">
+                  <span className="text-amber-500 text-base leading-tight mt-0.5">⚠️</span>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                    Vérifiez aussi votre <strong>dossier spam</strong> si vous ne voyez pas l'email.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {step === "email" && (
+            <form onSubmit={handleSendCode} className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Adresse Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input type="email" placeholder="votre@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required
+                    className="pl-10 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
+                    data-testid="input-forgot-email" autoFocus />
+                </div>
+              </div>
+              <Button type="submit" className="w-full h-12 font-bold text-base shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:scale-[1.01] transition-all rounded-xl" disabled={loading} data-testid="button-send-reset-code">
+                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Envoi en cours...</> : <span className="flex items-center gap-2 justify-center">Envoyer le code <ArrowRight className="h-4 w-4" /></span>}
+              </Button>
+            </form>
+          )}
+
+          {step === "code" && (
+            <form onSubmit={handleVerifyCode} className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Code de vérification</label>
+                <Input type="text" inputMode="numeric" placeholder="123456" value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} maxLength={6} required
+                  className="h-14 text-center text-2xl font-mono font-bold tracking-[0.5em] border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
+                  data-testid="input-reset-code" autoFocus />
+                <p className="text-xs text-muted-foreground">Valable 15 minutes.</p>
+              </div>
+              <Button type="submit" className="w-full h-12 font-bold text-base shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:scale-[1.01] transition-all rounded-xl" disabled={loading || code.length !== 6} data-testid="button-verify-reset-code">
+                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Vérification...</> : <span className="flex items-center gap-2 justify-center">Confirmer le code <ArrowRight className="h-4 w-4" /></span>}
+              </Button>
+              <div className="text-center">
+                <button type="button" className="text-sm text-primary font-semibold hover:underline" onClick={() => { setStep("email"); setCode(""); }} data-testid="button-back-resend">
+                  Renvoyer un nouveau code
+                </button>
+              </div>
+            </form>
+          )}
+
+          {step === "newPassword" && (
+            <form onSubmit={handleResetPassword} className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nouveau mot de passe</label>
+                <div className="relative flex items-center">
+                  <Lock className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input type={showPassword ? "text" : "password"} placeholder="6 caractères minimum" value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)} required
+                    className="pl-10 pr-11 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
+                    data-testid="input-new-password" autoFocus />
+                  <button type="button" className="absolute right-3.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <div className={`flex items-center gap-1.5 pt-0.5 text-xs ${newPassword.length >= 6 ? "text-emerald-600" : "text-muted-foreground"}`}>
+                  <CheckCircle2 className="w-3 h-3" />6 caractères minimum
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Confirmer le mot de passe</label>
+                <div className="relative flex items-center">
+                  <Lock className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input type={showConfirm ? "text" : "password"} placeholder="Confirmez votre mot de passe" value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)} required
+                    className="pl-10 pr-11 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
+                    data-testid="input-confirm-new-password" />
+                  <button type="button" className="absolute right-3.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => setShowConfirm(!showConfirm)}>
+                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                  <p className="text-xs text-destructive font-medium">Les mots de passe ne correspondent pas</p>
+                )}
+              </div>
+              <Button type="submit" className="w-full h-12 font-bold text-base shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:scale-[1.01] transition-all rounded-xl" disabled={loading} data-testid="button-submit-new-password">
+                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Modification...</> : <span className="flex items-center gap-2 justify-center">Changer mon mot de passe <ArrowRight className="h-4 w-4" /></span>}
+              </Button>
+            </form>
+          )}
+
+          <div className="text-center">
+            <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-back-to-login">
+              ← Retour à la connexion
+            </Link>
+          </div>
+        </div>
+      </div>
       <div className="hidden lg:flex lg:w-1/2 relative">
         <AuthPanel />
       </div>
