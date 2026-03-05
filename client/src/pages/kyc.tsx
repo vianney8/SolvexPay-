@@ -22,17 +22,18 @@ function kycStatusLabel(status: string) {
   return { label: "Non démarré", color: "bg-muted text-muted-foreground" };
 }
 
-function FileUploadField({ label, fieldName, value, onUploaded, required }: { label: string; fieldName: string; value: string; onUploaded: (url: string) => void; required?: boolean }) {
+function FileUploadField({ label, fieldName, value, onUploaded }: { label: string; fieldName: string; value: string; onUploaded: (url: string) => void }) {
   const { toast } = useToast();
   const ref = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
-  const compressImage = (file: File): Promise<Blob> =>
+  const tryCompress = (file: File): Promise<Blob> =>
     new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
+      const cleanup = () => URL.revokeObjectURL(url);
       img.onload = () => {
-        URL.revokeObjectURL(url);
+        cleanup();
         const MAX = 1600;
         let { width, height } = img;
         if (width > MAX || height > MAX) {
@@ -41,10 +42,12 @@ function FileUploadField({ label, fieldName, value, onUploaded, required }: { la
         }
         const canvas = document.createElement("canvas");
         canvas.width = width; canvas.height = height;
-        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Compression échouée")), "image/jpeg", 0.82);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("canvas")); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("canvas")), "image/jpeg", 0.82);
       };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Lecture image échouée")); };
+      img.onerror = () => { cleanup(); reject(new Error("canvas")); };
       img.src = url;
     });
 
@@ -53,23 +56,33 @@ function FileUploadField({ label, fieldName, value, onUploaded, required }: { la
     if (!file) return;
     setUploading(true);
     try {
-      const compressed = await compressImage(file);
+      let blob: Blob = file;
+      let filename = file.name.replace(/\.[^.]+$/, ".jpg");
+      try {
+        blob = await tryCompress(file);
+      } catch {
+        blob = file;
+        filename = file.name;
+      }
       const fd = new FormData();
-      fd.append("image", compressed, file.name.replace(/\.[^.]+$/, ".jpg"));
+      fd.append("image", blob, filename);
       const res = await fetch("/api/upload", { method: "POST", body: fd, credentials: "include" });
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || res.statusText); }
       const data = await res.json();
       if (data.imageUrl) { onUploaded(data.imageUrl); toast({ title: "Photo téléchargée" }); }
-      else toast({ title: "Erreur", description: "Impossible de télécharger", variant: "destructive" });
+      else throw new Error("Réponse invalide");
     } catch (err: any) {
-      toast({ title: "Erreur", description: err?.message || "Erreur de téléchargement", variant: "destructive" });
-    } finally { setUploading(false); }
+      toast({ title: "Erreur", description: "Impossible de télécharger la photo. Réessayez.", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (ref.current) ref.current.value = "";
+    }
   };
 
   return (
     <div className="space-y-2">
       <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-        {label}{required && <span className="text-rose-500 ml-1">*</span>}
+        {label}
       </Label>
       <input ref={ref} type="file" accept="image/*" onChange={handleFile} className="hidden" />
       {value ? (
@@ -259,28 +272,28 @@ export default function KycPage() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Prénom <span className="text-rose-500">*</span></Label>
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Prénom</Label>
                     <Input value={kycFirstName} onChange={e => setKycFirstName(e.target.value)} placeholder="Prénom sur document" className="h-11 border-border/70" required data-testid="input-kyc-firstname" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom <span className="text-rose-500">*</span></Label>
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom</Label>
                     <Input value={kycLastName} onChange={e => setKycLastName(e.target.value)} placeholder="Nom sur document" className="h-11 border-border/70" required data-testid="input-kyc-lastname" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de la pièce d'identité <span className="text-rose-500">*</span></Label>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de la pièce d'identité</Label>
                   <Input value={kycDocumentNumber} onChange={e => setKycDocumentNumber(e.target.value)} placeholder="Ex : BJ12345678" className="h-11 border-border/70 font-mono" required data-testid="input-kyc-document-number" />
                 </div>
 
                 <Separator />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FileUploadField label="Pièce d'identité (recto)" fieldName="doc-front" value={kycDocumentFront} onUploaded={setKycDocumentFront} required />
+                  <FileUploadField label="Pièce d'identité (recto)" fieldName="doc-front" value={kycDocumentFront} onUploaded={setKycDocumentFront} />
                   <FileUploadField label="Pièce d'identité (verso)" fieldName="doc-back" value={kycDocumentBack} onUploaded={setKycDocumentBack} />
                 </div>
 
-                <FileUploadField label="Selfie avec la pièce d'identité" fieldName="selfie" value={kycSelfie} onUploaded={setKycSelfie} required />
+                <FileUploadField label="Selfie avec la pièce d'identité" fieldName="selfie" value={kycSelfie} onUploaded={setKycSelfie} />
 
                 <Button
                   type="submit"
