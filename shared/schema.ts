@@ -29,6 +29,7 @@ export const paymentLinks = pgTable("payment_links", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
+  merchantName: text("merchant_name"),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   currency: text("currency").notNull().default("XOF"),
   description: text("description"),

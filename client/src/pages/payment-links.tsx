@@ -39,6 +39,7 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(editLink?.name || "");
+  const [merchantName, setMerchantName] = useState((editLink as any)?.merchantName || "");
   const [amount, setAmount] = useState(editLink && !editLink.allowCustomAmount ? editLink.amount : "");
   const [allowCustomAmount, setAllowCustomAmount] = useState(editLink?.allowCustomAmount || false);
   const [description, setDescription] = useState(editLink?.description || "");
@@ -100,6 +101,7 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
     if (!allowCustomAmount && !amount) return;
     const payload = {
       name: name.trim(),
+      merchantName: merchantName.trim() || null,
       amount: allowCustomAmount ? (amount ? parseFloat(String(amount)) : 0) : parseFloat(String(amount)),
       currency: "XOF",
       allowCustomAmount,
@@ -108,7 +110,7 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
       imageUrl: imageUrl.trim() || undefined,
     };
     if (editLink) {
-      updateMutation.mutate({ name: payload.name, amount: payload.amount, allowCustomAmount: payload.allowCustomAmount, description: payload.description || null, redirectUrl: payload.redirectUrl || null, imageUrl: payload.imageUrl || null });
+      updateMutation.mutate({ name: payload.name, merchantName: payload.merchantName, amount: payload.amount, allowCustomAmount: payload.allowCustomAmount, description: payload.description || null, redirectUrl: payload.redirectUrl || null, imageUrl: payload.imageUrl || null });
     } else {
       createMutation.mutate(payload);
     }
@@ -165,6 +167,11 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom du produit ou service</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: T-shirt, Abonnement mensuel..." required className="h-11 border-border/70" data-testid="input-link-name" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom du marchand (optionnel)</Label>
+                <Input value={merchantName} onChange={(e) => setMerchantName(e.target.value)} placeholder="Ex: Ma Boutique, John Doe..." className="h-11 border-border/70" data-testid="input-link-merchant-name" />
+                <p className="text-xs text-muted-foreground">Affiché sur la page de paiement. Laissez vide pour utiliser votre nom de profil.</p>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
