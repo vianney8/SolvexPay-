@@ -198,8 +198,14 @@ function VerifyEmailStep({ userId, email, onSuccess }: { userId: string; email: 
                 <h1 className="text-3xl font-extrabold text-foreground" data-testid="text-verify-title">Vérification email</h1>
               </div>
               <p className="text-muted-foreground text-sm mt-2">
-                Un code à 6 chiffres a été envoyé à <strong className="text-foreground">{email}</strong>. Vérifiez votre boîte de réception.
+                Un code à 6 chiffres a été envoyé à <strong className="text-foreground">{email}</strong>.
               </p>
+              <div className="mt-3 flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/40">
+                <span className="text-amber-500 text-base leading-tight mt-0.5">⚠️</span>
+                <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                  Si vous ne voyez pas l'email dans votre boîte de réception, <strong>vérifiez aussi votre dossier spam ou courriers indésirables</strong>.
+                </p>
+              </div>
             </div>
           </div>
 
