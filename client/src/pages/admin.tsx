@@ -201,7 +201,8 @@ export default function AdminPage() {
     staleTime: 30000,
   });
   const { data: paymentMethods, isLoading: pmLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-methods"] });
-  const { data: commissions, isLoading: comLoading } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
+  const { data: commissions, isLoading: comLoading, refetch: refetchCommissions } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
+  const { data: profitTx, isLoading: profitTxLoading } = useQuery<any[]>({ queryKey: ["/api/admin/profit-transactions"], staleTime: 30000 });
   const { data: financialSummary, isLoading: finLoading } = useQuery<any>({
     queryKey: ["/api/admin/financial-summary"],
     staleTime: 30000,
@@ -371,6 +372,7 @@ export default function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
       toast({ title: "Retrait initié", description: `Statut OmniPay : ${res.omnipayStatus}` });
       setWdDialog(false);
       setWdForm({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
@@ -382,6 +384,7 @@ export default function AdminPage() {
     mutationFn: (id: string) => apiRequest("POST", `/api/admin/omnipay/withdrawals/${id}/check`, {}),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
       toast({ title: "Statut mis à jour", description: `Statut : ${res.status}` });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
@@ -484,6 +487,7 @@ export default function AdminPage() {
             <TabsList className="inline-flex w-max min-w-full gap-1 p-1.5 bg-muted/60 rounded-2xl h-auto">
               {[
                 { v: "overview", label: "Vue d'ensemble", Icon: BarChart3, badge: 0 },
+                { v: "benefices", label: "Bénéfices", Icon: Coins, badge: 0 },
                 { v: "users", label: "Utilisateurs", Icon: Users, badge: 0 },
                 { v: "kyc", label: "KYC", Icon: BadgeCheck, badge: pendingKyc.length },
                 { v: "wallets", label: "Wallets & Solde", Icon: Wallet, badge: 0 },
@@ -823,6 +827,220 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* ══════════════════════════════════════
+              TAB — BÉNÉFICES
+          ══════════════════════════════════════ */}
+          <TabsContent value="benefices" className="space-y-5 mt-5">
+            {/* Solde disponible hero */}
+            <div className="relative rounded-3xl overflow-hidden" style={{ background: "linear-gradient(135deg, #064e3b 0%, #065f46 40%, #047857 100%)" }}>
+              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 20% 50%, #34d399 0%, transparent 50%), radial-gradient(circle at 80% 20%, #6ee7b7 0%, transparent 40%)" }} />
+              <div className="relative p-6 text-white">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <p className="text-emerald-300 text-xs font-semibold uppercase tracking-wider">Solde disponible en temps réel</p>
+                    </div>
+                    {comLoading ? (
+                      <div className="h-12 w-48 bg-white/10 rounded-xl animate-pulse mt-2" />
+                    ) : (
+                      <p className="text-4xl font-black text-white mt-1" data-testid="text-available-balance">
+                        {new Intl.NumberFormat("fr-FR").format(Math.round(commissions?.availableBalance || 0))} <span className="text-xl font-semibold text-emerald-300">XOF</span>
+                      </p>
+                    )}
+                    <p className="text-emerald-200/70 text-xs mt-1">
+                      Frais nets perçus − Retraits déjà effectués
+                    </p>
+                    {(commissions?.pendingWithdrawn || 0) > 0 && (
+                      <p className="text-amber-300 text-xs mt-1 font-semibold">
+                        {new Intl.NumberFormat("fr-FR").format(Math.round(commissions.pendingWithdrawn))} XOF en cours de retrait (en attente)
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => setWdDialog(true)}
+                      className="flex items-center gap-2 bg-white text-emerald-700 font-black px-5 py-3 rounded-2xl text-sm hover:bg-emerald-50 transition-colors shadow-lg"
+                      data-testid="btn-benefices-withdraw"
+                    >
+                      <Send className="h-4 w-4" />
+                      Retirer mes bénéfices
+                    </button>
+                    <button
+                      onClick={() => { refetchCommissions(); queryClient.invalidateQueries({ queryKey: ["/api/admin/profit-transactions"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] }); }}
+                      className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold px-4 py-2 rounded-xl text-xs transition-colors"
+                      data-testid="btn-benefices-refresh"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Actualiser
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Breakdown cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { label: "Frais collectés (total)", val: commissions?.totalFees || 0, icon: Coins, grad: "from-indigo-500 to-violet-600", desc: "Toutes transactions" },
+                { label: "Coût OmniPay déduit", val: -(commissions?.totalOmniPayCost || 0), icon: TrendingDown, grad: "from-rose-500 to-orange-500", desc: "Frais prestataire" },
+                { label: "Bénéfice net total", val: commissions?.adminNetProfit || 0, icon: TrendingUp, grad: "from-emerald-500 to-teal-600", desc: "Depuis le début" },
+                { label: "Déjà retiré", val: -(commissions?.totalWithdrawn || 0), icon: Send, grad: "from-amber-500 to-yellow-600", desc: "Retraits confirmés" },
+              ].map((item, i) => (
+                <Card key={i} className="border-0 overflow-hidden shadow-sm" data-testid={`benefice-card-${i}`}>
+                  <CardContent className="p-0">
+                    <div className={`h-1.5 bg-gradient-to-r ${item.grad}`} />
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs text-muted-foreground font-medium leading-tight">{item.label}</p>
+                        <div className={`h-7 w-7 rounded-lg bg-gradient-to-br ${item.grad} flex items-center justify-center`}>
+                          <item.icon className="h-3.5 w-3.5 text-white" />
+                        </div>
+                      </div>
+                      {comLoading ? <div className="h-6 w-24 bg-muted rounded animate-pulse" /> : (
+                        <p className={`text-lg font-black ${item.val >= 0 ? "text-foreground" : "text-rose-500"}`}>
+                          {item.val < 0 ? "−" : ""}{new Intl.NumberFormat("fr-FR").format(Math.abs(Math.round(item.val)))} XOF
+                        </p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{item.desc}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Fees breakdown */}
+            <div className="grid lg:grid-cols-2 gap-4">
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2"><Percent className="h-4 w-4 text-indigo-500" />Détail des frais perçus</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  {[
+                    { label: "Dépôts (Mobile Money)", val: commissions?.totalDepositFees || 0, color: "text-emerald-600", icon: "📲" },
+                    { label: "Retraits utilisateurs", val: commissions?.totalWithdrawalFees || 0, color: "text-orange-600", icon: "💸" },
+                    { label: "Transferts", val: commissions?.totalTransferFees || 0, color: "text-violet-600", icon: "↔️" },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-center justify-between py-2.5 border-b border-border/30 last:border-0">
+                      <div className="flex items-center gap-2">
+                        <span>{item.icon}</span>
+                        <span className="text-sm text-muted-foreground">{item.label}</span>
+                      </div>
+                      <span className={`text-sm font-bold ${item.color}`}>
+                        {comLoading ? "—" : `+${new Intl.NumberFormat("fr-FR").format(Math.round(item.val))} XOF`}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between py-2.5 mt-1">
+                    <span className="text-sm font-black">Total frais bruts</span>
+                    <span className="text-sm font-black text-indigo-600">
+                      {comLoading ? "—" : `${new Intl.NumberFormat("fr-FR").format(Math.round(commissions?.totalFees || 0))} XOF`}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2"><FileText className="h-4 w-4 text-rose-500" />Historique des retraits</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {wdHistoryLoading ? (
+                    <div className="p-4 space-y-2">{[1,2,3].map(i => <div key={i} className="h-10 bg-muted rounded-xl animate-pulse" />)}</div>
+                  ) : (adminWdHistory || []).length === 0 ? (
+                    <div className="py-8 flex flex-col items-center gap-2 text-muted-foreground">
+                      <Banknote className="h-7 w-7 opacity-30" />
+                      <p className="text-xs">Aucun retrait effectué</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/40 max-h-72 overflow-y-auto">
+                      {(adminWdHistory || []).map((wd: any) => (
+                        <div key={wd.id} className="px-4 py-2.5 flex items-center gap-3" data-testid={`benefice-wd-row-${wd.id}`}>
+                          <div className={`h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0 ${wd.status === "completed" ? "bg-emerald-500/15" : wd.status === "failed" ? "bg-rose-500/15" : "bg-amber-500/15"}`}>
+                            {wd.status === "completed" ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : wd.status === "failed" ? <XCircle className="h-3.5 w-3.5 text-rose-500" /> : <Clock className="h-3.5 w-3.5 text-amber-500" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold">{parseFloat(wd.amount).toLocaleString("fr-FR")} XOF</p>
+                            <p className="text-[10px] text-muted-foreground">{wd.operator} · {wd.phoneNumber}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-[10px] text-muted-foreground">{new Date(wd.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                            {wd.status === "pending" && (
+                              <button onClick={() => wdCheckM.mutate(wd.id)} disabled={wdCheckM.isPending} className="text-[10px] text-indigo-500 font-bold hover:underline flex items-center gap-0.5 ml-auto">
+                                <RefreshCw className="h-2.5 w-2.5" />Vérifier
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Transactions with fees table */}
+            <Card className="border-border/50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2"><ArrowDownUp className="h-4 w-4 text-indigo-500" />Transactions avec frais perçus</CardTitle>
+                  <span className="text-xs text-muted-foreground">{(profitTx || []).length} transactions</span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {profitTxLoading ? (
+                  <div className="p-4 space-y-2">{[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-muted rounded-xl animate-pulse" />)}</div>
+                ) : (profitTx || []).length === 0 ? (
+                  <div className="py-10 flex flex-col items-center gap-2 text-muted-foreground">
+                    <ArrowDownUp className="h-8 w-8 opacity-30" />
+                    <p className="text-sm">Aucune transaction avec frais trouvée</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border/50 bg-muted/50">
+                          <th className="text-left px-4 py-2.5 text-muted-foreground font-semibold">Date</th>
+                          <th className="text-left px-4 py-2.5 text-muted-foreground font-semibold">Utilisateur</th>
+                          <th className="text-left px-4 py-2.5 text-muted-foreground font-semibold">Type</th>
+                          <th className="text-right px-4 py-2.5 text-muted-foreground font-semibold">Montant</th>
+                          <th className="text-right px-4 py-2.5 text-muted-foreground font-semibold text-emerald-600">Frais perçus</th>
+                          <th className="text-left px-4 py-2.5 text-muted-foreground font-semibold">Opérateur</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {(profitTx || []).map((tx: any) => (
+                          <tr key={tx.id} className="hover:bg-muted/30 transition-colors" data-testid={`profit-tx-row-${tx.id}`}>
+                            <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
+                              {new Date(tx.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </td>
+                            <td className="px-4 py-2.5 font-medium max-w-[120px] truncate">{tx.userDisplayName}</td>
+                            <td className="px-4 py-2.5">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold ${
+                                tx.type === "deposit" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" :
+                                tx.type === "withdrawal" ? "bg-orange-500/10 text-orange-600 border-orange-500/30" :
+                                "bg-violet-500/10 text-violet-600 border-violet-500/30"
+                              }`}>{TX_TYPE_LABELS[tx.type] || tx.type}</span>
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-semibold whitespace-nowrap">
+                              {new Intl.NumberFormat("fr-FR").format(parseFloat(tx.amount))} {tx.currency}
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-black text-emerald-600 whitespace-nowrap">
+                              +{new Intl.NumberFormat("fr-FR").format(parseFloat(tx.fees || "0"))} XOF
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">{tx.provider || "—"}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ══════════════════════════════════════

@@ -1869,7 +1869,7 @@ export async function registerRoutes(
     try {
       const { db } = await import("./db");
       const { sum, count, eq, and, gte, lt } = await import("drizzle-orm");
-      const { transactions: txTable } = await import("@shared/schema");
+      const { transactions: txTable, adminWithdrawals: awTable } = await import("@shared/schema");
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -1887,11 +1887,18 @@ export async function registerRoutes(
 
       const [depositFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit"), eq(txTable.provider, "omnipay")));
       const [withdrawalFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "withdrawal")));
+      const [transferFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "transfer")));
+      const [apiFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit")));
       const [monthDepositFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit"), eq(txTable.provider, "omnipay"), gte(txTable.createdAt, startOfMonth)));
       const [monthWithdrawalFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "withdrawal"), gte(txTable.createdAt, startOfMonth)));
 
+      // Total admin profit withdrawals (completed only deducted, pending reserved)
+      const [withdrawnCompleted] = await db.select({ total: sum(awTable.amount) }).from(awTable).where(eq(awTable.status, "completed"));
+      const [withdrawnPending] = await db.select({ total: sum(awTable.amount) }).from(awTable).where(eq(awTable.status, "pending"));
+
       const totalDepositFees = parseFloat(depositFees.fees || "0");
       const totalWithdrawalFees = parseFloat(withdrawalFees.fees || "0");
+      const totalTransferFees = parseFloat(transferFees.fees || "0");
       const totalDepositVolume = parseFloat(depositFees.volume || "0");
       const totalWithdrawalVolume = parseFloat(withdrawalFees.volume || "0");
       const monthDepositFeesVal = parseFloat(monthDepositFees.fees || "0");
@@ -1910,6 +1917,10 @@ export async function registerRoutes(
       const monthOmniPayCost = omnipayCostDepositMonth + omnipayCostWithdrawalMonth;
       const monthNetProfit = monthAdminFees - monthOmniPayCost;
 
+      const totalWithdrawn = parseFloat(withdrawnCompleted.total || "0");
+      const pendingWithdrawn = parseFloat(withdrawnPending.total || "0");
+      const availableBalance = Math.max(0, adminNetProfit - totalWithdrawn);
+
       res.json({
         totalFees: totalAdminFees,
         monthFees: monthAdminFees,
@@ -1919,6 +1930,7 @@ export async function registerRoutes(
         completedTxCount: txCountCompleted.count,
         totalDepositFees,
         totalWithdrawalFees,
+        totalTransferFees,
         totalDepositVolume,
         totalWithdrawalVolume,
         omnipayCostDeposit,
@@ -1933,9 +1945,47 @@ export async function registerRoutes(
         omnipayWithdrawalRate: omnipayWithdrawalRate * 100,
         estimatedOmniPayCut: totalOmniPayCost,
         estimatedNetRevenue: adminNetProfit,
+        totalWithdrawn,
+        pendingWithdrawn,
+        availableBalance,
       });
     } catch (error) {
       console.error("Admin commissions error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // Profit transactions — completed transactions with fees for admin revenue view
+  app.get("/api/admin/profit-transactions", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { desc, eq: eqOp, and, isNotNull, gt } = await import("drizzle-orm");
+      const { transactions: txTable } = await import("@shared/schema");
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { sql: sqlFn } = await import("drizzle-orm");
+      const limit = parseInt(req.query.limit as string) || 200;
+      const rows = await db
+        .select({
+          tx: txTable,
+          userFirstName: usersTable.firstName,
+          userLastName: usersTable.lastName,
+          userEmail: usersTable.email,
+        })
+        .from(txTable)
+        .leftJoin(usersTable, eqOp(txTable.userId, usersTable.id))
+        .where(and(eqOp(txTable.status, "completed"), isNotNull(txTable.fees), gt(txTable.fees, sqlFn`0`)))
+        .orderBy(desc(txTable.createdAt))
+        .limit(limit);
+      const result = rows.map(r => ({
+        ...r.tx,
+        userDisplayName: r.userFirstName && r.userLastName
+          ? `${r.userFirstName} ${r.userLastName}`
+          : r.userFirstName || r.userLastName || r.userEmail || "—",
+        userEmail: r.userEmail,
+      }));
+      res.json(result);
+    } catch (error) {
+      console.error("Admin profit transactions error:", error);
       res.status(500).json({ message: "Erreur serveur" });
     }
   });
