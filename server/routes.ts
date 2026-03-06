@@ -1399,7 +1399,11 @@ export async function registerRoutes(
       console.log("OmniPay callback received:", payload);
 
       const callbackKey = omniPayService.getCallbackKey();
-      if (callbackKey && payload.signature) {
+      if (callbackKey) {
+        if (!payload.signature) {
+          console.error("OmniPay callback: missing signature");
+          return res.status(401).json({ error: "Missing signature" });
+        }
         const isValid = verifyCallbackSignature(payload, callbackKey);
         if (!isValid) {
           console.error("OmniPay callback: invalid signature");
@@ -1474,10 +1478,13 @@ export async function registerRoutes(
           if (statusStr === "completed") {
             await storage.updateTransactionStatus(transaction.id, "completed");
             if (transaction.type === "deposit") {
+              const grossAmt = parseFloat(transaction.amount);
+              const txFees = parseFloat((transaction as any).fees || "0") || 0;
+              const netAmt = grossAmt - txFees;
               await storage.updateWalletBalance(
                 transaction.userId,
                 transaction.currency,
-                parseFloat(transaction.amount)
+                netAmt > 0 ? netAmt : grossAmt
               );
             }
           } else if (statusStr === "failed") {
