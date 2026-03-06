@@ -583,7 +583,7 @@ else:
 
               <CodeBlock lang="javascript — Vérification signature (Express)" code={`const crypto = require('crypto');
 
-app.post('/api/webhook/solvexpay', express.raw({ type: 'application/json' }), (req, res) => {
+app.post('/api/webhook/solvexpay', express.raw({ type: 'application/json' }), async (req, res) => {
   const signature = req.headers['x-solvexpay-signature'];
   const secret = process.env.SOLVEXPAY_WEBHOOK_SECRET;
 
@@ -600,11 +600,10 @@ app.post('/api/webhook/solvexpay', express.raw({ type: 'application/json' }), (r
   const { event, transaction } = JSON.parse(req.body.toString());
 
   if (event === 'transaction.completed') {
-    const { id, amount, reference, metadata } = transaction;
-    
+    const { amount, reference } = transaction;
     // Exemple : activer un abonnement, livrer un produit, confirmer une commande
     console.log(\`Paiement reçu: \${amount} XOF — ref: \${reference}\`);
-    await activerCommande(metadata?.order_id);
+    // await activerCommande(reference);
   }
 
   res.json({ received: true });

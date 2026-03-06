@@ -199,11 +199,13 @@ export default function TransactionsPage() {
   const { data: transactions, isLoading } = useQuery<Transaction[]>({ queryKey: ["/api/transactions"] });
 
   const filteredTransactions = transactions?.filter((tx) => {
-    const matchesSearch =
+    const matchesSearch = !search ||
       tx.reference.toLowerCase().includes(search.toLowerCase()) ||
       tx.provider?.toLowerCase().includes(search.toLowerCase()) ||
       tx.phoneNumber?.toLowerCase().includes(search.toLowerCase()) ||
-      tx.description?.toLowerCase().includes(search.toLowerCase());
+      tx.description?.toLowerCase().includes(search.toLowerCase()) ||
+      (tx as any).payerName?.toLowerCase().includes(search.toLowerCase()) ||
+      (tx as any).payerEmail?.toLowerCase().includes(search.toLowerCase());
     const matchesType = typeFilter === "all" || tx.type === typeFilter;
     const matchesStatus = statusFilter === "all" || getEffectiveStatus(tx) === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
@@ -260,7 +262,7 @@ export default function TransactionsPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Rechercher par référence, description..."
+                  placeholder="Référence, réseau, numéro, nom payeur..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10 h-10 border-border/70"

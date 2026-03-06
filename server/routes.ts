@@ -1522,16 +1522,18 @@ export async function registerRoutes(
   app.get("/api/admin/users", isAdmin, async (_req, res) => {
     try {
       const { users: usersTable } = await import("@shared/models/auth");
+      const { wallets: walletsTable } = await import("@shared/schema");
       const { db } = await import("./db");
-      const { desc } = await import("drizzle-orm");
-      const allUsers = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
-      const usersWithWallets = await Promise.all(
-        allUsers.map(async (u) => {
-          const wallet = await storage.getWallet(u.id);
-          const { passwordHash: _, ...safeUser } = u;
-          return { ...safeUser, wallet };
-        })
-      );
+      const { desc, eq } = await import("drizzle-orm");
+      const rows = await db
+        .select()
+        .from(usersTable)
+        .leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id))
+        .orderBy(desc(usersTable.createdAt));
+      const usersWithWallets = rows.map(({ users, wallets }) => {
+        const { passwordHash: _, kycDocumentFront: _f, kycDocumentBack: _b, kycSelfie: _s, ...safeUser } = users as any;
+        return { ...safeUser, wallet: wallets ?? null };
+      });
       res.json(usersWithWallets);
     } catch (error) {
       console.error("Admin users error:", error);
