@@ -142,10 +142,18 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
               </div>
             )}
             {(tx as any).fees && parseFloat((tx as any).fees) > 0 && (
-              <div className="flex items-center justify-between py-2 border-b border-border/40">
-                <span className="text-muted-foreground">Frais</span>
-                <span className="font-semibold text-orange-600">{formatCurrency((tx as any).fees, tx.currency)} {tx.currency}</span>
-              </div>
+              <>
+                <div className="flex items-center justify-between py-2 border-b border-border/40">
+                  <span className="text-muted-foreground">Frais</span>
+                  <span className="font-semibold text-orange-600">{formatCurrency((tx as any).fees, tx.currency)} {tx.currency}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-border/40">
+                  <span className="text-muted-foreground">Montant net</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(parseFloat(tx.amount) - parseFloat((tx as any).fees), tx.currency)} {tx.currency}
+                  </span>
+                </div>
+              </>
             )}
             {showPayerInfo && (
               <>
