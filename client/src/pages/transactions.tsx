@@ -40,7 +40,7 @@ function getTypeIcon(tx: Transaction) {
 }
 
 function getTypeLabel(tx: Transaction) {
-  if (isPaymentLink(tx)) return "Paiement";
+  if (isPaymentLink(tx)) return "Paiement par lien";
   if (isApiPayment(tx)) return "Paiement API";
   if (tx.type === "deposit") return "Dépôt";
   if (tx.type === "transfer") return "Transfert";
