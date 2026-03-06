@@ -28,6 +28,12 @@ async function fetchUser(): Promise<SafeUser | null> {
   return response.json();
 }
 
+function clearOtherQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.removeQueries({
+    predicate: (query) => query.queryKey[0] !== "/api/auth/user",
+  });
+}
+
 export function useAuth() {
   const queryClient = useQueryClient();
   const { data: user, isLoading, error } = useQuery<SafeUser | null>({
@@ -45,8 +51,8 @@ export function useAuth() {
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.clear();
       queryClient.setQueryData(["/api/auth/user"], data);
+      clearOtherQueries(queryClient);
     },
   });
 
@@ -57,8 +63,8 @@ export function useAuth() {
     },
     onSuccess: (data) => {
       if (!data.requiresVerification) {
-        queryClient.clear();
         queryClient.setQueryData(["/api/auth/user"], data);
+        clearOtherQueries(queryClient);
       }
     },
   });
@@ -68,7 +74,8 @@ export function useAuth() {
       await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
-      queryClient.clear();
+      queryClient.setQueryData(["/api/auth/user"], null);
+      clearOtherQueries(queryClient);
     },
   });
 
