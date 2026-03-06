@@ -308,6 +308,12 @@ export async function registerRoutes(
       const withdrawalFeeRate = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7") / 100;
       const withdrawalFees = Math.round(amountXOF * withdrawalFeeRate);
 
+      // Net amount sent to user = requested amount minus fees
+      const netAmountXOF = amountXOF - withdrawalFees;
+      const netAmountLocal = localCurrency === "CDF"
+        ? Math.round(netAmountXOF / 0.22)
+        : netAmountXOF;
+
       if (withdrawalMode === "manual") {
         const transaction = await storage.createTransaction({
           userId,
@@ -332,10 +338,10 @@ export async function registerRoutes(
 
       const isWave = operator.toLowerCase() === "wave";
 
-      console.log(`Initiating OmniPay withdrawal for reference: ${reference} (Country: ${country}, Operator: ${operator})`);
+      console.log(`Initiating OmniPay withdrawal for reference: ${reference} (Country: ${country}, Operator: ${operator}), amount: ${amount}, fees: ${withdrawalFees}, net: ${netAmountLocal}`);
       const transferResponse = await omniPayService.transfer({
         msisdn: phoneNumber,
-        amount,
+        amount: netAmountLocal,
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
@@ -1624,8 +1630,15 @@ export async function registerRoutes(
         }
 
         const amount = parseFloat(transaction.amount);
+        const txFees = parseFloat((transaction as any).fees || "0");
+        const txCurrency = (transaction as any).currency || "XOF";
         const operator = (transaction as any).provider || "";
         const phoneNumber = (transaction as any).phoneNumber || "";
+
+        // Net amount to send = stored amount minus stored fees
+        const amountXOFForNet = txCurrency === "CDF" ? Math.floor(amount * 0.22) : amount;
+        const netXOF = amountXOFForNet - txFees;
+        const netAmountLocal = txCurrency === "CDF" ? Math.round(netXOF / 0.22) : netXOF;
 
         const { users: usersTable } = await import("@shared/models/auth");
         const { db: dbInst } = await import("./db");
@@ -1639,11 +1652,11 @@ export async function registerRoutes(
         const txCountry = (transaction as any).payerCountry || "BJ";
         const omnipayOperator = getOmniPayOperatorCode(operator, txCountry);
 
-        console.log(`Admin: initiating OmniPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${omnipayOperator}, ${amount})`);
+        console.log(`Admin: initiating OmniPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${omnipayOperator}, amount: ${amount}, fees: ${txFees}, net: ${netAmountLocal})`);
         try {
           const transferResponse = await omniPayService.transfer({
             msisdn: phoneNumber,
-            amount,
+            amount: netAmountLocal,
             reference: transaction.reference,
             firstName: resolvedFirstName,
             lastName: resolvedLastName,
