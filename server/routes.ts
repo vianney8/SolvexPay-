@@ -160,6 +160,55 @@ async function checkOperatorMaintenance(operator: string, country: string): Prom
   }
 }
 
+async function forwardToMerchantWebhooks(transaction: any) {
+  try {
+    const merchantApiKeys = await storage.getApiKeys(transaction.userId);
+    const activeKeysWithWebhook = merchantApiKeys.filter(
+      (k) => k.isActive && !(k as any).adminLocked && (k as any).webhookUrl
+    );
+    if (activeKeysWithWebhook.length === 0) return;
+
+    const statusStr = transaction.status as string;
+    const webhookPayload = {
+      event: statusStr === "completed" ? "transaction.completed" : "transaction.failed",
+      transaction: {
+        id: transaction.id,
+        status: statusStr,
+        amount: parseFloat(transaction.amount),
+        currency: transaction.currency,
+        operator: transaction.provider,
+        phone: transaction.phoneNumber,
+        reference: transaction.reference,
+        fees: transaction.fees ? parseFloat(transaction.fees) : 0,
+        net_amount: transaction.fees
+          ? parseFloat(transaction.amount) - parseFloat(transaction.fees)
+          : parseFloat(transaction.amount),
+        payer_name: transaction.payerName || null,
+        payer_email: transaction.payerEmail || null,
+        payer_country: transaction.payerCountry || null,
+        created_at: transaction.createdAt,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    for (const k of activeKeysWithWebhook) {
+      const webhookUrl = (k as any).webhookUrl as string;
+      const webhookSecret = (k as any).webhookSecret as string | undefined;
+      const bodyStr = JSON.stringify(webhookPayload);
+      const signature = webhookSecret
+        ? `sha256=${crypto.createHmac("sha256", webhookSecret).update(bodyStr).digest("hex")}`
+        : undefined;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (signature) headers["x-solvexpay-signature"] = signature;
+      axios.post(webhookUrl, webhookPayload, { headers, timeout: 10000 }).catch((err) => {
+        console.error(`Webhook delivery failed to ${webhookUrl}:`, err.message);
+      });
+    }
+  } catch (err) {
+    console.error("forwardToMerchantWebhooks error:", err);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -469,6 +518,8 @@ export async function registerRoutes(
               transaction.currency,
               netAmount > 0 ? netAmount : grossAmount
             );
+            const completedTx = await storage.getTransactionByReference(reference);
+            if (completedTx) forwardToMerchantWebhooks(completedTx);
           }
         } else if (statusStr === "failed") {
           const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
@@ -478,6 +529,10 @@ export async function registerRoutes(
               transaction.currency,
               parseFloat(transaction.amount)
             );
+          }
+          if (updated) {
+            const failedTx = await storage.getTransactionByReference(reference);
+            if (failedTx) forwardToMerchantWebhooks(failedTx);
           }
         }
       }
@@ -513,9 +568,15 @@ export async function registerRoutes(
               transaction.currency,
               netAmt > 0 ? netAmt : grossAmt
             );
+            const completedTx = await storage.getTransactionByReference(reference);
+            if (completedTx) forwardToMerchantWebhooks(completedTx);
           }
         } else if (statusStr === "failed") {
-          await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+          const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+          if (updated) {
+            const failedTx = await storage.getTransactionByReference(reference);
+            if (failedTx) forwardToMerchantWebhooks(failedTx);
+          }
         }
       }
 
@@ -657,9 +718,15 @@ export async function registerRoutes(
           const txFees = parseFloat((transaction as any).fees || "0") || 0;
           const netAmt = grossAmt - txFees;
           await storage.updateWalletBalance(transaction.userId, transaction.currency, netAmt > 0 ? netAmt : grossAmt);
+          const completedTx = await storage.getTransactionById(transaction.id);
+          if (completedTx) forwardToMerchantWebhooks(completedTx);
         }
       } else if (statusStr === "failed") {
-        await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+        const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+        if (updated) {
+          const failedTx = await storage.getTransactionById(transaction.id);
+          if (failedTx) forwardToMerchantWebhooks(failedTx);
+        }
       }
       const publicStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
       res.json({ success: result.success, status: publicStatus });
@@ -1381,50 +1448,10 @@ export async function registerRoutes(
         }
       }
 
-      // Forward webhook to merchant's configured webhook URLs
+      // Forward to merchant webhook URLs
       if (statusStr === "completed" || statusStr === "failed") {
-        try {
-          const merchantApiKeys = await storage.getApiKeys(transaction.userId);
-          const activeKeysWithWebhook = merchantApiKeys.filter(
-            (k) => k.isActive && !k.adminLocked && (k as any).webhookUrl
-          );
-          if (activeKeysWithWebhook.length > 0) {
-            const updatedTx = await storage.getTransactionByReference(reference);
-            const webhookPayload = {
-              event: statusStr === "completed" ? "transaction.completed" : "transaction.failed",
-              transaction: {
-                id: transaction.id,
-                status: statusStr,
-                amount: parseFloat(transaction.amount),
-                currency: transaction.currency,
-                operator: transaction.provider,
-                phone: transaction.phoneNumber,
-                reference: transaction.reference,
-                fees: transaction.fees ? parseFloat(transaction.fees) : 0,
-                net_amount: transaction.fees
-                  ? parseFloat(transaction.amount) - parseFloat(transaction.fees)
-                  : parseFloat(transaction.amount),
-                created_at: transaction.createdAt,
-              },
-              timestamp: new Date().toISOString(),
-            };
-            for (const k of activeKeysWithWebhook) {
-              const webhookUrl = (k as any).webhookUrl as string;
-              const webhookSecret = (k as any).webhookSecret as string | undefined;
-              const bodyStr = JSON.stringify(webhookPayload);
-              const signature = webhookSecret
-                ? `sha256=${crypto.createHmac("sha256", webhookSecret).update(bodyStr).digest("hex")}`
-                : undefined;
-              const headers: Record<string, string> = { "Content-Type": "application/json" };
-              if (signature) headers["x-solvexpay-signature"] = signature;
-              axios.post(webhookUrl, webhookPayload, { headers, timeout: 10000 }).catch((err) => {
-                console.error(`Webhook delivery failed for key ${k.id} to ${webhookUrl}:`, err.message);
-              });
-            }
-          }
-        } catch (webhookErr) {
-          console.error("Webhook forwarding error:", webhookErr);
-        }
+        const finalTx = await storage.getTransactionByReference(reference);
+        if (finalTx) forwardToMerchantWebhooks(finalTx);
       }
 
       res.json({ received: true });
