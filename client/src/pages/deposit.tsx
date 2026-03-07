@@ -40,9 +40,12 @@ export default function DepositPage() {
   const [country, setCountry] = useState("BJ");
   const [operator, setOperator] = useState("");
   const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [description, setDescription] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+
+  const needsOtp = country === "CM";
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [verifyCount, setVerifyCount] = useState(0);
@@ -52,7 +55,7 @@ export default function DepositPage() {
   const currency = selectedCountry.currency;
   const parsedAmount = parseFloat(amount) || 0;
 
-  useEffect(() => { setOperator(""); }, [country]);
+  useEffect(() => { setOperator(""); setOtp(""); }, [country]);
 
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
@@ -84,7 +87,7 @@ export default function DepositPage() {
   }, []);
 
   const depositMutation = useMutation({
-    mutationFn: async (data: { amount: number; currency: string; phoneNumber: string; operator: string; country: string; customerName?: string; description?: string }) => {
+    mutationFn: async (data: { amount: number; currency: string; phoneNumber: string; operator: string; country: string; otp?: string; customerName?: string; description?: string }) => {
       const res = await apiRequest("POST", "/api/transactions/deposit", data);
       return res.json();
     },
@@ -141,12 +144,13 @@ export default function DepositPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!parsedAmount || !phone || !operator || !country) return;
+    if (needsOtp && !otp.trim()) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
-    depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, customerName: customerName || undefined, description: description || undefined });
+    depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, otp: needsOtp ? otp.trim() : undefined, customerName: customerName || undefined, description: description || undefined });
   };
 
   const resetForm = () => {
-    setPaymentStatus("idle"); setAmount(""); setPhone(""); setCustomerName(""); setDescription(""); setPendingReference(null);
+    setPaymentStatus("idle"); setAmount(""); setPhone(""); setOtp(""); setCustomerName(""); setDescription(""); setPendingReference(null);
     setVerifyCount(0); setElapsed(0); setVerifyStatus("PENDING");
     window.history.replaceState({}, "", "/deposit");
   };
@@ -436,6 +440,27 @@ export default function DepositPage() {
                 </div>
               </div>
 
+              {needsOtp && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Code OTP
+                  </Label>
+                  <p className="text-xs text-muted-foreground -mt-1">
+                    {operator === "MTN" ? "Composez *126# puis entrez le code reçu" : operator === "Orange" ? "Composez #150*50# puis entrez le code reçu" : "Entrez votre code OTP Mobile Money"}
+                  </p>
+                  <Input
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Entrez votre code OTP"
+                    required={needsOtp}
+                    className="h-12 border-border/70 text-center tracking-widest text-lg font-bold"
+                    data-testid="input-deposit-otp"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Montant ({currency})
@@ -482,7 +507,10 @@ export default function DepositPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
             <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Un prompt <strong>USSD</strong> sera envoyé sur votre téléphone. Les frais de service (<strong>{Math.round(feeRate * 100)}%</strong>) sont déduits du montant déposé.
+              {needsOtp
+                ? <>Générez votre code OTP sur votre téléphone, puis entrez-le ci-dessus. Les frais de service (<strong>{Math.round(feeRate * 100)}%</strong>) sont déduits du montant déposé.</>
+                : <>Un prompt <strong>USSD</strong> sera envoyé sur votre téléphone. Les frais de service (<strong>{Math.round(feeRate * 100)}%</strong>) sont déduits du montant déposé.</>
+              }
             </p>
           </div>
 
@@ -490,7 +518,7 @@ export default function DepositPage() {
             type="submit"
             className="w-full h-13 text-base font-bold gap-2 shadow-xl"
             style={{ background: "linear-gradient(135deg, hsl(160 84% 34%) 0%, hsl(160 84% 44%) 100%)" }}
-            disabled={depositMutation.isPending || !parsedAmount || !phone || !operator || !country}
+            disabled={depositMutation.isPending || !parsedAmount || !phone || !operator || !country || (needsOtp && !otp.trim())}
             data-testid="button-confirm-deposit"
           >
             {depositMutation.isPending ? (
