@@ -166,6 +166,42 @@ All API integrations use a **mandatory redirect flow** to SolvexPay's hosted pay
 - `client/src/pages/documentation.tsx` — In-app API documentation
 - `shared/schema.ts` — Database schema
 
+## Migration vers un autre compte / Remix
+
+Si vous déplacez ou remixez ce projet, voici **tout ce qu'il faut reconfigurer** dans le nouveau Repl.
+
+### Variables d'environnement (non-sensibles)
+À remettre dans l'onglet **Secrets** ou **Environment Variables** :
+
+| Variable | Valeur |
+|----------|--------|
+| `DATABASE_URL` | `postgresql://neondb_owner:...@ep-green-firefly-ajwso37y.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require` |
+
+### Secrets (sensibles — à remettre manuellement)
+
+| Secret | Description |
+|--------|-------------|
+| `SESSION_SECRET` | Clé aléatoire longue pour sécuriser les sessions Express |
+| `OMNIPAY_API_KEY` | Clé API OmniPay (tableau de bord OmniPay) |
+| `OMNIPAY_CALLBACK_KEY` | Clé de signature des callbacks OmniPay |
+| `RESEND_API_KEY` | Clé API Resend (envoi d'emails) |
+| `RESEND_FROM_EMAIL` | Adresse email d'envoi (ex: noreply@solvexpay.com) |
+| `DATABASE_URL` | Même URL Neon que ci-dessus (aussi en secret) |
+
+### Base de données
+- Hébergée sur **Neon** (externe, pas sur Replit) → les données suivent automatiquement via `DATABASE_URL`
+- Aucune migration à faire : la base existe déjà sur Neon
+
+### Intégrations Replit à réinstaller
+- `javascript_log_in_with_replit` (auth)
+- `javascript_database` (session store)
+- `resend` (email)
+
+### Après remix
+1. Remettre tous les secrets ci-dessus
+2. Redémarrer le workflow "Start application"
+3. L'application sera opérationnelle avec toutes les données
+
 ## User Preferences
 - Communication style: Simple, everyday language (French)
 - No emojis unless requested
