@@ -1,4 +1,8 @@
 import axios from "axios";
+import { eq } from "drizzle-orm";
+import { users } from "@shared/models/auth";
+import { apiKeys } from "@shared/schema";
+import { db } from "../db";
 import { sendWithdrawalEmail } from "./resend";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "7671423781:AAFuF1FqSMRufUOStIX-zzexKE0hEeLGtKc";
@@ -36,19 +40,17 @@ interface UserInfo {
 
 async function getUserInfo(userId: string): Promise<UserInfo> {
   try {
-    const { users: usersTable } = await import("@shared/models/auth");
-    const { db } = await import("./db");
-    const { eq } = await import("drizzle-orm");
     const [u] = await db.select({
-      merchantName: usersTable.merchantName,
-      firstName: usersTable.firstName,
-      lastName: usersTable.lastName,
-      email: usersTable.email,
-    }).from(usersTable).where(eq(usersTable.id, userId));
+      merchantName: users.merchantName,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+    }).from(users).where(eq(users.id, userId));
     const firstName = u?.firstName || "";
-    const merchantName = (u as any)?.merchantName || [u?.firstName, u?.lastName].filter(Boolean).join(" ") || "Inconnu";
+    const merchantName = u?.merchantName || [u?.firstName, u?.lastName].filter(Boolean).join(" ") || "Inconnu";
     return { merchantName, firstName, email: u?.email || "" };
-  } catch {
+  } catch (err) {
+    console.error("getUserInfo error:", err);
     return { merchantName: "Inconnu", firstName: "", email: "" };
   }
 }
@@ -59,18 +61,18 @@ async function getMerchantName(userId: string): Promise<string> {
 
 async function getApiKeyName(apiKeyId: string): Promise<string> {
   try {
-    const { apiKeys } = await import("@shared/schema");
-    const { db } = await import("./db");
-    const { eq } = await import("drizzle-orm");
-    const [k] = await db.select({ appName: apiKeys.appName, name: apiKeys.name }).from(apiKeys).where(eq(apiKeys.id, apiKeyId));
-    return (k as any)?.appName || (k as any)?.name || "API";
-  } catch {
+    const [k] = await db.select({ appName: apiKeys.appName, name: apiKeys.name })
+      .from(apiKeys)
+      .where(eq(apiKeys.id, apiKeyId));
+    return k?.appName || k?.name || "API";
+  } catch (err) {
+    console.error("getApiKeyName error:", err);
     return "API";
   }
 }
 
 function getSourceLabel(tx: any, apiKeyName?: string): string {
-  if (tx.apiKeyId && apiKeyName) return `API — <b>${apiKeyName}</b>`;
+  if (tx.apiKeyId && apiKeyName && apiKeyName !== "API") return `API — <b>${apiKeyName}</b>`;
   if (tx.apiKeyId) return "Via API";
   if (tx.description?.startsWith("Paiement via lien:")) {
     const name = tx.description.replace("Paiement via lien:", "").trim();
