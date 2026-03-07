@@ -114,20 +114,17 @@ const publicPaySchema = z.object({
   customAmount: z.number().min(100).optional(),
 });
 
-function getOmniPayOperatorCode(operator: string, country: string): string {
+function getOmniPayOperatorCode(operator: string, _country: string): string {
   const op = operator.toUpperCase();
-  const co = country.toUpperCase();
-  const mapping: Record<string, Record<string, string>> = {
-    MOOV:     { BJ: "moov_benin", CI: "moov", TG: "moov_togo", BF: "moov_bf", ML: "moov_ml" },
-    ORANGE:   { CI: "orange", SN: "orange_sn", CM: "orange_cm", BF: "orange_bf", ML: "orange_ml", COD: "orange_cong" },
-    MTN:      { BJ: "mtn", CI: "mtn", CM: "mtn", COG: "mtn" },
-    TMONEY:   { TG: "tmoney" },
-    WAVE:     { CI: "wave", SN: "wave" },
-    FREE:     { SN: "free_sn" },
-    VODACOM:  { COD: "" },
-    AIRTEL:   { COD: "", COG: "" },
+  // OmniPay : n'envoyer operator que pour les portefeuilles électroniques (Wave, Mixx/Free).
+  // Pour les réseaux classiques (MTN, Orange, Moov, TMoney…) laisser vide = auto-détection par le numéro.
+  const WALLET_OPERATORS: Record<string, string> = {
+    WAVE: "wave",
+    FREE: "free_sn",
+    MIXX: "mixx",
   };
-  return mapping[op]?.[co] ?? op.toLowerCase();
+  if (WALLET_OPERATORS[op]) return WALLET_OPERATORS[op];
+  return "";
 }
 
 function getCountryCurrency(country: string): string {
