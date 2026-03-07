@@ -452,7 +452,7 @@ export default function DepositPage() {
                       <ol className="text-xs text-muted-foreground space-y-1 list-none">
                         <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144#</strong> sur votre téléphone Orange</li>
                         <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Sélectionnez <strong>"Générer un OTP"</strong> pour paiement en ligne</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez votre code secret Orange Money (4 chiffres)</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
                         <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
                       </ol>
                     </div>
