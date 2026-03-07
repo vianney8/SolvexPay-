@@ -447,7 +447,7 @@ export default function DepositPage() {
                     Code OTP
                   </Label>
                   <p className="text-xs text-muted-foreground -mt-1">
-                    Composez #150*50# sur votre téléphone puis entrez le code reçu
+                    Composez <strong>#144#</strong> sur votre téléphone Orange, sélectionnez "Générer OTP" puis entrez le code reçu
                   </p>
                   <Input
                     value={otp}
