@@ -275,6 +275,8 @@ export default function AdminPage() {
   });
   const { data: paymentMethods, isLoading: pmLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-methods"] });
   const { data: commissions, isLoading: comLoading, refetch: refetchCommissions } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
+  const { data: systemSettings } = useQuery<{ withdrawalMode: string }>({ queryKey: ["/api/admin/system-settings"] });
+  const isAutoWithdrawal = systemSettings?.withdrawalMode !== "manual";
   const { data: profitTx, isLoading: profitTxLoading } = useQuery<any[]>({ queryKey: ["/api/admin/profit-transactions"], staleTime: 30000 });
   const { data: financialSummary, isLoading: finLoading } = useQuery<any>({
     queryKey: ["/api/admin/financial-summary"],
@@ -567,7 +569,7 @@ export default function AdminPage() {
                 {[
                   { label: "Total utilisateurs", value: totalUsersCount || stats?.userCount, color: "text-cyan-300" },
                   { label: "KYC en attente", value: pendingKyc.length, color: "text-amber-300" },
-                  { label: "Retraits pendants", value: pendingWithdrawals.length, color: "text-rose-300" },
+                  { label: "Retraits pendants", value: isAutoWithdrawal ? 0 : pendingWithdrawals.length, color: "text-rose-300" },
                   { label: "Liens de paiement", value: (allPaymentLinks || []).length, color: "text-violet-300" },
                   { label: "Clés API", value: (allApiKeys || []).length, color: "text-emerald-300" },
                 ].map((s, i) => (
@@ -594,7 +596,7 @@ export default function AdminPage() {
                 { v: "links-keys", label: "Liens & API", Icon: Link2, badge: 0 },
                 { v: "fees", label: "Frais", Icon: Percent, badge: 0 },
                 { v: "payments", label: "Moyens de paiement", Icon: CreditCard, badge: 0 },
-                { v: "transactions", label: "Transactions", Icon: ArrowDownUp, badge: pendingWithdrawals.length },
+                { v: "transactions", label: "Transactions", Icon: ArrowDownUp, badge: isAutoWithdrawal ? 0 : pendingWithdrawals.length },
                 { v: "notifications", label: "Notifications", Icon: Bell, badge: (adminNotifications || []).filter((n: any) => n.isActive).length },
                 { v: "support-links", label: "Liens Support", Icon: HeadphonesIcon, badge: 0 },
                 { v: "settings", label: "Paramètres", Icon: Settings2, badge: 0 },
@@ -2170,7 +2172,7 @@ export default function AdminPage() {
               TAB 7 — TRANSACTIONS
           ══════════════════════════════════════ */}
           <TabsContent value="transactions" className="space-y-4 mt-5">
-            {pendingWithdrawals.length > 0 && (
+            {pendingWithdrawals.length > 0 && !isAutoWithdrawal && (
               <Card className="border-amber-500/30 bg-amber-500/5 overflow-hidden">
                 <CardContent className="p-0">
                   <div className="bg-amber-500/10 px-4 py-2.5 flex items-center gap-2">
