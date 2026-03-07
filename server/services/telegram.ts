@@ -36,7 +36,7 @@ interface UserInfo {
 
 async function getUserInfo(userId: string): Promise<UserInfo> {
   try {
-    const { users: usersTable } = await import("@shared/schema");
+    const { users: usersTable } = await import("@shared/models/auth");
     const { db } = await import("./db");
     const { eq } = await import("drizzle-orm");
     const [u] = await db.select({
