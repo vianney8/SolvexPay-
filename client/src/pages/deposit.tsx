@@ -46,7 +46,9 @@ export default function DepositPage() {
   const [description, setDescription] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
-  const needsOtp = country === "CM" && (operator === "Orange" || operator === "MTN");
+  const needsOtp =
+    (country === "CM" && (operator === "Orange" || operator === "MTN")) ||
+    (country === "BF" && operator === "Orange");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [verifyCount, setVerifyCount] = useState(0);
@@ -386,7 +388,22 @@ export default function DepositPage() {
                     Code OTP {operator} Money
                   </Label>
 
-                  {operator === "Orange" ? (
+                  {country === "BF" && operator === "Orange" ? (
+                    <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
+                      <div className="flex items-center gap-2 bg-orange-100/60 dark:bg-orange-900/20 rounded-lg px-3 py-2 my-1">
+                        <span className="text-xs text-muted-foreground">Composez ce code :</span>
+                        <code className="text-sm font-black text-orange-600 dark:text-orange-400 tracking-widest">
+                          *144*4*6*{parsedAmount > 0 ? parsedAmount : "MONTANT"}#
+                        </code>
+                      </div>
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>*144*4*6*{parsedAmount > 0 ? parsedAmount : "MONTANT"}#</strong> sur votre téléphone Orange</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Vous recevrez immédiatement votre code OTP</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez le code OTP reçu ci-dessous</li>
+                      </ol>
+                    </div>
+                  ) : operator === "Orange" ? (
                     <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
                       <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
                       <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
