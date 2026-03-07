@@ -45,7 +45,7 @@ export default function DepositPage() {
   const [description, setDescription] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
-  const needsOtp = country === "CM" && operator === "Orange";
+  const needsOtp = country === "CM" && (operator === "Orange" || operator === "MTN");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [verifyCount, setVerifyCount] = useState(0);
@@ -444,17 +444,29 @@ export default function DepositPage() {
               {needsOtp && (
                 <div className="space-y-3">
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Code OTP Orange Money
+                    Code OTP {operator} Money
                   </Label>
-                  <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
-                    <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
-                    <ol className="text-xs text-muted-foreground space-y-1 list-none">
-                      <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144#</strong> sur votre téléphone Orange</li>
-                      <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Sélectionnez <strong>"Générer un OTP"</strong> pour paiement en ligne</li>
-                      <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez votre code secret Orange Money (4 chiffres)</li>
-                      <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
-                    </ol>
-                  </div>
+                  {operator === "Orange" ? (
+                    <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-muted-foreground space-y-1 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144#</strong> sur votre téléphone Orange</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Sélectionnez <strong>"Générer un OTP"</strong> pour paiement en ligne</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez votre code secret Orange Money (4 chiffres)</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
+                      </ol>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-yellow-500/5 border border-yellow-500/20 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-muted-foreground space-y-1 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">1.</span> Composez <strong>*126#</strong> sur votre téléphone MTN</li>
+                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">2.</span> Sélectionnez l'option <strong>paiement en ligne / OTP</strong></li>
+                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">3.</span> Entrez votre code PIN MoMo (5 chiffres)</li>
+                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">4.</span> Entrez le code OTP reçu par SMS ci-dessous</li>
+                      </ol>
+                    </div>
+                  )}
                   <Input
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
