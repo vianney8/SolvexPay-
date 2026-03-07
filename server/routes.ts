@@ -526,6 +526,10 @@ export async function registerRoutes(
               notifyTransactionCompleted(completedTx).catch(() => {});
             }
           }
+          if (updated && transaction.type === "withdrawal") {
+            const completedWdTx = await storage.getTransactionByReference(reference);
+            if (completedWdTx) notifyWithdrawal(completedWdTx, "success").catch(() => {});
+          }
         } else if (statusStr === "failed") {
           const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
           if (updated && transaction.type === "withdrawal") {
