@@ -7,6 +7,7 @@ import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 import { sanitizeUser } from "./userUtils";
 import { z } from "zod";
+import { notifyKycPending } from "../../services/telegram";
 
 async function saveBase64ToFile(base64Data: string, userId: string, type: string): Promise<string> {
   const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
@@ -149,6 +150,7 @@ export function registerAuthRoutes(app: Express): void {
         kycDocumentBack: backPath,
         kycSelfie: selfiePath,
       } as any);
+      notifyKycPending(kycFirstName, kycLastName, user.email || "").catch(() => {});
       res.json(sanitizeUser(updated));
     } catch (error) {
       console.error("Error submitting KYC:", error);

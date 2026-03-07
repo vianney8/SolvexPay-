@@ -6,6 +6,7 @@ import { storage, generateApiKey, generateSlug, generateReference } from "./stor
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
 import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, type OmniPayCallbackPayload } from "./services/omnipay";
 import { testResendConnection } from "./services/resend";
+import { notifyTransactionCompleted, notifyWithdrawal } from "./services/telegram";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -520,7 +521,10 @@ export async function registerRoutes(
               netAmount > 0 ? netAmount : grossAmount
             );
             const completedTx = await storage.getTransactionByReference(reference);
-            if (completedTx) forwardToMerchantWebhooks(completedTx);
+            if (completedTx) {
+              forwardToMerchantWebhooks(completedTx);
+              notifyTransactionCompleted(completedTx).catch(() => {});
+            }
           }
         } else if (statusStr === "failed") {
           const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
@@ -530,6 +534,8 @@ export async function registerRoutes(
               transaction.currency,
               parseFloat(transaction.amount)
             );
+            const failedWdTx = await storage.getTransactionByReference(reference);
+            if (failedWdTx) notifyWithdrawal(failedWdTx, "failed").catch(() => {});
           }
           if (updated) {
             const failedTx = await storage.getTransactionByReference(reference);
@@ -570,7 +576,10 @@ export async function registerRoutes(
               netAmt > 0 ? netAmt : grossAmt
             );
             const completedTx = await storage.getTransactionByReference(reference);
-            if (completedTx) forwardToMerchantWebhooks(completedTx);
+            if (completedTx) {
+              forwardToMerchantWebhooks(completedTx);
+              notifyTransactionCompleted(completedTx).catch(() => {});
+            }
           }
         } else if (statusStr === "failed") {
           const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
@@ -1453,10 +1462,17 @@ export async function registerRoutes(
         }
       }
 
-      // Forward to merchant webhook URLs
+      // Forward to merchant webhook URLs + Telegram notifications
       if (statusStr === "completed" || statusStr === "failed") {
         const finalTx = await storage.getTransactionByReference(reference);
-        if (finalTx) forwardToMerchantWebhooks(finalTx);
+        if (finalTx) {
+          forwardToMerchantWebhooks(finalTx);
+          if (statusStr === "completed" && finalTx.type === "deposit") {
+            notifyTransactionCompleted(finalTx).catch(() => {});
+          } else if (finalTx.type === "withdrawal") {
+            notifyWithdrawal(finalTx, statusStr === "completed" ? "success" : "failed").catch(() => {});
+          }
+        }
       }
 
       res.json({ received: true });
@@ -1702,6 +1718,7 @@ export async function registerRoutes(
           console.log(`Admin: OmniPay transfer response for tx ${id}:`, transferResponse);
 
           const tx = await storage.updateTransactionStatus(id, "completed");
+          if (tx) notifyWithdrawal(tx, "success").catch(() => {});
           return res.json({ ...tx, omnipayId: transferResponse.id, omnipayTriggered: true });
         } catch (omnipayError: any) {
           console.error(`Admin: OmniPay transfer failed for tx ${id}:`, omnipayError);
@@ -1716,6 +1733,7 @@ export async function registerRoutes(
         await storage.updateTransactionStatus(id, "failed");
         await storage.updateWalletBalance(transaction.userId, transaction.currency, parseFloat(transaction.amount));
         const tx = await storage.getTransactionById(id);
+        if (tx) notifyWithdrawal(tx, "failed").catch(() => {});
         return res.json({ ...tx, refunded: true });
       }
 
