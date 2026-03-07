@@ -577,14 +577,20 @@ export async function registerRoutes(
             if (completedWdTx) notifyWithdrawal(completedWdTx, "success").catch(() => {});
           }
         } else if (statusStr === "failed") {
-          if (transaction.type !== "withdrawal") {
-            const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
-            if (updated) {
-              const failedTx = await storage.getTransactionByReference(reference);
-              if (failedTx) forwardToMerchantWebhooks(failedTx);
-            }
+          const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+          if (updated && transaction.type === "withdrawal") {
+            await storage.updateWalletBalance(
+              transaction.userId,
+              transaction.currency,
+              parseFloat(transaction.amount)
+            );
+            const failedWdTx = await storage.getTransactionByReference(reference);
+            if (failedWdTx) notifyWithdrawal(failedWdTx, "failed").catch(() => {});
           }
-          // For withdrawals, ignore "failed" status — keep as pending for admin review
+          if (updated) {
+            const failedTx = await storage.getTransactionByReference(reference);
+            if (failedTx) forwardToMerchantWebhooks(failedTx);
+          }
         }
       }
 
@@ -1497,27 +1503,27 @@ export async function registerRoutes(
           } else if (transaction.type === "withdrawal") {
             console.log(`[OmniPay] Withdrawal ${reference} completed`);
           }
-          const finalTx = await storage.getTransactionByReference(reference);
-          if (finalTx) {
-            forwardToMerchantWebhooks(finalTx);
-            if (finalTx.type === "deposit") {
-              notifyTransactionCompleted(finalTx).catch(() => {});
-            } else if (finalTx.type === "withdrawal") {
-              notifyWithdrawal(finalTx, "success").catch(() => {});
-            }
-          }
         } else {
-          // status = failed
+          await storage.updateTransactionStatus(transaction.id, "failed");
           if (transaction.type === "withdrawal") {
-            // For withdrawals, ignore OmniPay "failed" callbacks — keep as pending
-            // OmniPay sometimes incorrectly reports failed for transactions that were actually sent
-            // Admin must manually update the withdrawal status
-            console.log(`[OmniPay] Withdrawal ${reference} received failed callback — kept as pending for admin review`);
+            await storage.updateWalletBalance(
+              transaction.userId,
+              transaction.currency,
+              parseFloat(transaction.amount)
+            );
+            console.log(`[OmniPay] Withdrawal ${reference} failed, balance refunded`);
           } else {
-            await storage.updateTransactionStatus(transaction.id, "failed");
             console.log(`[OmniPay] Payment ${reference} failed`);
-            const finalTx = await storage.getTransactionByReference(reference);
-            if (finalTx) forwardToMerchantWebhooks(finalTx);
+          }
+        }
+
+        const finalTx = await storage.getTransactionByReference(reference);
+        if (finalTx) {
+          forwardToMerchantWebhooks(finalTx);
+          if (statusStr === "completed" && finalTx.type === "deposit") {
+            notifyTransactionCompleted(finalTx).catch(() => {});
+          } else if (finalTx.type === "withdrawal") {
+            notifyWithdrawal(finalTx, statusStr === "completed" ? "success" : "failed").catch(() => {});
           }
         }
       } catch (error: any) {
