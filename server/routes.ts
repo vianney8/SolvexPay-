@@ -446,7 +446,7 @@ export async function registerRoutes(
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
-        operator: getTransferOperatorCode(operator, country),
+        operator: getOmniPayOperatorCode(operator, country),
       });
       console.log(`OmniPay withdrawal response for ${reference}:`, transferResponse);
 
@@ -518,7 +518,7 @@ export async function registerRoutes(
         reference,
         firstName,
         lastName,
-        operator: getTransferOperatorCode(operator, country),
+        operator: getOmniPayOperatorCode(operator, country),
       });
       console.log(`OmniPay transfer response for ${reference}:`, transferResponse);
 
@@ -1757,7 +1757,7 @@ export async function registerRoutes(
         const resolvedLastName = txUser?.lastName || "SolvexPay";
 
         const txCountry = (transaction as any).payerCountry || "BJ";
-        const omnipayOperator = getTransferOperatorCode(operator, txCountry);
+        const omnipayOperator = getOmniPayOperatorCode(operator, txCountry);
 
         console.log(`Admin: initiating OmniPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${omnipayOperator}, amount: ${amount}, fees: ${txFees}, net: ${netAmountLocal})`);
         try {
