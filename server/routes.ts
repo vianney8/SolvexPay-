@@ -159,12 +159,49 @@ async function checkOperatorMaintenance(operator: string, country: string): Prom
   }
 }
 
+// ── Webhook delivery with automatic retry (3 attempts: 0s, 8s, 30s) ──────────
+function scheduleWebhookDelivery(
+  webhookUrl: string,
+  payload: object,
+  headers: Record<string, string>,
+  attempt = 0,
+  maxRetries = 3
+): void {
+  const RETRY_DELAYS_MS = [0, 8000, 30000];
+  const delay = RETRY_DELAYS_MS[attempt] ?? 30000;
+
+  setTimeout(async () => {
+    try {
+      await axios.post(webhookUrl, payload, { headers, timeout: 12000 });
+      if (attempt > 0) {
+        console.log(`[Webhook] ✓ Delivered to ${webhookUrl} (attempt ${attempt + 1})`);
+      }
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const msg = err?.message || "unknown error";
+      console.error(`[Webhook] ✗ Attempt ${attempt + 1}/${maxRetries} failed for ${webhookUrl}: ${msg}${status ? ` (HTTP ${status})` : ""}`);
+      if (attempt + 1 < maxRetries) {
+        scheduleWebhookDelivery(webhookUrl, payload, headers, attempt + 1, maxRetries);
+      } else {
+        console.error(`[Webhook] ✗✗ Permanently failed for ${webhookUrl} after ${maxRetries} attempts — transaction: ${(payload as any)?.transaction?.reference || "?"}`);
+      }
+    }
+  }, delay);
+}
+
 async function forwardToMerchantWebhooks(transaction: any) {
   try {
     const merchantApiKeys = await storage.getApiKeys(transaction.userId);
-    const activeKeysWithWebhook = merchantApiKeys.filter(
+    let activeKeysWithWebhook = merchantApiKeys.filter(
       (k) => k.isActive && !(k as any).adminLocked && (k as any).webhookUrl
     );
+
+    // If the transaction was made via a specific API key, only notify that key
+    if (transaction.apiKeyId) {
+      const specificKey = activeKeysWithWebhook.find((k) => k.id === transaction.apiKeyId);
+      activeKeysWithWebhook = specificKey ? [specificKey] : [];
+    }
+
     if (activeKeysWithWebhook.length === 0) return;
 
     const statusStr = transaction.status as string;
@@ -199,12 +236,10 @@ async function forwardToMerchantWebhooks(transaction: any) {
         : undefined;
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (signature) headers["x-solvexpay-signature"] = signature;
-      axios.post(webhookUrl, webhookPayload, { headers, timeout: 10000 }).catch((err) => {
-        console.error(`Webhook delivery failed to ${webhookUrl}:`, err.message);
-      });
+      scheduleWebhookDelivery(webhookUrl, webhookPayload, headers);
     }
   } catch (err) {
-    console.error("forwardToMerchantWebhooks error:", err);
+    console.error("[Webhook] forwardToMerchantWebhooks error:", err);
   }
 }
 
@@ -733,7 +768,10 @@ export async function registerRoutes(
           const netAmt = grossAmt - txFees;
           await storage.updateWalletBalance(transaction.userId, transaction.currency, netAmt > 0 ? netAmt : grossAmt);
           const completedTx = await storage.getTransactionById(transaction.id);
-          if (completedTx) forwardToMerchantWebhooks(completedTx);
+          if (completedTx) {
+            forwardToMerchantWebhooks(completedTx);
+            notifyTransactionCompleted(completedTx).catch(() => {});
+          }
         }
       } else if (statusStr === "failed") {
         const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
@@ -1408,66 +1446,66 @@ export async function registerRoutes(
   });
 
   app.post("/api/webhooks/omnipay", async (req, res) => {
-    try {
-      const payload = req.body as OmniPayCallbackPayload;
-      console.log("OmniPay callback received:", payload);
+    const payload = req.body as OmniPayCallbackPayload;
+    console.log("[OmniPay] Callback received:", JSON.stringify(payload));
 
-      const callbackKey = omniPayService.getCallbackKey();
-      if (callbackKey) {
-        if (!payload.signature) {
-          console.error("OmniPay callback: missing signature");
-          return res.status(401).json({ error: "Missing signature" });
-        }
-        const isValid = verifyCallbackSignature(payload, callbackKey);
-        if (!isValid) {
-          console.error("OmniPay callback: invalid signature");
-          return res.status(401).json({ error: "Invalid signature" });
-        }
+    // Signature verification — reject invalid requests immediately
+    const callbackKey = omniPayService.getCallbackKey();
+    if (callbackKey) {
+      if (!payload.signature) {
+        console.error("[OmniPay] Callback: missing signature");
+        return res.status(401).json({ error: "Missing signature" });
       }
-
-      const { reference, status: statusCode, type } = payload;
-      if (!reference) {
-        return res.json({ received: true });
+      if (!verifyCallbackSignature(payload, callbackKey)) {
+        console.error("[OmniPay] Callback: invalid signature");
+        return res.status(401).json({ error: "Invalid signature" });
       }
+    }
 
-      const statusStr = omnipayStatusToString(Number(statusCode));
-      const transaction = await storage.getTransactionByReference(reference);
+    // Always acknowledge immediately — prevents OmniPay from retrying on our internal errors
+    res.json({ received: true });
 
-      if (!transaction || transaction.status !== "pending") {
-        return res.json({ received: true });
-      }
+    // Process asynchronously after response is sent
+    ;(async () => {
+      try {
+        const { reference, status: statusCode } = payload;
+        if (!reference) return;
 
-      if (statusStr === "completed") {
-        await storage.updateTransactionStatus(transaction.id, "completed");
-        if (transaction.type === "deposit") {
-          const grossAmtWh = parseFloat(transaction.amount);
-          const txFeesWh = parseFloat((transaction as any).fees || "0") || 0;
-          const netAmtWh = grossAmtWh - txFeesWh;
-          await storage.updateWalletBalance(
-            transaction.userId,
-            transaction.currency,
-            netAmtWh > 0 ? netAmtWh : grossAmtWh
-          );
-          console.log(`OmniPay callback: deposit ${reference} completed, wallet credited`);
-        } else if (transaction.type === "withdrawal") {
-          console.log(`OmniPay callback: transfer ${reference} completed`);
-        }
-      } else if (statusStr === "failed") {
-        await storage.updateTransactionStatus(transaction.id, "failed");
-        if (transaction.type === "withdrawal") {
-          await storage.updateWalletBalance(
-            transaction.userId,
-            transaction.currency,
-            parseFloat(transaction.amount)
-          );
-          console.log(`OmniPay callback: transfer ${reference} failed, balance refunded`);
+        const statusStr = omnipayStatusToString(Number(statusCode));
+        if (statusStr !== "completed" && statusStr !== "failed") return;
+
+        const transaction = await storage.getTransactionByReference(reference);
+        if (!transaction || transaction.status !== "pending") return;
+
+        if (statusStr === "completed") {
+          await storage.updateTransactionStatus(transaction.id, "completed");
+          if (transaction.type === "deposit") {
+            const grossAmtWh = parseFloat(transaction.amount);
+            const txFeesWh = parseFloat((transaction as any).fees || "0") || 0;
+            const netAmtWh = grossAmtWh - txFeesWh;
+            await storage.updateWalletBalance(
+              transaction.userId,
+              transaction.currency,
+              netAmtWh > 0 ? netAmtWh : grossAmtWh
+            );
+            console.log(`[OmniPay] Deposit ${reference} completed, wallet credited`);
+          } else if (transaction.type === "withdrawal") {
+            console.log(`[OmniPay] Withdrawal ${reference} completed`);
+          }
         } else {
-          console.log(`OmniPay callback: payment ${reference} failed`);
+          await storage.updateTransactionStatus(transaction.id, "failed");
+          if (transaction.type === "withdrawal") {
+            await storage.updateWalletBalance(
+              transaction.userId,
+              transaction.currency,
+              parseFloat(transaction.amount)
+            );
+            console.log(`[OmniPay] Withdrawal ${reference} failed, balance refunded`);
+          } else {
+            console.log(`[OmniPay] Payment ${reference} failed`);
+          }
         }
-      }
 
-      // Forward to merchant webhook URLs + Telegram notifications
-      if (statusStr === "completed" || statusStr === "failed") {
         const finalTx = await storage.getTransactionByReference(reference);
         if (finalTx) {
           forwardToMerchantWebhooks(finalTx);
@@ -1477,13 +1515,10 @@ export async function registerRoutes(
             notifyWithdrawal(finalTx, statusStr === "completed" ? "success" : "failed").catch(() => {});
           }
         }
+      } catch (error: any) {
+        console.error("[OmniPay] Callback async processing error:", error.message || error);
       }
-
-      res.json({ received: true });
-    } catch (error: any) {
-      console.error("OmniPay callback processing error:", error);
-      res.status(500).json({ error: "Callback processing failed" });
-    }
+    })();
   });
 
   app.get("/api/payment/callback", async (req, res) => {
