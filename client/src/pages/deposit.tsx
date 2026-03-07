@@ -462,7 +462,7 @@ export default function DepositPage() {
                       <ol className="text-xs text-muted-foreground space-y-1 list-none">
                         <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">1.</span> Composez <strong>*126#</strong> sur votre téléphone MTN</li>
                         <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">2.</span> Sélectionnez l'option <strong>paiement en ligne / OTP</strong></li>
-                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">3.</span> Entrez votre code PIN MoMo (5 chiffres)</li>
+                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">3.</span> Entrez votre code PIN MoMo</li>
                         <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">4.</span> Entrez le code OTP reçu par SMS ci-dessous</li>
                       </ol>
                     </div>
