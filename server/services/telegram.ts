@@ -1,4 +1,5 @@
 import axios from "axios";
+import { sendWithdrawalEmail } from "./resend";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "7671423781:AAFuF1FqSMRufUOStIX-zzexKE0hEeLGtKc";
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID || "8360195532";
@@ -27,7 +28,13 @@ async function send(text: string): Promise<void> {
   }
 }
 
-async function getMerchantName(userId: string): Promise<string> {
+interface UserInfo {
+  merchantName: string;
+  firstName: string;
+  email: string;
+}
+
+async function getUserInfo(userId: string): Promise<UserInfo> {
   try {
     const { users: usersTable } = await import("@shared/schema");
     const { db } = await import("./db");
@@ -36,11 +43,18 @@ async function getMerchantName(userId: string): Promise<string> {
       merchantName: usersTable.merchantName,
       firstName: usersTable.firstName,
       lastName: usersTable.lastName,
+      email: usersTable.email,
     }).from(usersTable).where(eq(usersTable.id, userId));
-    return (u as any)?.merchantName || [u?.firstName, u?.lastName].filter(Boolean).join(" ") || "Inconnu";
+    const firstName = u?.firstName || "";
+    const merchantName = (u as any)?.merchantName || [u?.firstName, u?.lastName].filter(Boolean).join(" ") || "Inconnu";
+    return { merchantName, firstName, email: u?.email || "" };
   } catch {
-    return "Inconnu";
+    return { merchantName: "Inconnu", firstName: "", email: "" };
   }
+}
+
+async function getMerchantName(userId: string): Promise<string> {
+  return (await getUserInfo(userId)).merchantName;
 }
 
 async function getApiKeyName(apiKeyId: string): Promise<string> {
@@ -92,23 +106,36 @@ export async function notifyTransactionCompleted(tx: any): Promise<void> {
 
 export async function notifyWithdrawal(tx: any, statusLabel: "success" | "failed"): Promise<void> {
   try {
-    const merchantName = await getMerchantName(tx.userId);
+    const userInfo = await getUserInfo(tx.userId);
     const amount = parseFloat(tx.amount || "0");
     const currency = tx.currency || "XOF";
     const phone = tx.phoneNumber || "—";
     const operator = tx.provider || "—";
+    const dateStr = now();
     const icon = statusLabel === "success" ? "✅" : "❌";
     const label = statusLabel === "success" ? "Retrait réussi" : "Retrait échoué";
 
     await send(
       `${icon} <b>${label}</b>\n\n` +
       `📋 Référence: <code>${tx.reference}</code>\n` +
-      `👤 Marchand: <b>${merchantName}</b>\n` +
+      `👤 Marchand: <b>${userInfo.merchantName}</b>\n` +
       `📱 Numéro: <code>${phone}</code>\n` +
       `💰 Montant: <b>${fmt(amount, currency)}</b>\n` +
       `📡 Opérateur: ${operator}\n` +
-      `🕐 Heure: ${now()}`
+      `🕐 Heure: ${dateStr}`
     );
+
+    if (userInfo.email) {
+      await sendWithdrawalEmail(userInfo.email, userInfo.firstName || userInfo.merchantName, {
+        status: statusLabel,
+        reference: tx.reference,
+        amount,
+        currency,
+        phone,
+        operator,
+        date: dateStr,
+      });
+    }
   } catch (err) {
     console.error("notifyWithdrawal error:", err);
   }
