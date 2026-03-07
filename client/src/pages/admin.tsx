@@ -232,6 +232,21 @@ export default function AdminPage() {
   const [kycDialog, setKycDialog] = useState<{ userId: string; name: string; status: string } | null>(null);
   const [kycAction, setKycAction] = useState<"verified" | "rejected" | "not_started" | null>(null);
   const [kycReason, setKycReason] = useState("");
+  const [kycDocs, setKycDocs] = useState<Record<string, { kycDocumentFront?: string; kycDocumentBack?: string; kycSelfie?: string } | null>>({});
+  const [kycDocsLoading, setKycDocsLoading] = useState<Record<string, boolean>>({});
+  const loadKycDocs = async (userId: string) => {
+    if (kycDocs[userId] !== undefined) return;
+    setKycDocsLoading(p => ({ ...p, [userId]: true }));
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/kyc-docs`);
+      const data = await res.json();
+      setKycDocs(p => ({ ...p, [userId]: data }));
+    } catch {
+      setKycDocs(p => ({ ...p, [userId]: null }));
+    } finally {
+      setKycDocsLoading(p => ({ ...p, [userId]: false }));
+    }
+  };
   const [pwdDialog, setPwdDialog] = useState<{ userId: string; name: string } | null>(null);
   const [pwd, setPwd] = useState("");
   const [balDialog, setBalDialog] = useState<{ userId: string; name: string; bal: number } | null>(null);
@@ -1595,13 +1610,22 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* KYC Photos */}
-                      {true && (
+                      {/* KYC Photos — chargées à la demande */}
+                      {kycDocs[u.id] === undefined ? (
+                        <button
+                          onClick={() => loadKycDocs(u.id)}
+                          disabled={kycDocsLoading[u.id]}
+                          className="w-full text-xs text-violet-600 dark:text-violet-400 font-medium py-1.5 rounded-xl bg-violet-500/8 hover:bg-violet-500/15 transition-colors border border-violet-500/20"
+                          data-testid={`btn-load-kyc-docs-${u.id}`}
+                        >
+                          {kycDocsLoading[u.id] ? "Chargement…" : "Voir les documents"}
+                        </button>
+                      ) : (
                         <div className="grid grid-cols-3 gap-2 pt-1">
                           {[
-                            { src: u.kycDocumentFront, label: "Recto", testId: `img-kyc-front-${u.id}` },
-                            { src: u.kycDocumentBack, label: "Verso", testId: `img-kyc-back-${u.id}` },
-                            { src: u.kycSelfie, label: "Selfie", testId: `img-kyc-selfie-${u.id}` },
+                            { src: kycDocs[u.id]?.kycDocumentFront, label: "Recto", testId: `img-kyc-front-${u.id}` },
+                            { src: kycDocs[u.id]?.kycDocumentBack, label: "Verso", testId: `img-kyc-back-${u.id}` },
+                            { src: kycDocs[u.id]?.kycSelfie, label: "Selfie", testId: `img-kyc-selfie-${u.id}` },
                           ].map(({ src, label, testId }) => (
                             <div key={label} className="space-y-1">
                               <p className="text-[10px] text-muted-foreground font-medium text-center">{label}</p>

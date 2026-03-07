@@ -2520,10 +2520,32 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { inArray, desc } = await import("drizzle-orm");
       const kycUsers = await db.select().from(usersTable).where(inArray(usersTable.kycStatus as any, ["pending", "verified", "rejected"])).orderBy(desc(usersTable.updatedAt));
-      const result = kycUsers.map(u => { const { passwordHash: _, ...safe } = u; return safe; });
+      // Exclure les images base64 (très lourdes) de la liste — chargées à la demande via /api/admin/users/:id/kyc-docs
+      const result = kycUsers.map(u => {
+        const { passwordHash: _, kycDocumentFront: _f, kycDocumentBack: _b, kycSelfie: _s, ...safe } = u as any;
+        return safe;
+      });
       res.json(result);
     } catch (error) {
       console.error("Admin KYC list error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/users/:id/kyc-docs", isAdmin, async (req, res) => {
+    try {
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [user] = await db.select({
+        kycDocumentFront: usersTable.kycDocumentFront,
+        kycDocumentBack: usersTable.kycDocumentBack,
+        kycSelfie: usersTable.kycSelfie,
+      }).from(usersTable).where(eq(usersTable.id, req.params.id));
+      if (!user) return res.status(404).json({ message: "Utilisateur introuvable" });
+      res.json(user);
+    } catch (error) {
+      console.error("Admin KYC docs error:", error);
       res.status(500).json({ message: "Erreur serveur" });
     }
   });
