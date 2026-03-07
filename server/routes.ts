@@ -118,8 +118,6 @@ const publicPaySchema = z.object({
 
 function getOmniPayOperatorCode(operator: string, _country: string): string {
   const op = operator.toUpperCase();
-  // OmniPay : n'envoyer operator que pour les portefeuilles électroniques (Wave, Mixx/Free).
-  // Pour les réseaux classiques (MTN, Orange, Moov, TMoney…) laisser vide = auto-détection par le numéro.
   const WALLET_OPERATORS: Record<string, string> = {
     WAVE: "wave",
     FREE: "mixx",
@@ -127,6 +125,23 @@ function getOmniPayOperatorCode(operator: string, _country: string): string {
   };
   if (WALLET_OPERATORS[op]) return WALLET_OPERATORS[op];
   return "";
+}
+
+function getTransferOperatorCode(operator: string, country: string): string {
+  const op = operator.toUpperCase();
+  const co = country.toUpperCase();
+  const mapping: Record<string, Record<string, string>> = {
+    MOOV:     { BJ: "moov_benin", CI: "moov", TG: "moov_togo", BF: "moov_bf", ML: "moov_ml" },
+    ORANGE:   { CI: "orange", SN: "orange_sn", CM: "orange_cm", BF: "orange_bf", ML: "orange_ml", COD: "orange_cong" },
+    MTN:      { BJ: "mtn", CI: "mtn", CM: "mtn_cm", COG: "mtn" },
+    TMONEY:   { TG: "tmoney" },
+    WAVE:     { CI: "wave", SN: "wave" },
+    FREE:     { SN: "free_sn" },
+    MIXX:     { SN: "free_sn" },
+    VODACOM:  { COD: "mpesa" },
+    AIRTEL:   { COD: "airtel_money", COG: "airtel" },
+  };
+  return mapping[op]?.[co] ?? op.toLowerCase();
 }
 
 function getCountryCurrency(country: string): string {
@@ -431,7 +446,7 @@ export async function registerRoutes(
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
-        operator: getOmniPayOperatorCode(operator, country),
+        operator: getTransferOperatorCode(operator, country),
       });
       console.log(`OmniPay withdrawal response for ${reference}:`, transferResponse);
 
@@ -503,7 +518,7 @@ export async function registerRoutes(
         reference,
         firstName,
         lastName,
-        operator: getOmniPayOperatorCode(operator, country),
+        operator: getTransferOperatorCode(operator, country),
       });
       console.log(`OmniPay transfer response for ${reference}:`, transferResponse);
 
@@ -1742,7 +1757,7 @@ export async function registerRoutes(
         const resolvedLastName = txUser?.lastName || "SolvexPay";
 
         const txCountry = (transaction as any).payerCountry || "BJ";
-        const omnipayOperator = getOmniPayOperatorCode(operator, txCountry);
+        const omnipayOperator = getTransferOperatorCode(operator, txCountry);
 
         console.log(`Admin: initiating OmniPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${omnipayOperator}, amount: ${amount}, fees: ${txFees}, net: ${netAmountLocal})`);
         try {
