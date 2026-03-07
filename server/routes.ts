@@ -1021,7 +1021,7 @@ export async function registerRoutes(
       if (methods.length === 0) {
         const defaultMethods = [
           { code: "MTN", name: "MTN Mobile Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "CM", "COG"] },
-          { code: "Orange", name: "Orange Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "BF", "CM", "ML", "SN"] },
+          { code: "Orange", name: "Orange Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "BF", "CM", "ML", "SN", "COD"] },
           { code: "Moov", name: "Moov Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "BF", "TG", "ML"] },
           { code: "Wave", name: "Wave", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "SN"] },
           { code: "TMoney", name: "T-Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["TG"] },
@@ -2215,7 +2215,7 @@ export async function registerRoutes(
       if (methods.length === 0) {
         const defaultMethods = [
           { code: "MTN", name: "MTN Mobile Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "CM", "COG"] },
-          { code: "Orange", name: "Orange Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "BF", "CM", "ML", "SN"] },
+          { code: "Orange", name: "Orange Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "BF", "CM", "ML", "SN", "COD"] },
           { code: "Moov", name: "Moov Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "BF", "TG", "ML"] },
           { code: "Wave", name: "Wave", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "SN"] },
           { code: "TMoney", name: "T-Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["TG"] },
