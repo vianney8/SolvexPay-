@@ -1,9 +1,22 @@
 import type { Express } from "express";
 import bcrypt from "bcryptjs";
+import fs from "fs";
+import path from "path";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 import { sanitizeUser } from "./userUtils";
 import { z } from "zod";
+
+function saveBase64ToFile(base64Data: string, userId: string, type: string): string {
+  const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) throw new Error("Format base64 invalide");
+  const ext = match[1].split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+  const filename = `${userId}_${type}_${Date.now()}.${ext}`;
+  const dir = path.resolve(process.cwd(), "uploads/kyc");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, filename), Buffer.from(match[2], "base64"));
+  return `/uploads/kyc/${filename}`;
+}
 
 const updateProfileSchema = z.object({
   firstName: z.string().min(1).optional(),
@@ -117,15 +130,20 @@ export function registerAuthRoutes(app: Express): void {
 
       const { kycFirstName, kycLastName, kycDocumentNumber, kycDocumentFront, kycDocumentBack, kycSelfie } = validation.data;
 
+      const isBase64 = (s: string) => s.startsWith("data:");
+      const frontPath = isBase64(kycDocumentFront) ? saveBase64ToFile(kycDocumentFront, userId, "front") : kycDocumentFront;
+      const backPath = kycDocumentBack ? (isBase64(kycDocumentBack) ? saveBase64ToFile(kycDocumentBack, userId, "back") : kycDocumentBack) : null;
+      const selfiePath = isBase64(kycSelfie) ? saveBase64ToFile(kycSelfie, userId, "selfie") : kycSelfie;
+
       const updated = await authStorage.upsertUser({
         id: userId,
         kycStatus: "pending",
         kycFirstName,
         kycLastName,
         kycDocumentNumber,
-        kycDocumentFront,
-        kycDocumentBack: kycDocumentBack || null,
-        kycSelfie,
+        kycDocumentFront: frontPath,
+        kycDocumentBack: backPath,
+        kycSelfie: selfiePath,
       } as any);
       res.json(sanitizeUser(updated));
     } catch (error) {
