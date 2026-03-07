@@ -45,7 +45,7 @@ export default function DepositPage() {
   const [description, setDescription] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
-  const needsOtp = country === "CM";
+  const needsOtp = country === "CM" && operator === "Orange";
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [verifyCount, setVerifyCount] = useState(0);
@@ -56,6 +56,7 @@ export default function DepositPage() {
   const parsedAmount = parseFloat(amount) || 0;
 
   useEffect(() => { setOperator(""); setOtp(""); }, [country]);
+  useEffect(() => { setOtp(""); }, [operator]);
 
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
@@ -446,7 +447,7 @@ export default function DepositPage() {
                     Code OTP
                   </Label>
                   <p className="text-xs text-muted-foreground -mt-1">
-                    {operator === "MTN" ? "Composez *126# puis entrez le code reçu" : operator === "Orange" ? "Composez #150*50# puis entrez le code reçu" : "Entrez votre code OTP Mobile Money"}
+                    Composez #150*50# sur votre téléphone puis entrez le code reçu
                   </p>
                   <Input
                     value={otp}
