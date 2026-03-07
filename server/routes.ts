@@ -116,14 +116,18 @@ const publicPaySchema = z.object({
   customAmount: z.number().min(100).optional(),
 });
 
-function getOmniPayOperatorCode(operator: string, _country: string): string {
+function getOmniPayOperatorCode(operator: string, country: string): string {
   const op = operator.toUpperCase();
-  const WALLET_OPERATORS: Record<string, string> = {
-    WAVE: "wave",
-    FREE: "mixx",
-    MIXX: "mixx",
-  };
-  if (WALLET_OPERATORS[op]) return WALLET_OPERATORS[op];
+  const co = country.toUpperCase();
+  if (op === "WAVE") return "wave";
+  if (op === "FREE" || op === "MIXX") return "mixx";
+  if (op === "MOOV") {
+    if (co === "BJ") return "moov_benin";
+    if (co === "CI") return "moov_ci";
+    if (co === "TG") return "moov_tg";
+    if (co === "BF") return "moov_bf";
+    if (co === "ML") return "moov_ml";
+  }
   return "";
 }
 
