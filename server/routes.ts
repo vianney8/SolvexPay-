@@ -120,7 +120,7 @@ function getOmniPayOperatorCode(operator: string, _country: string): string {
   // Pour les réseaux classiques (MTN, Orange, Moov, TMoney…) laisser vide = auto-détection par le numéro.
   const WALLET_OPERATORS: Record<string, string> = {
     WAVE: "wave",
-    FREE: "free_sn",
+    FREE: "mixx",
     MIXX: "mixx",
   };
   if (WALLET_OPERATORS[op]) return WALLET_OPERATORS[op];
