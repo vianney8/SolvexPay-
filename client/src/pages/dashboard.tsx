@@ -64,6 +64,7 @@ const quickActions = [
 
 function isExpiredPending(tx: Transaction): boolean {
   if (tx.status !== "pending") return false;
+  if (tx.type === "withdrawal") return false;
   if (!tx.createdAt) return false;
   const age = Date.now() - new Date(tx.createdAt).getTime();
   return age > 12 * 60 * 1000;
