@@ -186,7 +186,17 @@ export default function PayPage() {
     }
     const isCustom = (paymentLink as any)?.allowCustomAmount;
     const parsedCustom = parseFloat(customAmount);
-    if (isCustom && (!customAmount || parsedCustom < 100)) return;
+    const minAmount = parseFloat(paymentLink.amount);
+    if (isCustom) {
+      if (!customAmount || isNaN(parsedCustom) || parsedCustom < 100) {
+        toast({ title: "Montant invalide", description: "Veuillez entrer un montant valide.", variant: "destructive" });
+        return;
+      }
+      if (minAmount > 0 && parsedCustom < minAmount) {
+        toast({ title: "Montant insuffisant", description: `Le montant minimum est de ${formatAmount(minAmount)} ${paymentLink.currency}.`, variant: "destructive" });
+        return;
+      }
+    }
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     payMutation.mutate({
