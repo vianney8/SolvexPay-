@@ -93,7 +93,8 @@ All API integrations use a **mandatory redirect flow** to SolvexPay's hosted pay
 ### API Endpoints (merchant, requires `sk_live_` key)
 - `GET /api/v1/checkout?key=&amount=&description=&customer_name=&customer_email=&country=` — Direct redirect to hosted page (no JS needed)
 - `POST /api/v1/deposit` — JSON API: returns `{ id, payment_url, status, amount, fees, reference, ... }`
-- `GET /api/v1/transactions/:id` — Check transaction status
+- `GET /api/v1/transactions/:id` — Check transaction status (read-only, no real-time operator call)
+- `POST /api/v1/transactions/:id/verify` — Force real-time status check from operator; if completed, credits wallet and fires webhook immediately
 - `GET /api/v1/balance` — Get merchant wallet balance
 
 ### Hosted Payment Page (`/pay-api/:id`)
@@ -118,6 +119,20 @@ All API integrations use a **mandatory redirect flow** to SolvexPay's hosted pay
 - Outbound webhooks: fired on `completed`/`failed` status change
 - Signed with HMAC-SHA256 using per-key `webhookSecret` → `x-solvexpay-signature: sha256=...`
 - OmniPay inbound: `POST /api/webhooks/omnipay` with `OMNIPAY_CALLBACK_KEY` verification
+- 3 retries: immediate → 8s delay → 30s delay
+- `callbackUrl: "https://solvexpay.com/api/webhooks/omnipay"` sent on every OmniPay deposit call
+
+## Auto-Recovery (PendingChecker)
+- Background job in `server/routes.ts` → `startPendingChecker()`
+- Starts 30s after server boot, runs every 3 minutes
+- Checks pending deposits between 90s and 1h old (max 15 per batch)
+- Calls OmniPay `getStatus()` → if completed: credits wallet + fires merchant webhook
+- Prevents double-crediting via `updateTransactionStatusIfPending()` (atomic SQL WHERE status='pending')
+
+## Telegram Notifications
+- Bot sends alerts for completed deposits and withdrawals to admin
+- `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` — hardcoded fallback values in `server/services/telegram.ts` (token: `7671423781:AAF...`, chat: `8360195532`)
+- Set as env vars to override the hardcoded defaults
 
 ## Maintenance System
 - Admin can set operators to global maintenance or per-country maintenance
@@ -187,6 +202,9 @@ Si vous déplacez ou remixez ce projet, voici **tout ce qu'il faut reconfigurer*
 | `RESEND_API_KEY` | Clé API Resend (envoi d'emails) |
 | `RESEND_FROM_EMAIL` | Adresse email d'envoi (ex: noreply@solvexpay.com) |
 | `DATABASE_URL` | Même URL Neon que ci-dessus (aussi en secret) |
+| `TELEGRAM_BOT_TOKEN` | Token du bot Telegram (optionnel — fallback hardcodé dans telegram.ts) |
+| `TELEGRAM_CHAT_ID` | Chat ID Telegram admin (optionnel — fallback hardcodé dans telegram.ts) |
+| `ALLOWED_ORIGINS` | Origines CORS autorisées, séparées par virgules (ex: `https://monsite.com,https://app.monsite.com`) |
 
 ### Base de données
 - Hébergée sur **Neon** (externe, pas sur Replit) → les données suivent automatiquement via `DATABASE_URL`
