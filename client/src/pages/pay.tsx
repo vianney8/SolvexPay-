@@ -467,21 +467,32 @@ export default function PayPage() {
                   <p className="text-xs text-gray-400 mb-4" data-testid="text-payment-merchant">à {(paymentLink as any).merchantName}</p>
                 )}
                 <p className="text-xs text-gray-500 font-medium mb-2">Choisissez le montant à payer</p>
-                <div className="flex items-center gap-2 rounded-xl border-2 border-blue-300 bg-blue-50 px-4 py-2 focus-within:border-blue-500 transition-all w-full max-w-[280px] mx-auto">
-                  <input
-                    type="number"
-                    value={customAmount}
-                    onChange={(e) => setCustomAmount(e.target.value)}
-                    placeholder={parseFloat(paymentLink.amount) > 0 ? `${formatAmount(paymentLink.amount)}` : "Montant"}
-                    min={parseFloat(paymentLink.amount) > 0 ? parseFloat(paymentLink.amount) : 100}
-                    className="flex-1 text-2xl font-black text-blue-600 bg-transparent outline-none text-center placeholder:text-blue-300 w-full"
-                    data-testid="input-custom-amount"
-                  />
-                  <span className="text-base font-bold text-blue-400">{paymentLink.currency}</span>
-                </div>
-                {parseFloat(paymentLink.amount) > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">Minimum : {formatAmount(paymentLink.amount)} {paymentLink.currency}</p>
-                )}
+                {(() => {
+                  const minAmt = parseFloat(paymentLink.amount);
+                  const parsed = parseFloat(customAmount);
+                  const isInvalid = customAmount !== "" && (!isNaN(parsed)) && ((minAmt > 0 && parsed < minAmt) || parsed < 100);
+                  return (
+                    <>
+                      <div className={`flex items-center gap-2 rounded-xl border-2 px-4 py-2 transition-all w-full max-w-[280px] mx-auto ${isInvalid ? "border-red-400 bg-red-50 focus-within:border-red-500" : "border-blue-300 bg-blue-50 focus-within:border-blue-500"}`}>
+                        <input
+                          type="number"
+                          value={customAmount}
+                          onChange={(e) => setCustomAmount(e.target.value)}
+                          placeholder={minAmt > 0 ? `${formatAmount(minAmt)}` : "Montant"}
+                          min={minAmt > 0 ? minAmt : 100}
+                          className={`flex-1 text-2xl font-black bg-transparent outline-none text-center w-full ${isInvalid ? "text-red-500 placeholder:text-red-300" : "text-blue-600 placeholder:text-blue-300"}`}
+                          data-testid="input-custom-amount"
+                        />
+                        <span className={`text-base font-bold ${isInvalid ? "text-red-400" : "text-blue-400"}`}>{paymentLink.currency}</span>
+                      </div>
+                      {minAmt > 0 && (
+                        <p className={`text-xs mt-1 font-medium transition-colors ${isInvalid ? "text-red-500" : "text-gray-400"}`}>
+                          {isInvalid ? `⚠ Montant en dessous du minimum` : `Minimum : ${formatAmount(minAmt)} ${paymentLink.currency}`}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </>
             ) : (
               <>
