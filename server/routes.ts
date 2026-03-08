@@ -1598,7 +1598,7 @@ export async function registerRoutes(
         .leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id))
         .orderBy(desc(usersTable.createdAt));
       const usersWithWallets = rows.map(({ users, wallets }) => {
-        const { passwordHash: _, kycDocumentFront: _f, kycDocumentBack: _b, kycSelfie: _s, ...safeUser } = users as any;
+        const { passwordHash: _, ...safeUser } = users as any;
         return { ...safeUser, wallet: wallets ?? null };
       });
       res.json(usersWithWallets);
