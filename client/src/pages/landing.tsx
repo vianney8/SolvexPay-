@@ -583,7 +583,6 @@ export default function LandingPage() {
                 {[
                   [contactLinks?.support_link_whatsapp_direct || "#", "WhatsApp Support"],
                   [contactLinks?.support_link_email || "mailto:support@solvexpay.com", "Email"],
-                  [contactLinks?.support_link_whatsapp_group || "#", "Groupe WhatsApp"],
                   [contactLinks?.support_link_facebook || "#", "Facebook"],
                 ].map(([href, label]) => (
                   <li key={label}><a href={href} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-400 hover:text-white transition-colors">{label}</a></li>

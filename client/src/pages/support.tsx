@@ -3,7 +3,6 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import {
   MessageCircle,
   Mail,
-  Users,
   Radio,
   Facebook,
   ExternalLink,
@@ -24,18 +23,6 @@ const CHANNEL_META = [
     iconBg: "bg-green-500",
     badge: "Réponse rapide",
     badgeBg: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
-  },
-  {
-    id: "whatsapp_group",
-    key: "support_link_whatsapp_group",
-    label: "Groupe WhatsApp",
-    description: "Rejoignez la communauté SolvexPay",
-    icon: Users,
-    bg: "bg-teal-50 dark:bg-teal-950/30",
-    border: "border-teal-200 dark:border-teal-800/40",
-    iconBg: "bg-teal-500",
-    badge: "Communauté",
-    badgeBg: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400",
   },
   {
     id: "email",

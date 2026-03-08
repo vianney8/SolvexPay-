@@ -2395,7 +2395,6 @@ export default function AdminPage() {
                   const form = supportLinksForm || supportLinks || {};
                   const fields = [
                     { key: "support_link_whatsapp_direct", label: "WhatsApp Direct", placeholder: "https://wa.me/..." },
-                    { key: "support_link_whatsapp_group", label: "Groupe WhatsApp", placeholder: "https://chat.whatsapp.com/..." },
                     { key: "support_link_email", label: "Email (lien mailto:)", placeholder: "mailto:support@..." },
                     { key: "support_link_whatsapp_channel", label: "Canal WhatsApp", placeholder: "https://whatsapp.com/channel/..." },
                     { key: "support_link_facebook", label: "Page Facebook", placeholder: "https://www.facebook.com/..." },
