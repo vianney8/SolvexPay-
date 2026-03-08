@@ -114,6 +114,7 @@ const publicPaySchema = z.object({
   customerName: z.string().optional(),
   customerEmail: z.string().email().optional().or(z.literal("")),
   customAmount: z.number().min(100).optional(),
+  otp: z.string().optional(),
 });
 
 function getOmniPayOperatorCode(operator: string, _country: string): string {
@@ -724,7 +725,7 @@ export async function registerRoutes(
       if (!validation.success) {
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
-      const { phoneNumber, operator, country, customerName, customerEmail } = validation.data;
+      const { phoneNumber, operator, country, customerName, customerEmail, otp } = validation.data;
 
       const maintError = await checkOperatorMaintenance(operator, country);
       if (maintError) {
@@ -750,6 +751,7 @@ export async function registerRoutes(
         reference: transaction.reference,
         firstName,
         lastName,
+        otp,
         operator: omniOperator,
         returnUrl,
       });
@@ -1088,7 +1090,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
       
-      const { phoneNumber, operator, country, customerName, customerEmail, customAmount } = validation.data;
+      const { phoneNumber, operator, country, customerName, customerEmail, customAmount, otp } = validation.data;
 
       const paymentLink = await storage.getPaymentLinkBySlug(slug);
       
@@ -1142,6 +1144,7 @@ export async function registerRoutes(
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
+        otp,
         operator: getOmniPayOperatorCode(operator, country),
         returnUrl,
       });

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { OperatorLogo } from "@/components/operator-logo";
-import { CheckCircle2, XCircle, Loader2, ChevronDown, Shield, ChevronUp, Smartphone, RefreshCw, Clock, Wifi } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, ChevronDown, Shield, ChevronUp, Smartphone, RefreshCw, Clock, Wifi, ShieldCheck, ArrowLeft } from "lucide-react";
 import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 import type { PaymentLink } from "@shared/schema";
 
@@ -80,10 +80,18 @@ export default function PayPage() {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
   const [customAmount, setCustomAmount] = useState("");
+  const [step, setStep] = useState(1);
+  const [otp, setOtp] = useState("");
 
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
+  const needsOtp =
+    (country === "CM" && (operator === "Orange" || operator === "MTN")) ||
+    (country === "BF" && operator === "Orange") ||
+    (country === "CI" && (operator === "Orange" || operator === "Moov")) ||
+    (country === "SN" && operator === "Orange");
 
-  useEffect(() => { setOperator(""); }, [country]);
+  useEffect(() => { setOperator(""); setOtp(""); setStep(1); }, [country]);
+  useEffect(() => { setOtp(""); setStep(1); }, [operator]);
 
   const { data: paymentMethods } = useQuery<any[]>({
     queryKey: ["/api/payment-methods/public"],
@@ -133,7 +141,7 @@ export default function PayPage() {
   }, []);
 
   const payMutation = useMutation({
-    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName?: string; customerEmail?: string }) => {
+    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; otp?: string; customerName?: string; customerEmail?: string; customAmount?: number }) => {
       const res = await apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
       return res.json();
     },
@@ -184,6 +192,11 @@ export default function PayPage() {
       toast({ title: "Champs requis", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
       return;
     }
+    if (needsOtp && step === 1) {
+      setStep(2);
+      return;
+    }
+    if (needsOtp && !otp.trim()) return;
     const isCustom = (paymentLink as any)?.allowCustomAmount;
     const parsedCustom = parseFloat(customAmount);
     const minAmount = parseFloat(paymentLink.amount);
@@ -205,6 +218,7 @@ export default function PayPage() {
       country,
       customerName: fullName || undefined,
       customerEmail: customerEmail || undefined,
+      ...(needsOtp ? { otp: otp.trim() } : {}),
       ...(isCustom ? { customAmount: parsedCustom } : {}),
     } as any);
   };
@@ -528,6 +542,130 @@ export default function PayPage() {
           )}
 
           <form onSubmit={handlePay} className="space-y-4">
+
+            {/* ── ÉTAPE 2 : OTP ── */}
+            {step === 2 && needsOtp && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 pb-1">
+                  <button type="button" onClick={() => setStep(1)} className="h-8 w-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors flex-shrink-0" data-testid="button-back-step1">
+                    <ArrowLeft className="h-4 w-4 text-gray-500" />
+                  </button>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400">Étape 2 sur 2</p>
+                    <p className="text-sm font-bold text-gray-800">Vérification OTP</p>
+                  </div>
+                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <ShieldCheck className="h-4 w-4 text-blue-600" />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-1 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-500">Opérateur</span><span className="font-semibold">{operator} · {selectedCountry.name}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Numéro</span><span className="font-semibold font-mono">{selectedCountry.prefix} {phone}</span></div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Code OTP {operator}</Label>
+
+                  {country === "BF" && operator === "Orange" ? (
+                    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-orange-700">Comment obtenir votre code OTP :</p>
+                      <div className="flex items-center gap-2 bg-orange-100 rounded-lg px-3 py-2">
+                        <span className="text-xs text-gray-500">Composez :</span>
+                        <code className="text-sm font-black text-orange-600 tracking-widest">*144*4*6*{"{MONTANT}"}#</code>
+                      </div>
+                      <ol className="text-xs text-gray-500 space-y-1 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">1.</span> Composez <strong>*144*4*6*{"{MONTANT}"}#</strong> sur votre téléphone Orange</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">2.</span> Vous recevrez immédiatement votre code OTP</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">3.</span> Entrez le code OTP reçu ci-dessous</li>
+                      </ol>
+                    </div>
+                  ) : country === "CI" && operator === "Orange" ? (
+                    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-orange-700">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-gray-500 space-y-1 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">1.</span> Composez <strong>#144*82#</strong> sur votre téléphone Orange</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">2.</span> Sélectionnez l'<strong>option 2</strong> pour obtenir votre code</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
+                      </ol>
+                    </div>
+                  ) : country === "CI" && operator === "Moov" ? (
+                    <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-blue-700">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-gray-500 space-y-1 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">1.</span> Composez <strong>*155#</strong> sur votre téléphone Moov</li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">2.</span> Choisissez <strong>Moov Money / Paiement en ligne</strong></li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">3.</span> Sélectionnez <strong>Générer OTP</strong></li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">4.</span> Entrez votre code secret Moov Money</li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">5.</span> Entrez le code OTP reçu ci-dessous</li>
+                      </ol>
+                    </div>
+                  ) : country === "SN" && operator === "Orange" ? (
+                    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-orange-700">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-gray-500 space-y-1 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">1.</span> Composez <strong>#144#391#</strong> sur votre téléphone Orange</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">2.</span> Vous recevrez un code d'autorisation par SMS</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">3.</span> Entrez le code reçu ci-dessous</li>
+                      </ol>
+                    </div>
+                  ) : operator === "Orange" ? (
+                    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-orange-700">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-gray-500 space-y-1 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">1.</span> Composez <strong>#144#</strong> sur votre téléphone Orange</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">2.</span> Sélectionnez <strong>"Générer un OTP"</strong> pour paiement en ligne</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
+                      </ol>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-yellow-50 border border-yellow-200 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-yellow-700">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-gray-500 space-y-1 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-yellow-600 flex-shrink-0">1.</span> Composez <strong>*126#</strong> sur votre téléphone MTN</li>
+                        <li className="flex gap-2"><span className="font-bold text-yellow-600 flex-shrink-0">2.</span> Sélectionnez l'option <strong>paiement en ligne / OTP</strong></li>
+                        <li className="flex gap-2"><span className="font-bold text-yellow-600 flex-shrink-0">3.</span> Entrez votre code PIN MoMo</li>
+                        <li className="flex gap-2"><span className="font-bold text-yellow-600 flex-shrink-0">4.</span> Entrez le code OTP reçu par SMS ci-dessous</li>
+                      </ol>
+                    </div>
+                  )}
+
+                  <Input
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Entrez votre code OTP"
+                    className="h-14 border-gray-200 text-center tracking-widest text-xl font-bold rounded-xl"
+                    data-testid="input-pay-otp"
+                    autoFocus
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-14 text-base font-black rounded-2xl shadow-lg gap-2"
+                  style={{ background: !otp.trim() ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
+                  disabled={payMutation.isPending || !otp.trim()}
+                  data-testid="button-confirm-pay-otp"
+                >
+                  {payMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
+                  ) : (paymentLink as any).allowCustomAmount && customAmount ? (
+                    `Payer ${formatAmount(parseFloat(customAmount))} ${paymentLink.currency}`
+                  ) : (paymentLink as any).allowCustomAmount ? (
+                    "Payer"
+                  ) : (
+                    `Payer ${formatAmount(paymentLink.amount)} ${paymentLink.currency}`
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {/* ── ÉTAPE 1 : FORMULAIRE ── */}
+            {step === 1 && (<>
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Pays Mobile Money</Label>
               <div className="relative">
@@ -682,6 +820,8 @@ export default function PayPage() {
             >
               {payMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
+              ) : needsOtp ? (
+                "Continuer →"
               ) : (paymentLink as any).allowCustomAmount && customAmount ? (
                 `Payer ${formatAmount(parseFloat(customAmount))} ${paymentLink.currency}`
               ) : (paymentLink as any).allowCustomAmount ? (
@@ -690,6 +830,8 @@ export default function PayPage() {
                 `Payer ${formatAmount(paymentLink.amount)} ${paymentLink.currency}`
               )}
             </Button>
+
+            </>)}
 
           </form>
         </div>
