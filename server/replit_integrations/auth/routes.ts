@@ -1,7 +1,5 @@
 import type { Express } from "express";
 import bcrypt from "bcryptjs";
-import fs from "fs";
-import path from "path";
 import sharp from "sharp";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
@@ -9,18 +7,15 @@ import { sanitizeUser } from "./userUtils";
 import { z } from "zod";
 import { notifyKycPending } from "../../services/telegram";
 
-async function saveBase64ToFile(base64Data: string, userId: string, type: string): Promise<string> {
+async function compressBase64Image(base64Data: string): Promise<string> {
   const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
-  if (!match) throw new Error("Format base64 invalide");
-  const filename = `${userId}_${type}_${Date.now()}.jpg`;
-  const dir = path.resolve(process.cwd(), "uploads/kyc");
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!match) return base64Data;
   const buffer = Buffer.from(match[2], "base64");
-  await sharp(buffer)
+  const compressed = await sharp(buffer)
     .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 80 })
-    .toFile(path.join(dir, filename));
-  return `/uploads/kyc/${filename}`;
+    .jpeg({ quality: 75 })
+    .toBuffer();
+  return `data:image/jpeg;base64,${compressed.toString("base64")}`;
 }
 
 const updateProfileSchema = z.object({
@@ -136,9 +131,9 @@ export function registerAuthRoutes(app: Express): void {
       const { kycFirstName, kycLastName, kycDocumentNumber, kycDocumentFront, kycDocumentBack, kycSelfie } = validation.data;
 
       const isBase64 = (s: string) => s.startsWith("data:");
-      const frontPath = isBase64(kycDocumentFront) ? await saveBase64ToFile(kycDocumentFront, userId, "front") : kycDocumentFront;
-      const backPath = kycDocumentBack ? (isBase64(kycDocumentBack) ? await saveBase64ToFile(kycDocumentBack, userId, "back") : kycDocumentBack) : null;
-      const selfiePath = isBase64(kycSelfie) ? await saveBase64ToFile(kycSelfie, userId, "selfie") : kycSelfie;
+      const frontPath = isBase64(kycDocumentFront) ? await compressBase64Image(kycDocumentFront) : kycDocumentFront;
+      const backPath = kycDocumentBack ? (isBase64(kycDocumentBack) ? await compressBase64Image(kycDocumentBack) : kycDocumentBack) : null;
+      const selfiePath = isBase64(kycSelfie) ? await compressBase64Image(kycSelfie) : kycSelfie;
 
       const updated = await authStorage.upsertUser({
         id: userId,
