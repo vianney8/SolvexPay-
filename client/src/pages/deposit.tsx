@@ -419,15 +419,13 @@ export default function DepositPage() {
                       </ol>
                     </div>
 
-                  /* Moov Côte d'Ivoire : *155# → paiement en ligne */
+                  /* Moov Côte d'Ivoire : code secret Moov (PIN) */
                   ) : country === "CI" && operator === "Moov" ? (
                     <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">Comment obtenir votre code OTP :</p>
+                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">Code d'autorisation requis :</p>
                       <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">1.</span> Composez <strong>*155#</strong> sur votre téléphone Moov</li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">2.</span> Sélectionnez <strong>Paiement en ligne</strong></li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">3.</span> Entrez votre code secret Moov Money</li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">4.</span> Entrez le code OTP reçu par SMS ci-dessous</li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">1.</span> Entrez votre <strong>code secret Moov Money</strong> dans le champ ci-dessous</li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">2.</span> Ce code autorise le débit de votre compte Moov</li>
                       </ol>
                     </div>
 
