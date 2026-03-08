@@ -576,7 +576,7 @@ export default function PayApiPage() {
                     type="text"
                     inputMode="numeric"
                     placeholder="Entrez votre code OTP"
-                    className="h-14 border-gray-200 text-center tracking-widest text-xl font-bold rounded-xl"
+                    className="h-14 border-gray-200 text-center tracking-widest text-xl font-bold rounded-xl placeholder:text-sm placeholder:tracking-normal placeholder:font-normal"
                     data-testid="input-payapi-otp"
                     autoFocus
                   />
