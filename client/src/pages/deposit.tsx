@@ -419,13 +419,16 @@ export default function DepositPage() {
                       </ol>
                     </div>
 
-                  /* Moov Côte d'Ivoire : code secret Moov (PIN) */
+                  /* Moov Côte d'Ivoire : *155# → Paiement en ligne → Générer OTP */
                   ) : country === "CI" && operator === "Moov" ? (
                     <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">Code d'autorisation requis :</p>
+                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">Comment obtenir votre code OTP :</p>
                       <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">1.</span> Entrez votre <strong>code secret Moov Money</strong> dans le champ ci-dessous</li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">2.</span> Ce code autorise le débit de votre compte Moov</li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">1.</span> Composez <strong>*155#</strong> sur votre téléphone Moov</li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">2.</span> Choisissez <strong>Moov Money / Paiement en ligne</strong></li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">3.</span> Sélectionnez <strong>Générer OTP</strong></li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">4.</span> Entrez votre code secret Moov Money</li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">5.</span> Entrez le code OTP reçu ci-dessous</li>
                       </ol>
                     </div>
 
