@@ -221,7 +221,7 @@ export async function setupAuth(app: Express) {
 
       const user = await authStorage.getUserByEmail(email);
       if (!user) {
-        return res.json({ success: true });
+        return res.status(404).json({ message: "Aucun compte SolvexPay n'est associé à cette adresse email." });
       }
 
       const limit = checkResendLimit(`reset:${user.id}`);
