@@ -82,12 +82,18 @@ export default function WithdrawPage() {
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
 
   function getOperatorStatus(op: string) {
-    if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
+    if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false, withdrawalMaintenance: false };
     const pm = paymentMethods.find((m: any) => m.code === op);
-    if (!pm) return { available: true, maintenance: false };
+    if (!pm) return { available: true, maintenance: false, withdrawalMaintenance: false };
     const globalMaint = pm.inMaintenance === true;
     const countryMaint = (pm.maintenanceCountries || []).includes(country);
-    return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint };
+    const globalWithdrawMaint = pm.withdrawalMaintenance === true;
+    const countryWithdrawMaint = (pm.withdrawalMaintenanceCountries || []).includes(country);
+    return {
+      available: pm.isActive !== false,
+      maintenance: globalMaint || countryMaint,
+      withdrawalMaintenance: globalWithdrawMaint || countryWithdrawMaint,
+    };
   }
   const balanceXOF = parseFloat(String(wallet?.balanceXOF || 0));
   const balance = currency === "CDF" ? Math.floor(balanceXOF / 0.22) : balanceXOF;
@@ -255,7 +261,7 @@ export default function WithdrawPage() {
                 <div className={`grid gap-3 ${selectedCountry.operators.length <= 2 ? "grid-cols-2" : selectedCountry.operators.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
                   {selectedCountry.operators.map((op) => {
                     const opStatus = getOperatorStatus(op);
-                    const isDisabled = !opStatus.available || opStatus.maintenance;
+                    const isDisabled = !opStatus.available || opStatus.maintenance || opStatus.withdrawalMaintenance;
                     return (
                       <button
                         key={op}
@@ -271,12 +277,12 @@ export default function WithdrawPage() {
                         }`}
                         data-testid={`option-withdraw-operator-${op}`}
                       >
-                        {opStatus.maintenance && (
+                        {(opStatus.maintenance || opStatus.withdrawalMaintenance) && (
                           <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
                             Maint.
                           </span>
                         )}
-                        {!opStatus.available && !opStatus.maintenance && (
+                        {!opStatus.available && !opStatus.maintenance && !opStatus.withdrawalMaintenance && (
                           <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
                             Indispo
                           </span>
