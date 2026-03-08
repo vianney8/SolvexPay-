@@ -86,6 +86,12 @@ export class DatabaseStorage implements IStorage {
       amountXOF = Math.floor(amount);
     }
 
+    // Ensure wallet exists before crediting — if absent the UPDATE would silently credit nothing
+    const existing = await db.select().from(wallets).where(eq(wallets.userId, userId));
+    if (existing.length === 0) {
+      await db.insert(wallets).values({ userId });
+    }
+
     const [wallet] = await db
       .update(wallets)
       .set({
@@ -94,6 +100,12 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(wallets.userId, userId))
       .returning();
+
+    if (!wallet) {
+      console.error(`[updateWalletBalance] FAILED to credit ${amountXOF} XOF to userId=${userId}`);
+      throw new Error(`Impossible de créditer le wallet pour userId=${userId}`);
+    }
+
     return wallet;
   }
 

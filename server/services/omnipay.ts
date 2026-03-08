@@ -14,6 +14,7 @@ export interface OmniPayDepositParams {
   otp?: string;
   operator?: string;
   returnUrl?: string;
+  callbackUrl?: string;
 }
 
 export interface OmniPayTransferParams {
@@ -135,6 +136,7 @@ class OmniPayService {
     if (params.otp) body.otp = params.otp;
     if (params.operator) body.operator = params.operator.toLowerCase();
     if (params.returnUrl) body.return_url = params.returnUrl;
+    if (params.callbackUrl) body.callback_url = params.callbackUrl;
 
     console.log("OmniPay deposit request:", {
       ...body,

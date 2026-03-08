@@ -342,6 +342,7 @@ export async function registerRoutes(
         otp,
         operator: omniDepositOperator,
         returnUrl,
+        callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
       });
 
       const depositFeeRate = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7") / 100;
@@ -754,6 +755,7 @@ export async function registerRoutes(
         otp,
         operator: omniOperator,
         returnUrl,
+        callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
       });
       const { db } = await import("./db");
       const { eq: eqFn } = await import("drizzle-orm");
@@ -1147,6 +1149,7 @@ export async function registerRoutes(
         otp,
         operator: getOmniPayOperatorCode(operator, country),
         returnUrl,
+        callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
       });
       console.log(`Payment response for ${reference}:`, depositResponse);
 
@@ -1445,6 +1448,56 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("API v1 get transaction error:", error);
       res.status(500).json({ error: { code: "SERVER_ERROR", message: "Erreur interne.", status: 500 } });
+    }
+  });
+
+  // ── Merchant: manually check/sync a transaction status from OmniPay ─────────
+  app.post("/api/v1/transactions/:id/verify", authenticateApiKey, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const transaction = await storage.getTransactionById(id);
+      if (!transaction || transaction.userId !== req.merchantUserId) {
+        return res.status(404).json({ error: { code: "NOT_FOUND", message: "Transaction introuvable.", status: 404 } });
+      }
+      if (transaction.status !== "pending") {
+        return res.json({
+          id: transaction.id,
+          status: transaction.status,
+          synced: false,
+          message: "Transaction déjà traitée",
+        });
+      }
+      const result = await omniPayService.getStatus(transaction.reference);
+      const statusStr = omnipayStatusToString(result.status ?? 0);
+
+      if (statusStr === "completed") {
+        const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
+        if (updated) {
+          const grossAmt = parseFloat(transaction.amount);
+          const txFees = parseFloat((transaction as any).fees || "0") || 0;
+          const netAmt = grossAmt - txFees;
+          await storage.updateWalletBalance(transaction.userId, transaction.currency, netAmt > 0 ? netAmt : grossAmt);
+          const completedTx = await storage.getTransactionById(transaction.id);
+          if (completedTx) {
+            forwardToMerchantWebhooks(completedTx);
+            notifyTransactionCompleted(completedTx).catch(() => {});
+          }
+        }
+      } else if (statusStr === "failed") {
+        await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+        const failedTx = await storage.getTransactionById(transaction.id);
+        if (failedTx) forwardToMerchantWebhooks(failedTx);
+      }
+
+      return res.json({
+        id: transaction.id,
+        status: statusStr,
+        synced: statusStr !== "pending",
+        message: statusStr === "completed" ? "Paiement confirmé, solde crédité" : statusStr === "failed" ? "Paiement échoué" : "En attente de confirmation",
+      });
+    } catch (error: any) {
+      console.error("API v1 verify transaction error:", error);
+      res.status(500).json({ error: { code: "SERVER_ERROR", message: error.message || "Erreur interne.", status: 500 } });
     }
   });
 
@@ -2780,6 +2833,88 @@ export async function registerRoutes(
   });
 
   // ─── END ADMIN ROUTES ──────────────────────────────────────────────────────
+
+  // ── Background job: recheck pending transactions every 3 minutes ─────────────
+  // This catches payments where the user closed the browser before confirmation
+  // and where OmniPay webhook may not have arrived yet.
+  ;(async function startPendingChecker() {
+    const CHECK_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
+    const MIN_AGE_MS = 90 * 1000;            // only check transactions older than 90s
+    const MAX_AGE_MS = 60 * 60 * 1000;       // ignore transactions older than 1 hour
+    const MAX_BATCH = 15;                    // max per run to avoid OmniPay flood
+
+    const runCheck = async () => {
+      try {
+        const { db } = await import("./db");
+        const { transactions: txTable } = await import("@shared/schema");
+        const { and, eq: eqD, lt, gt } = await import("drizzle-orm");
+
+        const now = new Date();
+        const minAge = new Date(now.getTime() - MIN_AGE_MS);
+        const maxAge = new Date(now.getTime() - MAX_AGE_MS);
+
+        const pendingTxs = await db
+          .select()
+          .from(txTable)
+          .where(
+            and(
+              eqD(txTable.status, "pending"),
+              eqD(txTable.type, "deposit"),
+              lt(txTable.createdAt, minAge),
+              gt(txTable.createdAt, maxAge)
+            )
+          )
+          .limit(MAX_BATCH);
+
+        if (pendingTxs.length === 0) return;
+
+        console.log(`[PendingChecker] Checking ${pendingTxs.length} pending deposits...`);
+
+        for (const tx of pendingTxs) {
+          try {
+            const result = await omniPayService.getStatus(tx.reference);
+            const statusStr = omnipayStatusToString(result.status ?? 0);
+
+            if (statusStr === "completed") {
+              const updated = await storage.updateTransactionStatusIfPending(tx.id, "completed");
+              if (updated) {
+                const grossAmt = parseFloat(tx.amount);
+                const txFees = parseFloat((tx as any).fees || "0") || 0;
+                const netAmt = grossAmt - txFees;
+                await storage.updateWalletBalance(tx.userId, tx.currency, netAmt > 0 ? netAmt : grossAmt);
+                const finalTx = await storage.getTransactionById(tx.id);
+                if (finalTx) {
+                  forwardToMerchantWebhooks(finalTx);
+                  notifyTransactionCompleted(finalTx).catch(() => {});
+                }
+                console.log(`[PendingChecker] ✓ Credited ${tx.reference}`);
+              }
+            } else if (statusStr === "failed") {
+              const updated = await storage.updateTransactionStatusIfPending(tx.id, "failed");
+              if (updated) {
+                const failedTx = await storage.getTransactionById(tx.id);
+                if (failedTx) forwardToMerchantWebhooks(failedTx);
+                console.log(`[PendingChecker] ✗ Failed ${tx.reference}`);
+              }
+            }
+
+            // Small delay between OmniPay calls to avoid rate limiting
+            await new Promise((r) => setTimeout(r, 300));
+          } catch (err: any) {
+            // Silently skip — OmniPay may return error for unknown references
+          }
+        }
+      } catch (err) {
+        console.error("[PendingChecker] error:", err);
+      }
+    };
+
+    // Start after a 30s delay (allow server to warm up), then run every 3 minutes
+    setTimeout(() => {
+      runCheck();
+      setInterval(runCheck, CHECK_INTERVAL_MS);
+    }, 30000);
+  })();
 
   return httpServer;
 }
