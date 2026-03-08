@@ -91,12 +91,14 @@ export async function notifyTransactionCompleted(tx: any): Promise<void> {
     const amount = parseFloat(tx.amount || "0");
     const currency = tx.currency || "XOF";
     const phone = tx.phoneNumber || tx.payerName || "—";
+    const operator = tx.payerOperator || tx.provider || "—";
 
     await send(
       `✅ <b>Paiement réussi</b>\n\n` +
       `📋 Référence: <code>${tx.reference}</code>\n` +
       `👤 Marchand: <b>${merchantName}</b>\n` +
       `📱 Numéro: <code>${phone}</code>\n` +
+      `📡 Opérateur: ${operator}\n` +
       `💰 Montant: <b>${fmt(amount, currency)}</b>\n` +
       `🔗 Source: ${sourceLabel}\n` +
       `🕐 Heure: ${now()}`
