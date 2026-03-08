@@ -437,14 +437,19 @@ else:
                   <CheckCircle2 className="h-5 w-5 text-primary" /> Vérifier le statut d'une transaction
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Interrogez le statut d'une transaction via son <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">id</code> retourné lors de sa création. Préférez les webhooks pour éviter le polling.
+                  Deux endpoints complémentaires : un pour lire le statut (GET), un pour forcer la vérification et le crédit du wallet si le paiement a été complété chez l'opérateur (POST).
                 </p>
               </div>
 
+              {/* GET status */}
               <div className="border border-border/60 rounded-xl overflow-hidden">
-                <div className="flex items-center gap-3 px-4 py-3 bg-muted/30">
+                <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
                   <MethodBadge method="GET" />
                   <code className="text-sm font-mono font-semibold">/api/v1/transactions/:id</code>
+                  <span className="text-xs text-muted-foreground ml-auto">Lecture seule</span>
+                </div>
+                <div className="p-4">
+                  <p className="text-xs text-muted-foreground">Retourne le statut actuel de la transaction tel qu'enregistré dans SolvexPay. N'appelle pas l'opérateur en temps réel.</p>
                 </div>
               </div>
 
@@ -481,6 +486,83 @@ else:
   "created_at": "2026-03-04T12:00:00.000Z",
   "completed_at": "2026-03-04T12:01:35.000Z"
 }`} />
+
+              {/* POST verify */}
+              <div className="border-t border-border/60 pt-5 space-y-4">
+                <div>
+                  <p className="text-sm font-bold mb-1">Forcer la vérification d'un paiement en attente</p>
+                  <p className="text-xs text-muted-foreground">
+                    Si vous n'avez pas reçu de webhook après quelques minutes alors que le client a confirmé sur son téléphone, appelez cet endpoint. SolvexPay interroge l'opérateur en temps réel, crédite votre solde si le paiement est confirmé, et envoie le webhook immédiatement.
+                  </p>
+                </div>
+
+                <Card className="border-emerald-500/20 bg-emerald-500/5">
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <Zap className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-emerald-700">Récupération automatique en arrière-plan</p>
+                      <p className="text-xs text-emerald-600 mt-0.5">SolvexPay vérifie automatiquement toutes les 3 minutes les transactions <code className="bg-emerald-100 px-1 rounded font-mono">pending</code> de moins d'1h. Si le paiement est confirmé chez l'opérateur, le crédit et le webhook sont déclenchés automatiquement — sans action de votre part. Cet endpoint vous permet de forcer ce processus immédiatement.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="border border-border/60 rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
+                    <MethodBadge method="POST" />
+                    <code className="text-sm font-mono font-semibold">/api/v1/transactions/:id/verify</code>
+                    <span className="text-xs text-emerald-600 font-semibold ml-auto">Appel opérateur en temps réel</span>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">Aucun body requis. Authentification via header <code className="bg-muted px-1 rounded font-mono">Authorization: Bearer sk_live_xxx</code>.</p>
+                    <div className="text-xs space-y-1">
+                      <p className="font-bold text-muted-foreground uppercase tracking-wide">Comportement :</p>
+                      <ul className="space-y-1 text-muted-foreground list-disc list-inside">
+                        <li>Si le paiement est déjà <code className="bg-muted px-1 rounded font-mono">completed</code> → retourne le statut actuel sans modifier</li>
+                        <li>Si <code className="bg-muted px-1 rounded font-mono">pending</code> et confirmé chez l'opérateur → crédite votre solde + envoie le webhook + retourne <code className="bg-muted px-1 rounded font-mono">completed</code></li>
+                        <li>Si <code className="bg-muted px-1 rounded font-mono">pending</code> et non confirmé → retourne <code className="bg-muted px-1 rounded font-mono">pending</code> sans modification</li>
+                        <li>Si <code className="bg-muted px-1 rounded font-mono">failed</code> → retourne le statut actuel sans modifier</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <CodeBlock lang="bash — Forcer la vérification" code={`curl -X POST ${BASE_URL}/api/v1/transactions/a1b2c3d4-e5f6-7890-abcd-ef1234567890/verify \\
+  -H "Authorization: Bearer sk_live_xxxxxxxxxxxx"`} />
+
+                <CodeBlock lang="javascript (Node.js) — Vérification après timeout" code={`// À utiliser si votre webhook n'arrive pas après 3-5 minutes
+async function verifyPayment(transactionId) {
+  const response = await fetch(
+    \`${BASE_URL}/api/v1/transactions/\${transactionId}/verify\`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': \`Bearer \${process.env.SOLVEXPAY_API_KEY}\` },
+    }
+  );
+  const data = await response.json();
+
+  if (data.status === 'completed') {
+    console.log('Paiement confirmé — solde crédité');
+    // Le webhook a également été envoyé vers votre URL configurée
+  } else if (data.status === 'pending') {
+    console.log('Toujours en attente — le client n\\'a peut-être pas encore validé');
+  }
+
+  return data;
+}`} />
+
+                <CodeBlock lang="json — Réponse (paiement confirmé)" code={`{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "completed",
+  "amount": 5000,
+  "currency": "XOF",
+  "operator": "MTN",
+  "phone": "+22697000000",
+  "fees": 350,
+  "net_amount": 4650,
+  "credited": true,
+  "completed_at": "2026-03-04T12:01:35.000Z"
+}`} />
+              </div>
             </section>
 
             {/* SOLDE */}
