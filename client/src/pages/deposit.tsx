@@ -431,15 +431,14 @@ export default function DepositPage() {
                       </ol>
                     </div>
 
-                  /* Orange Sénégal : #144# → générer OTP */
+                  /* Orange Sénégal : #144#391# → code d'autorisation */
                   ) : country === "SN" && operator === "Orange" ? (
                     <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
                       <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
                       <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144#</strong> sur votre téléphone Orange</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Sélectionnez <strong>"Générer un OTP"</strong> pour paiement en ligne</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144#391#</strong> sur votre téléphone Orange</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Vous recevrez un code d'autorisation par SMS</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez le code reçu ci-dessous</li>
                       </ol>
                     </div>
 
