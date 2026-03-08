@@ -228,6 +228,7 @@ export default function AdminPage() {
   const [txStatus, setTxStatus] = useState("all");
   const [txType, setTxType] = useState("all");
   const [statsPeriod, setStatsPeriod] = useState("month");
+  const [activeTab, setActiveTab] = useState("overview");
   // Dialogs
   const [kycDialog, setKycDialog] = useState<{ userId: string; name: string; status: string } | null>(null);
   const [kycAction, setKycAction] = useState<"verified" | "rejected" | "not_started" | null>(null);
@@ -253,49 +254,100 @@ export default function AdminPage() {
   const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
 
   // Queries
-  const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"] });
+  const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"], staleTime: 60000 });
   const { data: periodStats, isLoading: pLoading } = useQuery<any>({
     queryKey: ["/api/admin/stats/period", statsPeriod],
     queryFn: () => fetch(`/api/admin/stats/period?period=${statsPeriod}`, { credentials: "include" }).then(r => r.json()),
+    enabled: activeTab === "overview",
+    staleTime: 60000,
   });
-  const { data: users, isLoading: usersLoading } = useQuery<any[]>({ queryKey: ["/api/admin/users"] });
-  const { data: kycList, isLoading: kycLoading } = useQuery<any[]>({ queryKey: ["/api/admin/kyc"] });
-  const { data: allTx, isLoading: txLoading } = useQuery<any[]>({ queryKey: ["/api/admin/transactions"] });
-  const { data: wallets, isLoading: walletsLoading } = useQuery<any[]>({ queryKey: ["/api/admin/wallets"] });
+  const { data: users, isLoading: usersLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/users"],
+    enabled: ["users", "kyc", "wallets"].includes(activeTab),
+    staleTime: 120000,
+  });
+  const { data: kycList, isLoading: kycLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/kyc"],
+    staleTime: 120000,
+  });
+  const { data: allTx, isLoading: txLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/transactions"],
+    enabled: activeTab === "transactions",
+    staleTime: 60000,
+  });
+  const { data: wallets, isLoading: walletsLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/wallets"],
+    enabled: ["wallets", "liquidity"].includes(activeTab),
+    staleTime: 120000,
+  });
   const { data: omnipayBalance, isLoading: omniLoading, refetch: refetchOmni } = useQuery<any>({
     queryKey: ["/api/admin/omnipay/balance"],
     retry: 1,
     staleTime: 10000,
-    refetchInterval: 10000,
+    refetchInterval: activeTab === "overview" ? 10000 : false,
   });
   const { data: liquidityData } = useQuery<{ walletsByCountry: any[]; pendingByCountry: any[] }>({
     queryKey: ["/api/admin/liquidity-analysis"],
-    refetchInterval: 10000,
+    enabled: ["overview", "liquidity"].includes(activeTab),
+    refetchInterval: ["overview", "liquidity"].includes(activeTab) ? 10000 : false,
     staleTime: 8000,
   });
-  const { data: paymentMethods, isLoading: pmLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-methods"] });
-  const { data: commissions, isLoading: comLoading, refetch: refetchCommissions } = useQuery<any>({ queryKey: ["/api/admin/commissions"] });
-  const { data: systemSettings } = useQuery<{ withdrawalMode: string }>({ queryKey: ["/api/admin/system-settings"] });
+  const { data: paymentMethods, isLoading: pmLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/payment-methods"],
+    enabled: ["fees", "payments"].includes(activeTab),
+    staleTime: 120000,
+  });
+  const { data: commissions, isLoading: comLoading, refetch: refetchCommissions } = useQuery<any>({
+    queryKey: ["/api/admin/commissions"],
+    enabled: activeTab === "benefices",
+    staleTime: 120000,
+  });
+  const { data: systemSettings } = useQuery<{ withdrawalMode: string }>({ queryKey: ["/api/admin/system-settings"], staleTime: 60000 });
   const isAutoWithdrawal = systemSettings?.withdrawalMode !== "manual";
-  const { data: profitTx, isLoading: profitTxLoading } = useQuery<any[]>({ queryKey: ["/api/admin/profit-transactions"], staleTime: 30000 });
+  const { data: profitTx, isLoading: profitTxLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/profit-transactions"],
+    enabled: activeTab === "benefices",
+    staleTime: 120000,
+  });
   const { data: financialSummary, isLoading: finLoading } = useQuery<any>({
     queryKey: ["/api/admin/financial-summary"],
-    staleTime: 30000,
+    enabled: ["overview", "benefices"].includes(activeTab),
+    staleTime: 120000,
   });
   const { data: adminWdHistory, isLoading: wdHistoryLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/omnipay/withdrawals"],
-    staleTime: 30000,
+    enabled: activeTab === "benefices",
+    staleTime: 120000,
   });
   const { data: userTxList } = useQuery<any[]>({
     queryKey: ["/api/admin/users", expandedUserId, "transactions"],
     enabled: !!expandedUserId,
     queryFn: () => fetch(`/api/admin/users/${expandedUserId}/transactions`, { credentials: "include" }).then(r => r.json()),
   });
-  const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({ queryKey: ["/api/admin/payment-links"] });
-  const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({ queryKey: ["/api/admin/api-keys"] });
-  const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({ queryKey: ["/api/admin/notifications"] });
-  const { data: supportLinks, isLoading: supportLinksLoading } = useQuery<Record<string, string>>({ queryKey: ["/api/support-links"] });
-  const { data: countriesStats } = useQuery<{ txByCountry: any[]; usersByWithdrawal: any[] }>({ queryKey: ["/api/admin/stats/countries"] });
+  const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/payment-links"],
+    enabled: activeTab === "links-keys",
+    staleTime: 120000,
+  });
+  const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/api-keys"],
+    enabled: activeTab === "links-keys",
+    staleTime: 120000,
+  });
+  const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/notifications"],
+    enabled: activeTab === "notifications",
+    staleTime: 120000,
+  });
+  const { data: supportLinks, isLoading: supportLinksLoading } = useQuery<Record<string, string>>({
+    queryKey: ["/api/support-links"],
+    staleTime: 120000,
+  });
+  const { data: countriesStats } = useQuery<{ txByCountry: any[]; usersByWithdrawal: any[] }>({
+    queryKey: ["/api/admin/stats/countries"],
+    enabled: activeTab === "overview",
+    staleTime: 120000,
+  });
 
   // Mutations
   const blockM = useMutation({
@@ -583,7 +635,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="overview">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="overflow-x-auto">
             <TabsList className="inline-flex w-max min-w-full gap-1 p-1.5 bg-muted/60 rounded-2xl h-auto">
               {[
