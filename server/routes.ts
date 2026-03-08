@@ -467,7 +467,13 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Error creating withdrawal:", error);
-      res.status(500).json({ message: error.message || "Echec du retrait" });
+      let userMessage = error.message || "Echec du retrait";
+      if (error.code === "ECONNABORTED" || (error.message && error.message.includes("timeout"))) {
+        userMessage = "Le service de paiement ne répond pas. Veuillez réessayer dans quelques instants ou contacter le support.";
+      } else if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+        userMessage = "Impossible de contacter le service de paiement. Veuillez réessayer plus tard.";
+      }
+      res.status(500).json({ message: userMessage });
     }
   });
 
@@ -539,7 +545,13 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Error creating transfer:", error);
-      res.status(500).json({ message: error.message || "Echec du transfert" });
+      let userMessage = error.message || "Echec du transfert";
+      if (error.code === "ECONNABORTED" || (error.message && error.message.includes("timeout"))) {
+        userMessage = "Le service de paiement ne répond pas. Veuillez réessayer dans quelques instants ou contacter le support.";
+      } else if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+        userMessage = "Impossible de contacter le service de paiement. Veuillez réessayer plus tard.";
+      }
+      res.status(500).json({ message: userMessage });
     }
   });
 
