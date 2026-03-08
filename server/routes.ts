@@ -399,6 +399,23 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Solde insuffisant" });
       }
 
+      // Check withdrawal maintenance for this operator/country
+      {
+        const { db } = await import("./db");
+        const { paymentMethods: pmTable } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        const [pm] = await db.select().from(pmTable).where(eq(pmTable.code, operator));
+        if (pm) {
+          if (pm.withdrawalMaintenance) {
+            return res.status(503).json({ message: `Les retraits via ${pm.name} sont temporairement indisponibles.` });
+          }
+          const wmCountries: string[] = (pm.withdrawalMaintenanceCountries as string[]) || [];
+          if (wmCountries.includes(country)) {
+            return res.status(503).json({ message: `Les retraits via ${pm.name} ne sont pas disponibles pour ce pays.` });
+          }
+        }
+      }
+
       const reference = generateReference();
       const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
 
@@ -467,13 +484,7 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Error creating withdrawal:", error);
-      let userMessage = error.message || "Echec du retrait";
-      if (error.code === "ECONNABORTED" || (error.message && error.message.includes("timeout"))) {
-        userMessage = "Le service de paiement ne répond pas. Veuillez réessayer dans quelques instants ou contacter le support.";
-      } else if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
-        userMessage = "Impossible de contacter le service de paiement. Veuillez réessayer plus tard.";
-      }
-      res.status(500).json({ message: userMessage });
+      res.status(500).json({ message: error.message || "Echec du retrait" });
     }
   });
 
@@ -545,13 +556,7 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Error creating transfer:", error);
-      let userMessage = error.message || "Echec du transfert";
-      if (error.code === "ECONNABORTED" || (error.message && error.message.includes("timeout"))) {
-        userMessage = "Le service de paiement ne répond pas. Veuillez réessayer dans quelques instants ou contacter le support.";
-      } else if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
-        userMessage = "Impossible de contacter le service de paiement. Veuillez réessayer plus tard.";
-      }
-      res.status(500).json({ message: userMessage });
+      res.status(500).json({ message: error.message || "Echec du transfert" });
     }
   });
 
@@ -2380,7 +2385,7 @@ export async function registerRoutes(
   app.patch("/api/admin/payment-methods/:code", isAdmin, async (req, res) => {
     try {
       const { code } = req.params;
-      const { isActive, inMaintenance, maintenanceCountries, feeValue, feeType } = req.body;
+      const { isActive, inMaintenance, maintenanceCountries, withdrawalMaintenance, withdrawalMaintenanceCountries, feeValue, feeType } = req.body;
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
@@ -2388,6 +2393,8 @@ export async function registerRoutes(
       if (isActive !== undefined) updateData.isActive = isActive;
       if (inMaintenance !== undefined) updateData.inMaintenance = inMaintenance;
       if (maintenanceCountries !== undefined) updateData.maintenanceCountries = maintenanceCountries;
+      if (withdrawalMaintenance !== undefined) updateData.withdrawalMaintenance = withdrawalMaintenance;
+      if (withdrawalMaintenanceCountries !== undefined) updateData.withdrawalMaintenanceCountries = withdrawalMaintenanceCountries;
       if (feeValue !== undefined) updateData.feeValue = String(feeValue);
       if (feeType !== undefined) updateData.feeType = feeType;
       const [updated] = await db.update(pmTable).set(updateData).where(eq(pmTable.code, code)).returning();

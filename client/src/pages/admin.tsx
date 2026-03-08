@@ -379,7 +379,7 @@ export default function AdminPage() {
   });
 
   const pmM = useMutation({
-    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[] }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
+    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[]; withdrawalMaintenance?: boolean; withdrawalMaintenanceCountries?: string[] }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] }); toast({ title: "Mis à jour" }); },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
@@ -2088,8 +2088,10 @@ export default function AdminPage() {
               <div className="space-y-3">
                 {(paymentMethods || []).map((pm: any) => {
                   const maintCountries: string[] = pm.maintenanceCountries || [];
+                  const wmCountries: string[] = pm.withdrawalMaintenanceCountries || [];
                   const pmCountries: string[] = pm.countries || [];
                   const hasMaint = pm.inMaintenance || maintCountries.length > 0;
+                  const hasWithdrawalMaint = pm.withdrawalMaintenance || wmCountries.length > 0;
                   const statusBand = pm.inMaintenance ? "bg-amber-500" : !pm.isActive ? "bg-red-500" : hasMaint ? "bg-amber-400" : "bg-emerald-500";
 
                   function toggleCountryMaint(countryCode: string) {
@@ -2098,6 +2100,13 @@ export default function AdminPage() {
                       ? current.filter((c: string) => c !== countryCode)
                       : [...current, countryCode];
                     pmM.mutate({ code: pm.code, maintenanceCountries: updated });
+                  }
+
+                  function toggleWithdrawalCountryMaint(countryCode: string) {
+                    const updated = wmCountries.includes(countryCode)
+                      ? wmCountries.filter((c: string) => c !== countryCode)
+                      : [...wmCountries, countryCode];
+                    pmM.mutate({ code: pm.code, withdrawalMaintenanceCountries: updated });
                   }
 
                   return (
@@ -2123,6 +2132,7 @@ export default function AdminPage() {
                           </div>
 
                           {pm.isActive && (
+                            <div className="space-y-2">
                             <div className="border border-border/40 rounded-xl overflow-hidden">
                               <div className="bg-muted/30 px-3 py-1.5 flex items-center justify-between">
                                 <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5"><ZapOff className="h-3 w-3" />Maintenance par pays</p>
@@ -2158,6 +2168,47 @@ export default function AdminPage() {
                                 </div>
                               )}
                             </div>
+
+                            {/* Withdrawal maintenance */}
+                            <div className="border border-orange-500/30 rounded-xl overflow-hidden mt-2">
+                              <div className="bg-orange-500/10 px-3 py-1.5 flex items-center justify-between">
+                                <p className="text-xs font-bold text-orange-700 dark:text-orange-400 flex items-center gap-1.5">
+                                  <ZapOff className="h-3 w-3" />Maintenance retraits
+                                  {hasWithdrawalMaint && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-600 text-[10px]">Actif</span>}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={pm.withdrawalMaintenance}
+                                    onCheckedChange={(v) => pmM.mutate({ code: pm.code, withdrawalMaintenance: v })}
+                                    disabled={pmM.isPending}
+                                    data-testid={`switch-withdrawal-maint-${pm.code}`}
+                                  />
+                                  <span className="text-xs text-muted-foreground">{pm.withdrawalMaintenance ? "Tous les pays" : "Sélectif"}</span>
+                                </div>
+                              </div>
+                              {!pm.withdrawalMaintenance && (
+                                <div className="p-2 grid grid-cols-3 gap-1.5">
+                                  {pmCountries.map((cc: string) => {
+                                    const cInfo = COUNTRIES.find(c => c.code === cc);
+                                    const isWMaint = wmCountries.includes(cc);
+                                    return (
+                                      <button
+                                        key={cc}
+                                        onClick={() => toggleWithdrawalCountryMaint(cc)}
+                                        disabled={pmM.isPending}
+                                        className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${isWMaint ? "border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-400" : "border-border/40 bg-muted/20 text-muted-foreground hover:bg-muted/40"}`}
+                                        data-testid={`btn-withdrawal-maint-${pm.code}-${cc}`}
+                                      >
+                                        <span>{cInfo?.flag || "🌍"}</span>
+                                        <span>{cc}</span>
+                                        {isWMaint && <ZapOff className="h-2.5 w-2.5 ml-auto" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                           )}
                         </div>
                       </CardContent>

@@ -77,6 +77,8 @@ export const paymentMethods = pgTable("payment_methods", {
   isActive: boolean("is_active").notNull().default(true),
   inMaintenance: boolean("in_maintenance").notNull().default(false),
   maintenanceCountries: text("maintenance_countries").array().default([]),
+  withdrawalMaintenance: boolean("withdrawal_maintenance").notNull().default(false),
+  withdrawalMaintenanceCountries: text("withdrawal_maintenance_countries").array().default([]),
   feeType: text("fee_type").notNull().default("percentage"),
   feeValue: decimal("fee_value", { precision: 5, scale: 2 }).notNull().default("5"),
   countries: text("countries").array().default([]),
