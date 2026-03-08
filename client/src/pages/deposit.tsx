@@ -48,7 +48,9 @@ export default function DepositPage() {
 
   const needsOtp =
     (country === "CM" && (operator === "Orange" || operator === "MTN")) ||
-    (country === "BF" && operator === "Orange");
+    (country === "BF" && operator === "Orange") ||
+    (country === "CI" && (operator === "Orange" || operator === "Moov")) ||
+    (country === "SN" && operator === "Orange");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [verifyCount, setVerifyCount] = useState(0);
@@ -388,6 +390,7 @@ export default function DepositPage() {
                     Code OTP {operator} Money
                   </Label>
 
+                  {/* Orange Burkina Faso : code USSD avec montant */}
                   {country === "BF" && operator === "Orange" ? (
                     <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
                       <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
@@ -403,6 +406,44 @@ export default function DepositPage() {
                         <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez le code OTP reçu ci-dessous</li>
                       </ol>
                     </div>
+
+                  /* Orange Côte d'Ivoire : #144*82# option 2 */
+                  ) : country === "CI" && operator === "Orange" ? (
+                    <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144*82#</strong> sur votre téléphone Orange</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Sélectionnez l'<strong>option 2</strong> pour obtenir votre code de paiement</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
+                      </ol>
+                    </div>
+
+                  /* Moov Côte d'Ivoire : *155# → paiement en ligne */
+                  ) : country === "CI" && operator === "Moov" ? (
+                    <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">1.</span> Composez <strong>*155#</strong> sur votre téléphone Moov</li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">2.</span> Sélectionnez <strong>Paiement en ligne</strong></li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">3.</span> Entrez votre code secret Moov Money</li>
+                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">4.</span> Entrez le code OTP reçu par SMS ci-dessous</li>
+                      </ol>
+                    </div>
+
+                  /* Orange Sénégal : #144# → générer OTP */
+                  ) : country === "SN" && operator === "Orange" ? (
+                    <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144#</strong> sur votre téléphone Orange</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Sélectionnez <strong>"Générer un OTP"</strong> pour paiement en ligne</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
+                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
+                      </ol>
+                    </div>
+
+                  /* Orange Cameroun : #144# */
                   ) : operator === "Orange" ? (
                     <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
                       <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
@@ -413,6 +454,8 @@ export default function DepositPage() {
                         <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
                       </ol>
                     </div>
+
+                  /* MTN Cameroun : *126# */
                   ) : (
                     <div className="rounded-xl bg-yellow-500/5 border border-yellow-500/20 p-3 space-y-1.5">
                       <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">Comment obtenir votre code OTP :</p>
