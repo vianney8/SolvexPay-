@@ -100,9 +100,13 @@ export default function WithdrawPage() {
   const withdrawAmount = parseFloat(amount) || 0;
   const feeRate = (serviceFees?.withdrawal ?? 7) / 100;
   const withdrawAmountXOF = currency === "CDF" ? Math.floor(withdrawAmount * 0.22) : withdrawAmount;
-  const fees = Math.round(withdrawAmountXOF * feeRate);
-  const netAmount = withdrawAmount - (currency === "CDF" ? Math.round(withdrawAmount * feeRate) : fees);
-  const insufficientFunds = withdrawAmountXOF > balanceXOF && withdrawAmount > 0;
+  const feesXOF = Math.round(withdrawAmountXOF * feeRate);
+  // Fees in local currency (shown to user)
+  const feesLocal = currency === "CDF" ? Math.round(feesXOF / 0.22) : feesXOF;
+  // Total debited from wallet = exact amount entered + fees
+  const totalDebit = withdrawAmount + feesLocal;
+  const totalDebitXOF = withdrawAmountXOF + feesXOF;
+  const insufficientFunds = totalDebitXOF > balanceXOF && withdrawAmount > 0;
 
   const recentWithdrawals = allTransactions
     ?.filter((t: any) => t.type === "withdrawal")
@@ -208,7 +212,7 @@ export default function WithdrawPage() {
                 <>
                   <p className="font-black text-xl" data-testid="text-current-balance">{formatCurrency(balance)} {currency}</p>
                   {balance > 0 && (
-                    <button type="button" onClick={() => setAmount(String(Math.floor(balance * 0.99)))} className="text-white/70 text-xs underline hover:text-white mt-0.5" data-testid="button-max-amount">
+                    <button type="button" onClick={() => setAmount(String(Math.floor(balance / (1 + feeRate))))} className="text-white/70 text-xs underline hover:text-white mt-0.5" data-testid="button-max-amount">
                       Max
                     </button>
                   )}
@@ -341,21 +345,21 @@ export default function WithdrawPage() {
                 {insufficientFunds && (
                   <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/5 border border-destructive/20 mb-2">
                     <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-destructive font-semibold">Solde insuffisant. Disponible : {formatCurrency(balance)} {currency}</p>
+                    <p className="text-xs text-destructive font-semibold">Solde insuffisant. Il faut {formatCurrency(totalDebit)} {currency} (montant + frais). Disponible : {formatCurrency(balance)} {currency}</p>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Montant du retrait</span>
-                  <span className="font-semibold">{formatCurrency(withdrawAmount)} {currency}</span>
+                  <span className="text-muted-foreground">Vous recevrez</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(withdrawAmount)} {currency}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Frais ({Math.round(feeRate * 100)}%)</span>
-                  <span className="text-destructive font-medium">- {formatCurrency(fees)} {currency}</span>
+                  <span className="text-destructive font-medium">+ {formatCurrency(feesLocal)} {currency}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm">Vous recevrez</span>
-                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`} data-testid="text-withdraw-total">{formatCurrency(netAmount)} {currency}</span>
+                  <span className="font-bold text-sm">Total débité de votre solde</span>
+                  <span className={`font-black text-xl ${insufficientFunds ? "text-destructive" : "text-foreground"}`} data-testid="text-withdraw-total">{formatCurrency(totalDebit)} {currency}</span>
                 </div>
               </CardContent>
             </Card>
@@ -364,7 +368,7 @@ export default function WithdrawPage() {
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-cyan-500/5 border border-cyan-500/20">
             <Info className="h-4 w-4 text-cyan-600 dark:text-cyan-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Frais de retrait de <strong>{Math.round(feeRate * 100)}%</strong> appliqués sur le montant retiré. Les fonds arrivent automatiquement sur votre compte Mobile Money.
+              Frais de retrait de <strong>{Math.round(feeRate * 100)}%</strong> débités de votre solde SolvexPay en supplément. Vous recevrez exactement le montant saisi sur votre Mobile Money.
             </p>
           </div>
 

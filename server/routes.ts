@@ -396,8 +396,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Aucun portefeuille trouvé" });
       }
 
+      const withdrawalFeeRate = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7") / 100;
+      const withdrawalFees = Math.round(amountXOF * withdrawalFeeRate);
+
+      // Fees in local currency for wallet deduction
+      const feesLocal = localCurrency === "CDF"
+        ? Math.round(withdrawalFees / 0.22)
+        : withdrawalFees;
+
+      // Total wallet deduction = exact amount user entered + fees
+      const totalDebitXOF = amountXOF + withdrawalFees;
+
       const currentBalance = parseFloat(String(wallet.balanceXOF || "0"));
-      if (currentBalance < amountXOF) {
+      if (currentBalance < totalDebitXOF) {
         return res.status(400).json({ message: "Solde insuffisant" });
       }
 
@@ -421,15 +432,6 @@ export async function registerRoutes(
       const reference = generateReference();
       const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
 
-      const withdrawalFeeRate = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7") / 100;
-      const withdrawalFees = Math.round(amountXOF * withdrawalFeeRate);
-
-      // Net amount sent to user = requested amount minus fees
-      const netAmountXOF = amountXOF - withdrawalFees;
-      const netAmountLocal = localCurrency === "CDF"
-        ? Math.round(netAmountXOF / 0.22)
-        : netAmountXOF;
-
       if (withdrawalMode === "manual") {
         const transaction = await storage.createTransaction({
           userId,
@@ -443,7 +445,8 @@ export async function registerRoutes(
           description: `Retrait vers ${phoneNumber} via ${operator}`,
           fees: String(withdrawalFees),
         } as any);
-        await storage.updateWalletBalance(userId, localCurrency, -amount);
+        // Deduct amount + fees from wallet (user receives exact amount, fees taken on top)
+        await storage.updateWalletBalance(userId, localCurrency, -(amount + feesLocal));
         return res.json({ ...transaction, mode: "manual" });
       }
 
@@ -454,10 +457,10 @@ export async function registerRoutes(
 
       const isWave = operator.toLowerCase() === "wave";
 
-      console.log(`Initiating OmniPay withdrawal for reference: ${reference} (Country: ${country}, Operator: ${operator}), amount: ${amount}, fees: ${withdrawalFees}, net: ${netAmountLocal}`);
+      console.log(`Initiating OmniPay withdrawal for reference: ${reference} (Country: ${country}, Operator: ${operator}), amount: ${amount}, fees: ${withdrawalFees}, total_debit: ${amount + feesLocal}`);
       const transferResponse = await omniPayService.transfer({
         msisdn: phoneNumber,
-        amount: netAmountLocal,
+        amount: amount, // User receives exact amount they entered
         reference,
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
@@ -478,7 +481,8 @@ export async function registerRoutes(
         fees: String(withdrawalFees),
       } as any);
 
-      await storage.updateWalletBalance(userId, localCurrency, -amount);
+      // Deduct amount + fees from wallet (user receives exact amount, fees taken on top)
+      await storage.updateWalletBalance(userId, localCurrency, -(amount + feesLocal));
 
       res.json({
         ...transaction,
@@ -598,10 +602,13 @@ export async function registerRoutes(
         } else if (statusStr === "failed") {
           const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
           if (updated && transaction.type === "withdrawal") {
+            const refundAmt = parseFloat(transaction.amount);
+            const refundFeesXOF = parseFloat((transaction as any).fees || "0");
+            const refundFeesLocal = transaction.currency === "CDF" ? Math.round(refundFeesXOF / 0.22) : refundFeesXOF;
             await storage.updateWalletBalance(
               transaction.userId,
               transaction.currency,
-              parseFloat(transaction.amount)
+              refundAmt + refundFeesLocal
             );
             const failedWdTx = await storage.getTransactionByReference(reference);
             if (failedWdTx) notifyWithdrawal(failedWdTx, "failed").catch(() => {});
@@ -1579,12 +1586,15 @@ export async function registerRoutes(
         } else {
           await storage.updateTransactionStatus(transaction.id, "failed");
           if (transaction.type === "withdrawal") {
+            const refundAmt = parseFloat(transaction.amount);
+            const refundFeesXOF = parseFloat((transaction as any).fees || "0");
+            const refundFeesLocal = transaction.currency === "CDF" ? Math.round(refundFeesXOF / 0.22) : refundFeesXOF;
             await storage.updateWalletBalance(
               transaction.userId,
               transaction.currency,
-              parseFloat(transaction.amount)
+              refundAmt + refundFeesLocal // Refund exact amount + fees
             );
-            console.log(`[OmniPay] Withdrawal ${reference} failed, balance refunded`);
+            console.log(`[OmniPay] Withdrawal ${reference} failed, balance refunded (amount + fees)`);
           } else {
             console.log(`[OmniPay] Payment ${reference} failed`);
           }
@@ -1854,7 +1864,10 @@ export async function registerRoutes(
 
       if (status === "failed" && transaction.type === "withdrawal" && transaction.status === "pending") {
         await storage.updateTransactionStatus(id, "failed");
-        await storage.updateWalletBalance(transaction.userId, transaction.currency, parseFloat(transaction.amount));
+        const refundAmt = parseFloat(transaction.amount);
+        const refundFeesXOF = parseFloat((transaction as any).fees || "0");
+        const refundFeesLocal = transaction.currency === "CDF" ? Math.round(refundFeesXOF / 0.22) : refundFeesXOF;
+        await storage.updateWalletBalance(transaction.userId, transaction.currency, refundAmt + refundFeesLocal);
         const tx = await storage.getTransactionById(id);
         if (tx) notifyWithdrawal(tx, "failed").catch(() => {});
         return res.json({ ...tx, refunded: true });
