@@ -81,6 +81,10 @@ export const paymentMethods = pgTable("payment_methods", {
   withdrawalMaintenanceCountries: text("withdrawal_maintenance_countries").array().default([]),
   feeType: text("fee_type").notNull().default("percentage"),
   feeValue: decimal("fee_value", { precision: 5, scale: 2 }).notNull().default("5"),
+  feeDeposit: decimal("fee_deposit", { precision: 5, scale: 2 }),
+  feeWithdrawal: decimal("fee_withdrawal", { precision: 5, scale: 2 }),
+  feePLink: decimal("fee_plink", { precision: 5, scale: 2 }),
+  feeApi: decimal("fee_api", { precision: 5, scale: 2 }),
   countries: text("countries").array().default([]),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

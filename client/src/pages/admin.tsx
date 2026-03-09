@@ -243,6 +243,7 @@ export default function AdminPage() {
   const [migrateDialog, setMigrateDialog] = useState(false);
   const [migrateData, setMigrateData] = useState({ fromUserId: "", toUserId: "", amount: "", motif: "" });
   const [serviceFeeEdit, setServiceFeeEdit] = useState<{ deposit: string; withdrawal: string; transfer: string; api: string } | null>(null);
+  const [pmFeeEdit, setPmFeeEdit] = useState<Record<string, { deposit: string; withdrawal: string; plink: string; api: string }>>({});
   const [omnipayRateEdit, setOmnipayRateEdit] = useState<{ deposit: string; withdrawal: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
@@ -431,7 +432,7 @@ export default function AdminPage() {
   });
 
   const pmM = useMutation({
-    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[]; withdrawalMaintenance?: boolean; withdrawalMaintenanceCountries?: string[] }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
+    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[]; withdrawalMaintenance?: boolean; withdrawalMaintenanceCountries?: string[]; feeDeposit?: string | null; feeWithdrawal?: string | null; feePLink?: string | null; feeApi?: string | null }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] }); toast({ title: "Mis à jour" }); },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
@@ -2260,6 +2261,88 @@ export default function AdminPage() {
                                 </div>
                               )}
                             </div>
+
+                            {/* Per-operator fees */}
+                            {(() => {
+                              const editing = pmFeeEdit[pm.code];
+                              const hasCustFees = pm.feeDeposit != null || pm.feeWithdrawal != null || pm.feePLink != null || pm.feeApi != null;
+                              return (
+                                <div className="border border-blue-500/30 rounded-xl overflow-hidden mt-2">
+                                  <div className="bg-blue-500/10 px-3 py-1.5 flex items-center justify-between">
+                                    <p className="text-xs font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                                      <span>%</span> Frais spécifiques
+                                      {hasCustFees && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-600 text-[10px]">Personnalisés</span>}
+                                    </p>
+                                    {!editing ? (
+                                      <button
+                                        className="text-xs text-blue-600 hover:underline"
+                                        onClick={() => setPmFeeEdit(prev => ({ ...prev, [pm.code]: { deposit: pm.feeDeposit ?? "", withdrawal: pm.feeWithdrawal ?? "", plink: pm.feePLink ?? "", api: pm.feeApi ?? "" } }))}
+                                        data-testid={`btn-fee-edit-${pm.code}`}
+                                      >Modifier</button>
+                                    ) : (
+                                      <div className="flex gap-2">
+                                        <button
+                                          className="text-xs text-emerald-600 hover:underline font-semibold"
+                                          disabled={pmM.isPending}
+                                          onClick={() => {
+                                            const f = pmFeeEdit[pm.code];
+                                            pmM.mutate({ code: pm.code, feeDeposit: f.deposit || null, feeWithdrawal: f.withdrawal || null, feePLink: f.plink || null, feeApi: f.api || null });
+                                            setPmFeeEdit(prev => { const n = {...prev}; delete n[pm.code]; return n; });
+                                          }}
+                                          data-testid={`btn-fee-save-${pm.code}`}
+                                        >Sauv.</button>
+                                        <button
+                                          className="text-xs text-muted-foreground hover:underline"
+                                          onClick={() => setPmFeeEdit(prev => { const n = {...prev}; delete n[pm.code]; return n; })}
+                                          data-testid={`btn-fee-cancel-${pm.code}`}
+                                        >Annuler</button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="p-2.5">
+                                    {editing ? (
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                          { key: "deposit" as const, label: "Dépôt %" },
+                                          { key: "withdrawal" as const, label: "Retrait %" },
+                                          { key: "plink" as const, label: "Lien paiement %" },
+                                          { key: "api" as const, label: "API %" },
+                                        ].map(({ key, label }) => (
+                                          <div key={key}>
+                                            <p className="text-[10px] text-muted-foreground mb-1">{label} <span className="text-[9px]">(vide = global)</span></p>
+                                            <input
+                                              type="number"
+                                              step="0.1"
+                                              min="0"
+                                              max="100"
+                                              placeholder="Global"
+                                              value={pmFeeEdit[pm.code][key]}
+                                              onChange={e => setPmFeeEdit(prev => ({ ...prev, [pm.code]: { ...prev[pm.code], [key]: e.target.value } }))}
+                                              className="w-full h-8 text-xs px-2 rounded-lg border border-border bg-background"
+                                              data-testid={`input-fee-${pm.code}-${key}`}
+                                            />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                                        {[
+                                          { label: "Dépôt", val: pm.feeDeposit },
+                                          { label: "Retrait", val: pm.feeWithdrawal },
+                                          { label: "Lien pmt", val: pm.feePLink },
+                                          { label: "API", val: pm.feeApi },
+                                        ].map(({ label, val }) => (
+                                          <div key={label} className="flex justify-between text-xs">
+                                            <span className="text-muted-foreground">{label}</span>
+                                            <span className={val != null ? "font-semibold text-blue-600" : "text-muted-foreground/50"}>{val != null ? `${val}%` : "Global"}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                           )}
                         </div>

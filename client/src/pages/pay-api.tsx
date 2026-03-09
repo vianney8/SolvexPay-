@@ -83,6 +83,7 @@ export default function PayApiPage() {
   const [otp, setOtp] = useState("");
 
   const selectedCountry = COUNTRIES.find((c) => c.code === country) || COUNTRIES[0];
+  const isOrangeCM = country === "CM" && operator === "Orange";
   const needsOtp =
     (country === "CM" && (operator === "Orange" || operator === "MTN")) ||
     (country === "BF" && operator === "Orange") ||
@@ -202,11 +203,11 @@ export default function PayApiPage() {
       toast({ title: "Champs requis", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
       return;
     }
-    if (needsOtp && step === 1) {
+    if (needsOtp && !isOrangeCM && step === 1) {
       setStep(2);
       return;
     }
-    if (needsOtp && !otp.trim()) return;
+    if (needsOtp && !isOrangeCM && !otp.trim()) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     payMutation.mutate({
@@ -215,7 +216,7 @@ export default function PayApiPage() {
       country,
       customerName: fullName || undefined,
       customerEmail: customerEmail || undefined,
-      ...(needsOtp ? { otp: otp.trim() } : {}),
+      ...(needsOtp ? { otp: isOrangeCM ? "0000" : otp.trim() } : {}),
     });
   };
 
@@ -722,7 +723,7 @@ export default function PayApiPage() {
             >
               {payMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
-              ) : needsOtp ? (
+              ) : needsOtp && !isOrangeCM && step === 1 ? (
                 "Continuer →"
               ) : (
                 `Payer ${formatAmount(paymentInfo.amount)} ${paymentInfo.currency}`

@@ -171,6 +171,25 @@ async function checkOperatorMaintenance(operator: string, country: string): Prom
   }
 }
 
+// ── Per-operator fee lookup (falls back to global systemSetting if not configured) ──
+async function getOperatorFeeRate(
+  operatorCode: string | null | undefined,
+  feeColumn: "feeDeposit" | "feeWithdrawal" | "feePLink" | "feeApi",
+  globalFallback: number
+): Promise<number> {
+  if (!operatorCode) return globalFallback;
+  try {
+    const { db } = await import("./db");
+    const { paymentMethods: pmTable } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    const [pm] = await db.select().from(pmTable).where(eq(pmTable.code, operatorCode));
+    if (pm && pm[feeColumn] !== null && pm[feeColumn] !== undefined) {
+      return parseFloat(String(pm[feeColumn]));
+    }
+  } catch {}
+  return globalFallback;
+}
+
 // ── Webhook delivery with automatic retry (3 attempts: 0s, 8s, 30s) ──────────
 function scheduleWebhookDelivery(
   webhookUrl: string,
@@ -345,7 +364,8 @@ export async function registerRoutes(
         callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
       });
 
-      const depositFeeRate = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7") / 100;
+      const globalDepositFee = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
+      const depositFeeRate = (await getOperatorFeeRate(operator, "feeDeposit", globalDepositFee)) / 100;
       const depositFees = Math.round(amount * depositFeeRate);
 
       const transaction = await storage.createTransaction({
@@ -396,7 +416,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Aucun portefeuille trouvé" });
       }
 
-      const withdrawalFeeRate = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7") / 100;
+      const globalWithdrawalFee = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7");
+      const withdrawalFeeRate = (await getOperatorFeeRate(operator, "feeWithdrawal", globalWithdrawalFee)) / 100;
       const withdrawalFees = Math.round(amountXOF * withdrawalFeeRate);
 
       // Fees in local currency for wallet deduction
@@ -1143,7 +1164,8 @@ export async function registerRoutes(
       } else {
         linkAmount = fixedAmount;
       }
-      const feeRate = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7") / 100;
+      const globalPLinkFee = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
+      const feeRate = (await getOperatorFeeRate(operator, "feePLink", globalPLinkFee)) / 100;
       const feesAmount = Math.round(linkAmount * feeRate);
 
       console.log(`Initiating payment for link ${slug} with reference: ${reference}`);
@@ -1379,7 +1401,8 @@ export async function registerRoutes(
 
       const appName = (req.merchantApiKey as any).appName || `${merchantUser.firstName || ""} ${merchantUser.lastName || ""}`.trim() || "SolvexPay";
       const apiKeyId = req.merchantApiKey?.id;
-      const feeRate = parseFloat((await storage.getSystemSetting("fee_api")) || "7") / 100;
+      const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
+      const feeRate = (await getOperatorFeeRate(operator ? operator.toUpperCase() : null, "feeApi", globalApiFee)) / 100;
       const feesAmount = Math.round(amount * feeRate);
       const reference = generateReference();
 
@@ -2454,7 +2477,7 @@ export async function registerRoutes(
   app.patch("/api/admin/payment-methods/:code", isAdmin, async (req, res) => {
     try {
       const { code } = req.params;
-      const { isActive, inMaintenance, maintenanceCountries, withdrawalMaintenance, withdrawalMaintenanceCountries, feeValue, feeType } = req.body;
+      const { isActive, inMaintenance, maintenanceCountries, withdrawalMaintenance, withdrawalMaintenanceCountries, feeValue, feeType, feeDeposit, feeWithdrawal, feePLink, feeApi } = req.body;
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
@@ -2466,6 +2489,11 @@ export async function registerRoutes(
       if (withdrawalMaintenanceCountries !== undefined) updateData.withdrawalMaintenanceCountries = withdrawalMaintenanceCountries;
       if (feeValue !== undefined) updateData.feeValue = String(feeValue);
       if (feeType !== undefined) updateData.feeType = feeType;
+      // Per-type per-operator fees (null = use global)
+      if (feeDeposit !== undefined) updateData.feeDeposit = feeDeposit === null || feeDeposit === "" ? null : String(feeDeposit);
+      if (feeWithdrawal !== undefined) updateData.feeWithdrawal = feeWithdrawal === null || feeWithdrawal === "" ? null : String(feeWithdrawal);
+      if (feePLink !== undefined) updateData.feePLink = feePLink === null || feePLink === "" ? null : String(feePLink);
+      if (feeApi !== undefined) updateData.feeApi = feeApi === null || feeApi === "" ? null : String(feeApi);
       const [updated] = await db.update(pmTable).set(updateData).where(eq(pmTable.code, code)).returning();
       res.json(updated);
     } catch (error) {

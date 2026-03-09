@@ -84,6 +84,7 @@ export default function PayPage() {
   const [otp, setOtp] = useState("");
 
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
+  const isOrangeCM = country === "CM" && operator === "Orange";
   const needsOtp =
     (country === "CM" && (operator === "Orange" || operator === "MTN")) ||
     (country === "BF" && operator === "Orange") ||
@@ -192,11 +193,11 @@ export default function PayPage() {
       toast({ title: "Champs requis", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
       return;
     }
-    if (needsOtp && step === 1) {
+    if (needsOtp && !isOrangeCM && step === 1) {
       setStep(2);
       return;
     }
-    if (needsOtp && !otp.trim()) return;
+    if (needsOtp && !isOrangeCM && !otp.trim()) return;
     const isCustom = (paymentLink as any)?.allowCustomAmount;
     const parsedCustom = parseFloat(customAmount);
     const minAmount = parseFloat(paymentLink.amount);
@@ -218,7 +219,7 @@ export default function PayPage() {
       country,
       customerName: fullName || undefined,
       customerEmail: customerEmail || undefined,
-      ...(needsOtp ? { otp: otp.trim() } : {}),
+      ...(needsOtp ? { otp: isOrangeCM ? "0000" : otp.trim() } : {}),
       ...(isCustom ? { customAmount: parsedCustom } : {}),
     } as any);
   };
@@ -820,7 +821,7 @@ export default function PayPage() {
             >
               {payMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
-              ) : needsOtp ? (
+              ) : needsOtp && !isOrangeCM && step === 1 ? (
                 "Continuer →"
               ) : (paymentLink as any).allowCustomAmount && customAmount ? (
                 `Payer ${formatAmount(parseFloat(customAmount))} ${paymentLink.currency}`
