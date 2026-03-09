@@ -181,3 +181,16 @@ export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
 
 export type Wallet = typeof wallets.$inferSelect;
 export type InsertWallet = z.infer<typeof insertWalletSchema>;
+
+export const partnerProfiles = pgTable("partner_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  companyName: text("company_name").notNull(),
+  country: text("country").notNull().default(""),
+  enabledCountries: text("enabled_countries").array().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPartnerProfileSchema = createInsertSchema(partnerProfiles).omit({ id: true, createdAt: true });
+export type PartnerProfile = typeof partnerProfiles.$inferSelect;
+export type InsertPartnerProfile = z.infer<typeof insertPartnerProfileSchema>;

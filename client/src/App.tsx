@@ -23,6 +23,7 @@ import PayApiPage from "@/pages/pay-api";
 import AdminPage from "@/pages/admin";
 import SupportPage from "@/pages/support";
 import DocumentationPage from "@/pages/documentation";
+import PartnerPage from "@/pages/partner";
 
 const PREFETCH_KEYS = [
   ["/api/wallet"],
@@ -111,6 +112,8 @@ function Router() {
       <Route path="/pay/:slug" component={PayPage} />
       <Route path="/pay-api/:id" component={PayApiPage} />
       <Route path="/documentation" component={DocumentationPage} />
+      <Route path="/partner" component={PartnerPage} />
+      <Route path="/partner/:sub" component={PartnerPage} />
       {user ? (
         <AuthenticatedRoutes />
       ) : (

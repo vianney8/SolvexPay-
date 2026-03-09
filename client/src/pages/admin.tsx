@@ -256,6 +256,8 @@ export default function AdminPage() {
   const [wdForm, setWdForm] = useState({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
   const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue" });
   const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
+  const [partnerDialog, setPartnerDialog] = useState(false);
+  const [partnerData, setPartnerData] = useState({ companyName: "", email: "", password: "", country: "BJ" });
 
   // Queries
   const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"], staleTime: 60000 });
@@ -359,6 +361,11 @@ export default function AdminPage() {
     queryKey: ["/api/support-links"],
     staleTime: 120000,
   });
+  const { data: partners, isLoading: partnersLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/partners"],
+    enabled: activeTab === "partners",
+    staleTime: 60000,
+  });
   const { data: countriesStats } = useQuery<{ txByCountry: any[]; usersByWithdrawal: any[] }>({
     queryKey: ["/api/admin/stats/countries"],
     enabled: activeTab === "overview",
@@ -382,6 +389,29 @@ export default function AdminPage() {
   });
 
   // Mutations
+  const partnerM = useMutation({
+    mutationFn: (d: any) => apiRequest("POST", "/api/admin/partners", d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/partners"] });
+      toast({ title: "Compte partenaire créé" });
+      setPartnerDialog(false);
+      setPartnerData({ companyName: "", email: "", password: "", country: "BJ" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const updatePartnerM = useMutation({
+    mutationFn: (d: { id: string; isBlocked: boolean }) => apiRequest("PATCH", `/api/admin/partners/${d.id}`, { isBlocked: d.isBlocked }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/partners"] }); toast({ title: "Statut partenaire mis à jour" }); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const deletePartnerM = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/partners/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/partners"] }); toast({ title: "Partenaire supprimé" }); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
   const blockM = useMutation({
     mutationFn: (d: { userId: string; isBlocked: boolean }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/block`, { isBlocked: d.isBlocked }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: "Statut mis à jour" }); },
@@ -680,6 +710,7 @@ export default function AdminPage() {
                 { v: "links-keys", label: "Liens & API", Icon: Link2, badge: 0 },
                 { v: "fees", label: "Frais", Icon: Percent, badge: 0 },
                 { v: "payments", label: "Moyens de paiement", Icon: CreditCard, badge: 0 },
+                { v: "partners", label: "Partenaires", Icon: Building2, badge: 0 },
                 { v: "transactions", label: "Transactions", Icon: ArrowDownUp, badge: isAutoWithdrawal ? 0 : pendingWithdrawals.length },
                 { v: "notifications", label: "Notifications", Icon: Bell, badge: (adminNotifications || []).filter((n: any) => n.isActive).length },
                 { v: "support-links", label: "Liens Support", Icon: HeadphonesIcon, badge: 0 },
@@ -2557,6 +2588,181 @@ export default function AdminPage() {
           {/* ══════════════════════════════════════
               TAB 7 — TRANSACTIONS
           ══════════════════════════════════════ */}
+          {/* ══════════════════════════════════════
+              TAB — PARTENAIRES
+          ══════════════════════════════════════ */}
+          <TabsContent value="partners" className="space-y-4 mt-5">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-2">
+              <div>
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-indigo-500" />
+                  Gestion des Partenaires
+                </h3>
+                <p className="text-xs text-muted-foreground">{partners?.length || 0} partenaire(s) enregistré(s)</p>
+              </div>
+              <Button onClick={() => setPartnerDialog(true)} className="rounded-xl gap-2 h-10 font-bold bg-indigo-600 hover:bg-indigo-700 text-white" data-testid="btn-create-partner-open">
+                <Plus className="h-4 w-4" />
+                Créer un partenaire
+              </Button>
+            </div>
+
+            <Dialog open={partnerDialog} onOpenChange={setPartnerDialog}>
+              <DialogContent className="sm:max-w-[450px] rounded-3xl p-6 border-border/40">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-black flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+                      <Plus className="h-5 w-5 text-indigo-500" />
+                    </div>
+                    Créer un compte partenaire
+                  </DialogTitle>
+                  <DialogDescription className="text-sm font-medium pt-1">
+                    Un compte utilisateur sera créé avec le flag <span className="text-indigo-500 font-bold">isPartner</span> activé.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Nom de l'entreprise</Label>
+                    <Input
+                      placeholder="ex: SolvexPay Partner Ltd"
+                      value={partnerData.companyName}
+                      onChange={e => setPartnerData(prev => ({ ...prev, companyName: e.target.value }))}
+                      className="rounded-xl h-11 border-border/60 focus:ring-indigo-500/20"
+                      data-testid="input-partner-company"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Adresse email (Identifiant)</Label>
+                    <Input
+                      type="email"
+                      placeholder="email@partenaire.com"
+                      value={partnerData.email}
+                      onChange={e => setPartnerData(prev => ({ ...prev, email: e.target.value }))}
+                      className="rounded-xl h-11 border-border/60 focus:ring-indigo-500/20"
+                      data-testid="input-partner-email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Mot de passe</Label>
+                    <Input
+                      type="password"
+                      placeholder="Mot de passe sécurisé"
+                      value={partnerData.password}
+                      onChange={e => setPartnerData(prev => ({ ...prev, password: e.target.value }))}
+                      className="rounded-xl h-11 border-border/60 focus:ring-indigo-500/20"
+                      data-testid="input-partner-password"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Pays d'origine</Label>
+                    <Select value={partnerData.country} onValueChange={v => setPartnerData(prev => ({ ...prev, country: v }))}>
+                      <SelectTrigger className="rounded-xl h-11 border-border/60" data-testid="select-partner-country">
+                        <SelectValue placeholder="Choisir un pays" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {COUNTRIES.map(c => (
+                          <SelectItem key={c.code} value={c.code} className="rounded-lg">
+                            <span className="flex items-center gap-2">
+                              <span>{c.flag}</span>
+                              <span>{c.name}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => setPartnerDialog(false)} className="rounded-xl h-11 font-bold">Annuler</Button>
+                  <Button
+                    onClick={() => partnerM.mutate(partnerData)}
+                    disabled={partnerM.isPending || !partnerData.companyName || !partnerData.email || !partnerData.password}
+                    className="rounded-xl h-11 font-bold flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    data-testid="btn-partner-submit"
+                  >
+                    {partnerM.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Créer le partenaire"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/30 border-b border-border/40">
+                      <th className="text-left px-4 py-3 font-bold text-muted-foreground">Entreprise / Email</th>
+                      <th className="text-left px-4 py-3 font-bold text-muted-foreground">Pays</th>
+                      <th className="text-center px-4 py-3 font-bold text-muted-foreground">Statut</th>
+                      <th className="text-left px-4 py-3 font-bold text-muted-foreground">Création</th>
+                      <th className="text-right px-4 py-3 font-bold text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {partnersLoading ? (
+                      [1,2,3].map(i => (
+                        <tr key={i}><td colSpan={5} className="px-4 py-8"><Skeleton className="h-10 w-full rounded-xl" /></td></tr>
+                      ))
+                    ) : partners?.length === 0 ? (
+                      <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground font-medium">Aucun partenaire pour le moment.</td></tr>
+                    ) : partners?.map((p: any) => {
+                      const country = COUNTRIES.find(c => c.code === p.country);
+                      return (
+                        <tr key={p.id} className="hover:bg-muted/10 transition-colors" data-testid={`partner-row-${p.id}`}>
+                          <td className="px-4 py-3.5">
+                            <div>
+                              <p className="font-bold text-foreground text-sm">{p.companyName}</p>
+                              <p className="text-[11px] text-muted-foreground font-medium">{p.email}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className="flex items-center gap-2 font-medium">
+                              <span className="text-base">{country?.flag || "🌍"}</span>
+                              <span className="text-xs uppercase font-bold text-muted-foreground">{p.country}</span>
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            {p.isBlocked ? (
+                              <Badge variant="destructive" className="rounded-full text-[10px] uppercase font-black px-2 shadow-sm border-0">Bloqué</Badge>
+                            ) : (
+                              <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0 rounded-full text-[10px] uppercase font-black px-2 shadow-sm">Actif</Badge>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-xs font-medium text-muted-foreground">
+                            {fmtDate(p.createdAt)}
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={`h-8 w-8 p-0 rounded-lg border-border/60 ${p.isBlocked ? "text-emerald-500 hover:bg-emerald-500/10" : "text-amber-500 hover:bg-amber-500/10"}`}
+                                onClick={() => updatePartnerM.mutate({ id: p.id, isBlocked: !p.isBlocked })}
+                                data-testid={`btn-partner-toggle-${p.id}`}
+                                title={p.isBlocked ? "Débloquer" : "Bloquer"}
+                              >
+                                {p.isBlocked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 w-8 p-0 rounded-lg border-border/60 text-rose-500 hover:bg-rose-500/10"
+                                onClick={() => { if(confirm("Supprimer ce partenaire ?")) deletePartnerM.mutate(p.id); }}
+                                data-testid={`btn-partner-delete-${p.id}`}
+                                title="Supprimer"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </TabsContent>
+
           <TabsContent value="transactions" className="space-y-4 mt-5">
             {pendingWithdrawals.length > 0 && !isAutoWithdrawal && (
               <Card className="border-amber-500/30 bg-amber-500/5 overflow-hidden">

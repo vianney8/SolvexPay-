@@ -5,6 +5,7 @@ import {
   wallets,
   systemSettings,
   notifications,
+  partnerProfiles,
   type Transaction, 
   type InsertTransaction,
   type PaymentLink,
@@ -15,10 +16,13 @@ import {
   type InsertWallet,
   type Notification,
   type InsertNotification,
+  type PartnerProfile,
+  type InsertPartnerProfile,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, ne } from "drizzle-orm";
 import { randomBytes, createHash } from "crypto";
+import { users } from "@shared/models/auth";
 
 export interface IStorage {
   getWallet(userId: string): Promise<Wallet | undefined>;
@@ -60,6 +64,14 @@ export interface IStorage {
   createNotification(data: InsertNotification): Promise<Notification>;
   updateNotification(id: string, data: Partial<Notification>): Promise<Notification | undefined>;
   deleteNotification(id: string): Promise<void>;
+
+  // Partner methods
+  getPartners(): Promise<any[]>;
+  getPartnerProfile(userId: string): Promise<PartnerProfile | undefined>;
+  createPartnerProfile(data: InsertPartnerProfile): Promise<PartnerProfile>;
+  updatePartnerProfile(userId: string, data: Partial<PartnerProfile>): Promise<PartnerProfile | undefined>;
+  deletePartner(userId: string): Promise<void>;
+  updateUserStatus(userId: string, isBlocked: boolean): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -294,6 +306,55 @@ export class DatabaseStorage implements IStorage {
 
   async deleteNotification(id: string): Promise<void> {
     await db.delete(notifications).where(eq(notifications.id, id));
+  }
+
+  // Partner implementation
+  async getPartners(): Promise<any[]> {
+    return db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        isPartner: users.isPartner,
+        isBlocked: users.isBlocked,
+        createdAt: users.createdAt,
+        companyName: partnerProfiles.companyName,
+        country: partnerProfiles.country,
+        enabledCountries: partnerProfiles.enabledCountries,
+      })
+      .from(users)
+      .leftJoin(partnerProfiles, eq(users.id, partnerProfiles.userId))
+      .where(eq(users.isPartner, true))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getPartnerProfile(userId: string): Promise<PartnerProfile | undefined> {
+    const [profile] = await db.select().from(partnerProfiles).where(eq(partnerProfiles.userId, userId));
+    return profile;
+  }
+
+  async createPartnerProfile(data: InsertPartnerProfile): Promise<PartnerProfile> {
+    const [profile] = await db.insert(partnerProfiles).values(data).returning();
+    return profile;
+  }
+
+  async updatePartnerProfile(userId: string, data: Partial<PartnerProfile>): Promise<PartnerProfile | undefined> {
+    const [profile] = await db
+      .update(partnerProfiles)
+      .set(data)
+      .where(eq(partnerProfiles.userId, userId))
+      .returning();
+    return profile;
+  }
+
+  async deletePartner(userId: string): Promise<void> {
+    await db.delete(partnerProfiles).where(eq(partnerProfiles.userId, userId));
+    await db.delete(users).where(eq(users.id, userId));
+  }
+
+  async updateUserStatus(userId: string, isBlocked: boolean): Promise<void> {
+    await db.update(users).set({ isBlocked }).where(eq(users.id, userId));
   }
 }
 
