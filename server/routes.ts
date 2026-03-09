@@ -1612,9 +1612,10 @@ export async function registerRoutes(
 
   app.post("/api/v1/sr/pay", async (req: any, res) => {
     try {
+      // ── Authentification clé SR ──
       const authHeader = req.headers.authorization as string | undefined;
       if (!authHeader?.startsWith("Bearer ")) {
-        return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API SR manquante. Utilisez: Authorization: Bearer sr_live_xxxx", status: 401 } });
+        return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API SR manquante. Utilisez: Authorization: Bearer sk_live_xxxx", status: 401 } });
       }
       const keyValue = authHeader.replace("Bearer ", "").trim();
       const apiKey = await storage.findApiKeyByFullKey(keyValue);
@@ -1622,26 +1623,29 @@ export async function registerRoutes(
         return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API SR introuvable ou invalide.", status: 401 } });
       }
       if (!apiKey.isActive || (apiKey as any).adminLocked) {
-        return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API SR désactivée ou verrouillée.", status: 401 } });
+        return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API SR désactivée ou verrouillée par l'administrateur.", status: 401 } });
       }
 
+      // ── Vérification du compte marchand ──
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
       const { eq: eqFn } = await import("drizzle-orm");
       const [user] = await db.select().from(usersTable).where(eqFn(usersTable.id, apiKey.userId));
-      if (!user || user.isBlocked || !user.apiSrEnabled) {
-        return res.status(403).json({ error: { code: "FORBIDDEN", message: "Compte suspendu ou API SR désactivée.", status: 403 } });
-      }
+      if (!user) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Compte marchand introuvable.", status: 404 } });
+      if (user.isBlocked) return res.status(403).json({ error: { code: "FORBIDDEN", message: "Compte marchand suspendu.", status: 403 } });
+      if (!user.apiSrEnabled) return res.status(403).json({ error: { code: "FORBIDDEN", message: "API SR non activée sur ce compte.", status: 403 } });
 
+      // ── Validation des données ──
       const srPaySchema = z.object({
         amount: z.number().min(100, "Montant minimum 100"),
-        phone: z.string().min(8, "Numéro invalide"),
-        operator: z.string().min(1, "Opérateur requis"),
-        country: z.string().min(2, "Pays requis"),
+        phone: z.string().min(8, "Numéro de téléphone invalide"),
+        operator: z.string().min(1, "Opérateur requis (mtn, moov, orange, wave, tmoney, free, airtel, vodacom)"),
+        country: z.string().min(2, "Code pays requis (BJ, CI, SN, BF, ML, TG, CM, COG, COD)"),
         otp: z.string().optional(),
         description: z.string().optional(),
         customer_name: z.string().optional(),
         customer_email: z.string().optional(),
+        reference: z.string().optional(),
       });
 
       const validation = srPaySchema.safeParse(req.body);
@@ -1650,13 +1654,41 @@ export async function registerRoutes(
       }
 
       const { amount, phone, operator, country, otp, description, customer_name, customer_email } = validation.data;
-      const reference = generateReference();
-      const omniOperator = getOmniPayOperatorCode(operator, country);
+      const operatorUpper = operator.toUpperCase();
+      const countryUpper = country.toUpperCase();
 
-      const nameParts = (customer_name || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Client").trim().split(" ");
+      // ── Vérification pays suspendu ──
+      const suspRaw = await storage.getSystemSetting("suspended_countries");
+      const suspendedList: string[] = suspRaw ? JSON.parse(suspRaw) : [];
+      if (suspendedList.includes(countryUpper)) {
+        return res.status(503).json({ error: { code: "COUNTRY_SUSPENDED", message: `Les paiements depuis le pays ${countryUpper} sont temporairement suspendus.`, status: 503 } });
+      }
+
+      // ── Vérification maintenance opérateur ──
+      const opMaintenanceMsg = await checkOperatorMaintenance(operatorUpper, countryUpper);
+      if (opMaintenanceMsg) {
+        return res.status(503).json({ error: { code: "OPERATOR_MAINTENANCE", message: opMaintenanceMsg, status: 503 } });
+      }
+
+      if (!isApiKeyConfigured()) {
+        return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
+      }
+
+      // ── Calcul des frais ──
+      const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
+      const apiFeeRate = (await getOperatorFeeRate(operatorUpper, "feeApi", globalApiFee, countryUpper)) / 100;
+      const fees = Math.round(amount * apiFeeRate);
+      const currency = getCountryCurrency(countryUpper);
+      const reference = generateReference();
+      const omniOperator = getOmniPayOperatorCode(operatorUpper, countryUpper);
+
+      // ── Nom du payeur ──
+      const rawName = customer_name || "Client SolvexPay";
+      const nameParts = rawName.trim().split(" ");
       const firstName = nameParts[0] || "Client";
       const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
 
+      // ── Appel OmniPay ──
       const omnipayResponse = await omniPayService.deposit({
         msisdn: phone,
         amount,
@@ -1665,42 +1697,43 @@ export async function registerRoutes(
         lastName,
         otp,
         operator: omniOperator,
-        callbackUrl: `${process.env.APP_URL || "https://solvexpay.com"}/api/webhooks/omnipay`,
+        callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
       });
 
-      const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
-      const apiFeeRate = (await getOperatorFeeRate(operator, "feeApi", globalApiFee, country)) / 100;
-      const fees = Math.round(amount * apiFeeRate);
-
+      // ── Création de la transaction ──
       const transaction = await storage.createTransaction({
         userId: user.id,
         type: "deposit",
         amount: amount.toString(),
-        currency: getCountryCurrency(country),
-        provider: operator,
+        currency,
+        provider: operatorUpper,
         phoneNumber: phone,
         reference,
         status: "pending",
-        description: description || "Paiement SR API",
+        description: description || "Paiement API SR",
         fees: String(fees),
         payerName: customer_name || null,
         payerEmail: customer_email || null,
-        payerCountry: country,
-        payerOperator: operator,
+        payerCountry: countryUpper,
+        payerOperator: operatorUpper,
         apiKeyId: apiKey.id,
       } as any);
 
       await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
 
-      res.json({
+      res.status(201).json({
         success: true,
         id: transaction.id,
         status: "pending",
         reference,
         amount,
         fees,
-        currency: getCountryCurrency(country),
-        message: omnipayResponse.message || "Paiement initié. Le client doit valider sur son téléphone.",
+        net_amount: amount - fees,
+        currency,
+        operator: operatorUpper,
+        phone,
+        message: omnipayResponse.message || "Paiement initié. Le client doit valider sur son téléphone (USSD).",
+        created_at: transaction.createdAt,
       });
     } catch (error: any) {
       console.error("SR pay error:", error);
