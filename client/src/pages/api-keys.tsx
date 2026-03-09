@@ -19,6 +19,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Plus, Key, Copy, Trash2, Eye, EyeOff, Lock, Zap, BookOpen,
   ShieldAlert, Globe, Webhook, ChevronDown, ChevronUp, Check, AlertTriangle,
+  Code2, Bolt,
 } from "lucide-react";
 import { Link } from "wouter";
 import type { ApiKey } from "@shared/schema";
@@ -138,6 +139,269 @@ function KeyConfigSection({ apiKey }: { apiKey: ApiKey & { webhookSecret?: strin
   );
 }
 
+function SrSection({ allKeys }: { allKeys: ApiKey[] }) {
+  const { toast } = useToast();
+  const [createSrOpen, setCreateSrOpen] = useState(false);
+  const [srKeyName, setSrKeyName] = useState("");
+  const [visibleSrKey, setVisibleSrKey] = useState(false);
+  const [deleteSrId, setDeleteSrId] = useState<string | null>(null);
+
+  const srKey = allKeys.find((k) => (k as any).isSrKey);
+
+  const createSrMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const resp = await apiRequest("POST", "/api/api-keys", { name, appName: "API SR", isSrKey: true });
+      return resp.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      setCreateSrOpen(false);
+      setSrKeyName("");
+      toast({ title: "Clé SR créée", description: "Votre clé API SR est prête." });
+    },
+    onError: (e: any) => {
+      try {
+        const msg = JSON.parse(e.message?.replace(/^\d+:\s*/, "") || "{}");
+        toast({ title: "Erreur", description: msg.message || "Impossible de créer la clé SR.", variant: "destructive" });
+      } catch {
+        toast({ title: "Erreur", description: "Impossible de créer la clé SR.", variant: "destructive" });
+      }
+    },
+  });
+
+  const deleteSrMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/api-keys/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      setDeleteSrId(null);
+      toast({ title: "Clé SR supprimée" });
+    },
+  });
+
+  const toggleSrMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/api-keys/${id}`, { isActive }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] }),
+  });
+
+  return (
+    <>
+      <div
+        className="relative rounded-3xl overflow-hidden border border-green-500/30 shadow-lg shadow-green-500/5"
+        style={{ background: "linear-gradient(135deg, hsl(145 60% 10%) 0%, hsl(160 50% 8%) 100%)" }}
+        data-testid="section-api-sr"
+      >
+        <div className="absolute inset-0 opacity-20" style={{ background: "radial-gradient(ellipse at top right, hsl(145 70% 40%), transparent 60%)" }} />
+        <div className="relative p-6 space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-green-500/20 flex items-center justify-center flex-shrink-0 border border-green-500/30">
+              <Bolt className="h-6 w-6 text-green-400" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="font-black text-base text-green-300">API SR</h2>
+                <span className="px-2 py-0.5 rounded-full bg-green-500/20 border border-green-500/30 text-[10px] font-bold text-green-400 uppercase tracking-wider">Sans Redirection</span>
+              </div>
+              <p className="text-xs text-green-300/70 mt-0.5">Initiez des paiements directement depuis votre backend. Aucune page de redirection.</p>
+            </div>
+          </div>
+
+          {!srKey ? (
+            <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-green-200">Aucune clé SR créée</p>
+                <p className="text-xs text-green-300/60 mt-0.5">Une seule clé SR est autorisée par compte.</p>
+              </div>
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-500 text-white font-bold gap-2 flex-shrink-0"
+                onClick={() => setCreateSrOpen(true)}
+                data-testid="button-create-sr-key"
+              >
+                <Plus className="h-3.5 w-3.5" /> Créer ma clé SR
+              </Button>
+            </div>
+          ) : (
+            <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm text-green-200">{srKey.name}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${srKey.isActive ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"}`}>
+                    {srKey.isActive ? "Active" : "Inactive"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={srKey.isActive}
+                    onCheckedChange={(checked) => toggleSrMutation.mutate({ id: srKey.id, isActive: checked })}
+                    data-testid="switch-sr-key"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    onClick={() => setDeleteSrId(srKey.id)}
+                    data-testid="button-delete-sr-key"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 bg-black/30 rounded-xl px-4 py-2.5 border border-green-500/20">
+                  <code className="text-xs font-mono truncate block text-green-300" data-testid="text-sr-key-value">
+                    {visibleSrKey ? (srKey.fullKey || `${srKey.keyPrefix}...`) : `${srKey.keyPrefix}${"•".repeat(24)}`}
+                  </code>
+                </div>
+                <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0 border-green-500/30 text-green-400 hover:bg-green-500/10" onClick={() => setVisibleSrKey(v => !v)} data-testid="button-toggle-sr-key">
+                  {visibleSrKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0 border-green-500/30 text-green-400 hover:bg-green-500/10" onClick={() => { navigator.clipboard.writeText(srKey.fullKey || srKey.keyPrefix); toast({ title: "Clé SR copiée" }); }} data-testid="button-copy-sr-key">
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <p className="text-[10px] text-green-300/50">Dernière utilisation : {formatDate(srKey.lastUsedAt)}</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Code2 className="h-4 w-4 text-green-400" />
+              <p className="text-xs font-bold uppercase tracking-wider text-green-400">Documentation API SR</p>
+            </div>
+
+            <div className="bg-black/40 border border-green-500/15 rounded-2xl p-4 space-y-4 text-xs">
+              <div>
+                <p className="font-bold text-green-300 mb-1">Endpoint</p>
+                <code className="text-green-400/80 block">POST https://solvexpay.com/api/v1/sr/pay</code>
+              </div>
+
+              <div>
+                <p className="font-bold text-green-300 mb-1">Authentification</p>
+                <div className="bg-black/50 rounded-xl p-3 border border-green-500/10">
+                  <pre className="text-green-400/80 whitespace-pre-wrap text-[11px]">{`Authorization: Bearer <votre_clé_sr>`}</pre>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-bold text-green-300 mb-1">Corps de la requête (JSON)</p>
+                <div className="bg-black/50 rounded-xl p-3 border border-green-500/10">
+                  <pre className="text-green-400/80 whitespace-pre-wrap text-[11px]">{`{
+  "amount": 5000,          // Montant en XOF (min: 100)
+  "phone": "22901234567",  // Numéro de téléphone du client
+  "operator": "mtn",       // Opérateur : mtn, moov, orange, wave
+  "country": "BJ",         // Code pays : BJ, CI, SN, BF, ML, TG
+  "otp": "123456",         // OTP (optionnel selon l'opérateur)
+  "description": "...",    // Description (optionnel)
+  "customer_name": "...",  // Nom du client (optionnel)
+  "customer_email": "..."  // Email du client (optionnel)
+}`}</pre>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-bold text-green-300 mb-1">Réponse en succès</p>
+                <div className="bg-black/50 rounded-xl p-3 border border-green-500/10">
+                  <pre className="text-green-400/80 whitespace-pre-wrap text-[11px]">{`{
+  "success": true,
+  "id": "txn_...",         // ID de la transaction
+  "status": "pending",     // En attente de confirmation client
+  "reference": "REF...",
+  "amount": 5000,
+  "fees": 350,             // Frais déduits
+  "currency": "XOF",
+  "message": "Paiement initié. Le client doit valider sur son téléphone."
+}`}</pre>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-bold text-green-300 mb-1">Exemple cURL</p>
+                <div className="bg-black/50 rounded-xl p-3 border border-green-500/10">
+                  <pre className="text-green-400/80 whitespace-pre-wrap text-[11px]">{`curl -X POST https://solvexpay.com/api/v1/sr/pay \\
+  -H "Authorization: Bearer sk_live_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "amount": 5000,
+    "phone": "22901234567",
+    "operator": "mtn",
+    "country": "BJ"
+  }'`}</pre>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-amber-300/80 text-[11px] leading-relaxed">
+                  Le statut initial est toujours <strong className="text-amber-300">pending</strong>. Le paiement est confirmé ou rejeté via le webhook configuré ou en interrogeant <code className="bg-black/40 px-1 rounded">GET /api/v1/transactions/:id</code>.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={createSrOpen} onOpenChange={setCreateSrOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="h-14 w-14 rounded-2xl bg-green-500/15 flex items-center justify-center mx-auto mb-2">
+              <Bolt className="h-7 w-7 text-green-500" />
+            </div>
+            <DialogTitle className="text-center">Créer une clé API SR</DialogTitle>
+            <DialogDescription className="text-center">
+              Cette clé permettra des paiements directs sans redirection. Gardez-la secrète.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <Input
+              placeholder="Nom de la clé (ex: Clé SR principale)"
+              value={srKeyName}
+              onChange={(e) => setSrKeyName(e.target.value)}
+              data-testid="input-sr-key-name"
+            />
+            <Button
+              className="w-full font-bold bg-green-600 hover:bg-green-500 text-white gap-2"
+              disabled={!srKeyName.trim() || createSrMutation.isPending}
+              onClick={() => createSrMutation.mutate(srKeyName.trim())}
+              data-testid="button-confirm-create-sr-key"
+            >
+              <Bolt className="h-4 w-4" />
+              {createSrMutation.isPending ? "Création..." : "Créer la clé SR"}
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => setCreateSrOpen(false)}>Annuler</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteSrId} onOpenChange={(open) => !open && setDeleteSrId(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="h-14 w-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-2">
+              <AlertTriangle className="h-7 w-7 text-red-500" />
+            </div>
+            <DialogTitle className="text-center">Supprimer la clé SR ?</DialogTitle>
+            <DialogDescription className="text-center">
+              Cette clé sera supprimée définitivement. Vous pourrez en créer une nouvelle.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 mt-2">
+            <Button
+              variant="destructive"
+              className="w-full font-bold gap-2"
+              onClick={() => deleteSrId && deleteSrMutation.mutate(deleteSrId)}
+              disabled={deleteSrMutation.isPending}
+              data-testid="button-confirm-delete-sr-key"
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleteSrMutation.isPending ? "Suppression..." : "Supprimer"}
+            </Button>
+            <Button variant="ghost" onClick={() => setDeleteSrId(null)} className="w-full">Annuler</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function ApiKeysPage() {
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
@@ -150,6 +414,12 @@ export default function ApiKeysPage() {
   const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
     queryKey: ["/api/api-keys"],
   });
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ["/api/auth/user"],
+  });
+
+  const regularKeys = (apiKeys || []).filter((k) => !(k as any).isSrKey);
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; appName: string; websiteUrl?: string }) => {
@@ -298,7 +568,7 @@ export default function ApiKeysPage() {
           <div className="space-y-3">
             {[1, 2].map((i) => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)}
           </div>
-        ) : !apiKeys || apiKeys.length === 0 ? (
+        ) : !regularKeys || regularKeys.length === 0 ? (
           <Card className="border-border/60 border-dashed">
             <CardContent className="py-14 text-center">
               <div className="h-16 w-16 rounded-2xl bg-primary/5 flex items-center justify-center mx-auto mb-4">
@@ -314,7 +584,7 @@ export default function ApiKeysPage() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {apiKeys.map((key) => (
+            {regularKeys.map((key) => (
               <Card key={key.id} className="border-border/60 overflow-hidden" data-testid={`key-row-${key.id}`}>
                 <div className={`h-1 ${key.isActive ? "bg-gradient-to-r from-blue-500 to-violet-500" : "bg-muted"}`} />
                 <CardContent className="p-5">
@@ -418,6 +688,10 @@ export default function ApiKeysPage() {
             </div>
           </CardContent>
         </Card>
+
+        {currentUser?.apiSrEnabled && (
+          <SrSection allKeys={apiKeys || []} />
+        )}
       </div>
 
       <Dialog open={kycGateOpen} onOpenChange={setKycGateOpen}>

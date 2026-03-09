@@ -57,6 +57,7 @@ export const apiKeys = pgTable("api_keys", {
   webhookUrl: text("webhook_url"),
   isActive: boolean("is_active").notNull().default(true),
   adminLocked: boolean("admin_locked").notNull().default(false),
+  isSrKey: boolean("is_sr_key").notNull().default(false),
   lastUsedAt: timestamp("last_used_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [index("idx_api_keys_user").on(table.userId)]);

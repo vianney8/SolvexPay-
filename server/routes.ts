@@ -1270,9 +1270,25 @@ export async function registerRoutes(
   app.post("/api/api-keys", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      if (req.user.kycStatus !== "verified") {
-        return res.status(403).json({ message: "Vérification KYC requise pour créer une clé API", kycRequired: true });
+      const isSrKey = req.body.isSrKey === true;
+
+      if (isSrKey) {
+        if (!req.user.apiSrEnabled) {
+          return res.status(403).json({ message: "L'option API SR n'est pas activée sur votre compte." });
+        }
+        const { db } = await import("./db");
+        const { apiKeys: akTable } = await import("@shared/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const existingSrKeys = await db.select().from(akTable).where(and(eq(akTable.userId, userId), eq(akTable.isSrKey, true)));
+        if (existingSrKeys.length >= 1) {
+          return res.status(409).json({ message: "Vous avez déjà une clé API SR. Limite : 1 clé SR par compte." });
+        }
+      } else {
+        if (req.user.kycStatus !== "verified") {
+          return res.status(403).json({ message: "Vérification KYC requise pour créer une clé API", kycRequired: true });
+        }
       }
+
       const validation = createApiKeySchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ message: validation.error.errors[0].message });
@@ -1281,7 +1297,7 @@ export async function registerRoutes(
       const { name, appName, websiteUrl } = validation.data;
 
       const { key, prefix, hash } = generateApiKey();
-      const webhookSecret = `whs_live_${crypto.randomBytes(24).toString("hex")}`;
+      const webhookSecret = isSrKey ? undefined : `whs_live_${crypto.randomBytes(24).toString("hex")}`;
 
       const apiKey = await storage.createApiKey({
         userId,
@@ -1290,11 +1306,12 @@ export async function registerRoutes(
         keyPrefix: prefix,
         keyHash: hash,
         fullKey: key,
-        webhookSecret,
+        webhookSecret: webhookSecret || null,
         environment: "live",
         isActive: true,
+        isSrKey,
         websiteUrl: websiteUrl || null,
-      });
+      } as any);
 
       res.json(apiKey);
     } catch (error) {
@@ -1588,6 +1605,106 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("API v1 balance error:", error);
       res.status(500).json({ error: { code: "SERVER_ERROR", message: "Erreur interne.", status: 500 } });
+    }
+  });
+
+  // ─── SR API — PAIEMENT DIRECT SANS REDIRECTION ───────────────────────────────
+
+  app.post("/api/v1/sr/pay", async (req: any, res) => {
+    try {
+      const authHeader = req.headers.authorization as string | undefined;
+      if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API SR manquante. Utilisez: Authorization: Bearer sr_live_xxxx", status: 401 } });
+      }
+      const keyValue = authHeader.replace("Bearer ", "").trim();
+      const apiKey = await storage.findApiKeyByFullKey(keyValue);
+      if (!apiKey || !(apiKey as any).isSrKey) {
+        return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API SR introuvable ou invalide.", status: 401 } });
+      }
+      if (!apiKey.isActive || (apiKey as any).adminLocked) {
+        return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API SR désactivée ou verrouillée.", status: 401 } });
+      }
+
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq: eqFn } = await import("drizzle-orm");
+      const [user] = await db.select().from(usersTable).where(eqFn(usersTable.id, apiKey.userId));
+      if (!user || user.isBlocked || !user.apiSrEnabled) {
+        return res.status(403).json({ error: { code: "FORBIDDEN", message: "Compte suspendu ou API SR désactivée.", status: 403 } });
+      }
+
+      const srPaySchema = z.object({
+        amount: z.number().min(100, "Montant minimum 100"),
+        phone: z.string().min(8, "Numéro invalide"),
+        operator: z.string().min(1, "Opérateur requis"),
+        country: z.string().min(2, "Pays requis"),
+        otp: z.string().optional(),
+        description: z.string().optional(),
+        customer_name: z.string().optional(),
+        customer_email: z.string().optional(),
+      });
+
+      const validation = srPaySchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: validation.error.errors[0].message, status: 400 } });
+      }
+
+      const { amount, phone, operator, country, otp, description, customer_name, customer_email } = validation.data;
+      const reference = generateReference();
+      const omniOperator = getOmniPayOperatorCode(operator, country);
+
+      const nameParts = (customer_name || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Client").trim().split(" ");
+      const firstName = nameParts[0] || "Client";
+      const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
+
+      const omnipayResponse = await omniPayService.deposit({
+        msisdn: phone,
+        amount,
+        reference,
+        firstName,
+        lastName,
+        otp,
+        operator: omniOperator,
+        callbackUrl: `${process.env.APP_URL || "https://solvexpay.com"}/api/webhooks/omnipay`,
+      });
+
+      const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
+      const apiFeeRate = (await getOperatorFeeRate(operator, "feeApi", globalApiFee, country)) / 100;
+      const fees = Math.round(amount * apiFeeRate);
+
+      const transaction = await storage.createTransaction({
+        userId: user.id,
+        type: "deposit",
+        amount: amount.toString(),
+        currency: getCountryCurrency(country),
+        provider: operator,
+        phoneNumber: phone,
+        reference,
+        status: "pending",
+        description: description || "Paiement SR API",
+        fees: String(fees),
+        payerName: customer_name || null,
+        payerEmail: customer_email || null,
+        payerCountry: country,
+        payerOperator: operator,
+        apiKeyId: apiKey.id,
+      } as any);
+
+      await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
+
+      res.json({
+        success: true,
+        id: transaction.id,
+        status: "pending",
+        reference,
+        amount,
+        fees,
+        currency: getCountryCurrency(country),
+        message: omnipayResponse.message || "Paiement initié. Le client doit valider sur son téléphone.",
+      });
+    } catch (error: any) {
+      console.error("SR pay error:", error);
+      res.status(500).json({ error: { code: "SERVER_ERROR", message: error.message || "Erreur interne.", status: 500 } });
     }
   });
 
@@ -2094,6 +2211,25 @@ export async function registerRoutes(
       res.json(safeUser);
     } catch (error) {
       console.error("Admin fee update error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/enable-sr", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { apiSrEnabled } = req.body;
+      if (typeof apiSrEnabled !== "boolean") {
+        return res.status(400).json({ message: "apiSrEnabled doit être un booléen" });
+      }
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await db.update(usersTable).set({ apiSrEnabled, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
+      res.json({ success: true, apiSrEnabled: updated.apiSrEnabled });
+    } catch (error) {
+      console.error("Admin enable-sr error:", error);
       res.status(500).json({ message: "Erreur serveur" });
     }
   });

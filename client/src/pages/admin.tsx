@@ -381,6 +381,12 @@ export default function AdminPage() {
   });
 
   // Mutations
+  const enableSrM = useMutation({
+    mutationFn: (d: { userId: string; apiSrEnabled: boolean }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/enable-sr`, { apiSrEnabled: d.apiSrEnabled }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: "Option API SR mise à jour" }); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
   const blockM = useMutation({
     mutationFn: (d: { userId: string; isBlocked: boolean }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/block`, { isBlocked: d.isBlocked }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: "Statut mis à jour" }); },
@@ -1539,6 +1545,7 @@ export default function AdminPage() {
                               <KycChip status={u.kycStatus || "not_started"} />
                               {u.isAdmin && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-rose-500/15 text-rose-600 border-rose-500/30"><Shield className="h-3 w-3" />Admin</span>}
                               {u.isBlocked && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-red-500/15 text-red-600 border-red-500/30"><Lock className="h-3 w-3" />Bloqué</span>}
+                              {(u as any).apiSrEnabled && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400">API SR</span>}
                             </div>
                             <p className="text-xs text-muted-foreground">{u.email}</p>
                             <p className="text-xs text-muted-foreground">{u.phone || "—"}</p>
@@ -1577,6 +1584,13 @@ export default function AdminPage() {
                             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.kycStatus === "verified" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-violet-500/10 text-violet-700 dark:text-violet-400 hover:bg-violet-500/15"}`}
                             data-testid={`btn-kyc-${u.id}`}>
                             <BadgeCheck className="h-3.5 w-3.5" />Vérification KYC
+                          </button>
+                          <button
+                            onClick={() => enableSrM.mutate({ userId: u.id, apiSrEnabled: !(u as any).apiSrEnabled })}
+                            disabled={enableSrM.isPending}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${(u as any).apiSrEnabled ? "bg-green-500/15 text-green-700 dark:text-green-400 hover:bg-green-500/25 border border-green-500/30" : "bg-slate-500/10 text-muted-foreground hover:bg-slate-500/15"}`}
+                            data-testid={`btn-sr-${u.id}`}>
+                            <span className="font-bold">{(u as any).apiSrEnabled ? "✓ API SR" : "API SR"}</span>
                           </button>
                         </div>
 
