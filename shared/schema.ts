@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, boolean, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -85,6 +85,7 @@ export const paymentMethods = pgTable("payment_methods", {
   feeWithdrawal: decimal("fee_withdrawal", { precision: 5, scale: 2 }),
   feePLink: decimal("fee_plink", { precision: 5, scale: 2 }),
   feeApi: decimal("fee_api", { precision: 5, scale: 2 }),
+  countryFees: jsonb("country_fees").$type<Record<string, { feeDeposit?: string | null; feeWithdrawal?: string | null; feePLink?: string | null; feeApi?: string | null }>>().default({}),
   countries: text("countries").array().default([]),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

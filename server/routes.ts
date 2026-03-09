@@ -175,7 +175,8 @@ async function checkOperatorMaintenance(operator: string, country: string): Prom
 async function getOperatorFeeRate(
   operatorCode: string | null | undefined,
   feeColumn: "feeDeposit" | "feeWithdrawal" | "feePLink" | "feeApi",
-  globalFallback: number
+  globalFallback: number,
+  country?: string | null
 ): Promise<number> {
   if (!operatorCode) return globalFallback;
   try {
@@ -183,8 +184,18 @@ async function getOperatorFeeRate(
     const { paymentMethods: pmTable } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
     const [pm] = await db.select().from(pmTable).where(eq(pmTable.code, operatorCode));
-    if (pm && pm[feeColumn] !== null && pm[feeColumn] !== undefined) {
-      return parseFloat(String(pm[feeColumn]));
+    if (pm) {
+      // 1. Per-country fee (most specific)
+      if (country && pm.countryFees) {
+        const cf = (pm.countryFees as Record<string, any>)[country.toUpperCase()];
+        if (cf && cf[feeColumn] !== null && cf[feeColumn] !== undefined && cf[feeColumn] !== "") {
+          return parseFloat(String(cf[feeColumn]));
+        }
+      }
+      // 2. Per-operator fee
+      if (pm[feeColumn] !== null && pm[feeColumn] !== undefined) {
+        return parseFloat(String(pm[feeColumn]));
+      }
     }
   } catch {}
   return globalFallback;
@@ -365,7 +376,7 @@ export async function registerRoutes(
       });
 
       const globalDepositFee = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
-      const depositFeeRate = (await getOperatorFeeRate(operator, "feeDeposit", globalDepositFee)) / 100;
+      const depositFeeRate = (await getOperatorFeeRate(operator, "feeDeposit", globalDepositFee, country)) / 100;
       const depositFees = Math.round(amount * depositFeeRate);
 
       const transaction = await storage.createTransaction({
@@ -417,7 +428,7 @@ export async function registerRoutes(
       }
 
       const globalWithdrawalFee = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7");
-      const withdrawalFeeRate = (await getOperatorFeeRate(operator, "feeWithdrawal", globalWithdrawalFee)) / 100;
+      const withdrawalFeeRate = (await getOperatorFeeRate(operator, "feeWithdrawal", globalWithdrawalFee, country)) / 100;
       const withdrawalFees = Math.round(amountXOF * withdrawalFeeRate);
 
       // Fees in local currency for wallet deduction
@@ -1198,7 +1209,7 @@ export async function registerRoutes(
         linkAmount = fixedAmount;
       }
       const globalPLinkFee = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
-      const feeRate = (await getOperatorFeeRate(operator, "feePLink", globalPLinkFee)) / 100;
+      const feeRate = (await getOperatorFeeRate(operator, "feePLink", globalPLinkFee, country)) / 100;
       const feesAmount = Math.round(linkAmount * feeRate);
 
       console.log(`Initiating payment for link ${slug} with reference: ${reference}`);
@@ -1435,7 +1446,7 @@ export async function registerRoutes(
       const appName = (req.merchantApiKey as any).appName || `${merchantUser.firstName || ""} ${merchantUser.lastName || ""}`.trim() || "SolvexPay";
       const apiKeyId = req.merchantApiKey?.id;
       const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
-      const feeRate = (await getOperatorFeeRate(operator ? operator.toUpperCase() : null, "feeApi", globalApiFee)) / 100;
+      const feeRate = (await getOperatorFeeRate(operator ? operator.toUpperCase() : null, "feeApi", globalApiFee, country)) / 100;
       const feesAmount = Math.round(amount * feeRate);
       const reference = generateReference();
 
@@ -2532,7 +2543,7 @@ export async function registerRoutes(
   app.patch("/api/admin/payment-methods/:code", isAdmin, async (req, res) => {
     try {
       const { code } = req.params;
-      const { isActive, inMaintenance, maintenanceCountries, withdrawalMaintenance, withdrawalMaintenanceCountries, feeValue, feeType, feeDeposit, feeWithdrawal, feePLink, feeApi } = req.body;
+      const { isActive, inMaintenance, maintenanceCountries, withdrawalMaintenance, withdrawalMaintenanceCountries, feeValue, feeType, feeDeposit, feeWithdrawal, feePLink, feeApi, countryFees } = req.body;
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
@@ -2549,6 +2560,8 @@ export async function registerRoutes(
       if (feeWithdrawal !== undefined) updateData.feeWithdrawal = feeWithdrawal === null || feeWithdrawal === "" ? null : String(feeWithdrawal);
       if (feePLink !== undefined) updateData.feePLink = feePLink === null || feePLink === "" ? null : String(feePLink);
       if (feeApi !== undefined) updateData.feeApi = feeApi === null || feeApi === "" ? null : String(feeApi);
+      // Per-country fees (JSONB)
+      if (countryFees !== undefined) updateData.countryFees = countryFees || {};
       const [updated] = await db.update(pmTable).set(updateData).where(eq(pmTable.code, code)).returning();
       res.json(updated);
     } catch (error) {

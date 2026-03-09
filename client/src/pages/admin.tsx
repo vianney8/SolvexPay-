@@ -245,6 +245,8 @@ export default function AdminPage() {
   const [migrateData, setMigrateData] = useState({ fromUserId: "", toUserId: "", amount: "", motif: "" });
   const [serviceFeeEdit, setServiceFeeEdit] = useState<{ deposit: string; withdrawal: string; transfer: string; api: string } | null>(null);
   const [pmFeeEdit, setPmFeeEdit] = useState<Record<string, { deposit: string; withdrawal: string; plink: string; api: string }>>({});
+  const [pmCountryFeeEdit, setPmCountryFeeEdit] = useState<Record<string, { deposit: string; withdrawal: string; plink: string; api: string }>>({});
+  const [expandedCountryFees, setExpandedCountryFees] = useState<Set<string>>(new Set());
   const [omnipayRateEdit, setOmnipayRateEdit] = useState<{ deposit: string; withdrawal: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
@@ -461,7 +463,7 @@ export default function AdminPage() {
   });
 
   const pmM = useMutation({
-    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[]; withdrawalMaintenance?: boolean; withdrawalMaintenanceCountries?: string[]; feeDeposit?: string | null; feeWithdrawal?: string | null; feePLink?: string | null; feeApi?: string | null }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
+    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[]; withdrawalMaintenance?: boolean; withdrawalMaintenanceCountries?: string[]; feeDeposit?: string | null; feeWithdrawal?: string | null; feePLink?: string | null; feeApi?: string | null; countryFees?: Record<string, any> }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] }); toast({ title: "Mis à jour" }); },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
@@ -2407,6 +2409,137 @@ export default function AdminPage() {
                                       </div>
                                     )}
                                   </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Per-country fees */}
+                            {pm.countries && pm.countries.length > 0 && (() => {
+                              const isExpanded = expandedCountryFees.has(pm.code);
+                              const countryFeesMap: Record<string, any> = (pm.countryFees as Record<string, any>) || {};
+                              const hasCustomCountryFees = pm.countries.some((cc: string) => {
+                                const cf = countryFeesMap[cc] || {};
+                                return cf.feeDeposit != null || cf.feeWithdrawal != null || cf.feePLink != null || cf.feeApi != null;
+                              });
+                              return (
+                                <div className="border border-violet-500/30 rounded-xl overflow-hidden mt-2">
+                                  <button
+                                    className="w-full bg-violet-500/10 px-3 py-1.5 flex items-center justify-between"
+                                    onClick={() => setExpandedCountryFees(prev => {
+                                      const n = new Set(prev);
+                                      n.has(pm.code) ? n.delete(pm.code) : n.add(pm.code);
+                                      return n;
+                                    })}
+                                    data-testid={`btn-country-fees-toggle-${pm.code}`}
+                                  >
+                                    <p className="text-xs font-bold text-violet-700 dark:text-violet-400 flex items-center gap-1.5">
+                                      <Globe className="h-3 w-3" /> Frais par pays
+                                      {hasCustomCountryFees && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-600 text-[10px]">Personnalisés</span>}
+                                    </p>
+                                    {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-violet-500" /> : <ChevronDown className="h-3.5 w-3.5 text-violet-500" />}
+                                  </button>
+                                  {isExpanded && (
+                                    <div className="p-2 space-y-1.5">
+                                      {pm.countries.map((cc: string) => {
+                                        const editKey = `${pm.code}_${cc}`;
+                                        const editing = pmCountryFeeEdit[editKey];
+                                        const cInfo = COUNTRIES.find(c => c.code === cc);
+                                        const existingFee: Record<string, any> = countryFeesMap[cc] || {};
+                                        const hasCF = existingFee.feeDeposit != null || existingFee.feeWithdrawal != null || existingFee.feePLink != null || existingFee.feeApi != null;
+                                        return (
+                                          <div key={cc} className={`rounded-lg border p-2 ${hasCF ? "border-violet-500/40 bg-violet-500/5" : "border-border/40"}`}>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                              <span className="text-xs font-semibold flex items-center gap-1">
+                                                <span>{cInfo?.flag || "🌍"}</span>
+                                                <span>{cInfo?.name || cc}</span>
+                                              </span>
+                                              {!editing ? (
+                                                <button
+                                                  className="text-[10px] text-violet-600 hover:underline"
+                                                  onClick={() => setPmCountryFeeEdit(prev => ({
+                                                    ...prev,
+                                                    [editKey]: {
+                                                      deposit: existingFee.feeDeposit ?? "",
+                                                      withdrawal: existingFee.feeWithdrawal ?? "",
+                                                      plink: existingFee.feePLink ?? "",
+                                                      api: existingFee.feeApi ?? "",
+                                                    }
+                                                  }))}
+                                                  data-testid={`btn-country-fee-edit-${pm.code}-${cc}`}
+                                                >Modifier</button>
+                                              ) : (
+                                                <div className="flex gap-1.5">
+                                                  <button
+                                                    className="text-[10px] text-emerald-600 hover:underline font-semibold"
+                                                    disabled={pmM.isPending}
+                                                    onClick={() => {
+                                                      const f = pmCountryFeeEdit[editKey];
+                                                      const updatedCF = {
+                                                        ...countryFeesMap,
+                                                        [cc]: {
+                                                          feeDeposit: f.deposit === "" ? null : f.deposit,
+                                                          feeWithdrawal: f.withdrawal === "" ? null : f.withdrawal,
+                                                          feePLink: f.plink === "" ? null : f.plink,
+                                                          feeApi: f.api === "" ? null : f.api,
+                                                        }
+                                                      };
+                                                      pmM.mutate({ code: pm.code, countryFees: updatedCF });
+                                                      setPmCountryFeeEdit(prev => { const n = {...prev}; delete n[editKey]; return n; });
+                                                    }}
+                                                    data-testid={`btn-country-fee-save-${pm.code}-${cc}`}
+                                                  >Sauv.</button>
+                                                  <button
+                                                    className="text-[10px] text-muted-foreground hover:underline"
+                                                    onClick={() => setPmCountryFeeEdit(prev => { const n = {...prev}; delete n[editKey]; return n; })}
+                                                    data-testid={`btn-country-fee-cancel-${pm.code}-${cc}`}
+                                                  >Annuler</button>
+                                                </div>
+                                              )}
+                                            </div>
+                                            {editing ? (
+                                              <div className="grid grid-cols-2 gap-1.5">
+                                                {([
+                                                  { key: "deposit" as const, label: "Dépôt %" },
+                                                  { key: "withdrawal" as const, label: "Retrait %" },
+                                                  { key: "plink" as const, label: "Lien pmt %" },
+                                                  { key: "api" as const, label: "API %" },
+                                                ]).map(({ key, label }) => (
+                                                  <div key={key}>
+                                                    <p className="text-[9px] text-muted-foreground mb-0.5">{label} <span className="text-[8px]">(vide = opér.)</span></p>
+                                                    <input
+                                                      type="number"
+                                                      step="0.1"
+                                                      min="0"
+                                                      max="100"
+                                                      placeholder="Opér."
+                                                      value={pmCountryFeeEdit[editKey][key]}
+                                                      onChange={e => setPmCountryFeeEdit(prev => ({ ...prev, [editKey]: { ...prev[editKey], [key]: e.target.value } }))}
+                                                      className="w-full h-7 text-xs px-1.5 rounded border border-border bg-background"
+                                                      data-testid={`input-country-fee-${pm.code}-${cc}-${key}`}
+                                                    />
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                                                {[
+                                                  { label: "Dépôt", val: existingFee.feeDeposit },
+                                                  { label: "Retrait", val: existingFee.feeWithdrawal },
+                                                  { label: "Lien pmt", val: existingFee.feePLink },
+                                                  { label: "API", val: existingFee.feeApi },
+                                                ].map(({ label, val }) => (
+                                                  <div key={label} className="flex justify-between text-[10px]">
+                                                    <span className="text-muted-foreground">{label}</span>
+                                                    <span className={val != null && val !== "" ? "font-semibold text-violet-600" : "text-muted-foreground/40"}>{val != null && val !== "" ? `${val}%` : "Opér."}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })()}
