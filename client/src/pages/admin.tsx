@@ -2506,7 +2506,12 @@ export default function AdminPage() {
                             {tx.userDisplayName || "—"}
                           </span>
                           {tx.phoneNumber && <span className="text-xs text-muted-foreground">{tx.phoneNumber}</span>}
-                          {tx.provider && <span className="text-xs text-muted-foreground">{tx.provider}</span>}
+                          {(tx.payerOperator || tx.provider)
+                            ? <span className="text-xs font-semibold text-foreground/70 bg-muted/60 border border-border/40 rounded px-1 py-0.5">{tx.payerOperator || tx.provider}</span>
+                            : tx.type === "deposit" && tx.apiKeyId
+                              ? <span className="text-[10px] text-muted-foreground italic">opérateur non sélectionné</span>
+                              : null
+                          }
                           <span className="text-xs text-muted-foreground">{fmtDate(tx.createdAt)}</span>
                         </div>
                       </div>
