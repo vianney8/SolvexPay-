@@ -613,7 +613,10 @@ export default function AdminPage() {
     !linksSearch || [l.name, l.slug, l.user?.email, l.user?.firstName, l.user?.lastName].join(" ").toLowerCase().includes(linksSearch.toLowerCase())
   );
   const filteredApiKeys = (allApiKeys || []).filter(k =>
-    !apiKeysSearch || [k.name, k.keyPrefix, k.websiteUrl, k.user?.email, k.user?.firstName, k.user?.lastName].join(" ").toLowerCase().includes(apiKeysSearch.toLowerCase())
+    !k.isSrKey && (!apiKeysSearch || [k.name, k.keyPrefix, k.websiteUrl, k.user?.email, k.user?.firstName, k.user?.lastName].join(" ").toLowerCase().includes(apiKeysSearch.toLowerCase()))
+  );
+  const filteredSrKeys = (allApiKeys || []).filter(k =>
+    k.isSrKey && (!apiKeysSearch || [k.name, k.keyPrefix, k.webhookUrl, k.user?.email, k.user?.firstName, k.user?.lastName].join(" ").toLowerCase().includes(apiKeysSearch.toLowerCase()))
   );
   const totalUsersCount = (users || []).length;
 
@@ -660,7 +663,8 @@ export default function AdminPage() {
                   { label: "KYC en attente", value: pendingKyc.length, color: "text-amber-300" },
                   { label: "Retraits pendants", value: isAutoWithdrawal ? 0 : pendingWithdrawals.length, color: "text-rose-300" },
                   { label: "Liens de paiement", value: (allPaymentLinks || []).length, color: "text-violet-300" },
-                  { label: "Clés API", value: (allApiKeys || []).length, color: "text-emerald-300" },
+                  { label: "Clés API", value: (allApiKeys || []).filter((k: any) => !k.isSrKey).length, color: "text-emerald-300" },
+                  { label: "Clés SR", value: (allApiKeys || []).filter((k: any) => k.isSrKey).length, color: "text-green-300" },
                 ].map((s, i) => (
                   <div key={i} className="text-center bg-white/8 backdrop-blur-sm rounded-2xl px-4 py-2.5 border border-white/10">
                     <p className={`font-black text-2xl ${s.color}`} data-testid={`header-stat-${i}`}>{s.value ?? "—"}</p>
@@ -1612,7 +1616,12 @@ export default function AdminPage() {
                                     <div key={tx.id} className="flex items-center gap-2 px-3 py-2">
                                       <TypeChip type={tx.type} tx={tx} />
                                       <TxChip status={tx.status} />
-                                      <span className="text-xs font-bold flex-1">{fmt(parseFloat(tx.amount))}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <span className="text-xs font-bold">{fmt(parseFloat(tx.amount))} {tx.currency || "XOF"}</span>
+                                        {tx.fees && parseFloat(tx.fees) > 0 && (
+                                          <span className="text-[10px] text-orange-500 ml-1">(-{fmt(parseFloat(tx.fees))})</span>
+                                        )}
+                                      </div>
                                       <span className="text-xs text-muted-foreground">{fmtDate(tx.createdAt)}</span>
                                     </div>
                                   ))}
@@ -1910,7 +1919,7 @@ export default function AdminPage() {
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
                     <Key className="h-4 w-4 text-amber-500" />
                     Clés API
-                    <Badge variant="secondary" className="text-xs">{(allApiKeys || []).length}</Badge>
+                    <Badge variant="secondary" className="text-xs">{filteredApiKeys.length}</Badge>
                   </CardTitle>
                   <div className="relative w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -1946,6 +1955,18 @@ export default function AdminPage() {
                                 <a href={key.websiteUrl} target="_blank" rel="noreferrer" className="hover:underline truncate max-w-xs" data-testid={`key-website-${key.id}`}>{key.websiteUrl}</a>
                               </p>
                             )}
+                            {key.redirectUrl && (
+                              <p className="text-xs text-blue-500 flex items-center gap-1">
+                                <Globe className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate max-w-xs">Redirect: {key.redirectUrl}</span>
+                              </p>
+                            )}
+                            {key.webhookUrl && (
+                              <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                <Globe className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate max-w-xs">Webhook: {key.webhookUrl}</span>
+                              </p>
+                            )}
                             <p className="text-xs text-muted-foreground">🌍 Env: <span className="font-semibold">{key.environment || "live"}</span></p>
                             <p className="text-xs text-muted-foreground">📅 {key.createdAt ? new Date(key.createdAt).toLocaleDateString("fr-FR") : "—"}</p>
                             {key.lastUsedAt && <p className="text-xs text-muted-foreground">🕐 Dernier usage: {new Date(key.lastUsedAt).toLocaleDateString("fr-FR")}</p>}
@@ -1955,6 +1976,69 @@ export default function AdminPage() {
                           checked={!!key.isActive}
                           onCheckedChange={v => toggleApiKeyM.mutate({ id: key.id, isActive: v })}
                           data-testid={`toggle-apikey-${key.id}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ── Clés API SR ── */}
+            <Card className="border-green-500/30 bg-card">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <Key className="h-4 w-4 text-green-600" />
+                    <span className="text-green-700 dark:text-green-400">Clés API SR</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400">Sans Redirection</span>
+                    <Badge variant="secondary" className="text-xs">{filteredSrKeys.length}</Badge>
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {akLoading ? (
+                  <div className="p-4 space-y-3">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
+                ) : filteredSrKeys.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground text-sm">Aucune clé SR créée</div>
+                ) : (
+                  <div className="divide-y divide-border/40">
+                    {filteredSrKeys.map((key: any) => (
+                      <div key={key.id} className="px-4 py-3 flex items-start gap-3 hover:bg-green-500/5 transition-colors" data-testid={`sr-key-${key.id}`}>
+                        <div className={`mt-0.5 h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${key.isActive ? "bg-green-100 dark:bg-green-900/30" : "bg-rose-100 dark:bg-rose-900/30"}`}>
+                          <Key className={`h-4 w-4 ${key.isActive ? "text-green-600" : "text-rose-500"}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-sm truncate">{key.name || "Clé SR sans nom"}</p>
+                            <Badge variant={key.isActive ? "default" : "destructive"} className="text-xs flex-shrink-0">
+                              {key.isActive ? "Active" : "Bloquée"}
+                            </Badge>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/15 text-green-700 dark:text-green-400">SR</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono mt-0.5">{key.keyPrefix}••••••••</p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                            {key.user && <p className="text-xs text-muted-foreground">👤 {key.user.firstName} {key.user.lastName} — {key.user.email}</p>}
+                            {key.webhookUrl && (
+                              <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                <Globe className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate max-w-xs">Webhook: {key.webhookUrl}</span>
+                              </p>
+                            )}
+                            {key.redirectUrl && (
+                              <p className="text-xs text-blue-500 flex items-center gap-1">
+                                <Globe className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate max-w-xs">Redirect Wave: {key.redirectUrl}</span>
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">📅 {key.createdAt ? new Date(key.createdAt).toLocaleDateString("fr-FR") : "—"}</p>
+                            {key.lastUsedAt && <p className="text-xs text-muted-foreground">🕐 Dernier usage: {new Date(key.lastUsedAt).toLocaleDateString("fr-FR")}</p>}
+                          </div>
+                        </div>
+                        <Switch
+                          checked={!!key.isActive}
+                          onCheckedChange={v => toggleApiKeyM.mutate({ id: key.id, isActive: v })}
+                          data-testid={`toggle-sr-key-${key.id}`}
                         />
                       </div>
                     ))}
@@ -2582,8 +2666,22 @@ export default function AdminPage() {
                     {pendingWithdrawals.map((tx: any) => (
                       <div key={tx.id} className="flex items-center gap-3 px-4 py-3" data-testid={`row-pending-withdrawal-${tx.id}`}>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold">{fmt(parseFloat(tx.amount))}</p>
-                          <p className="text-xs text-muted-foreground">{tx.phoneNumber} · {tx.provider || "—"} · {fmtDate(tx.createdAt)}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-bold">{fmt(parseFloat(tx.amount))} {tx.currency || "XOF"}</p>
+                            {tx.fees && parseFloat(tx.fees) > 0 && (() => {
+                              const fees = parseFloat(tx.fees);
+                              const amount = parseFloat(tx.amount);
+                              const net = amount - fees;
+                              const pct = amount > 0 ? ((fees / amount) * 100).toFixed(1) : "0";
+                              return (
+                                <>
+                                  <span className="text-xs text-orange-500">Frais: {fmt(fees)} ({pct}%)</span>
+                                  <span className="text-xs text-emerald-600 font-bold">→ Net: {fmt(net)}</span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{tx.userDisplayName || "—"} · {tx.phoneNumber} · {tx.provider || "—"} · {fmtDate(tx.createdAt)}</p>
                         </div>
                         <div className="flex gap-1.5">
                           <button onClick={() => txStatusM.mutate({ txId: tx.id, status: "completed" })} disabled={txStatusM.isPending}
@@ -2663,8 +2761,19 @@ export default function AdminPage() {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <div className="text-right">
-                          <p className="text-sm font-black">{fmt(parseFloat(tx.amount))}</p>
-                          {tx.fees && parseFloat(tx.fees) > 0 && <p className="text-xs text-muted-foreground">Frais: {fmt(parseFloat(tx.fees))}</p>}
+                          <p className="text-sm font-black">{fmt(parseFloat(tx.amount))} {tx.currency || "XOF"}</p>
+                          {tx.fees && parseFloat(tx.fees) > 0 && (() => {
+                            const fees = parseFloat(tx.fees);
+                            const amount = parseFloat(tx.amount);
+                            const pct = amount > 0 ? ((fees / amount) * 100).toFixed(1) : "0";
+                            const net = amount - fees;
+                            return (
+                              <div className="space-y-0.5">
+                                <p className="text-xs text-orange-500 dark:text-orange-400">Frais: {fmt(fees)} ({pct}%)</p>
+                                <p className="text-xs text-emerald-600 dark:text-emerald-400">Net: {fmt(net)}</p>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>

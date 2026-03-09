@@ -145,7 +145,14 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
               <>
                 <div className="flex items-center justify-between py-2 border-b border-border/40">
                   <span className="text-muted-foreground">Frais</span>
-                  <span className="font-semibold text-orange-600">{formatCurrency((tx as any).fees, tx.currency)} {tx.currency}</span>
+                  <span className="font-semibold text-orange-600">
+                    {formatCurrency((tx as any).fees, tx.currency)} {tx.currency}
+                    {parseFloat(tx.amount) > 0 && (
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        ({((parseFloat((tx as any).fees) / parseFloat(tx.amount)) * 100).toFixed(1)}%)
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-border/40">
                   <span className="text-muted-foreground">Montant net</span>
