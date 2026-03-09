@@ -24,7 +24,6 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash"),
   profileImageUrl: varchar("profile_image_url"),
   isAdmin: boolean("is_admin").notNull().default(false),
-  isPartner: boolean("is_partner").notNull().default(false),
   kycStatus: varchar("kyc_status").default("not_started"),
   kycRejectionReason: varchar("kyc_rejection_reason"),
   kycFirstName: varchar("kyc_first_name"),

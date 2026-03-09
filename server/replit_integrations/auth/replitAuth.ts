@@ -393,26 +393,6 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   next();
 };
 
-export const isPartner: RequestHandler = async (req, res, next) => {
-  const userId = (req.session as any)?.userId;
-
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const user = await authStorage.getUser(userId);
-  if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!user.isPartner && !user.isAdmin) {
-    return res.status(403).json({ message: "Acces refuse - Partenaire requis" });
-  }
-
-  (req as any).user = user;
-  next();
-};
-
 export const isAdmin: RequestHandler = async (req, res, next) => {
   const userId = (req.session as any)?.userId;
 
