@@ -280,7 +280,7 @@ export default function AdminPage() {
   const { data: allTx, isLoading: txLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/transactions", debouncedTxSearch],
     queryFn: async () => {
-      const params = new URLSearchParams({ limit: "500" });
+      const params = new URLSearchParams({ limit: "700" });
       if (debouncedTxSearch) params.set("search", debouncedTxSearch);
       const res = await fetch(`/api/admin/transactions?${params}`);
       if (!res.ok) throw new Error("Erreur serveur");

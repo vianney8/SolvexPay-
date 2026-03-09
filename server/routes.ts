@@ -1828,7 +1828,7 @@ export async function registerRoutes(
       const { transactions: txTable } = await import("@shared/schema");
       const { users: usersTable } = await import("@shared/models/auth");
       const { or, ilike, sql: sqlExpr } = await import("drizzle-orm");
-      const limit = parseInt(req.query.limit as string) || 500;
+      const limit = parseInt(req.query.limit as string) || 700;
       const search = (req.query.search as string || "").trim();
       let query = db
         .select({
