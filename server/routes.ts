@@ -1058,6 +1058,39 @@ export async function registerRoutes(
     }
   });
 
+  // ── Pays suspendus (public) ──────────────────────────────────────────────
+  app.get("/api/public/suspended-countries", async (req, res) => {
+    try {
+      const raw = await storage.getSystemSetting("suspended_countries");
+      const codes: string[] = raw ? JSON.parse(raw) : [];
+      res.json({ codes });
+    } catch {
+      res.json({ codes: [] });
+    }
+  });
+
+  app.get("/api/admin/suspended-countries", isAdmin, async (req, res) => {
+    try {
+      const raw = await storage.getSystemSetting("suspended_countries");
+      const codes: string[] = raw ? JSON.parse(raw) : [];
+      res.json({ codes });
+    } catch {
+      res.json({ codes: [] });
+    }
+  });
+
+  app.post("/api/admin/suspended-countries", isAdmin, async (req, res) => {
+    try {
+      const { codes } = req.body;
+      if (!Array.isArray(codes)) return res.status(400).json({ message: "codes doit être un tableau" });
+      await storage.setSystemSetting("suspended_countries", JSON.stringify(codes));
+      res.json({ codes });
+    } catch (error) {
+      console.error("Suspended countries update error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   app.get("/api/payment-methods/public", async (req, res) => {
     try {
       const { db } = await import("./db");
@@ -1794,24 +1827,46 @@ export async function registerRoutes(
       const { desc, eq: eqOp } = await import("drizzle-orm");
       const { transactions: txTable } = await import("@shared/schema");
       const { users: usersTable } = await import("@shared/models/auth");
-      const limit = parseInt(req.query.limit as string) || 100;
-      const rows = await db
+      const { or, ilike, sql: sqlExpr } = await import("drizzle-orm");
+      const limit = parseInt(req.query.limit as string) || 500;
+      const search = (req.query.search as string || "").trim();
+      let query = db
         .select({
           tx: txTable,
           userFirstName: usersTable.firstName,
           userLastName: usersTable.lastName,
           userEmail: usersTable.email,
+          userPhone: usersTable.phone,
         })
         .from(txTable)
         .leftJoin(usersTable, eqOp(txTable.userId, usersTable.id))
         .orderBy(desc(txTable.createdAt))
-        .limit(limit);
+        .$dynamic();
+      if (search) {
+        const like = `%${search}%`;
+        query = query.where(
+          or(
+            ilike(txTable.reference, like),
+            ilike(txTable.phoneNumber, like),
+            ilike(txTable.description, like),
+            ilike(txTable.payerName, like),
+            ilike(txTable.provider, like),
+            ilike(txTable.apiKeyId, like),
+            ilike(usersTable.firstName, like),
+            ilike(usersTable.lastName, like),
+            ilike(usersTable.email, like),
+            sqlExpr`(${usersTable.firstName} || ' ' || ${usersTable.lastName}) ilike ${like}`,
+          ) as any
+        );
+      }
+      const rows = await query.limit(limit);
       const allTx = rows.map(r => ({
         ...r.tx,
         userDisplayName: r.userFirstName && r.userLastName
           ? `${r.userFirstName} ${r.userLastName}`
           : r.userFirstName || r.userLastName || r.userEmail || "—",
         userEmail: r.userEmail,
+        userPhone: (r as any).userPhone,
       }));
       res.json(allTx);
     } catch (error) {

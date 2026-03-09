@@ -71,10 +71,24 @@ export default function WithdrawPage() {
   const [withdrawRef, setWithdrawRef] = useState("");
   const [kycGateOpen, setKycGateOpen] = useState(false);
 
-  const selectedCountry = COUNTRIES.find(c => c.code === country) || COUNTRIES[0];
+  const { data: suspendedData } = useQuery<{ codes: string[] }>({
+    queryKey: ["/api/public/suspended-countries"],
+    queryFn: async () => { const r = await fetch("/api/public/suspended-countries"); return r.json(); },
+    staleTime: 60_000,
+  });
+  const suspendedCodes = suspendedData?.codes || [];
+  const availableCountries = COUNTRIES.filter(c => !suspendedCodes.includes(c.code));
+
+  const selectedCountry = COUNTRIES.find(c => c.code === country) || availableCountries[0] || COUNTRIES[0];
   const currency = selectedCountry.currency;
 
   useEffect(() => { setOperator(""); }, [country]);
+  useEffect(() => {
+    if (suspendedCodes.length > 0 && suspendedCodes.includes(country)) {
+      const first = availableCountries[0];
+      if (first) setCountry(first.code);
+    }
+  }, [suspendedCodes.join(",")]); // eslint-disable-line
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: allTransactions } = useQuery<any[]>({ queryKey: ["/api/transactions"] });
@@ -241,7 +255,7 @@ export default function WithdrawPage() {
                   </button>
                   {showCountryPicker && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-                      {COUNTRIES.map((c) => (
+                      {availableCountries.map((c) => (
                         <button
                           key={c.code}
                           type="button"

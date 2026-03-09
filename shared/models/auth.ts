@@ -57,7 +57,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export const registerSchema = z.object({
   fullName: z.string().min(2, "Le nom complet doit contenir au moins 2 caractères"),
   email: z.string().email("Adresse email invalide"),
-  phone: z.string().min(8, "Numéro de téléphone invalide"),
+  phone: z.string().min(8, "Numéro de téléphone invalide (8 chiffres minimum)").optional().or(z.literal("")),
   password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
 });
 

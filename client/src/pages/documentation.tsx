@@ -100,6 +100,16 @@ function ParamRow({ name, type, required, desc }: { name: string; type: string; 
 
 function DocContent({ activeSection, setActiveSection }: { activeSection: string; setActiveSection: (s: string) => void }) {
   const { data: contactLinks } = useQuery<Record<string, string>>({ queryKey: ["/api/support-links"] });
+  const { data: suspendedData } = useQuery<{ codes: string[] }>({
+    queryKey: ["/api/public/suspended-countries"],
+    queryFn: async () => { const r = await fetch("/api/public/suspended-countries"); return r.json(); },
+    staleTime: 60_000,
+  });
+  const suspendedCodes = suspendedData?.codes || [];
+  const filteredOperators = OPERATORS.map(op => ({
+    ...op,
+    countries: op.countries.split(", ").filter(cc => !suspendedCodes.includes(cc)).join(", "),
+  })).filter(op => op.countries.length > 0);
   const supportEmail = contactLinks?.support_link_email?.replace("mailto:", "") || "support@solvexpay.com";
   const supportWhatsApp = contactLinks?.support_link_whatsapp_direct || "https://wa.me/22891840498";
   const supportEmailHref = contactLinks?.support_link_email || "mailto:support@solvexpay.com";
@@ -369,7 +379,7 @@ app.get('/payer', (req, res) => {
                 <CardContent className="p-4">
                   <p className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">Pays supportés</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                    {OPERATORS.map((op) => (
+                    {filteredOperators.map((op) => (
                       <div key={op.code} className="flex items-center gap-1.5 text-xs">
                         <code className="font-mono font-bold text-blue-600 w-16 flex-shrink-0">{op.code}</code>
                         <span className="text-muted-foreground">{op.countries}</span>

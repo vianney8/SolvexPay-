@@ -56,12 +56,26 @@ export default function DepositPage() {
   const [verifyCount, setVerifyCount] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
-  const selectedCountry = COUNTRIES.find(c => c.code === country)!;
+  const { data: suspendedData } = useQuery<{ codes: string[] }>({
+    queryKey: ["/api/public/suspended-countries"],
+    queryFn: async () => { const r = await fetch("/api/public/suspended-countries"); return r.json(); },
+    staleTime: 60_000,
+  });
+  const suspendedCodes = suspendedData?.codes || [];
+  const availableCountries = COUNTRIES.filter(c => !suspendedCodes.includes(c.code));
+
+  const selectedCountry = COUNTRIES.find(c => c.code === country) || availableCountries[0] || COUNTRIES[0];
   const currency = selectedCountry.currency;
   const parsedAmount = parseFloat(amount) || 0;
 
   useEffect(() => { setOperator(""); setOtp(""); setStep(1); }, [country]);
   useEffect(() => { setOtp(""); setStep(1); }, [operator]);
+  useEffect(() => {
+    if (suspendedCodes.length > 0 && suspendedCodes.includes(country)) {
+      const first = availableCountries[0];
+      if (first) setCountry(first.code);
+    }
+  }, [suspendedCodes.join(",")]); // eslint-disable-line
 
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
@@ -520,7 +534,7 @@ export default function DepositPage() {
                     </button>
                     {showCountryPicker && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-                        {COUNTRIES.map((c) => (
+                        {availableCountries.map((c) => (
                           <button
                             key={c.code}
                             type="button"

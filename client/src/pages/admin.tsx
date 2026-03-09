@@ -225,6 +225,7 @@ export default function AdminPage() {
   const [userSort, setUserSort] = useState<"default" | "balance_desc" | "balance_asc">("default");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [txSearch, setTxSearch] = useState("");
+  const [debouncedTxSearch, setDebouncedTxSearch] = useState("");
   const [txStatus, setTxStatus] = useState("all");
   const [txType, setTxType] = useState("all");
   const [statsPeriod, setStatsPeriod] = useState("month");
@@ -271,10 +272,22 @@ export default function AdminPage() {
     queryKey: ["/api/admin/kyc"],
     staleTime: 120000,
   });
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTxSearch(txSearch), 400);
+    return () => clearTimeout(t);
+  }, [txSearch]);
+
   const { data: allTx, isLoading: txLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/transactions"],
+    queryKey: ["/api/admin/transactions", debouncedTxSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: "500" });
+      if (debouncedTxSearch) params.set("search", debouncedTxSearch);
+      const res = await fetch(`/api/admin/transactions?${params}`);
+      if (!res.ok) throw new Error("Erreur serveur");
+      return res.json();
+    },
     enabled: activeTab === "transactions",
-    staleTime: 60000,
+    staleTime: 30000,
   });
   const { data: wallets, isLoading: walletsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/wallets"],
@@ -348,6 +361,22 @@ export default function AdminPage() {
     queryKey: ["/api/admin/stats/countries"],
     enabled: activeTab === "overview",
     staleTime: 120000,
+  });
+
+  const { data: suspendedCountriesData, isLoading: suspLoading } = useQuery<{ codes: string[] }>({
+    queryKey: ["/api/admin/suspended-countries"],
+    enabled: activeTab === "payments",
+    staleTime: 60000,
+  });
+  const suspendedCountryCodes = suspendedCountriesData?.codes || [];
+  const suspendCountryM = useMutation({
+    mutationFn: (codes: string[]) => apiRequest("POST", "/api/admin/suspended-countries", { codes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/suspended-countries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/suspended-countries"] });
+      toast({ title: "Pays suspendus mis à jour" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
   // Mutations
@@ -2133,6 +2162,44 @@ export default function AdminPage() {
                 <Zap className="h-4 w-4" />
                 Tout remettre en service
               </button>
+            </div>
+
+            {/* ── Pays suspendus ── */}
+            <div className="border border-red-500/30 rounded-2xl overflow-hidden">
+              <div className="bg-red-500/10 px-4 py-2.5 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+                    <Globe className="h-4 w-4" /> Pays suspendus
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Un pays suspendu n'apparaît plus dans dépôts, retraits, liens de paiement ni API (mais reste dans l'inscription).</p>
+                </div>
+                {suspendedCountryCodes.length > 0 && (
+                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-red-500/15 text-red-600 border border-red-500/30">{suspendedCountryCodes.length} suspendu(s)</span>
+                )}
+              </div>
+              <div className="p-3 grid grid-cols-3 gap-2">
+                {COUNTRIES.map((c) => {
+                  const isSuspended = suspendedCountryCodes.includes(c.code);
+                  return (
+                    <button
+                      key={c.code}
+                      onClick={() => {
+                        const updated = isSuspended
+                          ? suspendedCountryCodes.filter(code => code !== c.code)
+                          : [...suspendedCountryCodes, c.code];
+                        suspendCountryM.mutate(updated);
+                      }}
+                      disabled={suspendCountryM.isPending || suspLoading}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${isSuspended ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400" : "border-border/40 bg-muted/20 text-muted-foreground hover:bg-muted/40"}`}
+                      data-testid={`btn-suspend-country-${c.code}`}
+                    >
+                      <span className="text-base">{c.flag}</span>
+                      <span className="flex-1 text-left">{c.name}</span>
+                      {isSuspended && <XCircle className="h-3 w-3 ml-auto text-red-500 flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {pmLoading ? (

@@ -93,6 +93,14 @@ export default function PayApiPage() {
   useEffect(() => { setOperator(""); setOtp(""); setStep(1); }, [country]);
   useEffect(() => { setOtp(""); setStep(1); }, [operator]);
 
+  const { data: suspendedData } = useQuery<{ codes: string[] }>({
+    queryKey: ["/api/public/suspended-countries"],
+    queryFn: async () => { const r = await fetch("/api/public/suspended-countries"); return r.json(); },
+    staleTime: 60_000,
+  });
+  const suspendedCodes = suspendedData?.codes || [];
+  const availableCountries = COUNTRIES.filter(c => !suspendedCodes.includes(c.code));
+
   const { data: paymentInfo, isLoading, error } = useQuery<any>({
     queryKey: ["/api/payment-api/public", id],
     queryFn: async () => {
@@ -617,7 +625,7 @@ export default function PayApiPage() {
                 </button>
                 {showCountryPicker && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                    {COUNTRIES.map((c) => (
+                    {availableCountries.map((c) => (
                       <button
                         key={c.code}
                         type="button"

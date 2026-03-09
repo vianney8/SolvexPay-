@@ -469,11 +469,7 @@ export function RegisterPage() {
       toast({ title: "Erreur", description: "Le nom complet doit contenir au moins 2 caractères", variant: "destructive" });
       return;
     }
-    if (!formData.phone.trim()) {
-      toast({ title: "Erreur", description: "Le numéro de téléphone est obligatoire", variant: "destructive" });
-      return;
-    }
-    if (formData.phone.replace(/\s/g, "").length < 8) {
+    if (formData.phone.trim() && formData.phone.replace(/\s/g, "").length < 8) {
       toast({ title: "Erreur", description: "Numéro de téléphone invalide (8 chiffres minimum)", variant: "destructive" });
       return;
     }
@@ -489,7 +485,7 @@ export function RegisterPage() {
       const data = await register.mutateAsync({
         fullName: formData.fullName,
         email: formData.email,
-        phone: `${countryCode}${formData.phone}`,
+        phone: formData.phone.trim() ? `${countryCode}${formData.phone.trim()}` : "",
         password: formData.password,
       });
       if (data?.requiresVerification) {
@@ -588,7 +584,7 @@ export function RegisterPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de Téléphone</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de Téléphone <span className="normal-case font-normal text-muted-foreground/70">(optionnel)</span></label>
               <div className="flex gap-2">
                 <div className="relative">
                   <button
@@ -630,7 +626,6 @@ export function RegisterPage() {
                   placeholder="97 00 00 00"
                   value={formData.phone}
                   onChange={(e) => { const val = e.target.value.replace(/[^0-9\s]/g, ""); setFormData({ ...formData, phone: val }); }}
-                  required
                   className="flex-1 h-12 border-border/70 bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all rounded-xl"
                   data-testid="input-phone"
                 />
