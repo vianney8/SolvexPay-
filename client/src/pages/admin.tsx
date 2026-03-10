@@ -1602,9 +1602,10 @@ export default function AdminPage() {
                           <button
                             onClick={() => enableSrM.mutate({ userId: u.id, apiSrEnabled: !(u as any).apiSrEnabled })}
                             disabled={enableSrM.isPending}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${(u as any).apiSrEnabled ? "bg-green-500/15 text-green-700 dark:text-green-400 hover:bg-green-500/25 border border-green-500/30" : "bg-slate-500/10 text-muted-foreground hover:bg-slate-500/15"}`}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors border ${(u as any).apiSrEnabled ? "bg-green-500/15 text-green-700 dark:text-green-400 hover:bg-green-500/25 border-green-500/30" : "bg-orange-500/10 text-orange-700 dark:text-orange-400 hover:bg-orange-500/20 border-orange-500/30"}`}
                             data-testid={`btn-sr-${u.id}`}>
-                            <span className="font-bold">{(u as any).apiSrEnabled ? "✓ API SR" : "API SR"}</span>
+                            <Zap className="h-3.5 w-3.5" />
+                            {(u as any).apiSrEnabled ? "✓ API SR" : "Activer SR"}
                           </button>
                         </div>
 
