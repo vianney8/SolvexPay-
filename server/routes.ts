@@ -1751,30 +1751,9 @@ export async function registerRoutes(
       const firstName = nameParts[0] || "Client";
       const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
 
-      // ── Wave : même flux que le dépôt dashboard ──
       const isWave = operatorUpper === "WAVE";
-      const srRedirectUrl = (apiKey as any).redirectUrl as string | null | undefined;
-      // On utilise exactement le même returnUrl que pour les dépôts directs :
-      // Wave redirige vers /api/payment/callback qui gère le statut de façon identique.
-      // Si le marchand a configuré une redirectUrl, on la transmet en paramètre optionnel.
-      const returnUrl = isWave
-        ? `https://solvexpay.com/api/payment/callback?reference=${reference}${srRedirectUrl ? `&merchant_redirect=${encodeURIComponent(srRedirectUrl)}` : ""}`
-        : undefined;
 
-      // ── Appel OmniPay ──
-      const omnipayResponse = await omniPayService.deposit({
-        msisdn: phone,
-        amount,
-        reference,
-        firstName,
-        lastName,
-        otp,
-        operator: omniOperator,
-        returnUrl,
-        callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
-      });
-
-      // ── Création de la transaction ──
+      // ── Création de la transaction EN PREMIER (nécessaire pour Wave returnUrl) ──
       const transaction = await storage.createTransaction({
         userId: user.id,
         type: "deposit",
@@ -1792,6 +1771,33 @@ export async function registerRoutes(
         payerOperator: operatorUpper,
         apiKeyId: apiKey.id,
       } as any);
+
+      // ── Wave : même flux que le lien de paiement (page publique avec polling) ──
+      // La page /pay-api/:id est publique — le client n'a pas besoin d'un compte SolvexPay.
+      // L'éventuelle redirectUrl du marchand est récupérée via /api/payment-api/public/:id
+      // et la page gère la redirection automatiquement après confirmation.
+      const returnUrl = isWave
+        ? `https://solvexpay.com/pay-api/${transaction.id}?status=callback&reference=${reference}`
+        : undefined;
+
+      // ── Appel OmniPay ──
+      let omnipayResponse: any;
+      try {
+        omnipayResponse = await omniPayService.deposit({
+          msisdn: phone,
+          amount,
+          reference,
+          firstName,
+          lastName,
+          otp,
+          operator: omniOperator,
+          returnUrl,
+          callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
+        });
+      } catch (omniErr: any) {
+        await storage.updateTransactionStatus(transaction.id, "failed");
+        throw omniErr;
+      }
 
       await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
 
