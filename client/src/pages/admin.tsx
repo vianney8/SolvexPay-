@@ -3051,7 +3051,7 @@ export default function AdminPage() {
                         const codeVal = otpCodeEdit[key] ?? row.defaultOtp;
                         const codeChanged = codeVal !== row.defaultOtp;
                         return (
-                          <div key={key} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/20">
+                          <div key={key} className="flex items-center gap-2 px-3 py-2.5 hover:bg-muted/20">
                             <div className="flex-1 min-w-0">
                               <span className="font-semibold text-xs">{row.pmCode}</span>
                               <span className="text-xs text-muted-foreground ml-2">{row.flag} {row.countryName}</span>
@@ -3067,26 +3067,27 @@ export default function AdminPage() {
                               {row.requiresOtp ? "OTP actif" : "Sans OTP"}
                             </button>
                             {row.requiresOtp && (
-                              <div className="flex items-center gap-1 flex-shrink-0">
-                                <input
-                                  type="text"
-                                  value={codeVal}
-                                  onChange={e => setOtpCodeEdit(prev => ({ ...prev, [key]: e.target.value }))}
-                                  placeholder="Code auto"
-                                  maxLength={8}
-                                  className="w-20 px-2 py-1 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                  data-testid={`otp-code-${key}`}
-                                />
-                                {codeChanged && (
-                                  <button
-                                    type="button"
-                                    disabled={pmM.isPending}
-                                    onClick={() => {
-                                      saveOtp(row.pmCode, row.country, row.requiresOtp, codeVal);
-                                      setOtpCodeEdit(prev => { const n = { ...prev }; delete n[key]; return n; });
-                                    }}
-                                    className="flex-shrink-0 h-6 w-6 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center"
-                                    data-testid={`otp-save-code-${key}`}
+                              <input
+                                type="text"
+                                value={codeVal}
+                                onChange={e => setOtpCodeEdit(prev => ({ ...prev, [key]: e.target.value }))}
+                                placeholder="Code auto"
+                                maxLength={8}
+                                className="w-20 flex-shrink-0 px-2 py-1 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                data-testid={`otp-code-${key}`}
+                              />
+                            )}
+                            <div className="w-7 flex-shrink-0 flex justify-end">
+                              {row.requiresOtp && codeChanged ? (
+                                <button
+                                  type="button"
+                                  disabled={pmM.isPending}
+                                  onClick={() => {
+                                    saveOtp(row.pmCode, row.country, row.requiresOtp, codeVal);
+                                    setOtpCodeEdit(prev => { const n = { ...prev }; delete n[key]; return n; });
+                                  }}
+                                  className="h-6 w-6 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center"
+                                  data-testid={`otp-save-code-${key}`}
                                   >
                                     {pmM.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                                   </button>
