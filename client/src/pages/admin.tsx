@@ -250,6 +250,7 @@ export default function AdminPage() {
   const [omnipayRateEdit, setOmnipayRateEdit] = useState<{ deposit: string; withdrawal: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
+  const [srAllDialog, setSrAllDialog] = useState(false);
   const [linksSearch, setLinksSearch] = useState("");
   const [apiKeysSearch, setApiKeysSearch] = useState("");
   const [wdDialog, setWdDialog] = useState(false);
@@ -384,6 +385,15 @@ export default function AdminPage() {
   const enableSrM = useMutation({
     mutationFn: (d: { userId: string; apiSrEnabled: boolean }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/enable-sr`, { apiSrEnabled: d.apiSrEnabled }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: "Option API SR mise à jour" }); },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+  const enableSrAllM = useMutation({
+    mutationFn: () => apiRequest("PATCH", "/api/admin/users/enable-sr-all", {}),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setSrAllDialog(false);
+      toast({ title: `API SR activé pour ${data?.count ?? "tous les"} utilisateurs` });
+    },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
@@ -1994,6 +2004,14 @@ export default function AdminPage() {
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400">Sans Redirection</span>
                     <Badge variant="secondary" className="text-xs">{filteredSrKeys.length}</Badge>
                   </CardTitle>
+                  <button
+                    onClick={() => setSrAllDialog(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-green-500/15 text-green-700 dark:text-green-400 hover:bg-green-500/25 border border-green-500/30 transition-colors"
+                    data-testid="btn-enable-sr-all"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    Activer pour tous les utilisateurs
+                  </button>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -3330,6 +3348,37 @@ export default function AdminPage() {
               data-testid="btn-confirm-admin-wd"
             >
               {wdM.isPending ? "Envoi en cours…" : "Confirmer le retrait"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOG ACTIVER SR POUR TOUS ── */}
+      <Dialog open={srAllDialog} onOpenChange={setSrAllDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center mx-auto mb-2 shadow-lg">
+              <Key className="h-6 w-6 text-white" />
+            </div>
+            <DialogTitle className="text-center">Activer API SR pour tous</DialogTitle>
+            <DialogDescription className="text-center">
+              Cette action va activer l'option <strong>API SR (Sans Redirection)</strong> pour <strong>tous les utilisateurs</strong> de la plateforme.
+              <br /><br />
+              Les utilisateurs pourront créer leur clé SR uniquement si leur compte est également <strong>vérifié (KYC approuvé)</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold gap-2"
+              disabled={enableSrAllM.isPending}
+              onClick={() => enableSrAllM.mutate()}
+              data-testid="btn-confirm-sr-all"
+            >
+              <Zap className="h-4 w-4" />
+              {enableSrAllM.isPending ? "Activation en cours…" : "Confirmer l'activation"}
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => setSrAllDialog(false)}>
+              Annuler
             </Button>
           </DialogFooter>
         </DialogContent>

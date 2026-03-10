@@ -923,8 +923,29 @@ export default function ApiKeysPage() {
           </CardContent>
         </Card>
 
-        {/* SR Section — only if admin enabled it */}
-        {currentUser?.apiSrEnabled && (
+        {/* SR Section — only if admin enabled it AND KYC approved */}
+        {currentUser?.apiSrEnabled && currentUser?.kycStatus !== "verified" && (
+          <div className="rounded-2xl border border-green-500/30 bg-green-500/5 p-5 flex items-start gap-4">
+            <div className="h-10 w-10 rounded-xl bg-green-500/15 flex items-center justify-center flex-shrink-0">
+              <ShieldAlert className="h-5 w-5 text-green-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-green-700 dark:text-green-400">API SR activé — Vérification requise</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                L'option <strong>API SR (Sans Redirection)</strong> a été activée sur votre compte. Pour créer votre clé SR et commencer à l'utiliser, vous devez d'abord <strong>compléter votre vérification KYC</strong>.
+              </p>
+              <div className="mt-3">
+                <Link href="/kyc">
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2" data-testid="btn-kyc-for-sr">
+                    <ShieldAlert className="h-3.5 w-3.5" />
+                    Vérifier mon compte
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+        {currentUser?.apiSrEnabled && currentUser?.kycStatus === "verified" && (
           <SrSection allKeys={apiKeys || []} />
         )}
       </div>

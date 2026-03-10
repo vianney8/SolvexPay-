@@ -1276,6 +1276,9 @@ export async function registerRoutes(
         if (!req.user.apiSrEnabled) {
           return res.status(403).json({ message: "L'option API SR n'est pas activée sur votre compte." });
         }
+        if (req.user.kycStatus !== "verified") {
+          return res.status(403).json({ message: "Vérification KYC requise pour créer une clé API SR", kycRequired: true });
+        }
         const { db } = await import("./db");
         const { apiKeys: akTable } = await import("@shared/schema");
         const { eq, and } = await import("drizzle-orm");
@@ -2244,6 +2247,18 @@ export async function registerRoutes(
       res.json(safeUser);
     } catch (error) {
       console.error("Admin fee update error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/users/enable-sr-all", isAdmin, async (req, res) => {
+    try {
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const updated = await db.update(usersTable).set({ apiSrEnabled: true, updatedAt: new Date() }).returning({ id: usersTable.id });
+      res.json({ success: true, count: updated.length });
+    } catch (error) {
+      console.error("Admin enable-sr-all error:", error);
       res.status(500).json({ message: "Erreur serveur" });
     }
   });
