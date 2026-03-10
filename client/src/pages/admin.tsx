@@ -250,7 +250,7 @@ export default function AdminPage() {
   const [pmFeeEdit, setPmFeeEdit] = useState<Record<string, { deposit: string; withdrawal: string; plink: string; api: string }>>({});
   const [pmCountryFeeEdit, setPmCountryFeeEdit] = useState<Record<string, { deposit: string; withdrawal: string; plink: string; api: string }>>({});
   const [expandedCountryFees, setExpandedCountryFees] = useState<Set<string>>(new Set());
-  const [otpConfigEditing, setOtpConfigEditing] = useState<Record<string, { requiresOtp: boolean; defaultOtp: string }>>({});
+  const [otpCodeEdit, setOtpCodeEdit] = useState<Record<string, string>>({});
   const [omnipayRateEdit, setOmnipayRateEdit] = useState<{ deposit: string; withdrawal: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
@@ -3013,10 +3013,10 @@ export default function AdminPage() {
                   Configuration OTP
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Activez ou désactivez l'OTP par opérateur et par pays. Si un code par défaut est renseigné, il est envoyé en arrière-plan sans interaction de l'utilisateur.
+                  Activez ou désactivez l'OTP par opérateur et par pays. Si un code est renseigné, il sera envoyé en arrière-plan sans interaction de l'utilisateur. Les pays suspendus sont exclus.
                 </p>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2">
                 {(() => {
                   const OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
                     Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
@@ -3025,6 +3025,7 @@ export default function AdminPage() {
                   const rows: Array<{ pmCode: string; country: string; flag: string; countryName: string; requiresOtp: boolean; defaultOtp: string }> = [];
                   (paymentMethods ?? []).forEach((pm: any) => {
                     (pm.countries ?? []).forEach((ctry: string) => {
+                      if (suspendedCountryCodes.includes(ctry)) return;
                       const info = COUNTRIES.find(c => c.code === ctry);
                       const saved = pm.otpConfig?.[ctry];
                       const fallback = OTP_DEFAULTS[pm.code]?.[ctry];
@@ -3034,102 +3035,67 @@ export default function AdminPage() {
                     });
                   });
                   if (rows.length === 0) return <p className="text-xs text-muted-foreground">Aucun moyen de paiement configuré.</p>;
+
+                  const saveOtp = (pmCode: string, country: string, requiresOtp: boolean, defaultOtp: string) => {
+                    const pm = (paymentMethods ?? []).find((p: any) => p.code === pmCode);
+                    if (!pm) return;
+                    const newOtpConfig = { ...(pm.otpConfig ?? {}) };
+                    newOtpConfig[country] = { requiresOtp, defaultOtp: defaultOtp.trim() || null };
+                    pmM.mutate({ code: pm.code, otpConfig: newOtpConfig });
+                  };
+
                   return (
-                    <div className="rounded-xl border border-border/50 overflow-hidden">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-muted/40 border-b border-border/50">
-                            <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Opérateur</th>
-                            <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Pays</th>
-                            <th className="text-center px-3 py-2 font-semibold text-muted-foreground">OTP requis</th>
-                            <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Code arrière-plan</th>
-                            <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rows.map(row => {
-                            const key = `${row.pmCode}__${row.country}`;
-                            const editing = otpConfigEditing[key];
-                            const cur = editing ?? { requiresOtp: row.requiresOtp, defaultOtp: row.defaultOtp };
-                            const isEditing = editing !== undefined;
-                            return (
-                              <tr key={key} className="border-b border-border/40 last:border-0 hover:bg-muted/20">
-                                <td className="px-3 py-2 font-medium">{row.pmCode}</td>
-                                <td className="px-3 py-2">{row.flag} {row.countryName}</td>
-                                <td className="px-3 py-2 text-center">
-                                  {isEditing ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => setOtpConfigEditing(prev => ({ ...prev, [key]: { ...cur, requiresOtp: !cur.requiresOtp } }))}
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${cur.requiresOtp ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" : "bg-slate-100 dark:bg-slate-800 text-slate-500"}`}
-                                      data-testid={`otp-toggle-${key}`}
-                                    >
-                                      {cur.requiresOtp ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                                      {cur.requiresOtp ? "Activé" : "Désactivé"}
-                                    </button>
-                                  ) : (
-                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${row.requiresOtp ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" : "bg-slate-100 dark:bg-slate-800 text-slate-500"}`}>
-                                      {row.requiresOtp ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                                      {row.requiresOtp ? "Activé" : "Désactivé"}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2">
-                                  {isEditing ? (
-                                    <input
-                                      type="text"
-                                      value={cur.defaultOtp}
-                                      onChange={e => setOtpConfigEditing(prev => ({ ...prev, [key]: { ...cur, defaultOtp: e.target.value } }))}
-                                      placeholder="ex: 0000"
-                                      className="w-24 px-2 py-1 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-                                      data-testid={`otp-default-input-${key}`}
-                                    />
-                                  ) : (
-                                    <span className="text-muted-foreground">{row.defaultOtp || "—"}</span>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2 text-right">
-                                  {isEditing ? (
-                                    <div className="flex items-center gap-1 justify-end">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-6 text-xs px-2 rounded-lg"
-                                        onClick={() => setOtpConfigEditing(prev => { const n = { ...prev }; delete n[key]; return n; })}
-                                        data-testid={`otp-cancel-${key}`}
-                                      >Annuler</Button>
-                                      <Button
-                                        size="sm"
-                                        className="h-6 text-xs px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white"
-                                        data-testid={`otp-save-${key}`}
-                                        onClick={() => {
-                                          const pm = (paymentMethods ?? []).find((p: any) => p.code === row.pmCode);
-                                          if (!pm) return;
-                                          const newOtpConfig = { ...(pm.otpConfig ?? {}) };
-                                          newOtpConfig[row.country] = { requiresOtp: cur.requiresOtp, defaultOtp: cur.defaultOtp || null };
-                                          pmM.mutate({ code: pm.code, otpConfig: newOtpConfig }, {
-                                            onSuccess: () => {
-                                              setOtpConfigEditing(prev => { const n = { ...prev }; delete n[key]; return n; });
-                                            },
-                                          });
-                                        }}
-                                      >{pmM.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Sauvegarder"}</Button>
-                                    </div>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-6 text-xs px-2 rounded-lg"
-                                      onClick={() => setOtpConfigEditing(prev => ({ ...prev, [key]: { requiresOtp: row.requiresOtp, defaultOtp: row.defaultOtp } }))}
-                                      data-testid={`otp-edit-${key}`}
-                                    ><Pencil className="h-3 w-3" /></Button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                    <div className="rounded-xl border border-border/50 divide-y divide-border/40 overflow-hidden">
+                      {rows.map(row => {
+                        const key = `${row.pmCode}__${row.country}`;
+                        const codeVal = otpCodeEdit[key] ?? row.defaultOtp;
+                        const codeChanged = codeVal !== row.defaultOtp;
+                        return (
+                          <div key={key} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/20">
+                            <div className="flex-1 min-w-0">
+                              <span className="font-semibold text-xs">{row.pmCode}</span>
+                              <span className="text-xs text-muted-foreground ml-2">{row.flag} {row.countryName}</span>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={pmM.isPending}
+                              onClick={() => saveOtp(row.pmCode, row.country, !row.requiresOtp, row.defaultOtp)}
+                              className={`flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors border ${row.requiresOtp ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-600"}`}
+                              data-testid={`otp-toggle-${key}`}
+                            >
+                              {row.requiresOtp ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                              {row.requiresOtp ? "OTP actif" : "Sans OTP"}
+                            </button>
+                            {row.requiresOtp && (
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <input
+                                  type="text"
+                                  value={codeVal}
+                                  onChange={e => setOtpCodeEdit(prev => ({ ...prev, [key]: e.target.value }))}
+                                  placeholder="Code auto"
+                                  maxLength={8}
+                                  className="w-20 px-2 py-1 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  data-testid={`otp-code-${key}`}
+                                />
+                                {codeChanged && (
+                                  <button
+                                    type="button"
+                                    disabled={pmM.isPending}
+                                    onClick={() => {
+                                      saveOtp(row.pmCode, row.country, row.requiresOtp, codeVal);
+                                      setOtpCodeEdit(prev => { const n = { ...prev }; delete n[key]; return n; });
+                                    }}
+                                    className="flex-shrink-0 h-6 w-6 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center"
+                                    data-testid={`otp-save-code-${key}`}
+                                  >
+                                    {pmM.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}
