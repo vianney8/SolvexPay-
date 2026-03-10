@@ -112,7 +112,28 @@ export default function WithdrawPage() {
   const balanceXOF = parseFloat(String(wallet?.balanceXOF || 0));
   const balance = currency === "CDF" ? Math.floor(balanceXOF / 0.22) : balanceXOF;
   const withdrawAmount = parseFloat(amount) || 0;
-  const feeRate = (serviceFees?.withdrawal ?? 7) / 100;
+
+  // Calcul du taux effectif : par pays > par opérateur > global (même logique que le backend)
+  function getEffectiveWithdrawalFeeRate(): number {
+    const globalRate = serviceFees?.withdrawal ?? 7;
+    if (!operator || !paymentMethods) return globalRate;
+    const pm = paymentMethods.find((m: any) => m.code === operator);
+    if (!pm) return globalRate;
+    // 1. Frais par pays
+    if (country && pm.countryFees) {
+      const cf = (pm.countryFees as Record<string, any>)[country.toUpperCase()];
+      if (cf && cf.feeWithdrawal !== null && cf.feeWithdrawal !== undefined && cf.feeWithdrawal !== "") {
+        return parseFloat(String(cf.feeWithdrawal));
+      }
+    }
+    // 2. Frais par opérateur
+    if (pm.feeWithdrawal !== null && pm.feeWithdrawal !== undefined && pm.feeWithdrawal !== "") {
+      return parseFloat(String(pm.feeWithdrawal));
+    }
+    return globalRate;
+  }
+
+  const feeRate = getEffectiveWithdrawalFeeRate() / 100;
   const withdrawAmountXOF = currency === "CDF" ? Math.floor(withdrawAmount * 0.22) : withdrawAmount;
   const feesXOF = Math.round(withdrawAmountXOF * feeRate);
   // Fees in local currency (shown to user)

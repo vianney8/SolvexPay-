@@ -81,7 +81,27 @@ export default function DepositPage() {
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
 
-  const feeRate = (serviceFees?.deposit ?? 7) / 100;
+  // Calcul du taux effectif : par pays > par opérateur > global (même logique que le backend)
+  function getEffectiveFeeRate(): number {
+    const globalRate = serviceFees?.deposit ?? 7;
+    if (!operator || !paymentMethods) return globalRate;
+    const pm = paymentMethods.find((m: any) => m.code === operator);
+    if (!pm) return globalRate;
+    // 1. Frais par pays
+    if (country && pm.countryFees) {
+      const cf = (pm.countryFees as Record<string, any>)[country.toUpperCase()];
+      if (cf && cf.feeDeposit !== null && cf.feeDeposit !== undefined && cf.feeDeposit !== "") {
+        return parseFloat(String(cf.feeDeposit));
+      }
+    }
+    // 2. Frais par opérateur
+    if (pm.feeDeposit !== null && pm.feeDeposit !== undefined && pm.feeDeposit !== "") {
+      return parseFloat(String(pm.feeDeposit));
+    }
+    return globalRate;
+  }
+
+  const feeRate = getEffectiveFeeRate() / 100;
   const feesAmount = Math.round(parsedAmount * feeRate);
   const netAmount = parsedAmount - feesAmount;
   const balanceXOF = parseFloat(String(wallet?.balanceXOF || 0));
