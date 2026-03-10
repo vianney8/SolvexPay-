@@ -1701,22 +1701,14 @@ export async function registerRoutes(
       const firstName = nameParts[0] || "Client";
       const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
 
-      // ── Wave nécessite une URL de redirection ──
+      // ── Wave : même flux que le dépôt dashboard ──
       const isWave = operatorUpper === "WAVE";
       const srRedirectUrl = (apiKey as any).redirectUrl as string | null | undefined;
-      if (isWave && !srRedirectUrl) {
-        return res.status(400).json({
-          error: {
-            code: "MISSING_REDIRECT_URL",
-            message: "Wave nécessite une URL de redirection. Configurez le champ 'URL de redirection' dans la page API SR (Gestion des clés API SR > Configuration Webhook SR).",
-            status: 400,
-          },
-        });
-      }
-      // Pour Wave : on pointe vers notre callback SR (qui vérifie le statut + crédite le solde),
-      // lequel redirigera ensuite l'utilisateur vers srRedirectUrl.
+      // On utilise exactement le même returnUrl que pour les dépôts directs :
+      // Wave redirige vers /api/payment/callback qui gère le statut de façon identique.
+      // Si le marchand a configuré une redirectUrl, on la transmet en paramètre optionnel.
       const returnUrl = isWave
-        ? `https://solvexpay.com/api/v1/sr/wave-callback?reference=${reference}&redirect=${encodeURIComponent(srRedirectUrl!)}`
+        ? `https://solvexpay.com/api/payment/callback?reference=${reference}${srRedirectUrl ? `&merchant_redirect=${encodeURIComponent(srRedirectUrl)}` : ""}`
         : undefined;
 
       // ── Appel OmniPay ──
@@ -1913,10 +1905,10 @@ export async function registerRoutes(
   });
 
   app.get("/api/payment/callback", async (req, res) => {
-    const { reference } = req.query;
-    console.log(`OmniPay payment redirect callback: reference=${reference}`);
+    const { reference, merchant_redirect } = req.query as Record<string, string>;
+    console.log(`OmniPay payment redirect callback: reference=${reference} merchant_redirect=${merchant_redirect}`);
 
-    if (reference && typeof reference === "string") {
+    if (reference) {
       try {
         const result = await omniPayService.getStatus(reference);
         const statusStr = omnipayStatusToString(result.status ?? 0);
@@ -1933,16 +1925,26 @@ export async function registerRoutes(
                 transaction.currency,
                 netAmt > 0 ? netAmt : grossAmt
               );
+              const completedTx = await storage.getTransactionByReference(reference);
+              if (completedTx) {
+                forwardToMerchantWebhooks(completedTx);
+                notifyTransactionCompleted(completedTx).catch(() => {});
+              }
             }
           }
-          // Ne jamais marquer comme "failed" ici : le frontend va continuer à
-          // vérifier via le polling, et le webhook OmniPay gérera le statut final.
+          // Ne jamais marquer comme "failed" ici : le webhook OmniPay ou le polling
+          // du marchand s'en chargera avec des codes numériques fiables.
         }
       } catch (error) {
         console.error("Callback verify error:", error);
       }
     }
 
+    // Si le marchand a fourni une URL de redirection (cas SR API Wave), on y redirige.
+    // Sinon, on redirige vers la page de dépôt interne (cas dashboard).
+    if (merchant_redirect && typeof merchant_redirect === "string" && merchant_redirect.startsWith("http")) {
+      return res.redirect(merchant_redirect);
+    }
     res.redirect(`/deposit?status=callback&reference=${encodeURIComponent(String(reference || ""))}`);
   });
 
