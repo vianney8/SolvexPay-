@@ -497,8 +497,12 @@ export default function AdminPage() {
   });
 
   const pmM = useMutation({
-    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[]; withdrawalMaintenance?: boolean; withdrawalMaintenanceCountries?: string[]; feeDeposit?: string | null; feeWithdrawal?: string | null; feePLink?: string | null; feeApi?: string | null; countryFees?: Record<string, any> }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] }); toast({ title: "Mis à jour" }); },
+    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[]; withdrawalMaintenance?: boolean; withdrawalMaintenanceCountries?: string[]; feeDeposit?: string | null; feeWithdrawal?: string | null; feePLink?: string | null; feeApi?: string | null; countryFees?: Record<string, any>; otpConfig?: Record<string, any> }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payment-methods/public"] });
+      toast({ title: "Mis à jour" });
+    },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
@@ -3106,7 +3110,6 @@ export default function AdminPage() {
                                           pmM.mutate({ code: pm.code, otpConfig: newOtpConfig }, {
                                             onSuccess: () => {
                                               setOtpConfigEditing(prev => { const n = { ...prev }; delete n[key]; return n; });
-                                              toast({ title: "OTP mis à jour", description: `${row.pmCode} — ${row.countryName}` });
                                             },
                                           });
                                         }}
