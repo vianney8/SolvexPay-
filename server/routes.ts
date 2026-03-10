@@ -1791,8 +1791,8 @@ export async function registerRoutes(
 
         if (transaction && transaction.status === "pending") {
           if (statusStr === "completed") {
-            await storage.updateTransactionStatus(transaction.id, "completed");
-            if (transaction.type === "deposit") {
+            const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
+            if (updated && transaction.type === "deposit") {
               const grossAmt = parseFloat(transaction.amount);
               const txFees = parseFloat((transaction as any).fees || "0") || 0;
               const netAmt = grossAmt - txFees;
@@ -1801,10 +1801,15 @@ export async function registerRoutes(
                 transaction.currency,
                 netAmt > 0 ? netAmt : grossAmt
               );
+              const completedTx = await storage.getTransactionByReference(reference);
+              if (completedTx) {
+                forwardToMerchantWebhooks(completedTx);
+                notifyTransactionCompleted(completedTx).catch(() => {});
+              }
             }
-          } else if (statusStr === "failed") {
-            await storage.updateTransactionStatus(transaction.id, "failed");
           }
+          // Ne jamais marquer comme "failed" ici : le webhook OmniPay ou le polling
+          // du marchand s'en chargera avec des codes numériques fiables.
         }
       } catch (err) {
         console.error("[SR Wave Callback] Error verifying status:", err);
@@ -1918,8 +1923,8 @@ export async function registerRoutes(
         const transaction = await storage.getTransactionByReference(reference);
         if (transaction && transaction.status === "pending") {
           if (statusStr === "completed") {
-            await storage.updateTransactionStatus(transaction.id, "completed");
-            if (transaction.type === "deposit") {
+            const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
+            if (updated && transaction.type === "deposit") {
               const grossAmt = parseFloat(transaction.amount);
               const txFees = parseFloat((transaction as any).fees || "0") || 0;
               const netAmt = grossAmt - txFees;
@@ -1929,9 +1934,9 @@ export async function registerRoutes(
                 netAmt > 0 ? netAmt : grossAmt
               );
             }
-          } else if (statusStr === "failed") {
-            await storage.updateTransactionStatus(transaction.id, "failed");
           }
+          // Ne jamais marquer comme "failed" ici : le frontend va continuer à
+          // vérifier via le polling, et le webhook OmniPay gérera le statut final.
         }
       } catch (error) {
         console.error("Callback verify error:", error);
