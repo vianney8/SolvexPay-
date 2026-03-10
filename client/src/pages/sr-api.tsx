@@ -414,16 +414,25 @@ export default function SrApiPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[11px] text-green-300/80 font-semibold">URL de redirection (optionnel)</Label>
-                    <p className="text-[10px] text-green-300/50">Redirigez l'utilisateur ici après un paiement Wave réussi.</p>
+                    <Label className="text-[11px] text-green-300/80 font-semibold flex items-center gap-1.5">
+                      URL de redirection
+                      <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[9px] font-bold uppercase tracking-wide">Requis pour Wave</span>
+                    </Label>
+                    <p className="text-[10px] text-green-300/50">Wave redirige le client vers cette URL après paiement. Obligatoire si vous utilisez l'opérateur <strong className="text-amber-400">wave</strong>. Peut être votre site principal (ex: https://monsite.com).</p>
                     <Input
                       defaultValue={currentRedirectUrl}
                       onChange={(e) => setSrRedirectUrl(e.target.value)}
                       key={`rd-${srKey.id}`}
-                      placeholder="https://monsite.com/paiement-success"
-                      className="h-8 text-xs bg-black/40 border-green-500/20 text-green-200 placeholder:text-green-300/30"
+                      placeholder="https://monsite.com"
+                      className={`h-8 text-xs bg-black/40 text-green-200 placeholder:text-green-300/30 ${!currentRedirectUrl ? "border-amber-500/40 focus:border-amber-500/60" : "border-green-500/20"}`}
                       data-testid="input-sr-redirect-url"
                     />
+                    {!currentRedirectUrl && (
+                      <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <AlertCircle className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                        <p className="text-[10px] text-amber-300/80">Non configurée — les paiements Wave échoueront avec l'erreur <code className="bg-black/40 px-1 rounded">MISSING_REDIRECT_URL</code></p>
+                      </div>
+                    )}
                   </div>
                   <Button
                     size="sm"
@@ -476,6 +485,13 @@ export default function SrApiPage() {
                   <p className="text-blue-300/80 text-[11px] leading-relaxed">
                     Le statut initial est toujours <strong className="text-blue-300">pending</strong>. Un USSD est envoyé au client pour qu'il valide le paiement. SolvexPay reçoit la confirmation en temps réel et crédite automatiquement votre solde. Votre webhook est notifié à chaque changement de statut.
                   </p>
+                </div>
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-amber-300/80 space-y-1">
+                    <p className="font-bold text-amber-300">Cas particulier : Wave (CI, SN)</p>
+                    <p>Wave ne fonctionne pas via USSD. La réponse inclut un champ <code className="bg-black/40 px-1 rounded">payment_url</code> — redirigez votre client vers cette URL pour qu'il valide le paiement dans l'app Wave. L'<strong className="text-amber-300">URL de redirection</strong> doit être configurée sur votre clé SR (obligatoire).</p>
+                  </div>
                 </div>
               </div>
             </section>
@@ -621,6 +637,7 @@ export default function SrApiPage() {
                   { code: "UNAUTHORIZED", http: "401", desc: "Clé SR manquante, invalide ou désactivée" },
                   { code: "FORBIDDEN", http: "403", desc: "Compte suspendu ou API SR non activée" },
                   { code: "VALIDATION_ERROR", http: "400", desc: "Paramètre manquant ou invalide" },
+                  { code: "MISSING_REDIRECT_URL", http: "400", desc: "URL de redirection manquante sur la clé SR — obligatoire pour Wave" },
                   { code: "COUNTRY_SUSPENDED", http: "503", desc: "Paiements suspendus pour ce pays" },
                   { code: "OPERATOR_MAINTENANCE", http: "503", desc: "Opérateur en maintenance" },
                   { code: "SERVICE_UNAVAILABLE", http: "503", desc: "Service de paiement temporairement indisponible" },

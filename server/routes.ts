@@ -1691,6 +1691,20 @@ export async function registerRoutes(
       const firstName = nameParts[0] || "Client";
       const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
 
+      // ── Wave nécessite une URL de redirection ──
+      const isWave = operatorUpper === "WAVE";
+      const srRedirectUrl = (apiKey as any).redirectUrl as string | null | undefined;
+      if (isWave && !srRedirectUrl) {
+        return res.status(400).json({
+          error: {
+            code: "MISSING_REDIRECT_URL",
+            message: "Wave nécessite une URL de redirection. Configurez le champ 'URL de redirection' dans la page API SR (Gestion des clés API SR > Configuration Webhook SR).",
+            status: 400,
+          },
+        });
+      }
+      const returnUrl = isWave ? srRedirectUrl! : undefined;
+
       // ── Appel OmniPay ──
       const omnipayResponse = await omniPayService.deposit({
         msisdn: phone,
@@ -1700,6 +1714,7 @@ export async function registerRoutes(
         lastName,
         otp,
         operator: omniOperator,
+        returnUrl,
         callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
       });
 
@@ -1724,6 +1739,10 @@ export async function registerRoutes(
 
       await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
 
+      const defaultMessage = isWave
+        ? "Paiement Wave initié. Redirigez le client vers payment_url pour qu'il valide le paiement."
+        : "Paiement initié. Le client doit valider sur son téléphone (USSD).";
+
       res.status(201).json({
         success: true,
         id: transaction.id,
@@ -1735,7 +1754,8 @@ export async function registerRoutes(
         currency,
         operator: operatorUpper,
         phone,
-        message: omnipayResponse.message || "Paiement initié. Le client doit valider sur son téléphone (USSD).",
+        message: omnipayResponse.message || defaultMessage,
+        ...(isWave && omnipayResponse.payment_url ? { payment_url: omnipayResponse.payment_url } : {}),
         created_at: transaction.createdAt,
       });
     } catch (error: any) {
