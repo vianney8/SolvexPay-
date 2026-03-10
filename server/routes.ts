@@ -1772,12 +1772,12 @@ export async function registerRoutes(
         apiKeyId: apiKey.id,
       } as any);
 
-      // ── Wave : même flux que le lien de paiement (page publique avec polling) ──
-      // La page /pay-api/:id est publique — le client n'a pas besoin d'un compte SolvexPay.
-      // L'éventuelle redirectUrl du marchand est récupérée via /api/payment-api/public/:id
-      // et la page gère la redirection automatiquement après confirmation.
+      // ── Wave returnUrl : callback backend SR dédié ──
+      // Étape 1 : Wave redirige le client vers /api/v1/sr/wave-callback
+      // Étape 2 : on vérifie immédiatement le statut OmniPay et on crédite si confirmé
+      // Étape 3 : on redirige le client vers /pay-api/:id (page publique de confirmation)
       const returnUrl = isWave
-        ? `https://solvexpay.com/pay-api/${transaction.id}?status=callback&reference=${reference}`
+        ? `https://solvexpay.com/api/v1/sr/wave-callback?id=${transaction.id}&reference=${reference}`
         : undefined;
 
       // ── Appel OmniPay ──
@@ -1834,16 +1834,21 @@ export async function registerRoutes(
     }
   });
 
-  // ─── SR API — CALLBACK WAVE (GET redirect depuis Wave) ───────────────────────
+  // ─── SR API — CALLBACK WAVE (retour depuis l'app Wave) ───────────────────────
+  // Wave redirige ici après que le client ait payé (ou annulé).
+  // On vérifie le statut OmniPay immédiatement, on crédite si confirmé,
+  // puis on redirige vers la page de confirmation publique /pay-api/:id.
   app.get("/api/v1/sr/wave-callback", async (req, res) => {
-    const { reference, redirect } = req.query as Record<string, string>;
-    console.log(`[SR Wave Callback] reference=${reference} redirect=${redirect}`);
+    const { id: transactionId, reference } = req.query as Record<string, string>;
+    console.log(`[SR Wave Callback] transactionId=${transactionId} reference=${reference}`);
 
-    if (reference) {
+    let redirectTarget = `https://solvexpay.com/pay-api/${transactionId}?status=callback&reference=${encodeURIComponent(reference || "")}`;
+
+    if (transactionId && reference) {
       try {
         const result = await omniPayService.getStatus(reference);
         const statusStr = omnipayStatusToString(result.status ?? 0);
-        const transaction = await storage.getTransactionByReference(reference);
+        const transaction = await storage.getTransactionById(transactionId);
 
         if (transaction && transaction.status === "pending") {
           if (statusStr === "completed") {
@@ -1857,24 +1862,38 @@ export async function registerRoutes(
                 transaction.currency,
                 netAmt > 0 ? netAmt : grossAmt
               );
-              const completedTx = await storage.getTransactionByReference(reference);
+              const completedTx = await storage.getTransactionById(transaction.id);
               if (completedTx) {
                 forwardToMerchantWebhooks(completedTx);
                 notifyTransactionCompleted(completedTx).catch(() => {});
               }
+              console.log(`[SR Wave Callback] ✓ Transaction ${reference} completed and credited`);
             }
           }
-          // Ne jamais marquer comme "failed" ici : le webhook OmniPay ou le polling
-          // du marchand s'en chargera avec des codes numériques fiables.
+          // Ne jamais marquer "failed" ici : le webhook OmniPay s'en charge
+          // avec des codes numériques fiables.
+        }
+
+        // Si le marchand a configuré une redirectUrl sur sa clé API, on l'inclut
+        // dans la page de confirmation pour que la page y redirige après succès.
+        if (transaction) {
+          const apiKeyRows = await storage.getApiKeys(transaction.userId);
+          const matchingKey = (transaction as any).apiKeyId
+            ? apiKeyRows.find((k: any) => k.id === (transaction as any).apiKeyId)
+            : null;
+          const merchantRedirect = (matchingKey as any)?.redirectUrl;
+          if (merchantRedirect && typeof merchantRedirect === "string" && merchantRedirect.startsWith("http")) {
+            redirectTarget = merchantRedirect;
+          }
         }
       } catch (err) {
         console.error("[SR Wave Callback] Error verifying status:", err);
+        // En cas d'erreur OmniPay, on redirige quand même vers la page de confirmation
+        // qui fera le polling et récupèrera le statut au prochain cycle.
       }
     }
 
-    // Redirige l'utilisateur vers l'URL du marchand
-    const merchantRedirect = redirect && typeof redirect === "string" ? redirect : "https://solvexpay.com";
-    res.redirect(merchantRedirect);
+    res.redirect(redirectTarget);
   });
 
   // ─── END API V1 ───────────────────────────────────────────────────────────────

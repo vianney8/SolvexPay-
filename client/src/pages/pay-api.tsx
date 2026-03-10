@@ -147,6 +147,25 @@ export default function PayApiPage() {
     }
   }, [verifyStatus, redirectUrl]);
 
+  // Vérification immédiate du statut via l'endpoint verify
+  const checkStatus = async (ref: string) => {
+    try {
+      const res = await fetch(`/api/payment-api/public/${id}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference: ref }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status) {
+          setVerifyStatus(data.status);
+          setVerifyCount((c) => c + 1);
+        }
+      }
+    } catch {}
+  };
+
+  // Détection du retour depuis Wave (status=callback dans l'URL)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("status") === "callback") {
@@ -154,7 +173,8 @@ export default function PayApiPage() {
       if (ref) {
         setPendingReference(ref);
         setPaymentStatus("processing");
-        toast({ title: "Vérification en cours", description: "Nous vérifions votre paiement Wave..." });
+        // Vérification IMMÉDIATE dès l'arrivée sur la page (pas d'attente du premier cycle polling)
+        checkStatus(ref);
       }
     }
   }, []);
@@ -179,22 +199,10 @@ export default function PayApiPage() {
     },
   });
 
+  // Polling toutes les 3 secondes (au lieu de 5) pour une confirmation plus rapide
   useEffect(() => {
     if (!pendingReference || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/payment-api/public/${id}/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reference: pendingReference }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.status) setVerifyStatus(data.status);
-          setVerifyCount((c) => c + 1);
-        }
-      } catch {}
-    }, 5000);
+    const interval = setInterval(() => checkStatus(pendingReference), 3000);
     return () => clearInterval(interval);
   }, [pendingReference, verifyStatus, id]);
 
