@@ -14,6 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -222,7 +228,7 @@ function SrSection({ allKeys }: { allKeys: ApiKey[] }) {
                 <h2 className="font-black text-base text-green-300">API SR</h2>
                 <span className="px-2 py-0.5 rounded-full bg-green-500/20 border border-green-500/30 text-[10px] font-bold text-green-400 uppercase tracking-wider">Sans Redirection</span>
               </div>
-              <p className="text-xs text-green-300/60 mt-0.5">Initiez des paiements directement depuis votre backend. SolvexPay est l'intermédiaire entre votre intégration et OmniPay — aucune redirection.</p>
+              <p className="text-xs text-green-300/60 mt-0.5">Initiez des paiements directement depuis votre backend, sans redirection côté client.</p>
             </div>
           </div>
 
@@ -319,7 +325,7 @@ Content-Type: application/json`}</pre>
   "success": true,
   "id": "txn_abc123",       // ID de la transaction SolvexPay
   "status": "pending",      // En attente de validation client
-  "reference": "REF...",    // Référence OmniPay
+  "reference": "REF...",    // Référence de transaction
   "amount": 5000,
   "fees": 350,              // Frais SolvexPay (% configuré)
   "net_amount": 4650,       // Montant net crédité à vous
@@ -334,7 +340,7 @@ Content-Type: application/json`}</pre>
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                   <Info className="h-3.5 w-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
                   <p className="text-blue-300/80 text-[11px] leading-relaxed">
-                    Le statut initial est toujours <strong className="text-blue-300">pending</strong>. OmniPay envoie un USSD au client pour qu'il valide le paiement. SolvexPay reçoit la confirmation en temps réel et crédite automatiquement votre solde. Votre webhook est notifié à chaque changement de statut.
+                    Le statut initial est toujours <strong className="text-blue-300">pending</strong>. Un USSD est envoyé au client pour qu'il valide le paiement. SolvexPay reçoit la confirmation en temps réel et crédite automatiquement votre solde. Votre webhook est notifié à chaque changement de statut.
                   </p>
                 </div>
               </div>
@@ -634,7 +640,7 @@ if ($response['success']) {
                     <p>1. Votre client remplit son numéro (+ OTP si Orange) sur votre page</p>
                     <p>2. Vous appelez <code className="bg-black/40 px-1 rounded">POST /api/v1/sr/pay</code> depuis votre backend</p>
                     <p>3. Le client reçoit un USSD sur son téléphone et valide le paiement</p>
-                    <p>4. SolvexPay reçoit la confirmation OmniPay et crédite votre solde</p>
+                    <p>4. SolvexPay reçoit la confirmation et crédite votre solde</p>
                     <p>5. Votre webhook reçoit <code className="bg-black/40 px-1 rounded">transaction.completed</code></p>
                   </div>
                 </div>
@@ -722,6 +728,7 @@ export default function ApiKeysPage() {
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [kycGateOpen, setKycGateOpen] = useState(false);
+  const [srPanelOpen, setSrPanelOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
@@ -946,7 +953,45 @@ export default function ApiKeysPage() {
           </div>
         )}
         {currentUser?.apiSrEnabled && currentUser?.kycStatus === "verified" && (
-          <SrSection allKeys={apiKeys || []} />
+          <>
+            <button
+              onClick={() => setSrPanelOpen(true)}
+              className="w-full group relative rounded-2xl overflow-hidden border border-green-500/30 shadow-lg shadow-green-900/10 text-left"
+              style={{ background: "linear-gradient(135deg, hsl(145 60% 7%) 0%, hsl(160 50% 6%) 100%)" }}
+              data-testid="button-open-sr-panel"
+            >
+              <div className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity" style={{ background: "radial-gradient(ellipse at top right, hsl(145 70% 40%), transparent 60%)" }} />
+              <div className="relative flex items-center gap-4 px-5 py-4">
+                <div className="h-11 w-11 rounded-2xl bg-green-500/20 flex items-center justify-center flex-shrink-0 border border-green-500/30">
+                  <Bolt className="h-5 w-5 text-green-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-black text-sm text-green-300 uppercase tracking-wide">Gestion des clés API SR</span>
+                    <span className="px-2 py-0.5 rounded-full bg-green-500/20 border border-green-500/30 text-[10px] font-bold text-green-400 uppercase tracking-wider">Sans Redirection</span>
+                  </div>
+                  <p className="text-xs text-green-300/50 mt-0.5">Clé SR, configuration webhook, documentation</p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-green-400/60 flex-shrink-0 group-hover:text-green-400 transition-colors -rotate-90" />
+              </div>
+            </button>
+
+            <Sheet open={srPanelOpen} onOpenChange={setSrPanelOpen}>
+              <SheetContent side="bottom" className="h-[95dvh] p-0 rounded-t-3xl overflow-hidden flex flex-col">
+                <SheetHeader className="px-5 pt-5 pb-3 border-b border-border/50 flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-xl bg-green-500/15 flex items-center justify-center border border-green-500/30">
+                      <Bolt className="h-5 w-5 text-green-600" />
+                    </div>
+                    <SheetTitle className="text-base font-black">Gestion des clés API SR</SheetTitle>
+                  </div>
+                </SheetHeader>
+                <div className="flex-1 overflow-y-auto p-5">
+                  <SrSection allKeys={apiKeys || []} />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </>
         )}
       </div>
 
