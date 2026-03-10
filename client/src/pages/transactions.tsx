@@ -88,7 +88,7 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
   const isLink = isPaymentLink(tx);
   const isApi = isApiPayment(tx);
   const linkName = isLink ? tx.description?.replace("Paiement via lien: ", "") : undefined;
-  const apiName = isApi ? (tx.description?.replace("Paiement via API — ", "").replace("Dépôt via API — ", "") || "API") : undefined;
+  const apiName = isApi ? (tx.description?.replace("Paiement API SR — ", "").replace("Paiement via API — ", "").replace("Dépôt via API — ", "").replace("Paiement API SR", "").trim() || "API") : undefined;
   const showPayerInfo = isLink || isApi;
 
   return (
