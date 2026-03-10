@@ -49,7 +49,7 @@ function getTypeLabel(tx: Transaction) {
 
 function getDisplayProvider(tx: Transaction) {
   if (!tx.provider) return null;
-  if (tx.provider.toLowerCase() === "omnipay") return "OmniPay";
+  if (tx.provider.toLowerCase() === "omnipay") return "Fournisseur";
   if (tx.provider.toLowerCase() === "admin") return "Admin";
   return tx.provider;
 }
