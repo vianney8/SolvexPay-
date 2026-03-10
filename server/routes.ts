@@ -2919,6 +2919,9 @@ export async function registerRoutes(
       if (feeApi !== undefined) updateData.feeApi = feeApi === null || feeApi === "" ? null : String(feeApi);
       // Per-country fees (JSONB)
       if (countryFees !== undefined) updateData.countryFees = countryFees || {};
+      // OTP config (JSONB)
+      const { otpConfig } = req.body;
+      if (otpConfig !== undefined) updateData.otpConfig = otpConfig || {};
       const [updated] = await db.update(pmTable).set(updateData).where(eq(pmTable.code, code)).returning();
       res.json(updated);
     } catch (error) {

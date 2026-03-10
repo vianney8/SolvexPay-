@@ -84,12 +84,20 @@ export default function PayPage() {
   const [otp, setOtp] = useState("");
 
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
-  const isOrangeCM = country === "CM" && operator === "Orange";
-  const needsOtp =
-    (country === "CM" && (operator === "Orange" || operator === "MTN")) ||
-    (country === "BF" && operator === "Orange") ||
-    (country === "CI" && (operator === "Orange" || operator === "Moov")) ||
-    (country === "SN" && operator === "Orange");
+  const _OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
+    Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
+    Moov: { CI: { requiresOtp: true } },
+  };
+  const _otpPm = paymentMethods?.find((m: any) => m.code === operator);
+  const _otpSaved = _otpPm?.otpConfig?.[country];
+  const _otpFallback = _OTP_DEFAULTS[operator]?.[country];
+  const otpConfig = {
+    requiresOtp: _otpSaved !== undefined ? _otpSaved.requiresOtp : (_otpFallback?.requiresOtp ?? false),
+    defaultOtp: _otpSaved !== undefined ? (_otpSaved.defaultOtp ?? null) : (_otpFallback?.defaultOtp ?? null),
+  };
+  const needsOtp = otpConfig.requiresOtp;
+  const silentOtp = otpConfig.defaultOtp;
+  const isOrangeCM = !!(silentOtp);
 
   useEffect(() => { setOperator(""); setOtp(""); setStep(1); }, [country]);
   useEffect(() => { setOtp(""); setStep(1); }, [operator]);
@@ -227,7 +235,7 @@ export default function PayPage() {
       country,
       customerName: fullName || undefined,
       customerEmail: customerEmail || undefined,
-      ...(needsOtp ? { otp: isOrangeCM ? "0000" : otp.trim() } : {}),
+      ...(needsOtp ? { otp: silentOtp || otp.trim() } : {}),
       ...(isCustom ? { customAmount: parsedCustom } : {}),
     } as any);
   };

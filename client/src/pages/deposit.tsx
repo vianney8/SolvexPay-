@@ -46,11 +46,19 @@ export default function DepositPage() {
   const [description, setDescription] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
-  const needsOtp =
-    (country === "CM" && (operator === "Orange" || operator === "MTN")) ||
-    (country === "BF" && operator === "Orange") ||
-    (country === "CI" && (operator === "Orange" || operator === "Moov")) ||
-    (country === "SN" && operator === "Orange");
+  const _OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
+    Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
+    Moov: { CI: { requiresOtp: true } },
+  };
+  const _otpPm = paymentMethods?.find((m: any) => m.code === operator);
+  const _otpSaved = _otpPm?.otpConfig?.[country];
+  const _otpFallback = _OTP_DEFAULTS[operator]?.[country];
+  const otpConfig = {
+    requiresOtp: _otpSaved !== undefined ? _otpSaved.requiresOtp : (_otpFallback?.requiresOtp ?? false),
+    defaultOtp: _otpSaved !== undefined ? (_otpSaved.defaultOtp ?? null) : (_otpFallback?.defaultOtp ?? null),
+  };
+  const needsOtp = otpConfig.requiresOtp;
+  const silentOtp = otpConfig.defaultOtp;
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [verifyCount, setVerifyCount] = useState(0);
@@ -184,10 +192,12 @@ export default function DepositPage() {
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!parsedAmount || !phone || !operator || !country) return;
-    if (needsOtp) {
+    const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
+    if (needsOtp && silentOtp) {
+      depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, otp: silentOtp, customerName: customerName || undefined, description: description || undefined });
+    } else if (needsOtp) {
       setStep(2);
     } else {
-      const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
       depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, customerName: customerName || undefined, description: description || undefined });
     }
   };

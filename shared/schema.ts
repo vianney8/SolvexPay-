@@ -87,6 +87,7 @@ export const paymentMethods = pgTable("payment_methods", {
   feePLink: decimal("fee_plink", { precision: 5, scale: 2 }),
   feeApi: decimal("fee_api", { precision: 5, scale: 2 }),
   countryFees: jsonb("country_fees").$type<Record<string, { feeDeposit?: string | null; feeWithdrawal?: string | null; feePLink?: string | null; feeApi?: string | null }>>().default({}),
+  otpConfig: jsonb("otp_config").$type<Record<string, { requiresOtp: boolean; defaultOtp?: string | null }>>().default({}),
   countries: text("countries").array().default([]),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
