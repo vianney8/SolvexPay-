@@ -124,23 +124,6 @@ function getOmniPayOperatorCode(operator: string, _country: string): string {
   return "";
 }
 
-function getSrApiOperatorCode(operator: string, country: string): string {
-  const op = operator.toUpperCase();
-  const co = country.toUpperCase();
-  const mapping: Record<string, Record<string, string>> = {
-    WAVE:     { CI: "wave",        SN: "wave" },
-    FREE:     { SN: "mixx" },
-    MIXX:     { SN: "mixx" },
-    MTN:      { BJ: "mtn",        CI: "mtn",         CM: "mtn_cm",        COG: "mtn" },
-    MOOV:     { BJ: "moov_benin", CI: "moov",         TG: "moov_togo",     BF: "moov_bf",   ML: "moov_ml" },
-    ORANGE:   { CI: "orange",     SN: "orange_sn",    CM: "orange_cm",     BF: "orange_bf", ML: "orange_ml", COD: "orange_cong" },
-    TMONEY:   { TG: "tmoney" },
-    VODACOM:  { COD: "mpesa" },
-    AIRTEL:   { COD: "airtel_money", COG: "airtel" },
-  };
-  return mapping[op]?.[co] ?? op.toLowerCase();
-}
-
 function getTransferOperatorCode(operator: string, country: string): string {
   const op = operator.toUpperCase();
   const co = country.toUpperCase();
@@ -1700,8 +1683,7 @@ export async function registerRoutes(
       const fees = Math.round(amount * apiFeeRate);
       const currency = getCountryCurrency(countryUpper);
       const reference = generateReference();
-      const omniOperator = getSrApiOperatorCode(operatorUpper, countryUpper);
-      console.log(`[SR Pay] operator=${operatorUpper} country=${countryUpper} → omniOperator=${omniOperator}`);
+      const omniOperator = getOmniPayOperatorCode(operatorUpper, countryUpper);
 
       // ── Nom du payeur ──
       const rawName = customer_name || "Client SolvexPay";
