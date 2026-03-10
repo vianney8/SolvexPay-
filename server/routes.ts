@@ -117,7 +117,14 @@ const publicPaySchema = z.object({
   otp: z.string().optional(),
 });
 
-function getOmniPayOperatorCode(operator: string, country: string): string {
+function getOmniPayOperatorCode(operator: string, _country: string): string {
+  const op = operator.toUpperCase();
+  if (op === "WAVE") return "wave";
+  if (op === "FREE" || op === "MIXX") return "mixx";
+  return "";
+}
+
+function getSrApiOperatorCode(operator: string, country: string): string {
   const op = operator.toUpperCase();
   const co = country.toUpperCase();
   const mapping: Record<string, Record<string, string>> = {
@@ -1693,8 +1700,8 @@ export async function registerRoutes(
       const fees = Math.round(amount * apiFeeRate);
       const currency = getCountryCurrency(countryUpper);
       const reference = generateReference();
-      const omniOperator = getOmniPayOperatorCode(operatorUpper, countryUpper);
-      console.log(`[SR Pay] operator=${operatorUpper} country=${countryUpper} → omniOperator=${omniOperator || "(auto-detect)"}`);
+      const omniOperator = getSrApiOperatorCode(operatorUpper, countryUpper);
+      console.log(`[SR Pay] operator=${operatorUpper} country=${countryUpper} → omniOperator=${omniOperator}`);
 
       // ── Nom du payeur ──
       const rawName = customer_name || "Client SolvexPay";
