@@ -24,7 +24,7 @@ import {
   TrendingDown, Building2, ArrowRightLeft, Plus, DollarSign,
   Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
   Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon, Code2, User,
-  ShieldCheck, Pencil,
+  ShieldCheck, Pencil, Loader2,
 } from "lucide-react";
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
