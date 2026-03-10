@@ -3078,7 +3078,7 @@ export default function AdminPage() {
                               />
                             )}
                             <div className="w-7 flex-shrink-0 flex justify-end">
-                              {row.requiresOtp && codeChanged ? (
+                              {row.requiresOtp && codeChanged && (
                                 <button
                                   type="button"
                                   disabled={pmM.isPending}
@@ -3088,12 +3088,11 @@ export default function AdminPage() {
                                   }}
                                   className="h-6 w-6 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center"
                                   data-testid={`otp-save-code-${key}`}
-                                  >
-                                    {pmM.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-                                  </button>
-                                )}
-                              </div>
-                            )}
+                                >
+                                  {pmM.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
