@@ -223,6 +223,8 @@ export default function AdminPage() {
 
   const [userSearch, setUserSearch] = useState("");
   const [userSort, setUserSort] = useState<"default" | "balance_desc" | "balance_asc">("default");
+  const [srFilter, setSrFilter] = useState(false);
+  const [srConfirmDialog, setSrConfirmDialog] = useState<{ userId: string; name: string; enable: boolean } | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [txSearch, setTxSearch] = useState("");
   const [debouncedTxSearch, setDebouncedTxSearch] = useState("");
@@ -602,6 +604,7 @@ export default function AdminPage() {
 
   const filteredUsers = (users || [])
     .filter(u => !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase()))
+    .filter(u => !srFilter || (u as any).apiSrEnabled)
     .sort((a, b) => {
       if (userSort === "balance_desc") return parseFloat(b.wallet?.balanceXOF || "0") - parseFloat(a.wallet?.balanceXOF || "0");
       if (userSort === "balance_asc") return parseFloat(a.wallet?.balanceXOF || "0") - parseFloat(b.wallet?.balanceXOF || "0");
@@ -1516,6 +1519,14 @@ export default function AdminPage() {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Rechercher utilisateur..." className="pl-10 h-10" data-testid="input-search-users" />
               </div>
+              <button
+                onClick={() => setSrFilter(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${srFilter ? "bg-green-600 text-white border-green-600 shadow-sm" : "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 hover:bg-green-500/20"}`}
+                data-testid="btn-filter-sr"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                SR activé{srFilter ? ` (${filteredUsers.length})` : ""}
+              </button>
               <div className="flex items-center gap-1">
                 <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Trier par solde :</span>
                 {[
@@ -1600,7 +1611,7 @@ export default function AdminPage() {
                             <BadgeCheck className="h-3.5 w-3.5" />Vérification KYC
                           </button>
                           <button
-                            onClick={() => enableSrM.mutate({ userId: u.id, apiSrEnabled: !(u as any).apiSrEnabled })}
+                            onClick={() => setSrConfirmDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, enable: !(u as any).apiSrEnabled })}
                             disabled={enableSrM.isPending}
                             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors border ${(u as any).apiSrEnabled ? "bg-green-500/15 text-green-700 dark:text-green-400 hover:bg-green-500/25 border-green-500/30" : "bg-orange-500/10 text-orange-700 dark:text-orange-400 hover:bg-orange-500/20 border-orange-500/30"}`}
                             data-testid={`btn-sr-${u.id}`}>
@@ -3349,6 +3360,44 @@ export default function AdminPage() {
               data-testid="btn-confirm-admin-wd"
             >
               {wdM.isPending ? "Envoi en cours…" : "Confirmer le retrait"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOG CONFIRMATION SR PAR UTILISATEUR ── */}
+      <Dialog open={!!srConfirmDialog} onOpenChange={o => { if (!o) setSrConfirmDialog(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-lg ${srConfirmDialog?.enable ? "bg-gradient-to-br from-orange-500 to-orange-600" : "bg-gradient-to-br from-slate-400 to-slate-500"}`}>
+              <Zap className="h-6 w-6 text-white" />
+            </div>
+            <DialogTitle className="text-center">
+              {srConfirmDialog?.enable ? "Activer API SR" : "Désactiver API SR"}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {srConfirmDialog?.enable
+                ? <>Voulez-vous activer l'option <strong>API SR (Sans Redirection)</strong> pour <strong>{srConfirmDialog?.name}</strong> ?<br /><br />L'utilisateur pourra créer sa clé SR uniquement si son KYC est vérifié.</>
+                : <>Voulez-vous <strong>désactiver</strong> l'option API SR pour <strong>{srConfirmDialog?.name}</strong> ?</>
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              className={`w-full font-bold gap-2 ${srConfirmDialog?.enable ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-slate-600 hover:bg-slate-700 text-white"}`}
+              disabled={enableSrM.isPending}
+              onClick={() => {
+                if (!srConfirmDialog) return;
+                enableSrM.mutate({ userId: srConfirmDialog.userId, apiSrEnabled: srConfirmDialog.enable });
+                setSrConfirmDialog(null);
+              }}
+              data-testid="btn-confirm-sr-user"
+            >
+              <Zap className="h-4 w-4" />
+              {enableSrM.isPending ? "En cours…" : (srConfirmDialog?.enable ? "Confirmer l'activation" : "Confirmer la désactivation")}
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => setSrConfirmDialog(null)}>
+              Annuler
             </Button>
           </DialogFooter>
         </DialogContent>
