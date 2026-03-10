@@ -14,12 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -734,7 +729,6 @@ export default function ApiKeysPage() {
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [kycGateOpen, setKycGateOpen] = useState(false);
-  const [srPanelOpen, setSrPanelOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
@@ -959,10 +953,9 @@ export default function ApiKeysPage() {
           </div>
         )}
         {currentUser?.apiSrEnabled && currentUser?.kycStatus === "verified" && (
-          <>
-            <button
-              onClick={() => setSrPanelOpen(true)}
-              className="w-full group relative rounded-2xl overflow-hidden border border-green-500/30 shadow-lg shadow-green-900/10 text-left"
+          <Link href="/sr-api">
+            <div
+              className="w-full group relative rounded-2xl overflow-hidden border border-green-500/30 shadow-lg shadow-green-900/10 cursor-pointer"
               style={{ background: "linear-gradient(135deg, hsl(145 60% 7%) 0%, hsl(160 50% 6%) 100%)" }}
               data-testid="button-open-sr-panel"
             >
@@ -976,28 +969,12 @@ export default function ApiKeysPage() {
                     <span className="font-black text-sm text-green-300 uppercase tracking-wide">Gestion des clés API SR</span>
                     <span className="px-2 py-0.5 rounded-full bg-green-500/20 border border-green-500/30 text-[10px] font-bold text-green-400 uppercase tracking-wider">Sans Redirection</span>
                   </div>
-                  <p className="text-xs text-green-300/50 mt-0.5">Clé SR, configuration webhook, documentation</p>
+                  <p className="text-xs text-green-300/50 mt-0.5">Clé SR, configuration webhook, documentation complète</p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-green-400/60 flex-shrink-0 group-hover:text-green-400 transition-colors -rotate-90" />
               </div>
-            </button>
-
-            <Sheet open={srPanelOpen} onOpenChange={setSrPanelOpen}>
-              <SheetContent side="bottom" className="h-[95dvh] p-0 rounded-t-3xl overflow-hidden flex flex-col">
-                <SheetHeader className="px-5 pt-5 pb-3 border-b border-border/50 flex-shrink-0">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-xl bg-green-500/15 flex items-center justify-center border border-green-500/30">
-                      <Bolt className="h-5 w-5 text-green-600" />
-                    </div>
-                    <SheetTitle className="text-base font-black">Gestion des clés API SR</SheetTitle>
-                  </div>
-                </SheetHeader>
-                <div className="flex-1 overflow-y-auto p-5">
-                  <SrSection allKeys={apiKeys || []} />
-                </div>
-              </SheetContent>
-            </Sheet>
-          </>
+            </div>
+          </Link>
         )}
       </div>
 

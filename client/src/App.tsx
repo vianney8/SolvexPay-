@@ -23,6 +23,7 @@ import PayApiPage from "@/pages/pay-api";
 import AdminPage from "@/pages/admin";
 import SupportPage from "@/pages/support";
 import DocumentationPage from "@/pages/documentation";
+import SrApiPage from "@/pages/sr-api";
 
 const PREFETCH_KEYS = [
   ["/api/wallet"],
@@ -51,6 +52,7 @@ function AuthenticatedRoutes() {
       <Route path="/admin" component={AdminPage} />
       <Route path="/support" component={SupportPage} />
       <Route path="/documentation" component={DocumentationPage} />
+      <Route path="/sr-api" component={SrApiPage} />
       <Route component={NotFound} />
     </Switch>
   );
