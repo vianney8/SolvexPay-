@@ -851,6 +851,14 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { eq: eqFn } = await import("drizzle-orm");
       const { transactions: txTable } = await import("@shared/schema");
+      // Recalculer les frais avec le taux correct (par pays > par opérateur > global)
+      // selon que c'est un lien de paiement (feePLink) ou une API simple (feeApi)
+      const isPaymentLink = !(transaction as any).apiKeyId || (transaction as any).type === "payment_link";
+      const feeColumn = isPaymentLink ? "feePLink" : "feeApi";
+      const globalFallbackKey = isPaymentLink ? "fee_deposit" : "fee_api";
+      const globalFallback = parseFloat((await storage.getSystemSetting(globalFallbackKey)) || "7");
+      const recalcFeeRate = (await getOperatorFeeRate(operator.toUpperCase(), feeColumn, globalFallback, country)) / 100;
+      const recalcFees = Math.round(amount * recalcFeeRate);
       await db.update(txTable).set({
         phoneNumber,
         provider: operator.toUpperCase(),
@@ -858,6 +866,7 @@ export async function registerRoutes(
         payerEmail: customerEmail || null,
         payerCountry: country,
         payerOperator: operator.toUpperCase(),
+        fees: String(recalcFees),
       } as any).where(eqFn(txTable.id, id));
       res.json({
         reference: transaction.reference,

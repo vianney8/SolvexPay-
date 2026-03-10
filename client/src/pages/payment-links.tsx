@@ -47,7 +47,8 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
   const [imageUrl, setImageUrl] = useState(editLink?.imageUrl || "");
   const [imagePreview, setImagePreview] = useState(editLink?.imageUrl || "");
   const [uploading, setUploading] = useState(false);
-  const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
+  const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number; api: number }>({ queryKey: ["/api/service-fees"] });
+  // Taux de frais pour les liens de paiement — sans opérateur/pays connus à la création, on utilise le taux global
   const feeRate = (serviceFees?.deposit ?? 7) / 100;
 
   const createMutation = useMutation({
@@ -240,7 +241,7 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
                   <span className="font-semibold" data-testid="text-preview-amount">{formatCurrency(previewAmount)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Frais d'encaissement (4%)</span>
+                  <span className="text-muted-foreground">Frais d'encaissement ({Math.round(feeRate * 100)}%)</span>
                   <span className="text-destructive font-medium" data-testid="text-preview-fees">- {formatCurrency(fees)}</span>
                 </div>
                 <Separator />
