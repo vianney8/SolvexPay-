@@ -29,6 +29,32 @@ const verifyLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// ─── In-memory payment error store (last 300 errors) ─────────────────────────
+interface PaymentErrorEntry {
+  id: string;
+  message: string;
+  country: string;
+  type: "deposit" | "withdrawal" | "transfer";
+  operator: string;
+  userId: string;
+  source: string;
+  timestamp: Date;
+}
+
+const PAYMENT_ERRORS_MAX = 300;
+const paymentErrorStore: PaymentErrorEntry[] = [];
+
+function logPaymentError(entry: Omit<PaymentErrorEntry, "id" | "timestamp">) {
+  paymentErrorStore.unshift({
+    ...entry,
+    id: Math.random().toString(36).slice(2),
+    timestamp: new Date(),
+  });
+  if (paymentErrorStore.length > PAYMENT_ERRORS_MAX) {
+    paymentErrorStore.splice(PAYMENT_ERRORS_MAX);
+  }
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
@@ -409,6 +435,14 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Error creating deposit:", error);
+      logPaymentError({
+        message: error.message || "Erreur inconnue",
+        country: req.body?.country || "??",
+        type: "deposit",
+        operator: req.body?.operator || "??",
+        userId: (req as any).user?.id || "anonymous",
+        source: "dashboard",
+      });
       res.status(500).json({ message: error.message || "Echec du depot" });
     }
   });
@@ -532,6 +566,14 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Error creating withdrawal:", error);
+      logPaymentError({
+        message: error.message || "Erreur inconnue",
+        country: req.body?.country || "??",
+        type: "withdrawal",
+        operator: req.body?.operator || "??",
+        userId: (req as any).user?.id || "anonymous",
+        source: "dashboard",
+      });
       res.status(500).json({ message: error.message || "Echec du retrait" });
     }
   });
@@ -824,6 +866,14 @@ export async function registerRoutes(
       });
     } catch (err: any) {
       console.error("payment-api/public/:id/pay error:", err);
+      logPaymentError({
+        message: err.message || "Erreur inconnue",
+        country: req.body?.country || "??",
+        type: "deposit",
+        operator: req.body?.operator || "??",
+        userId: "payment-link",
+        source: "payment-link",
+      });
       res.status(500).json({ message: err.message || "Erreur lors du paiement" });
     }
   });
@@ -1766,6 +1816,14 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("SR pay error:", error);
+      logPaymentError({
+        message: error.message || "Erreur inconnue",
+        country: req.body?.country || "??",
+        type: "deposit",
+        operator: req.body?.operator || "??",
+        userId: "sr-api",
+        source: "sr-api",
+      });
       res.status(500).json({ error: { code: "SERVER_ERROR", message: error.message || "Erreur interne.", status: 500 } });
     }
   });
@@ -3202,6 +3260,36 @@ export async function registerRoutes(
     } catch (error) {
       res.status(500).json({ message: "Erreur" });
     }
+  });
+
+  // ─── Admin: recent payment errors ────────────────────────────────────────────
+  app.get("/api/admin/payment-errors", isAdmin, (_req, res) => {
+    // Aggregate: group by (message, country, type, operator), count unique userIds
+    const groups: Record<string, {
+      message: string; country: string; type: string; operator: string; source: string;
+      count: number; userIds: Set<string>; lastSeen: Date;
+    }> = {};
+
+    for (const err of paymentErrorStore) {
+      const key = `${err.message}|${err.country}|${err.type}|${err.operator}`;
+      if (!groups[key]) {
+        groups[key] = { message: err.message, country: err.country, type: err.type, operator: err.operator, source: err.source, count: 0, userIds: new Set(), lastSeen: err.timestamp };
+      }
+      groups[key].count++;
+      groups[key].userIds.add(err.userId);
+      if (err.timestamp > groups[key].lastSeen) groups[key].lastSeen = err.timestamp;
+    }
+
+    const result = Object.values(groups)
+      .map(g => ({ message: g.message, country: g.country, type: g.type, operator: g.operator, source: g.source, count: g.count, affectedUsers: g.userIds.size, lastSeen: g.lastSeen }))
+      .sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
+
+    res.json({ errors: result, total: paymentErrorStore.length });
+  });
+
+  app.delete("/api/admin/payment-errors", isAdmin, (_req, res) => {
+    paymentErrorStore.splice(0);
+    res.json({ success: true });
   });
 
   // ─── END ADMIN ROUTES ──────────────────────────────────────────────────────

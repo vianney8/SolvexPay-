@@ -373,6 +373,21 @@ export default function AdminPage() {
     staleTime: 60000,
   });
   const suspendedCountryCodes = suspendedCountriesData?.codes || [];
+
+  const { data: paymentErrorsData, isLoading: errorsLoading, refetch: refetchErrors } = useQuery<{ errors: any[]; total: number }>({
+    queryKey: ["/api/admin/payment-errors"],
+    enabled: activeTab === "errors",
+    refetchInterval: activeTab === "errors" ? 15000 : false,
+    staleTime: 10000,
+  });
+  const clearErrorsM = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/admin/payment-errors"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-errors"] });
+      toast({ title: "Journal effacé" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
   const suspendCountryM = useMutation({
     mutationFn: (codes: string[]) => apiRequest("POST", "/api/admin/suspended-countries", { codes }),
     onSuccess: () => {
@@ -706,6 +721,7 @@ export default function AdminPage() {
                 { v: "notifications", label: "Notifications", Icon: Bell, badge: (adminNotifications || []).filter((n: any) => n.isActive).length },
                 { v: "support-links", label: "Liens Support", Icon: HeadphonesIcon, badge: 0 },
                 { v: "settings", label: "Paramètres", Icon: Settings2, badge: 0 },
+                { v: "errors", label: "Erreurs système", Icon: AlertTriangle, badge: 0 },
               ].map(({ v, label, Icon, badge }) => (
                 <TabsTrigger key={v} value={v} className="gap-1.5 text-xs py-2 px-3 rounded-xl whitespace-nowrap relative" data-testid={`tab-${v}`}>
                   <Icon className="h-3.5 w-3.5 flex-shrink-0" />{label}
@@ -3007,6 +3023,87 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ══════════════════════════════════════════════════════════
+              ONGLET : ERREURS SYSTÈME
+          ══════════════════════════════════════════════════════════ */}
+          <TabsContent value="errors" className="space-y-4 mt-5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-500" />
+                  Erreurs de paiement récentes
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Actualisé toutes les 15 secondes — {paymentErrorsData?.total ?? 0} erreur(s) en mémoire (max 300)
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => refetchErrors()} className="gap-1.5 text-xs" data-testid="btn-refresh-errors">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Actualiser
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => clearErrorsM.mutate()} disabled={clearErrorsM.isPending || (paymentErrorsData?.errors?.length ?? 0) === 0} className="gap-1.5 text-xs" data-testid="btn-clear-errors">
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Effacer le journal
+                </Button>
+              </div>
+            </div>
+
+            {errorsLoading ? (
+              <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}</div>
+            ) : !paymentErrorsData?.errors?.length ? (
+              <Card className="rounded-2xl">
+                <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
+                  <CheckCircle2 className="h-10 w-10 text-green-500" />
+                  <p className="font-semibold text-base">Aucune erreur récente</p>
+                  <p className="text-xs text-muted-foreground max-w-xs">Les erreurs de paiement OmniPay apparaissent ici dès qu'elles surviennent.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {paymentErrorsData.errors.map((err: any, i: number) => (
+                  <Card key={i} className="rounded-2xl border-orange-200 dark:border-orange-900/40" data-testid={`card-error-${i}`}>
+                    <CardContent className="py-3 px-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <Badge variant="outline" className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${err.type === "deposit" ? "border-blue-400 text-blue-600 bg-blue-50 dark:bg-blue-950/40" : err.type === "withdrawal" ? "border-purple-400 text-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-400 text-gray-600"}`} data-testid={`badge-type-${i}`}>
+                              {err.type === "deposit" ? "Dépôt" : err.type === "withdrawal" ? "Retrait" : "Transfert"}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 rounded-full border-slate-300 text-slate-600" data-testid={`badge-country-${i}`}>
+                              <Globe className="h-3 w-3 mr-1 inline" />{err.country}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px] px-2 py-0.5 rounded-full border-slate-200 text-slate-500" data-testid={`badge-operator-${i}`}>
+                              {err.operator}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px] px-2 py-0.5 rounded-full border-slate-200 text-slate-400" data-testid={`badge-source-${i}`}>
+                              {err.source}
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-medium text-orange-700 dark:text-orange-300 truncate" title={err.message} data-testid={`text-error-msg-${i}`}>{err.message}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5" data-testid={`text-error-time-${i}`}>
+                            Dernière occurrence : {new Date(err.lastSeen).toLocaleString("fr-FR")}
+                          </p>
+                        </div>
+                        <div className="flex gap-4 sm:flex-col sm:items-end text-center sm:text-right shrink-0">
+                          <div>
+                            <p className="text-xl font-black text-orange-600 dark:text-orange-400 leading-none" data-testid={`text-error-count-${i}`}>{err.count}</p>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide">occurrences</p>
+                          </div>
+                          <div>
+                            <p className="text-xl font-black text-rose-600 dark:text-rose-400 leading-none" data-testid={`text-error-users-${i}`}>{err.affectedUsers}</p>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide">utilisateur(s)</p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
         </Tabs>
       </div>
 
