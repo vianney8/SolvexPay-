@@ -1703,7 +1703,11 @@ export async function registerRoutes(
           },
         });
       }
-      const returnUrl = isWave ? srRedirectUrl! : undefined;
+      // Pour Wave : on pointe vers notre callback SR (qui vérifie le statut + crédite le solde),
+      // lequel redirigera ensuite l'utilisateur vers srRedirectUrl.
+      const returnUrl = isWave
+        ? `https://solvexpay.com/api/v1/sr/wave-callback?reference=${reference}&redirect=${encodeURIComponent(srRedirectUrl!)}`
+        : undefined;
 
       // ── Appel OmniPay ──
       const omnipayResponse = await omniPayService.deposit({
@@ -1762,6 +1766,44 @@ export async function registerRoutes(
       console.error("SR pay error:", error);
       res.status(500).json({ error: { code: "SERVER_ERROR", message: error.message || "Erreur interne.", status: 500 } });
     }
+  });
+
+  // ─── SR API — CALLBACK WAVE (GET redirect depuis Wave) ───────────────────────
+  app.get("/api/v1/sr/wave-callback", async (req, res) => {
+    const { reference, redirect } = req.query as Record<string, string>;
+    console.log(`[SR Wave Callback] reference=${reference} redirect=${redirect}`);
+
+    if (reference) {
+      try {
+        const result = await omniPayService.getStatus(reference);
+        const statusStr = omnipayStatusToString(result.status ?? 0);
+        const transaction = await storage.getTransactionByReference(reference);
+
+        if (transaction && transaction.status === "pending") {
+          if (statusStr === "completed") {
+            await storage.updateTransactionStatus(transaction.id, "completed");
+            if (transaction.type === "deposit") {
+              const grossAmt = parseFloat(transaction.amount);
+              const txFees = parseFloat((transaction as any).fees || "0") || 0;
+              const netAmt = grossAmt - txFees;
+              await storage.updateWalletBalance(
+                transaction.userId,
+                transaction.currency,
+                netAmt > 0 ? netAmt : grossAmt
+              );
+            }
+          } else if (statusStr === "failed") {
+            await storage.updateTransactionStatus(transaction.id, "failed");
+          }
+        }
+      } catch (err) {
+        console.error("[SR Wave Callback] Error verifying status:", err);
+      }
+    }
+
+    // Redirige l'utilisateur vers l'URL du marchand
+    const merchantRedirect = redirect && typeof redirect === "string" ? redirect : "https://solvexpay.com";
+    res.redirect(merchantRedirect);
   });
 
   // ─── END API V1 ───────────────────────────────────────────────────────────────
