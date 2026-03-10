@@ -30,10 +30,15 @@ function isPaymentLink(tx: Transaction) {
 }
 
 function isApiPayment(tx: Transaction) {
-  return !!(tx as any).apiKeyId || tx.description?.startsWith("Paiement via API") || tx.description?.startsWith("Dépôt via API");
+  return !!(tx as any).apiKeyId || tx.description?.startsWith("Paiement via API") || tx.description?.startsWith("Dépôt via API") || tx.description?.startsWith("Paiement API SR");
+}
+
+function isSrApiPayment(tx: Transaction) {
+  return tx.description?.startsWith("Paiement API SR");
 }
 
 function getTypeIcon(tx: Transaction) {
+  if (isSrApiPayment(tx)) return { icon: ArrowDownLeft, bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400" };
   if (tx.type === "deposit") return { icon: ArrowDownLeft, bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400" };
   if (tx.type === "transfer") return { icon: ArrowLeftRight, bg: "bg-violet-500/10", text: "text-violet-600 dark:text-violet-400" };
   return { icon: ArrowUpRight, bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400" };
@@ -41,6 +46,7 @@ function getTypeIcon(tx: Transaction) {
 
 function getTypeLabel(tx: Transaction) {
   if (isPaymentLink(tx)) return "Paiement par lien";
+  if (isSrApiPayment(tx)) return "Paiement API SR";
   if (isApiPayment(tx)) return "Paiement API";
   if (tx.type === "deposit") return "Dépôt";
   if (tx.type === "transfer") return "Transfert";

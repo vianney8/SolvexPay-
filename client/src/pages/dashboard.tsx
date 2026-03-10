@@ -281,8 +281,9 @@ export default function DashboardPage() {
                   <div className="divide-y divide-border/40">
                     {recentTransactions.map((tx) => {
                       const isPayLink = tx.description?.startsWith("Paiement via lien:");
-                      const isApiPay = !!(tx as any).apiKeyId || tx.description?.startsWith("Paiement via API") || tx.description?.startsWith("Dépôt via API");
-                      const label = isPayLink ? "Paiement" : isApiPay ? "Paiement API" : tx.type === "deposit" ? "Dépôt" : tx.type === "transfer" ? "Transfert" : "Retrait";
+                      const isSrPay = tx.description?.startsWith("Paiement API SR");
+                      const isApiPay = !!(tx as any).apiKeyId || tx.description?.startsWith("Paiement via API") || tx.description?.startsWith("Dépôt via API") || isSrPay;
+                      const label = isPayLink ? "Paiement" : isSrPay ? "Paiement API SR" : isApiPay ? "Paiement API" : tx.type === "deposit" ? "Dépôt" : tx.type === "transfer" ? "Transfert" : "Retrait";
                       const provider = tx.provider && tx.provider.toLowerCase() !== "omnipay" ? tx.provider : null;
                       return (
                         <div key={tx.id} className="flex items-center gap-3 py-3 hover:bg-muted/30 rounded-xl px-2 transition-colors group" data-testid={`transaction-item-${tx.id}`}>

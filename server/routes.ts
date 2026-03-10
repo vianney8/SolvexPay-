@@ -1713,7 +1713,7 @@ export async function registerRoutes(
         phoneNumber: phone,
         reference,
         status: "pending",
-        description: description || "Paiement API SR",
+        description: description ? `Paiement API SR — ${description}` : "Paiement API SR",
         fees: String(fees),
         payerName: customer_name || null,
         payerEmail: customer_email || null,
