@@ -168,6 +168,12 @@ function SrSection({ allKeys }: { allKeys: ApiKey[] }) {
   const [deleteSrId, setDeleteSrId] = useState<string | null>(null);
   const [docSection, setDocSection] = useState<string | null>("quickstart");
 
+  const { data: suspendedData } = useQuery<{ codes: string[] }>({ queryKey: ["/api/public/suspended-countries"], staleTime: 60000 });
+  const suspendedCodes = suspendedData?.codes || [];
+
+  const activeSrCountries = SR_COUNTRIES.filter(c => !suspendedCodes.includes(c.code));
+  const activeSrOperators = SR_OPERATORS.filter(op => op.countries.some(c => !suspendedCodes.includes(c)));
+
   const srKey = allKeys.find((k) => (k as any).isSrKey);
 
   const createSrMutation = useMutation({
@@ -360,7 +366,7 @@ Content-Type: application/json`}</pre>
                       </tr>
                     </thead>
                     <tbody>
-                      {SR_COUNTRIES.map((c) => (
+                      {activeSrCountries.map((c) => (
                         <tr key={c.code} className="border-b border-green-500/5 text-green-300/80">
                           <td className="py-2 pr-3 font-medium">{c.name}</td>
                           <td className="py-2 pr-3"><code className="bg-green-500/10 px-1.5 py-0.5 rounded text-green-400">{c.code}</code></td>
@@ -391,7 +397,7 @@ Content-Type: application/json`}</pre>
               <div className="bg-black/40 border border-green-500/10 rounded-2xl p-4 space-y-3 text-xs">
                 <p className="text-green-300/70 text-[11px]">Certains opérateurs nécessitent un OTP (mot de passe à usage unique) que le client doit fournir avant le paiement.</p>
                 <div className="space-y-2">
-                  {SR_OPERATORS.map((op) => (
+                  {activeSrOperators.map((op) => (
                     <div key={op.code} className="bg-black/30 rounded-xl p-3 border border-green-500/10 flex items-start gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -404,7 +410,7 @@ Content-Type: application/json`}</pre>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1 mb-1">
-                          {op.countries.map((c) => <code key={c} className="bg-black/40 px-1 py-0.5 rounded border border-green-500/10 text-green-400/70 text-[9px]">{c}</code>)}
+                          {op.countries.filter(c => !suspendedCodes.includes(c)).map((c) => <code key={c} className="bg-black/40 px-1 py-0.5 rounded border border-green-500/10 text-green-400/70 text-[9px]">{c}</code>)}
                         </div>
                         <p className="text-green-300/50 text-[10px]">{op.note}</p>
                       </div>

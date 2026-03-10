@@ -158,7 +158,7 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
                   </div>
                 </div>
                 <p className="text-white/80 text-sm leading-relaxed">
-                  Intégrez les paiements Mobile Money dans votre application en quelques lignes de code. SolvexPay agrège 8 opérateurs dans 9 pays africains via notre partenaire OmniPay.
+                  Intégrez les paiements Mobile Money dans votre application en quelques lignes de code. SolvexPay agrège 8 opérateurs dans 9 pays africains.
                 </p>
                 <div className="flex flex-wrap gap-2 mt-4">
                   <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">REST · JSON</span>
