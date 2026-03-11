@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Plus, Copy, Trash2, Eye, EyeOff, Webhook, Check, AlertTriangle,
   Bolt, Code2, Info, CheckCircle2, XCircle, AlertCircle, ArrowLeft, ClipboardList,
+  Lock, MessageCircle,
 } from "lucide-react";
 import { Link } from "wouter";
 import type { ApiKey } from "@shared/schema";
@@ -250,13 +253,22 @@ Formule : net_amount = amount - fees = amount × (1 - taux)
 
 export default function SrApiPage() {
   const { toast } = useToast();
+  const { user, isLoading: authLoading } = useAuth();
   const [createSrOpen, setCreateSrOpen] = useState(false);
   const [srKeyName, setSrKeyName] = useState("");
   const [visibleSrKey, setVisibleSrKey] = useState(false);
   const [deleteSrId, setDeleteSrId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
 
-  const { data: apiKeys } = useQuery<ApiKey[]>({ queryKey: ["/api/api-keys"] });
+  const { data: supportLinks } = useQuery<Record<string, string>>({
+    queryKey: ["/api/support-links"],
+    staleTime: 60_000,
+  });
+
+  const { data: apiKeys } = useQuery<ApiKey[]>({
+    queryKey: ["/api/api-keys"],
+    enabled: !!(user as any)?.apiSrEnabled,
+  });
   const { data: suspendedData } = useQuery<{ codes: string[] }>({ queryKey: ["/api/public/suspended-countries"], staleTime: 60000 });
   const suspendedCodes = suspendedData?.codes || [];
   const activeSrCountries = SR_COUNTRIES.filter(c => !suspendedCodes.includes(c.code));
@@ -312,6 +324,62 @@ export default function SrApiPage() {
 
   const currentWebhookUrl = srKey ? ((srKey as any).webhookUrl || "") : "";
   const currentRedirectUrl = srKey ? ((srKey as any).redirectUrl || "") : "";
+
+  if (authLoading) {
+    return (
+      <DashboardLayout title="API SR" breadcrumbs={[{ label: "Clés API", href: "/api-keys" }, { label: "API SR" }]}>
+        <div className="max-w-3xl space-y-4 py-8">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-4 w-96" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!(user as any)?.apiSrEnabled) {
+    const whatsappUrl = supportLinks?.support_link_whatsapp_direct || "https://wa.me/22891840498";
+    return (
+      <DashboardLayout title="API SR" breadcrumbs={[{ label: "Clés API", href: "/api-keys" }, { label: "API SR" }]}>
+        <div className="max-w-md mx-auto py-16 flex flex-col items-center text-center space-y-6">
+          <div className="h-24 w-24 rounded-3xl bg-muted flex items-center justify-center">
+            <Lock className="h-12 w-12 text-muted-foreground" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Accès restreint</p>
+            <h1 className="text-2xl font-black text-foreground">Option non activée</h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              L'API SR (sans redirection) n'est pas activée sur votre compte. Cette option est réservée aux partenaires disposant d'un accord commercial avec SolvexPay.
+            </p>
+          </div>
+          <div className="w-full border border-border rounded-2xl p-4 bg-muted/30 text-left space-y-2">
+            <p className="text-xs font-bold text-foreground">Pour faire une demande de partenariat :</p>
+            <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+              <li>Contactez notre équipe via WhatsApp</li>
+              <li>Présentez votre projet et vos besoins d'intégration</li>
+              <li>L'accès sera activé manuellement après validation</li>
+            </ul>
+          </div>
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2.5 px-6 py-3.5 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl text-sm transition-colors"
+            data-testid="link-sr-whatsapp-contact"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Contacter le support WhatsApp
+          </a>
+          <p className="text-xs text-muted-foreground">
+            Vous avez déjà fait une demande ?{" "}
+            <Link href="/support" className="text-primary hover:underline font-semibold">
+              Voir la page support
+            </Link>
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="API SR" breadcrumbs={[{ label: "Clés API", href: "/api-keys" }, { label: "API SR" }]}>
