@@ -39,10 +39,12 @@ function parsePhoneNumber(raw: string): { countryCode: string | null; localNumbe
     const intlPrefix = c.prefix;
     const digitsOnly = intlPrefix.replace("+", "");
     if (normalized.startsWith(intlPrefix)) {
-      return { countryCode: c.code, localNumber: normalized.slice(intlPrefix.length) };
+      const local = normalized.slice(intlPrefix.length).replace(/^0+/, "");
+      return { countryCode: c.code, localNumber: local };
     }
     if (normalized.startsWith("00" + digitsOnly)) {
-      return { countryCode: c.code, localNumber: normalized.slice(2 + digitsOnly.length) };
+      const local = normalized.slice(2 + digitsOnly.length).replace(/^0+/, "");
+      return { countryCode: c.code, localNumber: local };
     }
   }
   return { countryCode: null, localNumber: normalized };
