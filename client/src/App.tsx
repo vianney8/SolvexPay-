@@ -37,9 +37,9 @@ const PREFETCH_KEYS = [
   ["/api/api-keys"],
 ];
 
-interface ErrorBoundaryState { hasError: boolean; error?: Error }
+interface EBState { hasError: boolean; error?: Error }
 
-class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+class GlobalErrorBoundary extends Component<{ children: ReactNode }, EBState> {
   constructor(props: { children: ReactNode }) {
     super(props);
     this.state = { hasError: false };
@@ -75,6 +75,61 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
+class AdminErrorBoundary extends Component<{ children: ReactNode }, EBState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch() {
+    this.setState({ hasError: true });
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-6">
+          <div className="max-w-sm w-full text-center space-y-5">
+            <div className="h-20 w-20 rounded-3xl bg-red-500/10 flex items-center justify-center mx-auto">
+              <svg className="h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-foreground">Erreur dans le panneau admin</h1>
+              <p className="text-muted-foreground mt-2 text-sm">Le reste du site fonctionne normalement. Rechargez la page pour réessayer.</p>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => this.setState({ hasError: false })}
+                className="inline-flex items-center justify-center px-4 py-2.5 bg-muted text-foreground font-semibold rounded-xl text-sm hover:bg-muted/80 transition-colors"
+              >
+                Réessayer
+              </button>
+              <button
+                onClick={() => { this.setState({ hasError: false }); window.location.href = "/dashboard"; }}
+                className="inline-flex items-center justify-center px-4 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl text-sm hover:bg-primary/90 transition-colors"
+              >
+                Retour au dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AdminPageWrapped() {
+  return (
+    <AdminErrorBoundary>
+      <AdminPage />
+    </AdminErrorBoundary>
+  );
+}
+
 function AuthenticatedRoutes() {
   return (
     <Switch>
@@ -87,7 +142,7 @@ function AuthenticatedRoutes() {
       <Route path="/api-keys" component={ApiKeysPage} />
       <Route path="/kyc" component={KycPage} />
       <Route path="/settings" component={SettingsPage} />
-      <Route path="/admin" component={AdminPage} />
+      <Route path="/admin" component={AdminPageWrapped} />
       <Route path="/support" component={SupportPage} />
       <Route path="/documentation" component={DocumentationPage} />
       <Route path="/sr-api" component={SrApiPage} />
@@ -172,9 +227,9 @@ function App() {
       <ThemeProvider>
         <TooltipProvider>
           <Toaster />
-          <ErrorBoundary>
+          <GlobalErrorBoundary>
             <Router />
-          </ErrorBoundary>
+          </GlobalErrorBoundary>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

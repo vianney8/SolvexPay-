@@ -762,7 +762,7 @@ export async function registerRoutes(
 
   app.get("/api/payment-api/public/:id", async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const transaction = await storage.getTransactionById(id);
       if (!transaction || (transaction as any).apiKeyId === null || (transaction as any).apiKeyId === undefined) {
         return res.status(404).json({ message: "Paiement introuvable" });
@@ -808,7 +808,7 @@ export async function registerRoutes(
 
   app.post("/api/payment-api/public/:id/pay", async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const transaction = await storage.getTransactionById(id);
       if (!transaction || transaction.status !== "pending") {
         return res.status(404).json({ message: "Paiement introuvable ou déjà traité" });
@@ -889,7 +889,7 @@ export async function registerRoutes(
 
   app.post("/api/payment-api/public/:id/verify", verifyLimiter, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const transaction = await storage.getTransactionById(id);
       if (!transaction) {
         return res.status(404).json({ message: "Paiement introuvable" });
@@ -974,7 +974,7 @@ export async function registerRoutes(
 
   app.patch("/api/payment-links/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const validation = updatePaymentLinkSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ message: validation.error.errors[0].message });
@@ -1000,7 +1000,7 @@ export async function registerRoutes(
 
   app.delete("/api/payment-links/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { db } = await import("./db");
       const { paymentLinks: plTable } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
@@ -1201,7 +1201,7 @@ export async function registerRoutes(
 
   app.get("/api/payment-links/public/:slug", async (req, res) => {
     try {
-      const { slug } = req.params;
+      const { slug } = req.params as Record<string, string>;
       const paymentLink = await storage.getPaymentLinkBySlug(slug);
       
       if (!paymentLink) {
@@ -1228,7 +1228,7 @@ export async function registerRoutes(
 
   app.post("/api/payment-links/public/:slug/pay", async (req, res) => {
     try {
-      const { slug } = req.params;
+      const { slug } = req.params as Record<string, string>;
       
       const validation = publicPaySchema.safeParse(req.body);
       if (!validation.success) {
@@ -1396,7 +1396,7 @@ export async function registerRoutes(
 
   app.patch("/api/api-keys/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const validation = updateApiKeySchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ message: validation.error.errors[0].message });
@@ -1427,7 +1427,7 @@ export async function registerRoutes(
 
   app.delete("/api/api-keys/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       await storage.deleteApiKey(id);
       res.json({ success: true });
     } catch (error) {
@@ -1586,7 +1586,7 @@ export async function registerRoutes(
 
   app.get("/api/v1/transactions/:id", authenticateApiKey, async (req: any, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const transaction = await storage.getTransactionById(id);
       if (!transaction || transaction.userId !== req.merchantUserId) {
         return res.status(404).json({ error: { code: "NOT_FOUND", message: "Transaction introuvable.", status: 404 } });
@@ -1619,7 +1619,7 @@ export async function registerRoutes(
   // ── Merchant: manually check/sync a transaction status from OmniPay ─────────
   app.post("/api/v1/transactions/:id/verify", authenticateApiKey, async (req: any, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const transaction = await storage.getTransactionById(id);
       if (!transaction || transaction.userId !== req.merchantUserId) {
         return res.status(404).json({ error: { code: "NOT_FOUND", message: "Transaction introuvable.", status: 404 } });
@@ -2214,7 +2214,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/transactions/:id/status", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { status } = req.body;
       if (!["pending", "completed", "failed"].includes(status)) {
         return res.status(400).json({ message: "Statut invalide" });
@@ -2298,7 +2298,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/users/:id/password", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { password } = req.body;
       if (!password || password.length < 6) {
         return res.status(400).json({ message: "Le mot de passe doit contenir au moins 6 caractères" });
@@ -2318,7 +2318,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/users/:id/balance", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { amount, motif } = req.body;
       if (typeof amount !== "number") {
         return res.status(400).json({ message: "Montant invalide" });
@@ -2349,7 +2349,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/users/:id/toggle-admin", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { isAdmin: adminVal } = req.body;
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
@@ -2369,7 +2369,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/users/:id/kyc", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { kycStatus, rejectionReason } = req.body;
       if (!["not_started", "pending", "verified", "rejected"].includes(kycStatus)) {
         return res.status(400).json({ message: "Statut KYC invalide" });
@@ -2392,7 +2392,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/users/:id/block", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { isBlocked } = req.body;
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
@@ -2409,7 +2409,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/users/:id/fee", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { customFeeRate } = req.body;
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
@@ -2438,7 +2438,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/users/:id/enable-sr", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { apiSrEnabled } = req.body;
       if (typeof apiSrEnabled !== "boolean") {
         return res.status(400).json({ message: "apiSrEnabled doit être un booléen" });
@@ -2457,7 +2457,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/users/:id/transactions", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const txList = await storage.getTransactions(id);
       res.json(txList);
     } catch (error) {
@@ -2899,7 +2899,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/payment-methods/:code", isAdmin, async (req, res) => {
     try {
-      const { code } = req.params;
+      const { code } = req.params as Record<string, string>;
       const { isActive, inMaintenance, maintenanceCountries, withdrawalMaintenance, withdrawalMaintenanceCountries, feeValue, feeType, feeDeposit, feeWithdrawal, feePLink, feeApi, countryFees } = req.body;
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
@@ -2979,7 +2979,7 @@ export async function registerRoutes(
         lastName,
         operator,
       });
-      const statusStr = omnipayStatusToString(transferResult.status ?? 0);
+      const statusStr = omnipayStatusToString((transferResult as any).status ?? 0);
       const [inserted] = await db.insert(adminWithdrawals).values({
         amount: String(parsedAmount),
         phoneNumber,
@@ -3015,7 +3015,7 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { adminWithdrawals } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
-      const [wd] = await db.select().from(adminWithdrawals).where(eq(adminWithdrawals.id, req.params.id));
+      const [wd] = await db.select().from(adminWithdrawals).where(eq(adminWithdrawals.id, req.params.id as string));
       if (!wd) return res.status(404).json({ message: "Retrait introuvable" });
       const result = await omniPayService.getStatus(wd.reference);
       const statusStr = omnipayStatusToString(result.status ?? 0);
@@ -3049,7 +3049,7 @@ export async function registerRoutes(
   // Admin deposit into a user wallet via OmniPay
   app.post("/api/admin/wallets/:userId/deposit", isAdmin, async (req, res) => {
     try {
-      const { userId } = req.params;
+      const { userId } = req.params as Record<string, string>;
       const { amount, phoneNumber, operator, motif, firstName, lastName } = req.body;
       if (!amount || !phoneNumber) return res.status(400).json({ message: "Montant et téléphone requis" });
       const reference = generateReference();
@@ -3173,7 +3173,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/fee-configs/:id", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { feeRate, minAmount, maxAmount, isActive } = req.body;
       const { db } = await import("./db");
       const { feeConfigs: fcTable } = await import("@shared/schema");
@@ -3212,7 +3212,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/payment-links/:id/toggle", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { isActive } = req.body;
       const { db } = await import("./db");
       const { paymentLinks: plTable } = await import("@shared/schema");
@@ -3247,7 +3247,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/api-keys/:id/toggle", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as Record<string, string>;
       const { isActive } = req.body;
       const { db } = await import("./db");
       const { apiKeys: akTable } = await import("@shared/schema");
