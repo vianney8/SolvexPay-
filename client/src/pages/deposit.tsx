@@ -46,6 +46,8 @@ export default function DepositPage() {
   const [description, setDescription] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
+  const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
+
   const _OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
     Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
     Moov: { CI: { requiresOtp: true } },
@@ -86,7 +88,6 @@ export default function DepositPage() {
   }, [suspendedCodes.join(",")]); // eslint-disable-line
 
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
-  const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
 
   // Calcul du taux effectif : par pays > par opérateur > global (même logique que le backend)

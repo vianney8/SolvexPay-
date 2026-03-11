@@ -82,6 +82,15 @@ export default function PayApiPage() {
   const [step, setStep] = useState(1);
   const [otp, setOtp] = useState("");
 
+  const { data: paymentMethods } = useQuery<any[]>({
+    queryKey: ["/api/payment-methods/public"],
+    queryFn: async () => {
+      const res = await fetch("/api/payment-methods/public");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   const selectedCountry = COUNTRIES.find((c) => c.code === country) || COUNTRIES[0];
   const _OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
     Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
@@ -127,15 +136,6 @@ export default function PayApiPage() {
       return data;
     },
     enabled: !!id,
-  });
-
-  const { data: paymentMethods } = useQuery<any[]>({
-    queryKey: ["/api/payment-methods/public"],
-    queryFn: async () => {
-      const res = await fetch("/api/payment-methods/public");
-      if (!res.ok) return [];
-      return res.json();
-    },
   });
 
   function getOperatorStatus(op: string) {

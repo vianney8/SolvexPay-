@@ -83,6 +83,15 @@ export default function PayPage() {
   const [step, setStep] = useState(1);
   const [otp, setOtp] = useState("");
 
+  const { data: paymentMethods } = useQuery<any[]>({
+    queryKey: ["/api/payment-methods/public"],
+    queryFn: async () => {
+      const res = await fetch("/api/payment-methods/public");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
   const _OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
     Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
@@ -109,15 +118,6 @@ export default function PayPage() {
   });
   const suspendedCodes = suspendedData?.codes || [];
   const availableCountries = COUNTRIES.filter(c => !suspendedCodes.includes(c.code));
-
-  const { data: paymentMethods } = useQuery<any[]>({
-    queryKey: ["/api/payment-methods/public"],
-    queryFn: async () => {
-      const res = await fetch("/api/payment-methods/public");
-      if (!res.ok) return [];
-      return res.json();
-    },
-  });
 
   function getOperatorStatus(op: string) {
     if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
@@ -216,14 +216,14 @@ export default function PayPage() {
     if (needsOtp && !isOrangeCM && !otp.trim()) return;
     const isCustom = (paymentLink as any)?.allowCustomAmount;
     const parsedCustom = parseFloat(customAmount);
-    const minAmount = parseFloat(paymentLink.amount);
+    const minAmount = parseFloat((paymentLink as any)?.amount ?? "0");
     if (isCustom) {
       if (!customAmount || isNaN(parsedCustom) || parsedCustom < 100) {
         toast({ title: "Montant invalide", description: "Veuillez entrer un montant valide.", variant: "destructive" });
         return;
       }
       if (minAmount > 0 && parsedCustom < minAmount) {
-        toast({ title: "Montant insuffisant", description: `Le montant minimum est de ${formatAmount(minAmount)} ${paymentLink.currency}.`, variant: "destructive" });
+        toast({ title: "Montant insuffisant", description: `Le montant minimum est de ${formatAmount(minAmount)} ${(paymentLink as any)?.currency ?? ""}.`, variant: "destructive" });
         return;
       }
     }

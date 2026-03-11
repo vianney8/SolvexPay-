@@ -484,7 +484,6 @@ export default function AdminPage() {
       } else {
         toast({ title: "Statut mis à jour" });
       }
-      setTxEditDialog(null);
     },
     onError: (e: any) => {
       let description = e?.message || "Erreur inconnue";
