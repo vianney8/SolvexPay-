@@ -31,6 +31,23 @@ const COUNTRIES = [
   { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"], phonePlaceholder: "06 123 45 67" },
 ];
 
+function parsePhoneNumber(raw: string): { countryCode: string | null; localNumber: string } {
+  if (!raw) return { countryCode: null, localNumber: "" };
+  const normalized = raw.trim();
+  const sorted = [...COUNTRIES].sort((a, b) => b.prefix.length - a.prefix.length);
+  for (const c of sorted) {
+    const intlPrefix = c.prefix;
+    const digitsOnly = intlPrefix.replace("+", "");
+    if (normalized.startsWith(intlPrefix)) {
+      return { countryCode: c.code, localNumber: normalized.slice(intlPrefix.length) };
+    }
+    if (normalized.startsWith("00" + digitsOnly)) {
+      return { countryCode: c.code, localNumber: normalized.slice(2 + digitsOnly.length) };
+    }
+  }
+  return { countryCode: null, localNumber: normalized };
+}
+
 const OPERATOR_LABEL: Record<string, string> = {
   MTN: "MTN Money", Orange: "Orange Money", Moov: "Moov Money", Wave: "Wave",
   TMoney: "T-Money", Vodacom: "Vodacom M-Pesa", Airtel: "Airtel Money", Free: "Free Money",
@@ -124,14 +141,14 @@ export default function PayApiPage() {
       const res = await fetch(`/api/payment-api/public/${id}`);
       if (!res.ok) throw new Error("not found");
       const data = await res.json();
-      if (data.payerCountry) setCountry(data.payerCountry);
       if (data.provider) setOperator(data.provider.charAt(0).toUpperCase() + data.provider.slice(1).toLowerCase());
       if (data.phoneNumber) {
-        const prefix = COUNTRIES.find((c) => c.code === data.payerCountry)?.prefix || "";
-        const stripped = data.phoneNumber.startsWith(prefix)
-          ? data.phoneNumber.slice(prefix.length)
-          : data.phoneNumber;
-        setPhone(stripped);
+        const { countryCode, localNumber } = parsePhoneNumber(data.phoneNumber);
+        const resolvedCountry = countryCode || data.payerCountry || null;
+        if (resolvedCountry) setCountry(resolvedCountry);
+        setPhone(localNumber);
+      } else if (data.payerCountry) {
+        setCountry(data.payerCountry);
       }
       return data;
     },
