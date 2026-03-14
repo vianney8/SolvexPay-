@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -277,10 +277,13 @@ export default function AdminPage() {
     gcTime: Infinity,
     refetchOnWindowFocus: false,
   });
-  const { data: kycList, isLoading: kycLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/kyc"],
-    staleTime: 120000,
-  });
+  const kycList = useMemo(() =>
+    (users || [])
+      .filter((u: any) => ["pending", "verified", "rejected"].includes(u.kycStatus))
+      .sort((a: any, b: any) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()),
+    [users]
+  );
+  const kycLoading = usersLoading;
   useEffect(() => {
     const t = setTimeout(() => setDebouncedTxSearch(txSearch), 400);
     return () => clearTimeout(t);
@@ -430,7 +433,6 @@ export default function AdminPage() {
     mutationFn: (d: { userId: string; kycStatus: string; rejectionReason?: string }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/kyc`, d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/kyc"] });
       toast({ title: "KYC mis à jour" });
       setKycDialog(null); setKycReason("");
     },
