@@ -252,17 +252,17 @@ export default function TransactionsPage() {
                 <p className="text-white/70 text-xs">Toutes vos opérations financières</p>
               </div>
             </div>
-            <div className="text-right flex-shrink-0">
+            <div className="text-right flex-shrink-0 min-w-0">
               <p className="text-white/60 text-xs">Total</p>
-              <p className="font-black text-2xl">{isLoading ? "—" : transactions?.length || 0}</p>
+              <p className="font-black text-lg leading-tight tabular-nums">{isLoading ? "—" : transactions?.length || 0}</p>
             </div>
           </div>
-          <div className="relative mt-4 grid grid-cols-3 gap-3">
+          <div className="relative mt-4 grid grid-cols-3 gap-2">
             {summaryCards.slice(1).map((card) => (
-              <div key={card.label} className="bg-white/10 rounded-2xl p-3 backdrop-blur-sm">
-                <p className="text-white/60 text-xs font-medium mb-1">{card.label}</p>
-                {isLoading ? <div className="h-6 w-10 bg-white/20 rounded animate-pulse" /> : (
-                  <p className="text-white font-black text-xl leading-none">{card.value}</p>
+              <div key={card.label} className="bg-white/10 rounded-2xl p-2.5 backdrop-blur-sm min-w-0">
+                <p className="text-white/60 text-[10px] font-medium mb-1 leading-tight">{card.label}</p>
+                {isLoading ? <div className="h-5 w-10 bg-white/20 rounded animate-pulse" /> : (
+                  <p className="text-white font-black text-base leading-none tabular-nums truncate">{card.value}</p>
                 )}
               </div>
             ))}
