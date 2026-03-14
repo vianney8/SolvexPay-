@@ -92,8 +92,8 @@ export default function DashboardPage() {
     setDismissedNotifs(prev => [...prev, id]);
   }
 
-  const depositTx = transactions?.filter(t => t.type === "deposit") || [];
-  const withdrawalTx = transactions?.filter(t => t.type === "withdrawal") || [];
+  const depositTx = transactions?.filter(t => t.type === "deposit" && t.status === "completed") || [];
+  const withdrawalTx = transactions?.filter(t => t.type === "withdrawal" && t.status === "completed") || [];
   const pendingTx = transactions?.filter(t => t.status === "pending") || [];
 
   const now = new Date();
