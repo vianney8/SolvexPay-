@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
+import { execSync } from "child_process";
 import rateLimit from "express-rate-limit";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
@@ -2083,6 +2084,20 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Admin users error:", error);
       res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/export-db", isAdmin, async (_req, res) => {
+    try {
+      const dbUrl = process.env.DATABASE_URL;
+      if (!dbUrl) return res.status(500).json({ message: "DATABASE_URL non configurée" });
+      const sql = execSync(`pg_dump "${dbUrl}" --no-owner --no-acl --clean --if-exists`, { maxBuffer: 50 * 1024 * 1024 });
+      const filename = `solvexpay_export_${new Date().toISOString().slice(0, 10)}.sql`;
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Type", "application/sql");
+      res.send(sql);
+    } catch (e: any) {
+      res.status(500).json({ message: "Erreur export", error: e.message });
     }
   });
 
