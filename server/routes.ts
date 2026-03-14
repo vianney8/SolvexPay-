@@ -1952,7 +1952,8 @@ export async function registerRoutes(
         if (!transaction || transaction.status !== "pending") return;
 
         if (statusStr === "completed") {
-          await storage.updateTransactionStatus(transaction.id, "completed");
+          const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
+          if (!updated) return; // Already processed by another callback — skip to avoid double credit
           if (transaction.type === "deposit") {
             const grossAmtWh = parseFloat(transaction.amount);
             const txFeesWh = parseFloat((transaction as any).fees || "0") || 0;
@@ -1967,7 +1968,8 @@ export async function registerRoutes(
             console.log(`[OmniPay] Withdrawal ${reference} completed`);
           }
         } else {
-          await storage.updateTransactionStatus(transaction.id, "failed");
+          const failedUpdate = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+          if (!failedUpdate) return;
           if (transaction.type === "withdrawal") {
             const refundAmt = parseFloat(transaction.amount);
             const refundFeesXOF = parseFloat((transaction as any).fees || "0");
