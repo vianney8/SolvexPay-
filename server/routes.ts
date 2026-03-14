@@ -2825,28 +2825,11 @@ export async function registerRoutes(
             WHEN phone LIKE '+242%' THEN 'COG'
             WHEN phone LIKE '+233%' THEN 'GH'
             WHEN phone LIKE '+234%' THEN 'NG'
-            ELSE NULL
+            ELSE 'AUTRE'
           END AS country,
           COUNT(*)::int AS count
         FROM users
-        WHERE phone IS NOT NULL
         GROUP BY 1
-        HAVING CASE
-          WHEN phone LIKE '+229%' THEN 'BJ'
-          WHEN phone LIKE '+225%' THEN 'CI'
-          WHEN phone LIKE '+221%' THEN 'SN'
-          WHEN phone LIKE '+228%' THEN 'TG'
-          WHEN phone LIKE '+237%' THEN 'CM'
-          WHEN phone LIKE '+224%' THEN 'GN'
-          WHEN phone LIKE '+223%' THEN 'ML'
-          WHEN phone LIKE '+226%' THEN 'BF'
-          WHEN phone LIKE '+227%' THEN 'NE'
-          WHEN phone LIKE '+243%' THEN 'COD'
-          WHEN phone LIKE '+242%' THEN 'COG'
-          WHEN phone LIKE '+233%' THEN 'GH'
-          WHEN phone LIKE '+234%' THEN 'NG'
-          ELSE NULL
-        END IS NOT NULL
         ORDER BY count DESC
       `);
       const usersByWithdrawal = usersByWithdrawalRaw.rows.map((r: any) => ({

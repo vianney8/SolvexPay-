@@ -273,7 +273,8 @@ export default function AdminPage() {
   });
   const { data: users, isLoading: usersLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/users"],
-    staleTime: 60000,
+    staleTime: Infinity,
+    gcTime: Infinity,
     refetchOnWindowFocus: false,
   });
   const { data: kycList, isLoading: kycLoading } = useQuery<any[]>({
@@ -348,18 +349,15 @@ export default function AdminPage() {
   });
   const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/payment-links"],
-    enabled: activeTab === "links-keys",
     staleTime: 120000,
   });
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/api-keys"],
-    enabled: activeTab === "links-keys",
     staleTime: 120000,
   });
   const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/notifications"],
-    enabled: activeTab === "notifications",
-    staleTime: 120000,
+    staleTime: 30000,
   });
   const { data: supportLinks, isLoading: supportLinksLoading } = useQuery<Record<string, string>>({
     queryKey: ["/api/support-links"],
@@ -1097,11 +1095,12 @@ export default function AdminPage() {
                 NG:  { name: "Nigéria",         flag: "🇳🇬", gradient: "from-emerald-500 to-green-700",border: "border-emerald-400/40", text: "text-emerald-400" },
               };
               const DEFAULT_META = { name: "", flag: "🌍", gradient: "from-slate-500 to-slate-600", border: "border-slate-400/40", text: "text-slate-400" };
+              const AUTRE_META = { name: "Autres / Inconnu", flag: "🌐", gradient: "from-slate-500 to-slate-600", border: "border-slate-400/40", text: "text-slate-400" };
 
               const userRows = (countriesStats?.usersByWithdrawal ?? []).map((c: any) => ({
                 code: c.country ?? "??",
                 count: c.count ?? 0,
-                meta: COUNTRY_META[c.country ?? ""] ?? { ...DEFAULT_META, name: c.country ?? "Inconnu" },
+                meta: c.country === "AUTRE" ? AUTRE_META : (COUNTRY_META[c.country ?? ""] ?? { ...DEFAULT_META, name: c.country ?? "Inconnu" }),
               }));
 
               const maxUsers = userRows.length > 0 ? userRows[0].count : 1;
@@ -2953,33 +2952,42 @@ export default function AdminPage() {
               ) : (
                 <div className="space-y-2">
                   {(adminNotifications || []).map((n: any) => (
-                    <div key={n.id} className={`flex items-start gap-3 p-4 rounded-2xl border transition-colors ${n.isActive ? (n.color === "red" ? "border-red-500/30 bg-red-500/5" : "border-blue-500/30 bg-blue-500/5") : "border-border/40 bg-muted/30 opacity-60"}`} data-testid={`row-notif-${n.id}`}>
-                      <div className={`h-2.5 w-2.5 rounded-full mt-1.5 flex-shrink-0 ${n.color === "red" ? "bg-red-500" : "bg-blue-500"}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold truncate">{n.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
-                        {n.linkUrl && (
-                          <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 truncate">
-                            🔗 {n.linkLabel || n.linkUrl}
-                          </p>
-                        )}
-                        <p className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString("fr-FR")}</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => toggleNotifM.mutate({ id: n.id, isActive: !n.isActive })}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${n.isActive ? "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                          data-testid={`btn-toggle-notif-${n.id}`}
-                        >
-                          {n.isActive ? "Actif" : "Inactif"}
-                        </button>
+                    <div key={n.id} className={`p-4 rounded-2xl border transition-all ${n.isActive ? (n.color === "red" ? "border-red-500/30 bg-red-500/5" : "border-blue-500/30 bg-blue-500/5") : "border-border/40 bg-muted/20 opacity-60"}`} data-testid={`row-notif-${n.id}`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`h-2.5 w-2.5 rounded-full mt-1.5 flex-shrink-0 ${n.color === "red" ? "bg-red-500" : "bg-blue-500"}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold truncate">{n.title}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                          {n.linkUrl && (
+                            <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 truncate">
+                              🔗 {n.linkLabel || n.linkUrl}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString("fr-FR")}</p>
+                        </div>
                         <button
                           onClick={() => deleteNotifM.mutate(n.id)}
-                          className="h-8 w-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center transition-colors"
+                          className="h-8 w-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center transition-colors flex-shrink-0"
                           data-testid={`btn-delete-notif-${n.id}`}
                         >
                           <Trash2 className="h-3.5 w-3.5 text-red-600" />
                         </button>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40">
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`text-xs font-bold ${n.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                            {n.isActive ? "✅ Visible par les utilisateurs" : "🔕 Masquée — non visible"}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">Appuyez sur le bouton pour changer</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{n.isActive ? "Actif" : "Inactif"}</span>
+                          <Switch
+                            checked={!!n.isActive}
+                            onCheckedChange={v => toggleNotifM.mutate({ id: n.id, isActive: v })}
+                            data-testid={`switch-notif-${n.id}`}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
