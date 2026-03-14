@@ -2954,11 +2954,12 @@ export default function AdminPage() {
             <Card className="border-border/50">
               <CardContent className="pt-5 space-y-4">
                 {supportLinksLoading ? (
-                  <div className="space-y-3">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 rounded-xl" />)}</div>
+                  <div className="space-y-3">{[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-10 rounded-xl" />)}</div>
                 ) : (() => {
                   const form = supportLinksForm || supportLinks || {};
                   const fields = [
                     { key: "support_link_whatsapp_direct", label: "WhatsApp Direct", placeholder: "https://wa.me/..." },
+                    { key: "support_link_whatsapp_group", label: "Groupe WhatsApp", placeholder: "https://chat.whatsapp.com/..." },
                     { key: "support_link_email", label: "Email (lien mailto:)", placeholder: "mailto:support@..." },
                     { key: "support_link_whatsapp_channel", label: "Canal WhatsApp", placeholder: "https://whatsapp.com/channel/..." },
                     { key: "support_link_facebook", label: "Page Facebook", placeholder: "https://www.facebook.com/..." },

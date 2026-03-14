@@ -25,6 +25,18 @@ const CHANNEL_META = [
     badgeBg: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
   },
   {
+    id: "whatsapp_group",
+    key: "support_link_whatsapp_group",
+    label: "Groupe WhatsApp",
+    description: "Rejoignez notre communauté WhatsApp",
+    icon: MessageCircle,
+    bg: "bg-emerald-50 dark:bg-emerald-950/30",
+    border: "border-emerald-200 dark:border-emerald-800/40",
+    iconBg: "bg-emerald-600",
+    badge: "Communauté",
+    badgeBg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400",
+  },
+  {
     id: "email",
     key: "support_link_email",
     label: "Email Support",
@@ -64,7 +76,7 @@ const CHANNEL_META = [
 
 const DEFAULTS: Record<string, string> = {
   support_link_whatsapp_direct: "https://wa.me/22891840498",
-  support_link_whatsapp_group: "https://chat.whatsapp.com/FeGmjzHa1VG7v4VGo0Rxbd",
+  support_link_whatsapp_group: "https://chat.whatsapp.com/KKiJ1CCNWJ31adokID74b3",
   support_link_email: "mailto:support@solvexpay.com",
   support_link_whatsapp_channel: "https://whatsapp.com/channel/0029Vb3WFkb2ZjCZTb0Dq11F",
   support_link_facebook: "https://www.facebook.com/profile.php?id=61574706268491",
@@ -108,12 +120,13 @@ export default function SupportPage() {
           <h3 className="text-sm font-bold text-foreground">Nos canaux de contact</h3>
           {CHANNEL_META.map((ch) => {
             const href = links?.[ch.key] || DEFAULTS[ch.key];
+            const isMailto = href.startsWith("mailto:");
             return (
               <a
                 key={ch.id}
                 href={href}
-                target="_blank"
-                rel="noopener noreferrer"
+                target={isMailto ? undefined : "_blank"}
+                rel={isMailto ? undefined : "noopener noreferrer"}
                 data-testid={`link-support-${ch.id}`}
                 className={`flex items-center gap-4 p-4 rounded-2xl border ${ch.bg} ${ch.border} hover:shadow-md transition-all duration-200 group`}
               >
