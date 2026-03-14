@@ -24,7 +24,7 @@ import {
   TrendingDown, Building2, ArrowRightLeft, Plus, DollarSign,
   Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
   Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon, Code2, User,
-  ShieldCheck, Pencil, Loader2,
+  ShieldCheck, Pencil, Loader2, Database, Download, Upload,
 } from "lucide-react";
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
@@ -257,6 +257,8 @@ export default function AdminPage() {
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [srAllDialog, setSrAllDialog] = useState(false);
+  const [importJson, setImportJson] = useState("");
+  const [importResult, setImportResult] = useState<any>(null);
   const [linksSearch, setLinksSearch] = useState("");
   const [apiKeysSearch, setApiKeysSearch] = useState("");
   const [wdDialog, setWdDialog] = useState(false);
@@ -392,6 +394,42 @@ export default function AdminPage() {
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
+  const importDbM = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/admin/db/import", data),
+    onSuccess: (res: any) => {
+      setImportResult(res);
+      toast({ title: "Import réussi !", description: "Les données ont été importées dans la base de production." });
+    },
+    onError: (e: any) => toast({ title: "Erreur d'import", description: e?.message, variant: "destructive" }),
+  });
+
+  const handleExportDb = async () => {
+    try {
+      const res = await fetch("/api/admin/db/export", { credentials: "include" });
+      if (!res.ok) throw new Error("Erreur serveur");
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `solvexpay-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Export téléchargé !", description: "Fichier JSON sauvegardé sur votre appareil." });
+    } catch (e: any) {
+      toast({ title: "Erreur d'export", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const handleImportDb = () => {
+    try {
+      const parsed = JSON.parse(importJson);
+      importDbM.mutate(parsed);
+    } catch {
+      toast({ title: "JSON invalide", description: "Le contenu collé n'est pas un JSON valide.", variant: "destructive" });
+    }
+  };
+
   const suspendCountryM = useMutation({
     mutationFn: (codes: string[]) => apiRequest("POST", "/api/admin/suspended-countries", { codes }),
     onSuccess: () => {
@@ -735,6 +773,7 @@ export default function AdminPage() {
                 { v: "support-links", label: "Liens Support", Icon: HeadphonesIcon, badge: 0 },
                 { v: "settings", label: "Paramètres", Icon: Settings2, badge: 0 },
                 { v: "errors", label: "Erreurs système", Icon: AlertTriangle, badge: 0 },
+                { v: "migration", label: "Migration DB", Icon: Database, badge: 0 },
               ].map(({ v, label, Icon, badge }) => (
                 <TabsTrigger key={v} value={v} className="gap-1.5 text-xs py-2 px-3 rounded-xl whitespace-nowrap relative" data-testid={`tab-${v}`}>
                   <Icon className="h-3.5 w-3.5 flex-shrink-0" />{label}
@@ -3252,6 +3291,113 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          {/* ══════════════════════════════════════
+              TAB — MIGRATION DB
+          ══════════════════════════════════════ */}
+          <TabsContent value="migration" className="space-y-6 mt-5">
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Database className="h-5 w-5 text-indigo-500" />
+                Migration de la base de données
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Exportez toutes les données depuis cet environnement et importez-les dans la production après déploiement.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* EXPORT */}
+              <Card className="rounded-2xl border-indigo-200 dark:border-indigo-900/40">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Download className="h-4 w-4 text-indigo-500" />
+                    Étape 1 — Exporter les données (dev)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Cliquez sur le bouton ci-dessous pour télécharger un fichier JSON contenant toutes les données actuelles :
+                    utilisateurs, wallets, transactions, clés API, liens de paiement, paramètres système, etc.
+                  </p>
+                  <div className="rounded-xl bg-muted/50 p-3 space-y-1 text-xs text-muted-foreground">
+                    <p className="font-semibold text-foreground mb-1">Tables exportées :</p>
+                    {["users", "wallets", "transactions", "paymentLinks", "apiKeys", "paymentMethods", "systemSettings", "feeConfigs", "notifications", "adminWithdrawals"].map(t => (
+                      <span key={t} className="inline-flex items-center gap-1 mr-2 mb-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 inline-block" />
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                  <Button
+                    className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+                    onClick={handleExportDb}
+                    data-testid="btn-export-db"
+                  >
+                    <Download className="h-4 w-4" />
+                    Télécharger l'export JSON
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* IMPORT */}
+              <Card className="rounded-2xl border-emerald-200 dark:border-emerald-900/40">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Upload className="h-4 w-4 text-emerald-500" />
+                    Étape 2 — Importer en production
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Après déploiement, connectez-vous en tant qu'admin sur la production, collez le contenu du fichier JSON exporté ci-dessous et cliquez sur Importer.
+                    Les données existantes ne seront pas écrasées (mode <em>ON CONFLICT DO NOTHING</em>), seuls les paramètres système seront mis à jour.
+                  </p>
+                  <Textarea
+                    placeholder='Collez ici le contenu du fichier JSON exporté (commence par { "exportedAt": "..." })'
+                    className="font-mono text-xs h-32 resize-none rounded-xl"
+                    value={importJson}
+                    onChange={(e) => { setImportJson(e.target.value); setImportResult(null); }}
+                    data-testid="textarea-import-json"
+                  />
+                  {importResult && (
+                    <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-3 text-xs space-y-1">
+                      <p className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5" />Import terminé avec succès
+                      </p>
+                      {Object.entries(importResult.imported || {}).map(([table, count]: [string, any]) => (
+                        <p key={table} className="text-muted-foreground"><span className="font-medium text-foreground">{table}</span> : {count} ligne(s)</p>
+                      ))}
+                    </div>
+                  )}
+                  <Button
+                    className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                    onClick={handleImportDb}
+                    disabled={!importJson.trim() || importDbM.isPending}
+                    data-testid="btn-import-db"
+                  >
+                    {importDbM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {importDbM.isPending ? "Import en cours…" : "Importer en production"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* HOW IT WORKS */}
+            <Card className="rounded-2xl bg-muted/30">
+              <CardContent className="py-4 px-5">
+                <p className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                  Comment ça fonctionne lors du déploiement
+                </p>
+                <div className="space-y-1.5 text-xs text-muted-foreground">
+                  <p>1. <strong className="text-foreground">Schéma automatique</strong> : Lors de chaque déploiement, la structure des tables (colonnes, nouveaux champs) est automatiquement synchronisée avec la base de production avant le lancement du serveur.</p>
+                  <p>2. <strong className="text-foreground">Données</strong> : Utilisez cet outil export/import pour copier vos données dev vers la production. À faire une seule fois lors du premier déploiement.</p>
+                  <p>3. <strong className="text-foreground">Sécurité</strong> : L'import ne supprime rien — il ajoute uniquement les enregistrements absents (sauf les paramètres système qui sont mis à jour).</p>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
         </Tabs>

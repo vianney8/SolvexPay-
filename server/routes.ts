@@ -3345,6 +3345,112 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // ─── DB EXPORT / IMPORT ────────────────────────────────────────────────────
+
+  app.get("/api/admin/db/export", isAdmin, async (_req, res) => {
+    try {
+      const { db } = await import("./db");
+      const {
+        users: usersTable, wallets: walletsTable, transactions: txTable,
+        paymentLinks: plTable, apiKeys: keysTable, paymentMethods: pmTable,
+        systemSettings: ssTable, feeConfigs: fcTable, notifications: notifTable,
+        adminWithdrawals: awTable,
+      } = await import("@shared/schema");
+
+      const [
+        usersData, walletsData, transactionsData, paymentLinksData,
+        apiKeysData, paymentMethodsData, systemSettingsData, feeConfigsData,
+        notificationsData, adminWithdrawalsData,
+      ] = await Promise.all([
+        db.select().from(usersTable),
+        db.select().from(walletsTable),
+        db.select().from(txTable),
+        db.select().from(plTable),
+        db.select().from(keysTable),
+        db.select().from(pmTable),
+        db.select().from(ssTable),
+        db.select().from(fcTable),
+        db.select().from(notifTable),
+        db.select().from(awTable),
+      ]);
+
+      res.json({
+        exportedAt: new Date().toISOString(),
+        version: 1,
+        tables: {
+          users: usersData,
+          wallets: walletsData,
+          transactions: transactionsData,
+          paymentLinks: paymentLinksData,
+          apiKeys: apiKeysData,
+          paymentMethods: paymentMethodsData,
+          systemSettings: systemSettingsData,
+          feeConfigs: feeConfigsData,
+          notifications: notificationsData,
+          adminWithdrawals: adminWithdrawalsData,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: "Erreur lors de l'export: " + err.message });
+    }
+  });
+
+  app.post("/api/admin/db/import", isAdmin, async (req, res) => {
+    try {
+      const { tables, version } = req.body;
+      if (!tables || version !== 1) {
+        return res.status(400).json({ message: "Format d'export invalide" });
+      }
+
+      const { db } = await import("./db");
+      const {
+        users: usersTable, wallets: walletsTable, transactions: txTable,
+        paymentLinks: plTable, apiKeys: keysTable, paymentMethods: pmTable,
+        systemSettings: ssTable, feeConfigs: fcTable, notifications: notifTable,
+        adminWithdrawals: awTable,
+      } = await import("@shared/schema");
+      const results: Record<string, number> = {};
+
+      const upsertBatch = async (table: any, rows: any[], tableName: string) => {
+        if (!rows?.length) { results[tableName] = 0; return; }
+        let count = 0;
+        for (const row of rows) {
+          try {
+            await db.insert(table).values(row).onConflictDoNothing();
+            count++;
+          } catch (_e) {}
+        }
+        results[tableName] = count;
+      };
+
+      // Order matters: users first, then wallets/transactions, then config tables
+      await upsertBatch(usersTable, tables.users, "users");
+      await upsertBatch(walletsTable, tables.wallets, "wallets");
+      await upsertBatch(txTable, tables.transactions, "transactions");
+      await upsertBatch(plTable, tables.paymentLinks, "paymentLinks");
+      await upsertBatch(keysTable, tables.apiKeys, "apiKeys");
+      await upsertBatch(pmTable, tables.paymentMethods, "paymentMethods");
+      await upsertBatch(fcTable, tables.feeConfigs, "feeConfigs");
+      await upsertBatch(notifTable, tables.notifications, "notifications");
+      await upsertBatch(awTable, tables.adminWithdrawals, "adminWithdrawals");
+
+      // System settings: upsert (overwrite)
+      if (tables.systemSettings?.length) {
+        for (const row of tables.systemSettings) {
+          try {
+            await db.insert(ssTable).values(row)
+              .onConflictDoUpdate({ target: ssTable.key, set: { value: row.value, updatedAt: new Date() } });
+          } catch (_e) {}
+        }
+        results["systemSettings"] = tables.systemSettings.length;
+      }
+
+      res.json({ success: true, imported: results });
+    } catch (err: any) {
+      res.status(500).json({ message: "Erreur lors de l'import: " + err.message });
+    }
+  });
+
   // ─── END ADMIN ROUTES ──────────────────────────────────────────────────────
 
   // ── Background job: recheck pending transactions every 3 minutes ─────────────
