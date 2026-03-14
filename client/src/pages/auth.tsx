@@ -293,10 +293,6 @@ export function LoginPage() {
       try {
         const parsed = JSON.parse(message.replace(/^\d+:\s*/, ""));
         errorText = parsed.message || message;
-        if (parsed.blocked) {
-          toast({ title: "Compte suspendu", description: "Votre compte a été suspendu par l'administrateur. Contactez le support.", variant: "destructive" });
-          return;
-        }
         if (parsed.requiresVerification) {
           setVerificationData({ userId: parsed.userId, email: parsed.email });
           return;

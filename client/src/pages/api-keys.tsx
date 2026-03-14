@@ -736,6 +736,7 @@ export default function ApiKeysPage() {
 
   const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({ queryKey: ["/api/api-keys"] });
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/user"] });
+  const isBlocked = !!(currentUser as any)?.isBlocked;
 
   const regularKeys = (apiKeys || []).filter((k) => !(k as any).isSrKey);
 
@@ -782,7 +783,17 @@ export default function ApiKeysPage() {
   return (
     <DashboardLayout title="Clés API" breadcrumbs={[{ label: "Clés API" }]}>
       <div className="max-w-3xl space-y-6">
-
+        {isBlocked && (
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-red-500 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-red-600 text-sm">Erreur</p>
+              <p className="text-xs text-muted-foreground">Compte suspendu — Contactez le support.</p>
+            </div>
+          </div>
+        )}
         {/* Hero */}
         <div className="relative rounded-3xl p-6 text-white overflow-hidden shadow-xl" style={{ background: "linear-gradient(135deg, hsl(220 83% 48%) 0%, hsl(240 70% 60%) 100%)" }}>
           <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />

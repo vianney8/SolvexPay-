@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Search, Activity, TrendingUp, CheckCircle2, Clock, X, ExternalLink, User, Mail, Phone, Globe, Zap } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Search, Activity, TrendingUp, CheckCircle2, Clock, X, ExternalLink, User, Mail, Phone, Globe, Zap, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import type { Transaction } from "@shared/schema";
 
@@ -204,6 +205,8 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
 }
 
 export default function TransactionsPage() {
+  const { user } = useAuth();
+  const isBlocked = !!(user as any)?.isBlocked;
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -237,6 +240,17 @@ export default function TransactionsPage() {
   return (
     <DashboardLayout title="Transactions" breadcrumbs={[{ label: "Transactions" }]} backTo="/dashboard">
       <div className="space-y-5">
+        {isBlocked && (
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-red-500 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-red-600 text-sm">Erreur</p>
+              <p className="text-xs text-muted-foreground">Compte suspendu — Contactez le support.</p>
+            </div>
+          </div>
+        )}
         <div
           className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
           style={{ background: "linear-gradient(135deg, hsl(262 83% 46%) 0%, hsl(250 80% 55%) 60%, hsl(240 78% 52%) 100%)" }}

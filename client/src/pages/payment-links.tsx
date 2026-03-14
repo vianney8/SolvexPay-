@@ -23,7 +23,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Plus, Link2, Copy, ExternalLink, Trash2, Search,
   Globe, Activity, ArrowLeft, ImagePlus,
-  Info, Pencil, Upload, X, CheckCircle2, Lock, Store,
+  Info, Pencil, Upload, X, CheckCircle2, Lock, Store, AlertTriangle,
 } from "lucide-react";
 import type { PaymentLink } from "@shared/schema";
 
@@ -285,6 +285,7 @@ export default function PaymentLinksPage() {
   const [savingMerchantName, setSavingMerchantName] = useState(false);
 
   const { data: userData } = useQuery<any>({ queryKey: ["/api/auth/user"] });
+  const isBlocked = !!(userData as any)?.isBlocked;
   const { data: paymentLinks, isLoading } = useQuery<PaymentLink[]>({ queryKey: ["/api/payment-links"] });
 
   useEffect(() => {
@@ -362,7 +363,17 @@ export default function PaymentLinksPage() {
   return (
     <DashboardLayout title="Liens de paiement" breadcrumbs={[{ label: "Liens de paiement" }]}>
       <div className="space-y-5">
-
+        {isBlocked && (
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-red-500 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-red-600 text-sm">Erreur</p>
+              <p className="text-xs text-muted-foreground">Compte suspendu — Contactez le support.</p>
+            </div>
+          </div>
+        )}
         <div
           className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
           style={{ background: "linear-gradient(135deg, hsl(262 83% 46%) 0%, hsl(300 68% 52%) 60%, hsl(330 78% 50%) 100%)" }}
