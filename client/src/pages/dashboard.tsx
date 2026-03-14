@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
   const recentTransactions = transactions?.slice(0, 5) || [];
   const isUserBlocked = !!(user as any)?.isBlocked;
-  const firstName = isUserBlocked ? "Utilisateurs SolvexPay" : (user?.firstName || user?.email?.split("@")[0] || "là");
+  const firstName = isUserBlocked ? "Utilisateur SolvexPay" : (user?.firstName || user?.email?.split("@")[0] || "là");
 
   const visibleNotifications = (activeNotifications || []).filter((n: any) => !dismissedNotifs.includes(n.id));
 

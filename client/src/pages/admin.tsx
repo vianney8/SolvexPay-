@@ -263,6 +263,7 @@ export default function AdminPage() {
   const [wdDialog, setWdDialog] = useState(false);
   const [wdForm, setWdForm] = useState({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
   const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue", linkUrl: "", linkLabel: "" });
+  const [editNotifDialog, setEditNotifDialog] = useState<{ id: string; title: string; message: string; color: string; linkUrl: string; linkLabel: string } | null>(null);
   const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
   // Queries
   const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"], staleTime: 60000 });
@@ -622,6 +623,17 @@ export default function AdminPage() {
   const toggleNotifM = useMutation({
     mutationFn: (d: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/admin/notifications/${d.id}`, { isActive: d.isActive }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] }),
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const updateNotifM = useMutation({
+    mutationFn: (d: { id: string; title: string; message: string; color: string; linkUrl?: string; linkLabel?: string }) =>
+      apiRequest("PATCH", `/api/admin/notifications/${d.id}`, { title: d.title, message: d.message, color: d.color, linkUrl: d.linkUrl || null, linkLabel: d.linkLabel || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] });
+      toast({ title: "Notification modifiée" });
+      setEditNotifDialog(null);
+    },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
@@ -3109,13 +3121,22 @@ export default function AdminPage() {
                           )}
                           <p className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString("fr-FR")}</p>
                         </div>
-                        <button
-                          onClick={() => deleteNotifM.mutate(n.id)}
-                          className="h-8 w-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center transition-colors flex-shrink-0"
-                          data-testid={`btn-delete-notif-${n.id}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-red-600" />
-                        </button>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button
+                            onClick={() => setEditNotifDialog({ id: n.id, title: n.title, message: n.message, color: n.color || "blue", linkUrl: n.linkUrl || "", linkLabel: n.linkLabel || "" })}
+                            className="h-8 w-8 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 flex items-center justify-center transition-colors"
+                            data-testid={`btn-edit-notif-${n.id}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5 text-blue-600" />
+                          </button>
+                          <button
+                            onClick={() => deleteNotifM.mutate(n.id)}
+                            className="h-8 w-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center transition-colors"
+                            data-testid={`btn-delete-notif-${n.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40">
                         <div className="flex flex-col gap-0.5">
@@ -3899,6 +3920,96 @@ export default function AdminPage() {
               data-testid="btn-confirm-toggle"
             >
               {(toggleLinkM.isPending || toggleApiKeyM.isPending) ? "En cours..." : toggleConfirmDialog?.isCurrentlyActive ? "Confirmer le blocage" : "Confirmer l'activation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Notification Dialog ── */}
+      <Dialog open={!!editNotifDialog} onOpenChange={(o) => { if (!o) setEditNotifDialog(null); }}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black">Modifier la notification</DialogTitle>
+          </DialogHeader>
+          {editNotifDialog && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Titre</Label>
+                <Input
+                  value={editNotifDialog.title}
+                  onChange={e => setEditNotifDialog(p => p ? { ...p, title: e.target.value } : null)}
+                  placeholder="Ex: Maintenance prévue"
+                  className="h-10"
+                  data-testid="input-edit-notif-title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Message</Label>
+                <Textarea
+                  value={editNotifDialog.message}
+                  onChange={e => setEditNotifDialog(p => p ? { ...p, message: e.target.value } : null)}
+                  placeholder="Rédigez votre message..."
+                  className="min-h-[80px] resize-none"
+                  data-testid="input-edit-notif-message"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Couleur</Label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setEditNotifDialog(p => p ? { ...p, color: "blue" } : null)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${editNotifDialog.color === "blue" ? "border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-400" : "border-border text-muted-foreground hover:border-blue-300"}`}
+                    data-testid="btn-edit-color-blue"
+                  >
+                    <div className="h-3 w-3 rounded-full bg-blue-500" />
+                    Bleu
+                  </button>
+                  <button
+                    onClick={() => setEditNotifDialog(p => p ? { ...p, color: "red" } : null)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${editNotifDialog.color === "red" ? "border-red-500 bg-red-500/10 text-red-700 dark:text-red-400" : "border-border text-muted-foreground hover:border-red-300"}`}
+                    data-testid="btn-edit-color-red"
+                  >
+                    <div className="h-3 w-3 rounded-full bg-red-500" />
+                    Rouge
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-4 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lien optionnel</p>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">URL du lien</Label>
+                  <Input
+                    value={editNotifDialog.linkUrl}
+                    onChange={e => setEditNotifDialog(p => p ? { ...p, linkUrl: e.target.value } : null)}
+                    placeholder="https://..."
+                    className="h-10 text-sm"
+                    data-testid="input-edit-notif-link-url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Nom du bouton</Label>
+                  <Input
+                    value={editNotifDialog.linkLabel}
+                    onChange={e => setEditNotifDialog(p => p ? { ...p, linkLabel: e.target.value } : null)}
+                    placeholder="Ex: Rejoindre"
+                    className="h-10 text-sm"
+                    data-testid="input-edit-notif-link-label"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" onClick={() => setEditNotifDialog(null)} className="rounded-xl" data-testid="btn-cancel-edit-notif">
+              Annuler
+            </Button>
+            <Button
+              onClick={() => editNotifDialog && updateNotifM.mutate({ id: editNotifDialog.id, title: editNotifDialog.title, message: editNotifDialog.message, color: editNotifDialog.color, linkUrl: editNotifDialog.linkUrl || undefined, linkLabel: editNotifDialog.linkLabel || undefined })}
+              disabled={updateNotifM.isPending || !editNotifDialog?.title || !editNotifDialog?.message}
+              className="rounded-xl font-bold"
+              data-testid="btn-confirm-edit-notif"
+            >
+              {updateNotifM.isPending ? "En cours..." : "Enregistrer"}
             </Button>
           </DialogFooter>
         </DialogContent>

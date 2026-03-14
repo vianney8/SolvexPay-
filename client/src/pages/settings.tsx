@@ -343,7 +343,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* ── Right content panel ── */}
-          <div className="space-y-5">
+          <fieldset disabled={isBlocked} className="space-y-5 border-0 p-0 m-0 min-w-0 disabled:opacity-60 disabled:cursor-not-allowed">
 
             {/* ────── PROFIL ────── */}
             {activeSection === "profile" && (
@@ -623,7 +623,7 @@ export default function SettingsPage() {
               </Card>
             )}
 
-          </div>
+          </fieldset>
         </div>
       </div>
     </DashboardLayout>
