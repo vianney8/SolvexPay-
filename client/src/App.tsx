@@ -197,10 +197,6 @@ function Router() {
     );
   }
 
-  if (isBlocked) {
-    return <BlockedPage />;
-  }
-
   return (
     <Switch>
       <Route path="/pay/:slug" component={PayPage} />

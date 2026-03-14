@@ -373,6 +373,7 @@ export async function registerRoutes(
   app.post("/api/transactions/deposit", isAuthenticated, paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
       
       const validation = depositSchema.safeParse(req.body);
       if (!validation.success) {
@@ -451,6 +452,7 @@ export async function registerRoutes(
   app.post("/api/transactions/withdraw", isAuthenticated, paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
       if (req.user.kycStatus !== "verified") {
         return res.status(403).json({ message: "Vérification KYC requise pour effectuer un retrait", kycRequired: true });
       }
@@ -582,6 +584,7 @@ export async function registerRoutes(
   app.post("/api/transactions/transfer", isAuthenticated, paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
       if (req.user.kycStatus !== "verified") {
         return res.status(403).json({ message: "Vérification KYC requise pour effectuer un transfert", kycRequired: true });
       }
@@ -945,6 +948,7 @@ export async function registerRoutes(
   app.post("/api/payment-links", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
       
       const validation = createPaymentLinkSchema.safeParse(req.body);
       if (!validation.success) {
@@ -1342,6 +1346,7 @@ export async function registerRoutes(
   app.post("/api/api-keys", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
       const isSrKey = req.body.isSrKey === true;
 
       if (isSrKey) {
@@ -3138,6 +3143,46 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Admin wallet migrate error:", error);
       res.status(500).json({ message: "Erreur lors de la migration" });
+    }
+  });
+
+  // Merchants — users with at least 1 payment link or API key
+  app.get("/api/admin/merchants", isAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { paymentLinks: plTable, apiKeys: akTable, wallets: walletsTable } = await import("@shared/schema");
+      const { eq, inArray } = await import("drizzle-orm");
+
+      // Get all payment links and API keys to find which users have them
+      const [allLinks, allKeys] = await Promise.all([
+        db.select().from(plTable),
+        db.select({ id: akTable.id, userId: akTable.userId, name: akTable.name, appName: akTable.appName, keyPrefix: akTable.keyPrefix, environment: akTable.environment, isActive: akTable.isActive, adminLocked: akTable.adminLocked, isSrKey: akTable.isSrKey, createdAt: akTable.createdAt, lastUsedAt: akTable.lastUsedAt, webhookUrl: akTable.webhookUrl, websiteUrl: akTable.websiteUrl }).from(akTable),
+      ]);
+
+      // Find unique user IDs that have at least 1 link or key
+      const merchantUserIds = [...new Set([...allLinks.map(l => l.userId), ...allKeys.map(k => k.userId)])];
+      if (merchantUserIds.length === 0) return res.json([]);
+
+      const [merchantUsers, merchantWallets] = await Promise.all([
+        db.select().from(usersTable).where(inArray(usersTable.id, merchantUserIds)),
+        db.select().from(walletsTable).where(inArray(walletsTable.userId, merchantUserIds)),
+      ]);
+
+      const result = merchantUsers.map(u => {
+        const { passwordHash: _, ...safeUser } = u as any;
+        const wallet = merchantWallets.find(w => w.userId === u.id);
+        const links = allLinks.filter(l => l.userId === u.id);
+        const keys = allKeys.filter(k => k.userId === u.id);
+        return { ...safeUser, balance: wallet?.balanceXOF || "0", links, keys };
+      });
+
+      // Sort: blocked first, then by most links+keys
+      result.sort((a, b) => (b.links.length + b.keys.length) - (a.links.length + a.keys.length));
+      res.json(result);
+    } catch (error) {
+      console.error("Admin merchants error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
     }
   });
 

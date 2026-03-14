@@ -385,10 +385,6 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  if (user.isBlocked && !user.isAdmin) {
-    return res.status(403).json({ message: "Votre compte a été suspendu. Contactez le support.", blocked: true });
-  }
-
   (req as any).user = user;
   next();
 };

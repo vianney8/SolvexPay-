@@ -84,7 +84,8 @@ export default function DashboardPage() {
   const { data: paymentLinks } = useQuery<PaymentLink[]>({ queryKey: ["/api/payment-links"] });
 
   const recentTransactions = transactions?.slice(0, 5) || [];
-  const firstName = user?.firstName || user?.email?.split("@")[0] || "là";
+  const isUserBlocked = !!(user as any)?.isBlocked;
+  const firstName = isUserBlocked ? "Utilisateurs SolvexPay" : (user?.firstName || user?.email?.split("@")[0] || "là");
 
   const visibleNotifications = (activeNotifications || []).filter((n: any) => !dismissedNotifs.includes(n.id));
 
@@ -182,7 +183,12 @@ export default function DashboardPage() {
               {firstName}
             </h2>
           </div>
-          {(user as any)?.kycStatus === "verified" ? (
+          {isUserBlocked ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-600 text-white text-xs font-bold shadow-md shadow-red-500/30 mb-1" data-testid="badge-kyc-status">
+              <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
+              Suspendu
+            </div>
+          ) : (user as any)?.kycStatus === "verified" ? (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-500/30 mb-1" data-testid="badge-kyc-status">
               <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
               Vérifié
@@ -207,7 +213,11 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between mb-5">
               <div>
                 <p className="text-white/70 text-xs font-medium mb-2 uppercase tracking-wider">Solde disponible</p>
-                {walletLoading ? (
+                {isUserBlocked ? (
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-black tracking-tight text-red-300" data-testid="text-balance-xof">Erreur</span>
+                  </div>
+                ) : walletLoading ? (
                   <Skeleton className="h-10 w-44 bg-white/20 rounded-xl" />
                 ) : (
                   <div className="flex items-baseline gap-2">
@@ -267,7 +277,12 @@ export default function DashboardPage() {
                 </Link>
               </CardHeader>
               <CardContent className="pt-0">
-                {transactionsLoading ? (
+                {isUserBlocked ? (
+                  <div className="text-center py-8">
+                    <p className="font-bold text-red-500 text-sm">Erreur</p>
+                    <p className="text-xs text-muted-foreground mt-1">Compte suspendu</p>
+                  </div>
+                ) : transactionsLoading ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="flex items-center gap-3 p-2">

@@ -358,6 +358,11 @@ export default function AdminPage() {
     queryKey: ["/api/admin/api-keys"],
     staleTime: 120000,
   });
+  const { data: merchants, isLoading: merchantsLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/merchants"],
+    enabled: activeTab === "marchands",
+    staleTime: 60000,
+  });
   const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/notifications"],
     staleTime: 30000,
@@ -725,6 +730,7 @@ export default function AdminPage() {
                 { v: "liquidity", label: "Liquidité OmniPay", Icon: Activity, badge: liquidityCriticalCount },
                 { v: "benefices", label: "Bénéfices", Icon: Coins, badge: 0 },
                 { v: "users", label: "Utilisateurs", Icon: Users, badge: 0 },
+                { v: "marchands", label: "Marchands", Icon: Link2, badge: 0 },
                 { v: "kyc", label: "KYC", Icon: BadgeCheck, badge: pendingKyc.length },
                 { v: "wallets", label: "Wallets & Solde", Icon: Wallet, badge: 0 },
                 { v: "links-keys", label: "Liens & API", Icon: Link2, badge: 0 },
@@ -1712,6 +1718,139 @@ export default function AdminPage() {
           {/* ══════════════════════════════════════
               TAB 3 — KYC
           ══════════════════════════════════════ */}
+
+          {/* ══════════════════════════════════════
+              TAB — MARCHANDS
+          ══════════════════════════════════════ */}
+          <TabsContent value="marchands" className="space-y-4 mt-5">
+            <div className="rounded-2xl bg-gradient-to-r from-violet-600/10 to-fuchsia-600/10 border border-violet-500/20 p-4 flex items-center gap-4">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0">
+                <Link2 className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="font-black text-base">Marchands actifs</p>
+                <p className="text-xs text-muted-foreground">Utilisateurs ayant créé au moins 1 lien de paiement ou 1 clé API</p>
+              </div>
+              <div className="ml-auto text-right flex-shrink-0">
+                <p className="text-2xl font-black text-violet-600">{merchantsLoading ? "—" : (merchants || []).length}</p>
+                <p className="text-xs text-muted-foreground">marchands</p>
+              </div>
+            </div>
+
+            {merchantsLoading ? (
+              <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-24 rounded-2xl bg-muted/40 animate-pulse" />)}</div>
+            ) : (merchants || []).length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">Aucun marchand pour l'instant</div>
+            ) : (
+              <div className="space-y-3">
+                {(merchants || []).map((m: any) => (
+                  <Card key={m.id} className={`border-border/50 overflow-hidden ${m.isBlocked ? "border-red-500/40 bg-red-500/5" : ""}`} data-testid={`card-merchant-${m.id}`}>
+                    <CardContent className="p-4">
+                      {/* User header */}
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${m.isBlocked ? "bg-red-500/15 text-red-600" : "bg-violet-500/15 text-violet-600"}`}>
+                          {(m.firstName?.[0] || m.email?.[0] || "?").toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-bold text-sm truncate">{m.firstName} {m.lastName}</p>
+                            {m.isBlocked && <span className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 text-[10px] font-bold">Bloqué</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-xs text-muted-foreground">Solde</p>
+                          <p className="font-black text-sm text-emerald-600">{fmt(parseFloat(m.balance || "0"))}</p>
+                        </div>
+                      </div>
+
+                      {/* Stats row */}
+                      <div className="flex gap-2 mb-3">
+                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-400 text-xs font-semibold">
+                          <Link2 className="h-3 w-3" />{m.links.length} lien{m.links.length !== 1 ? "s" : ""}
+                        </div>
+                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 text-xs font-semibold">
+                          <Zap className="h-3 w-3" />{m.keys.length} clé{m.keys.length !== 1 ? "s" : ""}
+                        </div>
+                        <div className="ml-auto">
+                          <button
+                            onClick={() => setBlockDialog({ userId: m.id, name: `${m.firstName} ${m.lastName}`, isBlocked: m.isBlocked })}
+                            disabled={blockM.isPending}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${m.isBlocked ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
+                            data-testid={`btn-block-merchant-${m.id}`}
+                          >
+                            {m.isBlocked ? <><Unlock className="h-3.5 w-3.5" />Débloquer</> : <><Lock className="h-3.5 w-3.5" />Bloquer</>}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Payment Links */}
+                      {m.links.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Liens de paiement</p>
+                          <div className="space-y-1.5">
+                            {m.links.map((link: any) => (
+                              <div key={link.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${link.adminLocked ? "border-red-500/30 bg-red-500/5" : "border-border/40 bg-muted/30"}`} data-testid={`row-link-${link.id}`}>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-semibold truncate">{link.name}</p>
+                                  <p className="text-[10px] text-muted-foreground">{fmt(parseFloat(link.amount))} {link.currency} · utilisé {link.timesUsed}×</p>
+                                </div>
+                                {link.adminLocked && <span className="px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-600 text-[9px] font-bold flex-shrink-0">Bloqué</span>}
+                                <button
+                                  onClick={() => {
+                                    apiRequest("PATCH", `/api/admin/payment-links/${link.id}/toggle`, { isActive: link.adminLocked })
+                                      .then(() => queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] }))
+                                      .catch(() => toast({ title: "Erreur", variant: "destructive" }));
+                                  }}
+                                  className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${link.adminLocked ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
+                                  data-testid={`btn-toggle-link-${link.id}`}
+                                >
+                                  {link.adminLocked ? <><Unlock className="h-3 w-3" />Déverrouiller</> : <><Lock className="h-3 w-3" />Bloquer</>}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* API Keys */}
+                      {m.keys.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Clés API</p>
+                          <div className="space-y-1.5">
+                            {m.keys.map((key: any) => (
+                              <div key={key.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${key.adminLocked ? "border-red-500/30 bg-red-500/5" : "border-border/40 bg-muted/30"}`} data-testid={`row-key-${key.id}`}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-xs font-semibold truncate">{key.name || key.appName}</p>
+                                    {key.isSrKey && <span className="px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-600 text-[9px] font-bold">SR</span>}
+                                    {key.adminLocked && <span className="px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-600 text-[9px] font-bold">Bloqué</span>}
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground font-mono">{key.keyPrefix}••••</p>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    apiRequest("PATCH", `/api/admin/api-keys/${key.id}/toggle`, { isActive: key.adminLocked })
+                                      .then(() => queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] }))
+                                      .catch(() => toast({ title: "Erreur", variant: "destructive" }));
+                                  }}
+                                  className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${key.adminLocked ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
+                                  data-testid={`btn-toggle-key-${key.id}`}
+                                >
+                                  {key.adminLocked ? <><Unlock className="h-3 w-3" />Déverrouiller</> : <><Lock className="h-3 w-3" />Bloquer</>}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
           <TabsContent value="kyc" className="space-y-4 mt-5">
             <div className="grid grid-cols-3 gap-3">
               {[

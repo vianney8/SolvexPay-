@@ -14,10 +14,6 @@ async function fetchUser(): Promise<SafeUser | null> {
   }
 
   if (response.status === 403) {
-    const data = await response.json().catch(() => ({}));
-    if (data.blocked) {
-      throw Object.assign(new Error("blocked"), { blocked: true });
-    }
     return null;
   }
 
@@ -43,7 +39,7 @@ export function useAuth() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const isBlocked = !!(error && (error as any).blocked);
+  const isBlocked = !!(user?.isBlocked);
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
