@@ -78,7 +78,7 @@ export function AppSidebar() {
                   {isBlocked ? (
                     <>
                       <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-                      <span className="text-xs text-red-600 font-bold">Erreur</span>
+                      <span className="text-xs text-red-600 font-bold">Suspendu</span>
                     </>
                   ) : (user as any)?.kycStatus === "verified" ? (
                     <>

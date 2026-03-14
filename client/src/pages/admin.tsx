@@ -227,6 +227,7 @@ export default function AdminPage() {
   const [srFilter, setSrFilter] = useState(false);
   const [blockedFilter, setBlockedFilter] = useState(false);
   const [blockDialog, setBlockDialog] = useState<{ userId: string; name: string; isBlocked: boolean } | null>(null);
+  const [toggleConfirmDialog, setToggleConfirmDialog] = useState<{ type: "link" | "key"; id: string; name: string; isCurrentlyActive: boolean } | null>(null);
   const [srConfirmDialog, setSrConfirmDialog] = useState<{ userId: string; name: string; enable: boolean } | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [txSearch, setTxSearch] = useState("");
@@ -552,13 +553,23 @@ export default function AdminPage() {
 
   const toggleLinkM = useMutation({
     mutationFn: (d: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/admin/payment-links/${d.id}/toggle`, { isActive: d.isActive }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] }); toast({ title: "Lien de paiement mis à jour" }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      setToggleConfirmDialog(null);
+      toast({ title: "Lien de paiement mis à jour" });
+    },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
   const toggleApiKeyM = useMutation({
     mutationFn: (d: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/admin/api-keys/${d.id}/toggle`, { isActive: d.isActive }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/api-keys"] }); toast({ title: "Clé API mise à jour" }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/api-keys"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      setToggleConfirmDialog(null);
+      toast({ title: "Clé API mise à jour" });
+    },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
@@ -1797,11 +1808,7 @@ export default function AdminPage() {
                                 </div>
                                 {link.adminLocked && <span className="px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-600 text-[9px] font-bold flex-shrink-0">Bloqué</span>}
                                 <button
-                                  onClick={() => {
-                                    apiRequest("PATCH", `/api/admin/payment-links/${link.id}/toggle`, { isActive: link.adminLocked })
-                                      .then(() => queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] }))
-                                      .catch(() => toast({ title: "Erreur", variant: "destructive" }));
-                                  }}
+                                  onClick={() => setToggleConfirmDialog({ type: "link", id: link.id, name: link.name || "ce lien", isCurrentlyActive: !link.adminLocked })}
                                   className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${link.adminLocked ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
                                   data-testid={`btn-toggle-link-${link.id}`}
                                 >
@@ -1829,11 +1836,7 @@ export default function AdminPage() {
                                   <p className="text-[10px] text-muted-foreground font-mono">{key.keyPrefix}••••</p>
                                 </div>
                                 <button
-                                  onClick={() => {
-                                    apiRequest("PATCH", `/api/admin/api-keys/${key.id}/toggle`, { isActive: key.adminLocked })
-                                      .then(() => queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] }))
-                                      .catch(() => toast({ title: "Erreur", variant: "destructive" }));
-                                  }}
+                                  onClick={() => setToggleConfirmDialog({ type: "key", id: key.id, name: key.name || key.appName || "cette clé", isCurrentlyActive: !key.adminLocked })}
                                   className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${key.adminLocked ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
                                   data-testid={`btn-toggle-key-${key.id}`}
                                 >
@@ -2105,7 +2108,7 @@ export default function AdminPage() {
                         </div>
                         <Switch
                           checked={!!link.isActive}
-                          onCheckedChange={v => toggleLinkM.mutate({ id: link.id, isActive: v })}
+                          onCheckedChange={() => setToggleConfirmDialog({ type: "link", id: link.id, name: link.name || "ce lien", isCurrentlyActive: !!link.isActive })}
                           data-testid={`toggle-link-${link.id}`}
                         />
                       </div>
@@ -2177,7 +2180,7 @@ export default function AdminPage() {
                         </div>
                         <Switch
                           checked={!!key.isActive}
-                          onCheckedChange={v => toggleApiKeyM.mutate({ id: key.id, isActive: v })}
+                          onCheckedChange={() => setToggleConfirmDialog({ type: "key", id: key.id, name: key.name || key.appName || "cette clé", isCurrentlyActive: !!key.isActive })}
                           data-testid={`toggle-apikey-${key.id}`}
                         />
                       </div>
@@ -2248,7 +2251,7 @@ export default function AdminPage() {
                         </div>
                         <Switch
                           checked={!!key.isActive}
-                          onCheckedChange={v => toggleApiKeyM.mutate({ id: key.id, isActive: v })}
+                          onCheckedChange={() => setToggleConfirmDialog({ type: "key", id: key.id, name: key.name || key.appName || "cette clé SR", isCurrentlyActive: !!key.isActive })}
                           data-testid={`toggle-sr-key-${key.id}`}
                         />
                       </div>
@@ -3859,6 +3862,48 @@ export default function AdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ════ TOGGLE LINK / KEY CONFIRMATION DIALOG ════ */}
+      <Dialog open={!!toggleConfirmDialog} onOpenChange={(o) => { if (!o) setToggleConfirmDialog(null); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ${toggleConfirmDialog?.isCurrentlyActive ? "bg-gradient-to-br from-red-500 to-red-600" : "bg-gradient-to-br from-emerald-500 to-emerald-600"}`}>
+              {toggleConfirmDialog?.isCurrentlyActive ? <Lock className="h-7 w-7 text-white" /> : <Unlock className="h-7 w-7 text-white" />}
+            </div>
+            <DialogTitle className="text-center">
+              {toggleConfirmDialog?.isCurrentlyActive
+                ? `Bloquer ${toggleConfirmDialog?.type === "link" ? "ce lien" : "cette clé"} ?`
+                : `Activer ${toggleConfirmDialog?.type === "link" ? "ce lien" : "cette clé"} ?`}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              <strong>{toggleConfirmDialog?.name}</strong>
+              {toggleConfirmDialog?.isCurrentlyActive
+                ? ` sera désactivé${toggleConfirmDialog?.type === "link" ? "" : "e"} et inaccessible aux utilisateurs.`
+                : ` sera réactivé${toggleConfirmDialog?.type === "link" ? "" : "e"} et accessible aux utilisateurs.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1 h-10" onClick={() => setToggleConfirmDialog(null)}>Annuler</Button>
+            <Button
+              className={`flex-1 h-10 font-bold text-white ${toggleConfirmDialog?.isCurrentlyActive ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
+              disabled={toggleLinkM.isPending || toggleApiKeyM.isPending}
+              onClick={() => {
+                if (!toggleConfirmDialog) return;
+                const newActive = !toggleConfirmDialog.isCurrentlyActive;
+                if (toggleConfirmDialog.type === "link") {
+                  toggleLinkM.mutate({ id: toggleConfirmDialog.id, isActive: newActive });
+                } else {
+                  toggleApiKeyM.mutate({ id: toggleConfirmDialog.id, isActive: newActive });
+                }
+              }}
+              data-testid="btn-confirm-toggle"
+            >
+              {(toggleLinkM.isPending || toggleApiKeyM.isPending) ? "En cours..." : toggleConfirmDialog?.isCurrentlyActive ? "Confirmer le blocage" : "Confirmer l'activation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </DashboardLayout>
   );
 }
