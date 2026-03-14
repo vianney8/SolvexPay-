@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,8 @@ const COUNTRIES = [
 
 
 export default function DepositPage() {
+  const { user } = useAuth();
+  const isBlocked = !!(user as any)?.isBlocked;
   const { toast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
   const [amount, setAmount] = useState("");
@@ -365,6 +368,15 @@ export default function DepositPage() {
   return (
     <DashboardLayout title="" breadcrumbs={[{ label: "Dépôt" }]}>
       <div className="max-w-md mx-auto space-y-5">
+        {isBlocked && (
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-5 text-center space-y-2">
+            <div className="h-12 w-12 rounded-2xl bg-red-500 flex items-center justify-center mx-auto">
+              <XCircle className="h-6 w-6 text-white" />
+            </div>
+            <p className="font-bold text-red-600">Erreur</p>
+            <p className="text-sm text-muted-foreground">Impossible d'effectuer un dépôt. Compte suspendu.</p>
+          </div>
+        )}
         <div
           className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
           style={{ background: "linear-gradient(135deg, hsl(160 84% 28%) 0%, hsl(160 84% 40%) 60%, hsl(180 70% 34%) 100%)" }}

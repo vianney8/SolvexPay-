@@ -52,7 +52,10 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
 
+  const isBlocked = !!(user as any)?.isBlocked;
+
   const getDisplayName = () => {
+    if (isBlocked) return "Utilisateur SolvexPay";
     if (user?.firstName) return [user.firstName, user.lastName].filter(Boolean).join(" ");
     return user?.email || "Utilisateur";
   };
@@ -72,7 +75,12 @@ export function AppSidebar() {
               <div>
                 <p className="font-black text-base leading-none"><span className="text-blue-800">Solvex</span><span className="text-slate-400">Pay</span></p>
                 <div className="flex items-center gap-1.5 mt-1">
-                  {(user as any)?.kycStatus === "verified" ? (
+                  {isBlocked ? (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                      <span className="text-xs text-red-600 font-bold">Erreur</span>
+                    </>
+                  ) : (user as any)?.kycStatus === "verified" ? (
                     <>
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
                       <span className="text-xs text-emerald-600 font-medium">Vérifié</span>
@@ -186,8 +194,8 @@ export function AppSidebar() {
                   </div>
                 )}
                 <div className="flex-1 text-left min-w-0">
-                  <p className="text-sm font-bold text-gray-900 truncate" data-testid="text-user-name">{getDisplayName()}</p>
-                  <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                  <p className="text-sm font-bold truncate" data-testid="text-user-name" style={{ color: isBlocked ? "#dc2626" : undefined }}>{getDisplayName()}</p>
+                  <p className={`text-xs truncate ${isBlocked ? "text-red-500 font-semibold" : "text-gray-400"}`}>{isBlocked ? "Erreur" : user?.email}</p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0" />
               </Button>

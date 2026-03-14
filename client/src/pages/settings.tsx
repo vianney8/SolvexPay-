@@ -249,11 +249,23 @@ export default function SettingsPage() {
   const kycSt = kycStatusLabel(kycStatus);
   const kycAlreadySubmitted = kycStatus === "pending" || kycStatus === "verified";
 
-  const displayName = [firstName, lastName].filter(Boolean).join(" ") || user?.email || "Mon compte";
+  const isBlocked = !!(user as any)?.isBlocked;
+  const displayName = isBlocked ? "Utilisateur SolvexPay" : ([firstName, lastName].filter(Boolean).join(" ") || user?.email || "Mon compte");
 
   return (
     <DashboardLayout title="Paramètres" breadcrumbs={[{ label: "Paramètres" }]}>
       <div className="max-w-5xl space-y-6">
+        {isBlocked && (
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-red-500 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-red-600 text-sm">Erreur — Compte suspendu</p>
+              <p className="text-xs text-muted-foreground">Impossible de modifier les paramètres. Contactez le support.</p>
+            </div>
+          </div>
+        )}
 
         {/* ── Header banner ── */}
         <div
@@ -275,15 +287,15 @@ export default function SettingsPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-extrabold text-2xl leading-tight" data-testid="text-settings-name">{displayName}</p>
-              <p className="text-white/65 text-sm mt-0.5" data-testid="text-settings-email">{email}</p>
+              <p className="text-white/65 text-sm mt-0.5" data-testid="text-settings-email">{isBlocked ? "Erreur" : email}</p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 {user?.id && (
                   <span className="text-white/55 text-xs font-mono bg-white/10 px-2.5 py-1 rounded-lg border border-white/10" data-testid="text-user-id">
                     ID : {String(user.id).slice(0, 8).toUpperCase()}
                   </span>
                 )}
-                <span className={`text-xs px-2.5 py-1 rounded-lg border font-semibold ${kycSt.color}`} data-testid="badge-kyc-status">
-                  KYC : {kycSt.label}
+                <span className={`text-xs px-2.5 py-1 rounded-lg border font-semibold ${isBlocked ? "bg-red-500/25 border-red-400/40 text-red-200" : kycSt.color}`} data-testid="badge-kyc-status">
+                  KYC : {isBlocked ? "Erreur" : kycSt.label}
                 </span>
                 <span className="text-xs px-2.5 py-1 rounded-lg border border-white/15 bg-white/10 text-white/70 font-medium">
                   Français · XOF

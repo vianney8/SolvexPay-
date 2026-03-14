@@ -54,6 +54,7 @@ const OPERATOR_LABEL: Record<string, string> = {
 export default function WithdrawPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const isBlocked = !!(user as any)?.isBlocked;
   const [amount, setAmount] = useState("");
   const [country, setCountry] = useState((user as any)?.withdrawalCountry || "BJ");
   const [operator, setOperator] = useState((user as any)?.withdrawalOperator || "");
@@ -224,6 +225,15 @@ export default function WithdrawPage() {
   return (
     <DashboardLayout title="" breadcrumbs={[{ label: "Retrait" }]}>
       <div className="max-w-md mx-auto space-y-5">
+        {isBlocked && (
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-5 text-center space-y-2">
+            <div className="h-12 w-12 rounded-2xl bg-red-500 flex items-center justify-center mx-auto">
+              <AlertTriangle className="h-6 w-6 text-white" />
+            </div>
+            <p className="font-bold text-red-600">Erreur</p>
+            <p className="text-sm text-muted-foreground">Impossible d'effectuer un retrait. Compte suspendu.</p>
+          </div>
+        )}
         <div
           className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
           style={{ background: "linear-gradient(135deg, hsl(200 90% 30%) 0%, hsl(210 85% 48%) 60%, hsl(220 80% 52%) 100%)" }}
