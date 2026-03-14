@@ -119,7 +119,9 @@ export default function SupportPage() {
         <div className="space-y-3">
           <h3 className="text-sm font-bold text-foreground">Nos canaux de contact</h3>
           {CHANNEL_META.map((ch) => {
-            const href = links?.[ch.key] || DEFAULTS[ch.key];
+            const raw = links?.[ch.key] || "";
+            const isValidUrl = raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("mailto:");
+            const href = isValidUrl ? raw : DEFAULTS[ch.key];
             const isMailto = href.startsWith("mailto:");
             return (
               <a
@@ -129,6 +131,7 @@ export default function SupportPage() {
                 rel={isMailto ? undefined : "noopener noreferrer"}
                 data-testid={`link-support-${ch.id}`}
                 className={`flex items-center gap-4 p-4 rounded-2xl border ${ch.bg} ${ch.border} hover:shadow-md transition-all duration-200 group`}
+                onClick={e => { e.stopPropagation(); }}
               >
                 <div className={`h-12 w-12 rounded-xl ${ch.iconBg} flex items-center justify-center flex-shrink-0 shadow-sm`}>
                   <ch.icon className="h-6 w-6 text-white" />
