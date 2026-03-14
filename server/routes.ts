@@ -1055,9 +1055,9 @@ export async function registerRoutes(
 
   app.post("/api/admin/notifications", isAdmin, async (req: any, res) => {
     try {
-      const { title, message, color } = req.body;
+      const { title, message, color, linkUrl, linkLabel } = req.body;
       if (!title || !message) return res.status(400).json({ message: "Title and message are required" });
-      const notif = await storage.createNotification({ title, message, color: color || "blue", isActive: true });
+      const notif = await storage.createNotification({ title, message, color: color || "blue", isActive: true, linkUrl: linkUrl || null, linkLabel: linkLabel || null });
       res.json(notif);
     } catch {
       res.status(500).json({ message: "Failed to create notification" });

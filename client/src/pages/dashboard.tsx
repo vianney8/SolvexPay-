@@ -149,6 +149,19 @@ export default function DashboardPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold">{n.title}</p>
                   <p className="text-xs mt-0.5 opacity-80">{n.message}</p>
+                  {n.linkUrl && (
+                    <a
+                      href={n.linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className={`inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-lg text-xs font-bold transition-colors ${n.color === "red" ? "bg-red-500/20 hover:bg-red-500/30 text-red-800 dark:text-red-200" : "bg-blue-500/20 hover:bg-blue-500/30 text-blue-800 dark:text-blue-200"}`}
+                      data-testid={`link-notif-action-${n.id}`}
+                    >
+                      {n.linkLabel || "Voir"}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
                 </div>
                 <button
                   onClick={() => dismissNotif(n.id)}

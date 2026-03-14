@@ -139,6 +139,8 @@ export const notifications = pgTable("notifications", {
   title: text("title").notNull(),
   message: text("message").notNull(),
   color: text("color").notNull().default("blue"),
+  linkUrl: text("link_url"),
+  linkLabel: text("link_label"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

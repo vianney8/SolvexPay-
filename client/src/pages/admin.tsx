@@ -259,7 +259,7 @@ export default function AdminPage() {
   const [apiKeysSearch, setApiKeysSearch] = useState("");
   const [wdDialog, setWdDialog] = useState(false);
   const [wdForm, setWdForm] = useState({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
-  const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue" });
+  const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue", linkUrl: "", linkLabel: "" });
   const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
   // Queries
   const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"], staleTime: 60000 });
@@ -588,11 +588,11 @@ export default function AdminPage() {
   });
 
   const createNotifM = useMutation({
-    mutationFn: (data: { title: string; message: string; color: string }) => apiRequest("POST", "/api/admin/notifications", data),
+    mutationFn: (data: { title: string; message: string; color: string; linkUrl?: string; linkLabel?: string }) => apiRequest("POST", "/api/admin/notifications", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] });
       toast({ title: "Notification envoyée" });
-      setNotifForm({ title: "", message: "", color: "blue" });
+      setNotifForm({ title: "", message: "", color: "blue", linkUrl: "", linkLabel: "" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
@@ -2889,8 +2889,31 @@ export default function AdminPage() {
                     </button>
                   </div>
                 </div>
+                <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-4 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lien optionnel</p>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">URL du lien</Label>
+                    <Input
+                      value={notifForm.linkUrl}
+                      onChange={e => setNotifForm(p => ({ ...p, linkUrl: e.target.value }))}
+                      placeholder="https://..."
+                      className="h-10 text-sm"
+                      data-testid="input-notif-link-url"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Nom du bouton (ex : Rejoindre, En savoir plus…)</Label>
+                    <Input
+                      value={notifForm.linkLabel}
+                      onChange={e => setNotifForm(p => ({ ...p, linkLabel: e.target.value }))}
+                      placeholder="Ex: Rejoindre"
+                      className="h-10 text-sm"
+                      data-testid="input-notif-link-label"
+                    />
+                  </div>
+                </div>
                 <Button
-                  onClick={() => createNotifM.mutate(notifForm)}
+                  onClick={() => createNotifM.mutate({ ...notifForm, linkUrl: notifForm.linkUrl || undefined, linkLabel: notifForm.linkLabel || undefined })}
                   disabled={createNotifM.isPending || !notifForm.title || !notifForm.message}
                   className="w-full h-10 font-bold"
                   data-testid="btn-send-notification"
@@ -2915,6 +2938,11 @@ export default function AdminPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold truncate">{n.title}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                        {n.linkUrl && (
+                          <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 truncate">
+                            🔗 {n.linkLabel || n.linkUrl}
+                          </p>
+                        )}
                         <p className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString("fr-FR")}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
