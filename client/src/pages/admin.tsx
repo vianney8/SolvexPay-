@@ -700,7 +700,7 @@ export default function AdminPage() {
               </div>
               <div className="hidden md:flex items-center gap-3">
                 {[
-                  { label: "Total utilisateurs", value: totalUsersCount || stats?.userCount, color: "text-cyan-300" },
+                  { label: "Total utilisateurs", value: stats?.userCount ?? totalUsersCount, color: "text-cyan-300" },
                   { label: "KYC en attente", value: pendingKyc.length, color: "text-amber-300" },
                   { label: "Retraits pendants", value: isAutoWithdrawal ? 0 : pendingWithdrawals.length, color: "text-rose-300" },
                   { label: "Liens de paiement", value: (allPaymentLinks || []).length, color: "text-violet-300" },
@@ -758,7 +758,7 @@ export default function AdminPage() {
                 <Users className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-2xl font-black text-foreground" data-testid="total-users-count">{totalUsersCount}</p>
+                <p className="text-2xl font-black text-foreground" data-testid="total-users-count">{(stats?.userCount ?? totalUsersCount) || "—"}</p>
                 <p className="text-xs text-muted-foreground">Utilisateurs inscrits sur la plateforme</p>
               </div>
             </div>

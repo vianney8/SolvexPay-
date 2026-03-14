@@ -2093,15 +2093,27 @@ export async function registerRoutes(
       const { count, sum, eq } = await import("drizzle-orm");
       const { transactions: txTable, wallets: walletsTable } = await import("@shared/schema");
 
-      const [userCount] = await db.select({ count: count() }).from(usersTable);
-      const [txCount] = await db.select({ count: count() }).from(txTable);
-      const [depositSum] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.type, "deposit"));
-      const [withdrawalSum] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.type, "withdrawal"));
-      const [transferSum] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.type, "transfer"));
-      const [pendingCount] = await db.select({ count: count() }).from(txTable).where(eq(txTable.status, "pending"));
-      const [completedCount] = await db.select({ count: count() }).from(txTable).where(eq(txTable.status, "completed"));
-      const [failedCount] = await db.select({ count: count() }).from(txTable).where(eq(txTable.status, "failed"));
-      const [walletTotal] = await db.select({ total: sum(walletsTable.balanceXOF) }).from(walletsTable);
+      const [
+        [userCount],
+        [txCount],
+        [depositSum],
+        [withdrawalSum],
+        [transferSum],
+        [pendingCount],
+        [completedCount],
+        [failedCount],
+        [walletTotal],
+      ] = await Promise.all([
+        db.select({ count: count() }).from(usersTable),
+        db.select({ count: count() }).from(txTable),
+        db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.type, "deposit")),
+        db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.type, "withdrawal")),
+        db.select({ total: sum(txTable.amount) }).from(txTable).where(eq(txTable.type, "transfer")),
+        db.select({ count: count() }).from(txTable).where(eq(txTable.status, "pending")),
+        db.select({ count: count() }).from(txTable).where(eq(txTable.status, "completed")),
+        db.select({ count: count() }).from(txTable).where(eq(txTable.status, "failed")),
+        db.select({ total: sum(walletsTable.balanceXOF) }).from(walletsTable),
+      ]);
 
       res.json({
         userCount: userCount.count,
