@@ -94,10 +94,10 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div
-        className="bg-background w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
+        className="bg-background w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border/50">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border/50 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${getTypeIcon(tx).bg}`}>
               {(() => { const Icon = getTypeIcon(tx).icon; return <Icon className={`h-5 w-5 ${getTypeIcon(tx).text}`} />; })()}
@@ -111,12 +111,12 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
               {isApi && apiName && <p className="text-xs text-muted-foreground">{apiName}</p>}
             </div>
           </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-xl bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors" data-testid="button-close-tx-modal">
+          <button onClick={onClose} className="h-8 w-8 rounded-xl bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0" data-testid="button-close-tx-modal">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div className="text-center py-2">
             <p className={`text-3xl font-black ${tx.type === "deposit" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
               {tx.type === "deposit" ? "+" : "-"}{formatCurrency(tx.amount, tx.currency)} {tx.currency}
@@ -209,7 +209,7 @@ export default function TransactionsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
-  const { data: transactions, isLoading } = useQuery<Transaction[]>({ queryKey: ["/api/transactions"] });
+  const { data: transactions, isLoading } = useQuery<Transaction[]>({ queryKey: ["/api/transactions"], staleTime: 30000, gcTime: 60000 });
 
   const filteredTransactions = transactions?.filter((tx) => {
     const matchesSearch = !search ||
@@ -235,7 +235,7 @@ export default function TransactionsPage() {
   ];
 
   return (
-    <DashboardLayout title="Transactions" breadcrumbs={[{ label: "Transactions" }]}>
+    <DashboardLayout title="Transactions" breadcrumbs={[{ label: "Transactions" }]} backTo="/dashboard">
       <div className="space-y-5">
         <div
           className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"

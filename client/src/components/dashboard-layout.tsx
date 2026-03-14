@@ -11,23 +11,28 @@ import {
 } from "@/components/ui/breadcrumb";
 import { ChevronLeft } from "lucide-react";
 import solvexpayIcon from "@/assets/images/solvexpay-icon.jpg";
+import { useLocation } from "wouter";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
   title: string;
   breadcrumbs?: { label: string; href?: string }[];
+  backTo?: string;
 }
 
-function goBack() {
-  if (window.history.length > 1) {
-    window.history.back();
-  } else {
-    window.location.href = "/dashboard";
-  }
-}
-
-export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayoutProps) {
+export function DashboardLayout({ children, title, breadcrumbs, backTo }: DashboardLayoutProps) {
+  const [, setLocation] = useLocation();
   const showBackButton = breadcrumbs && breadcrumbs.length > 0;
+
+  function goBack() {
+    if (backTo) {
+      setLocation(backTo);
+    } else if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      setLocation("/dashboard");
+    }
+  }
 
   const style = {
     "--sidebar-width": "16rem",

@@ -76,7 +76,7 @@ export default function DashboardPage() {
   const [dismissedNotifs, setDismissedNotifs] = useState<string[]>([]);
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
-  const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({ queryKey: ["/api/transactions"] });
+  const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({ queryKey: ["/api/transactions"], staleTime: 30000, gcTime: 60000 });
   const { data: activeNotifications } = useQuery<any[]>({ queryKey: ["/api/notifications"] });
   const { data: stats } = useQuery<{
     totalDeposits: number; totalWithdrawals: number; transactionCount: number; paymentLinksCount: number;
