@@ -210,13 +210,6 @@ Si vous déplacez ou remixez ce projet, voici **tout ce qu'il faut reconfigurer*
 - Hébergée sur **Neon** (externe, pas sur Replit) → les données suivent automatiquement via `DATABASE_URL`
 - Aucune migration à faire : la base existe déjà sur Neon
 
-### Déploiement et migration
-- **Schéma automatique** : le build de déploiement exécute `npm run db:push && npm run build` — le schéma est toujours synchronisé avec la production avant le lancement
-- **Migration de données** : onglet "Migration DB" dans le panneau admin → bouton export JSON (dev) + formulaire import (prod)
-  - Export : `GET /api/admin/db/export` — toutes les tables en JSON
-  - Import : `POST /api/admin/db/import` — ON CONFLICT DO NOTHING, sauf system_settings (upsert)
-- Ordre d'import : users → wallets → transactions → paymentLinks → apiKeys → paymentMethods → feeConfigs → notifications → adminWithdrawals
-
 ### Intégrations Replit à réinstaller
 - `javascript_log_in_with_replit` (auth)
 - `javascript_database` (session store)
