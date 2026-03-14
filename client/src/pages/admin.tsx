@@ -225,6 +225,8 @@ export default function AdminPage() {
   const [userSearch, setUserSearch] = useState("");
   const [userSort, setUserSort] = useState<"default" | "balance_desc" | "balance_asc">("default");
   const [srFilter, setSrFilter] = useState(false);
+  const [blockedFilter, setBlockedFilter] = useState(false);
+  const [blockDialog, setBlockDialog] = useState<{ userId: string; name: string; isBlocked: boolean } | null>(null);
   const [srConfirmDialog, setSrConfirmDialog] = useState<{ userId: string; name: string; enable: boolean } | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [txSearch, setTxSearch] = useState("");
@@ -271,8 +273,8 @@ export default function AdminPage() {
   });
   const { data: users, isLoading: usersLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/users"],
-    enabled: ["users", "kyc", "wallets"].includes(activeTab),
-    staleTime: 120000,
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
   });
   const { data: kycList, isLoading: kycLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/kyc"],
@@ -418,7 +420,11 @@ export default function AdminPage() {
 
   const blockM = useMutation({
     mutationFn: (d: { userId: string; isBlocked: boolean }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/block`, { isBlocked: d.isBlocked }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: "Statut mis à jour" }); },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: vars.isBlocked ? "Compte débloqué" : "Compte bloqué" });
+      setBlockDialog(null);
+    },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
@@ -622,9 +628,11 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
+  const blockedUsersCount = (users || []).filter(u => u.isBlocked).length;
   const filteredUsers = (users || [])
     .filter(u => !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase()))
     .filter(u => !srFilter || (u as any).apiSrEnabled)
+    .filter(u => !blockedFilter || u.isBlocked)
     .sort((a, b) => {
       if (userSort === "balance_desc") return parseFloat(b.wallet?.balanceXOF || "0") - parseFloat(a.wallet?.balanceXOF || "0");
       if (userSort === "balance_asc") return parseFloat(a.wallet?.balanceXOF || "0") - parseFloat(b.wallet?.balanceXOF || "0");
@@ -1548,6 +1556,14 @@ export default function AdminPage() {
                 <Zap className="h-3.5 w-3.5" />
                 SR activé{srFilter ? ` (${filteredUsers.length})` : ""}
               </button>
+              <button
+                onClick={() => setBlockedFilter(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${blockedFilter ? "bg-red-600 text-white border-red-600 shadow-sm" : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 hover:bg-red-500/20"}`}
+                data-testid="btn-filter-blocked"
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Bloqués{blockedUsersCount > 0 ? ` (${blockedUsersCount})` : ""}
+              </button>
               <div className="flex items-center gap-1">
                 <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Trier par solde :</span>
                 {[
@@ -1614,7 +1630,7 @@ export default function AdminPage() {
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-colors"
                             data-testid={`btn-bal-${u.id}`}><PenLine className="h-3.5 w-3.5" />Solde</button>
                           <button
-                            onClick={() => blockM.mutate({ userId: u.id, isBlocked: !u.isBlocked })}
+                            onClick={() => setBlockDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, isBlocked: u.isBlocked })}
                             disabled={blockM.isPending}
                             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.isBlocked ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
                             data-testid={`btn-block-${u.id}`}>
@@ -1683,7 +1699,11 @@ export default function AdminPage() {
                     </Card>
                   );
                 })}
-                {filteredUsers.length === 0 && <div className="text-center py-12 text-sm text-muted-foreground">Aucun utilisateur trouvé</div>}
+                {filteredUsers.length === 0 && (
+                  <div className="text-center py-12 text-sm text-muted-foreground">
+                    {blockedFilter ? "Aucun utilisateur bloqué" : "Aucun utilisateur trouvé"}
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
@@ -3287,6 +3307,36 @@ export default function AdminPage() {
               className={`h-10 ${kycAction === "verified" ? "bg-emerald-600 hover:bg-emerald-700" : kycAction === "not_started" ? "bg-amber-600 hover:bg-amber-700" : kycAction === "rejected" ? "bg-red-600 hover:bg-red-700" : ""}`}
               data-testid="btn-kyc-confirm">
               {kycM.isPending ? "Enregistrement..." : kycAction === "verified" ? "Marquer comme vérifié" : kycAction === "not_started" ? "Réinitialiser" : kycAction === "rejected" ? "Rejeter" : "Confirmer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ BLOCK / UNBLOCK DIALOG ════ */}
+      <Dialog open={!!blockDialog} onOpenChange={(o) => { if (!o) setBlockDialog(null); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ${blockDialog?.isBlocked ? "bg-gradient-to-br from-emerald-500 to-emerald-600" : "bg-gradient-to-br from-red-500 to-red-600"}`}>
+              {blockDialog?.isBlocked ? <Unlock className="h-7 w-7 text-white" /> : <Lock className="h-7 w-7 text-white" />}
+            </div>
+            <DialogTitle className="text-center">
+              {blockDialog?.isBlocked ? "Débloquer ce compte ?" : "Bloquer ce compte ?"}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {blockDialog?.isBlocked
+                ? <>L'utilisateur <strong>{blockDialog?.name}</strong> pourra de nouveau se connecter et utiliser son compte.</>
+                : <>L'utilisateur <strong>{blockDialog?.name}</strong> ne pourra plus se connecter ni effectuer d'opérations.</>}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1 h-10" onClick={() => setBlockDialog(null)}>Annuler</Button>
+            <Button
+              className={`flex-1 h-10 font-bold text-white ${blockDialog?.isBlocked ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
+              onClick={() => blockDialog && blockM.mutate({ userId: blockDialog.userId, isBlocked: !blockDialog.isBlocked })}
+              disabled={blockM.isPending}
+              data-testid="btn-confirm-block"
+            >
+              {blockM.isPending ? "En cours..." : blockDialog?.isBlocked ? "Confirmer le déblocage" : "Confirmer le blocage"}
             </Button>
           </DialogFooter>
         </DialogContent>
