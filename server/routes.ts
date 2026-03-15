@@ -322,6 +322,20 @@ async function forwardToMerchantWebhooks(transaction: any) {
   }
 }
 
+const _adminCache = new Map<string, { data: any; expiresAt: number }>();
+const ADMIN_CACHE_TTL = 30_000;
+function adminCacheGet(key: string): any | null {
+  const entry = _adminCache.get(key);
+  if (!entry || Date.now() > entry.expiresAt) { _adminCache.delete(key); return null; }
+  return entry.data;
+}
+function adminCacheSet(key: string, data: any): void {
+  _adminCache.set(key, { data, expiresAt: Date.now() + ADMIN_CACHE_TTL });
+}
+function adminCacheDel(...keys: string[]): void {
+  keys.forEach(k => _adminCache.delete(k));
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -2086,6 +2100,8 @@ export async function registerRoutes(
 
   app.get("/api/admin/users", isAdmin, async (_req, res) => {
     try {
+      const cached = adminCacheGet("admin-users");
+      if (cached) return res.json(cached);
       const { users: usersTable } = await import("@shared/models/auth");
       const { wallets: walletsTable } = await import("@shared/schema");
       const { db } = await import("./db");
@@ -2099,6 +2115,7 @@ export async function registerRoutes(
         const { passwordHash: _, ...safeUser } = users as any;
         return { ...safeUser, wallet: wallets ?? null };
       });
+      adminCacheSet("admin-users", usersWithWallets);
       res.json(usersWithWallets);
     } catch (error) {
       console.error("Admin users error:", error);
@@ -2388,6 +2405,7 @@ export async function registerRoutes(
         status: "completed",
         description: `Ajustement admin: ${motif}`,
       });
+      adminCacheDel("admin-users", "admin-wallets");
       res.json(updatedWallet);
     } catch (error) {
       console.error("Admin balance adjustment error:", error);
@@ -2447,6 +2465,7 @@ export async function registerRoutes(
       const { eq } = await import("drizzle-orm");
       const [updated] = await db.update(usersTable).set({ isBlocked: !!isBlocked, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
+      adminCacheDel("admin-users", "admin-wallets", "admin-merchants");
       const { passwordHash: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
@@ -3061,15 +3080,20 @@ export async function registerRoutes(
   // All wallets for admin view
   app.get("/api/admin/wallets", isAdmin, async (req, res) => {
     try {
+      const cached = adminCacheGet("admin-wallets");
+      if (cached) return res.json(cached);
       const { users: usersTable } = await import("@shared/models/auth");
+      const { wallets: walletsTable } = await import("@shared/schema");
       const { db } = await import("./db");
-      const { desc } = await import("drizzle-orm");
-      const allUsers = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
-      const result = await Promise.all(allUsers.map(async (u) => {
-        const wallet = await storage.getWallet(u.id);
-        const { passwordHash: _, ...safe } = u;
-        return { ...safe, wallet };
-      }));
+      const { desc, eq } = await import("drizzle-orm");
+      const rows = await db.select().from(usersTable)
+        .leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id))
+        .orderBy(desc(usersTable.createdAt));
+      const result = rows.map(({ users, wallets }) => {
+        const { passwordHash: _, ...safe } = users as any;
+        return { ...safe, wallet: wallets ?? null };
+      });
+      adminCacheSet("admin-wallets", result);
       res.json(result);
     } catch (error) {
       console.error("Admin wallets error:", error);
@@ -3163,6 +3187,8 @@ export async function registerRoutes(
   // Merchants — users with at least 1 payment link or API key
   app.get("/api/admin/merchants", isAdmin, async (req, res) => {
     try {
+      const cached = adminCacheGet("admin-merchants");
+      if (cached) return res.json(cached);
       const { db } = await import("./db");
       const { users: usersTable } = await import("@shared/models/auth");
       const { paymentLinks: plTable, apiKeys: akTable, wallets: walletsTable } = await import("@shared/schema");
@@ -3193,6 +3219,7 @@ export async function registerRoutes(
 
       // Sort: blocked first, then by most links+keys
       result.sort((a, b) => (b.links.length + b.keys.length) - (a.links.length + a.keys.length));
+      adminCacheSet("admin-merchants", result);
       res.json(result);
     } catch (error) {
       console.error("Admin merchants error:", error);
@@ -3265,15 +3292,20 @@ export async function registerRoutes(
   // All payment links (admin view)
   app.get("/api/admin/payment-links", isAdmin, async (req, res) => {
     try {
+      const cached = adminCacheGet("admin-payment-links");
+      if (cached) return res.json(cached);
       const { db } = await import("./db");
       const { paymentLinks: plTable } = await import("@shared/schema");
       const { users: usersTable } = await import("@shared/models/auth");
-      const { desc } = await import("drizzle-orm");
-      const links = await db.select().from(plTable).orderBy(desc(plTable.createdAt));
-      const enriched = await Promise.all(links.map(async (link) => {
-        const [user] = await db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName, email: usersTable.email }).from(usersTable).where((await import("drizzle-orm")).eq(usersTable.id, link.userId));
-        return { ...link, user: user || null };
-      }));
+      const { desc, eq } = await import("drizzle-orm");
+      const rows = await db.select().from(plTable)
+        .leftJoin(usersTable, eq(usersTable.id, plTable.userId))
+        .orderBy(desc(plTable.createdAt));
+      const enriched = rows.map(({ payment_links, users }) => {
+        const user = users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null;
+        return { ...payment_links, user };
+      });
+      adminCacheSet("admin-payment-links", enriched);
       res.json(enriched);
     } catch (error) {
       console.error("Admin payment links error:", error);
@@ -3289,6 +3321,7 @@ export async function registerRoutes(
       const { paymentLinks: plTable } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
       const [updated] = await db.update(plTable).set({ isActive: !!isActive, adminLocked: !isActive }).where(eq(plTable.id, id)).returning();
+      adminCacheDel("admin-payment-links", "admin-merchants");
       res.json(updated);
     } catch (error) {
       console.error("Admin toggle payment link error:", error);
@@ -3299,16 +3332,21 @@ export async function registerRoutes(
   // All API keys (admin view)
   app.get("/api/admin/api-keys", isAdmin, async (req, res) => {
     try {
+      const cached = adminCacheGet("admin-api-keys");
+      if (cached) return res.json(cached);
       const { db } = await import("./db");
       const { apiKeys: akTable } = await import("@shared/schema");
       const { users: usersTable } = await import("@shared/models/auth");
-      const { desc } = await import("drizzle-orm");
-      const keys = await db.select().from(akTable).orderBy(desc(akTable.createdAt));
-      const enriched = await Promise.all(keys.map(async (key) => {
-        const [user] = await db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName, email: usersTable.email }).from(usersTable).where((await import("drizzle-orm")).eq(usersTable.id, key.userId));
-        const { keyHash: _, ...safeKey } = key;
-        return { ...safeKey, user: user || null };
-      }));
+      const { desc, eq } = await import("drizzle-orm");
+      const rows = await db.select().from(akTable)
+        .leftJoin(usersTable, eq(usersTable.id, akTable.userId))
+        .orderBy(desc(akTable.createdAt));
+      const enriched = rows.map(({ api_keys, users }) => {
+        const { keyHash: _, ...safeKey } = api_keys;
+        const user = users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null;
+        return { ...safeKey, user };
+      });
+      adminCacheSet("admin-api-keys", enriched);
       res.json(enriched);
     } catch (error) {
       console.error("Admin API keys error:", error);
@@ -3326,6 +3364,7 @@ export async function registerRoutes(
       const setActive = !!isActive;
       const [updated] = await db.update(akTable).set({ isActive: setActive, adminLocked: !setActive }).where(eq(akTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Clé non trouvée" });
+      adminCacheDel("admin-api-keys", "admin-merchants");
       const { keyHash: _, ...safeKey } = updated;
       res.json(safeKey);
     } catch (error) {
