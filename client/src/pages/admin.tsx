@@ -385,7 +385,7 @@ export default function AdminPage() {
   });
   const { data: adminWdHistory, isLoading: wdHistoryLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/omnipay/withdrawals"],
-    enabled: activeTab === "benefices",
+    enabled: ["overview", "benefices"].includes(activeTab),
     staleTime: 120000,
   });
   const { data: userTxList } = useQuery<any[]>({
@@ -463,7 +463,7 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
   const enableSrAllM = useMutation({
-    mutationFn: () => apiRequest("PATCH", "/api/admin/users/enable-sr-all", {}),
+    mutationFn: () => apiRequest("PATCH", "/api/admin/users/enable-sr-all", {}).then(r => r.json()),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setSrAllDialog(false);
@@ -476,7 +476,7 @@ export default function AdminPage() {
     mutationFn: (d: { userId: string; isBlocked: boolean }) => apiRequest("PATCH", `/api/admin/users/${d.userId}/block`, { isBlocked: d.isBlocked }),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: vars.isBlocked ? "Compte débloqué" : "Compte bloqué" });
+      toast({ title: vars.isBlocked ? "Compte bloqué" : "Compte débloqué" });
       setBlockDialog(null);
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
@@ -633,7 +633,7 @@ export default function AdminPage() {
   });
 
   const wdM = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/admin/omnipay/withdraw", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/admin/omnipay/withdraw", data).then(r => r.json()),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] });
@@ -647,7 +647,7 @@ export default function AdminPage() {
   });
 
   const wdCheckM = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/admin/omnipay/withdrawals/${id}/check`, {}),
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/omnipay/withdrawals/${id}/check`, {}).then(r => r.json()),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
@@ -704,7 +704,7 @@ export default function AdminPage() {
 
   const blockedUsersCount = (users || []).filter(u => u.isBlocked).length;
   const filteredUsers = (users || [])
-    .filter(u => !userSearch || [u.email, u.firstName, u.lastName].join(" ").toLowerCase().includes(userSearch.toLowerCase()))
+    .filter(u => !userSearch || [u.email, u.firstName, u.lastName, u.phone].join(" ").toLowerCase().includes(userSearch.toLowerCase()))
     .filter(u => !srFilter || (u as any).apiSrEnabled)
     .filter(u => !blockedFilter || u.isBlocked)
     .sort((a, b) => {
@@ -2025,11 +2025,11 @@ export default function AdminPage() {
                   </div>
                   {omniLoading ? (
                     <Skeleton className="h-8 w-48 bg-white/20" />
-                  ) : omnipayBalance?.success !== 1 ? (
+                  ) : !omnipayBalance?.balance?.length ? (
                     <p className="text-white/60 text-sm">Solde non disponible</p>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {(omnipayBalance?.data || []).map((b: any, i: number) => (
+                      {(omnipayBalance?.balance || []).map((b: any, i: number) => (
                         <div key={i} className="bg-white/10 rounded-2xl px-3 py-2.5" data-testid={`omnipay-balance-${b.countryCode}`}>
                           <p className="text-white/60 text-xs">{b.countryName} ({b.currency})</p>
                           <p className="text-white font-black text-lg">{new Intl.NumberFormat("fr-FR").format(parseFloat(b.amount || "0"))}</p>
