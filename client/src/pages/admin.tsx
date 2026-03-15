@@ -219,6 +219,46 @@ function WithdrawalModeCard() {
   );
 }
 
+function CountdownLoader({ label, icon }: { label: string; icon: string }) {
+  const [count, setCount] = useState(5);
+  useEffect(() => {
+    if (count <= 0) return;
+    const t = setTimeout(() => setCount(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [count]);
+  const radius = 40;
+  const circ = 2 * Math.PI * radius;
+  const filled = (5 - count) / 5;
+  const offset = circ - filled * circ;
+  return (
+    <div className="flex flex-col items-center justify-center py-14 gap-5 select-none">
+      <div className="relative w-28 h-28">
+        <svg width="112" height="112" viewBox="0 0 112 112" className="-rotate-90 absolute inset-0">
+          <circle cx="56" cy="56" r={radius} fill="none" strokeWidth="7" className="stroke-muted/30" />
+          <circle cx="56" cy="56" r={radius} fill="none" strokeWidth="7"
+            strokeDasharray={circ} strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="stroke-primary transition-[stroke-dashoffset] duration-1000 ease-linear"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+          <span className="text-lg">{icon}</span>
+          <span className="text-3xl font-black text-foreground leading-none">{count}</span>
+        </div>
+      </div>
+      <div className="text-center space-y-1">
+        <p className="font-bold text-base text-foreground">Chargement {label}</p>
+        <p className="text-xs text-muted-foreground">Les données arrivent dans {count}s...</p>
+      </div>
+      <div className="flex gap-2">
+        {[0,1,2,3,4].map(i => (
+          <div key={i} className={`h-2 rounded-full transition-all duration-500 ${i < (5 - count) ? "w-6 bg-primary" : "w-2 bg-muted/40"}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { toast } = useToast();
 
@@ -1623,7 +1663,7 @@ export default function AdminPage() {
             </div>
 
             {usersLoading ? (
-              <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)}</div>
+              <CountdownLoader label="Utilisateurs" icon="👥" />
             ) : (
               <div className="space-y-3">
                 {filteredUsers.map((u: any) => {
@@ -1767,7 +1807,7 @@ export default function AdminPage() {
             </div>
 
             {merchantsLoading ? (
-              <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-24 rounded-2xl bg-muted/40 animate-pulse" />)}</div>
+              <CountdownLoader label="Marchands" icon="🏪" />
             ) : (merchants || []).length === 0 ? (
               <div className="text-center py-10 text-muted-foreground text-sm">Aucun marchand pour l'instant</div>
             ) : (
@@ -1887,7 +1927,7 @@ export default function AdminPage() {
             </div>
 
             {kycLoading ? (
-              <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div>
+              <CountdownLoader label="KYC" icon="🪪" />
             ) : (
               <div className="space-y-3">
                 {(kycList || []).sort((a: any, b: any) => a.kycStatus === "pending" ? -1 : 1).map((u: any) => (

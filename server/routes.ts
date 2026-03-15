@@ -323,7 +323,7 @@ async function forwardToMerchantWebhooks(transaction: any) {
 }
 
 const _adminCache = new Map<string, { data: any; expiresAt: number }>();
-const ADMIN_CACHE_TTL = 30_000;
+const ADMIN_CACHE_TTL = 65_000;
 function adminCacheGet(key: string): any | null {
   const entry = _adminCache.get(key);
   if (!entry || Date.now() > entry.expiresAt) { _adminCache.delete(key); return null; }
@@ -400,8 +400,8 @@ async function warmAdminCache(): Promise<void> {
 
 export function startAdminCacheWarmer(): void {
   warmAdminCache();
-  setInterval(warmAdminCache, 25_000);
-  console.log("[CacheWarmer] Préchauffeur cache admin démarré (toutes les 25s)");
+  setInterval(warmAdminCache, 60_000);
+  console.log("[CacheWarmer] Préchauffeur cache admin démarré (toutes les 60s)");
 }
 
 export async function registerRoutes(
