@@ -362,7 +362,9 @@ export default function AdminPage() {
   });
   const { data: merchants, isLoading: merchantsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/merchants"],
-    staleTime: 60000,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
   });
   const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/notifications"],
@@ -1571,7 +1573,7 @@ export default function AdminPage() {
           {/* ══════════════════════════════════════
               TAB 2 — UTILISATEURS
           ══════════════════════════════════════ */}
-          <TabsContent value="users" className="space-y-4 mt-5">
+          <TabsContent value="users" forceMount className="space-y-4 mt-5 data-[state=inactive]:hidden">
             <div className="flex gap-2 flex-wrap">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1744,7 +1746,7 @@ export default function AdminPage() {
           {/* ══════════════════════════════════════
               TAB — MARCHANDS
           ══════════════════════════════════════ */}
-          <TabsContent value="marchands" className="space-y-4 mt-5">
+          <TabsContent value="marchands" forceMount className="space-y-4 mt-5 data-[state=inactive]:hidden">
             <div className="rounded-2xl bg-gradient-to-r from-violet-600/10 to-fuchsia-600/10 border border-violet-500/20 p-4 flex items-center gap-4">
               <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0">
                 <Link2 className="h-5 w-5 text-white" />
@@ -1865,7 +1867,7 @@ export default function AdminPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="kyc" className="space-y-4 mt-5">
+          <TabsContent value="kyc" forceMount className="space-y-4 mt-5 data-[state=inactive]:hidden">
             <div className="grid grid-cols-3 gap-3">
               {[
                 { label: "En attente", val: (kycList || []).filter((u: any) => u.kycStatus === "pending").length, color: "text-amber-600", bg: "bg-amber-500/10", border: "border-amber-500/20" },
