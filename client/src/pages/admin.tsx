@@ -235,7 +235,7 @@ export default function AdminPage() {
   const [txStatus, setTxStatus] = useState("all");
   const [txType, setTxType] = useState("all");
   const [statsPeriod, setStatsPeriod] = useState("month");
-  const [activeTab, setActiveTab] = useState("users");
+  const [activeTab, setActiveTab] = useState("overview");
   // Dialogs
   const [kycDialog, setKycDialog] = useState<{ userId: string; name: string; status: string } | null>(null);
   const [kycAction, setKycAction] = useState<"verified" | "rejected" | "not_started" | null>(null);
@@ -362,7 +362,6 @@ export default function AdminPage() {
   });
   const { data: merchants, isLoading: merchantsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/merchants"],
-    enabled: activeTab === "marchands",
     staleTime: 60000,
   });
   const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({
@@ -749,12 +748,12 @@ export default function AdminPage() {
           <div className="overflow-x-auto">
             <TabsList className="inline-flex w-max min-w-full gap-1 p-1.5 bg-muted/60 rounded-2xl h-auto">
               {[
-                { v: "users", label: "Utilisateurs", Icon: Users, badge: 0 },
-                { v: "marchands", label: "Marchands", Icon: Link2, badge: 0 },
-                { v: "kyc", label: "KYC", Icon: BadgeCheck, badge: pendingKyc.length },
                 { v: "overview", label: "Vue d'ensemble", Icon: BarChart3, badge: 0 },
                 { v: "liquidity", label: "Liquidité OmniPay", Icon: Activity, badge: liquidityCriticalCount },
                 { v: "benefices", label: "Bénéfices", Icon: Coins, badge: 0 },
+                { v: "users", label: "Utilisateurs", Icon: Users, badge: 0 },
+                { v: "marchands", label: "Marchands", Icon: Link2, badge: 0 },
+                { v: "kyc", label: "KYC", Icon: BadgeCheck, badge: pendingKyc.length },
                 { v: "wallets", label: "Wallets & Solde", Icon: Wallet, badge: 0 },
                 { v: "links-keys", label: "Liens & API", Icon: Link2, badge: 0 },
                 { v: "fees", label: "Frais", Icon: Percent, badge: 0 },
