@@ -305,8 +305,9 @@ export default function AdminPage() {
   });
   const { data: wallets, isLoading: walletsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/wallets"],
-    enabled: ["wallets", "liquidity"].includes(activeTab),
-    staleTime: 120000,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
   });
   const { data: omnipayBalance, isLoading: omniLoading, refetch: refetchOmni } = useQuery<any>({
     queryKey: ["/api/admin/omnipay/balance"],
@@ -354,11 +355,15 @@ export default function AdminPage() {
   });
   const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/payment-links"],
-    staleTime: 120000,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
   });
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/api-keys"],
-    staleTime: 120000,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
   });
   const { data: merchants, isLoading: merchantsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/merchants"],
@@ -1959,7 +1964,7 @@ export default function AdminPage() {
           {/* ══════════════════════════════════════
               TAB 4 — WALLETS & SOLDE
           ══════════════════════════════════════ */}
-          <TabsContent value="wallets" className="space-y-4 mt-5">
+          <TabsContent value="wallets" forceMount className="space-y-4 mt-5 data-[state=inactive]:hidden">
             {/* OmniPay Balance */}
             <Card className="border-0 overflow-hidden shadow-md">
               <CardContent className="p-0">
@@ -2070,7 +2075,7 @@ export default function AdminPage() {
           {/* ══════════════════════════════════════
               TAB 5 — LIENS & API
           ══════════════════════════════════════ */}
-          <TabsContent value="links-keys" className="space-y-5 mt-5">
+          <TabsContent value="links-keys" forceMount className="space-y-5 mt-5 data-[state=inactive]:hidden">
 
             {/* ── Payment Links ── */}
             <Card className="border-border/50">
