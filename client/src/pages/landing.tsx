@@ -581,7 +581,7 @@ export default function LandingPage() {
               <p className="text-xs font-black uppercase tracking-wider text-gray-500 mb-4">Support</p>
               <ul className="space-y-3">
                 {[
-                  [contactLinks?.support_link_whatsapp_direct || "#", "WhatsApp Support"],
+                  [contactLinks?.support_link_whatsapp_direct || "#", "Telegram Support"],
                   [contactLinks?.support_link_email || "mailto:support@solvexpay.com", "Email"],
                   [contactLinks?.support_link_facebook || "#", "Facebook"],
                 ].map(([href, label]) => (

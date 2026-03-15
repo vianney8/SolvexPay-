@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Shield, CheckCircle2, Clock, AlertTriangle, Loader2,
-  Upload, BadgeCheck, Lock,
+  Upload, BadgeCheck, Lock, XCircle,
 } from "lucide-react";
 
 function kycStatusLabel(status: string) {
@@ -117,6 +117,7 @@ export default function KycPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const isBlocked = !!(user as any)?.isBlocked;
   const kycStatus = (user as any)?.kycStatus || "not_started";
   const kycSt = kycStatusLabel(kycStatus);
 
@@ -172,6 +173,16 @@ export default function KycPage() {
   return (
     <DashboardLayout title="Vérification KYC" breadcrumbs={[{ label: "Vérification KYC" }]}>
       <div className="max-w-xl space-y-5">
+
+        {isBlocked && (
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 flex items-center gap-3" data-testid="banner-kyc-blocked">
+            <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-red-600 dark:text-red-400">Erreur — Compte suspendu</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Impossible d'accéder à la vérification KYC. Contactez le support.</p>
+            </div>
+          </div>
+        )}
 
         {/* ── Bannière statut ── */}
         <div className={`relative rounded-3xl p-6 text-white overflow-hidden shadow-xl bg-gradient-to-br ${statusGradient}`}>
@@ -303,7 +314,7 @@ export default function KycPage() {
                 <Button
                   type="submit"
                   className="w-full gap-2 h-12 font-bold shadow-xl shadow-primary/20"
-                  disabled={kycMutation.isPending || !kycDocumentFront || !kycSelfie || !kycFirstName || !kycLastName || !kycDocumentNumber}
+                  disabled={kycMutation.isPending || !kycDocumentFront || !kycSelfie || !kycFirstName || !kycLastName || !kycDocumentNumber || isBlocked}
                   data-testid="button-submit-kyc"
                 >
                   {kycMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" />Envoi en cours...</> : <><Shield className="h-4 w-4" />Soumettre pour vérification</>}
