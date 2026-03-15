@@ -3186,18 +3186,32 @@ export default function AdminPage() {
                   ];
                   return (
                     <>
-                      {fields.map(f => (
-                        <div key={f.key} className="space-y-1.5">
-                          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{f.label}</Label>
-                          <Input
-                            value={form[f.key] || ""}
-                            onChange={e => setSupportLinksForm(prev => ({ ...(prev || supportLinks || {}), [f.key]: e.target.value }))}
-                            placeholder={f.placeholder}
-                            className="h-10 text-sm font-mono"
-                            data-testid={`input-support-${f.key}`}
-                          />
-                        </div>
-                      ))}
+                      {fields.map(f => {
+                        const visKey = `${f.key}_visible`;
+                        const isVisible = form[visKey] !== "0";
+                        return (
+                          <div key={f.key} className={`rounded-xl border p-3 space-y-2 transition-colors ${isVisible ? "border-border/50 bg-background" : "border-border/30 bg-muted/30 opacity-60"}`}>
+                            <div className="flex items-center justify-between gap-3">
+                              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{f.label}</Label>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-xs text-muted-foreground">{isVisible ? "Visible" : "Masqué"}</span>
+                                <Switch
+                                  checked={isVisible}
+                                  onCheckedChange={v => setSupportLinksForm(prev => ({ ...(prev || supportLinks || {}), [visKey]: v ? "1" : "0" }))}
+                                  data-testid={`switch-support-visible-${f.key}`}
+                                />
+                              </div>
+                            </div>
+                            <Input
+                              value={form[f.key] || ""}
+                              onChange={e => setSupportLinksForm(prev => ({ ...(prev || supportLinks || {}), [f.key]: e.target.value }))}
+                              placeholder={f.placeholder}
+                              className="h-10 text-sm font-mono"
+                              data-testid={`input-support-${f.key}`}
+                            />
+                          </div>
+                        );
+                      })}
                       <div className="flex gap-3 pt-2">
                         {supportLinksForm && (
                           <Button variant="outline" className="flex-1 h-10" onClick={() => setSupportLinksForm(null)} data-testid="btn-cancel-support-links">

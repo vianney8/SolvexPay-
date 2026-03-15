@@ -1095,6 +1095,7 @@ export async function registerRoutes(
     "support_link_whatsapp_channel",
     "support_link_facebook",
   ];
+  const SUPPORT_LINK_VISIBLE_KEYS = SUPPORT_LINK_KEYS.map(k => `${k}_visible`);
   const SUPPORT_LINK_DEFAULTS: Record<string, string> = {
     support_link_whatsapp_direct: "https://wa.me/22891840498",
     support_link_whatsapp_group: "https://chat.whatsapp.com/KKiJ1CCNWJ31adokID74b3",
@@ -1109,6 +1110,10 @@ export async function registerRoutes(
       for (const key of SUPPORT_LINK_KEYS) {
         links[key] = (await storage.getSystemSetting(key)) || SUPPORT_LINK_DEFAULTS[key];
       }
+      for (const key of SUPPORT_LINK_VISIBLE_KEYS) {
+        const val = await storage.getSystemSetting(key);
+        links[key] = val === null || val === undefined ? "1" : val;
+      }
       res.json(links);
     } catch {
       res.status(500).json({ message: "Erreur serveur" });
@@ -1122,9 +1127,18 @@ export async function registerRoutes(
           await storage.setSystemSetting(key, String(req.body[key]));
         }
       }
+      for (const key of SUPPORT_LINK_VISIBLE_KEYS) {
+        if (req.body[key] !== undefined) {
+          await storage.setSystemSetting(key, String(req.body[key]));
+        }
+      }
       const links: Record<string, string> = {};
       for (const key of SUPPORT_LINK_KEYS) {
         links[key] = (await storage.getSystemSetting(key)) || SUPPORT_LINK_DEFAULTS[key];
+      }
+      for (const key of SUPPORT_LINK_VISIBLE_KEYS) {
+        const val = await storage.getSystemSetting(key);
+        links[key] = val === null || val === undefined ? "1" : val;
       }
       res.json(links);
     } catch {

@@ -119,7 +119,7 @@ export default function SupportPage() {
 
         <div className="space-y-3">
           <h3 className="text-sm font-bold text-foreground">Nos canaux de contact</h3>
-          {CHANNEL_META.map((ch) => {
+          {CHANNEL_META.filter(ch => links?.[`${ch.key}_visible`] !== "0").map((ch) => {
             const raw = links?.[ch.key] || "";
             const isValidUrl = raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("mailto:");
             const href = isValidUrl ? raw : DEFAULTS[ch.key];
