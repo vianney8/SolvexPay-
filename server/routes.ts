@@ -336,6 +336,74 @@ function adminCacheDel(...keys: string[]): void {
   keys.forEach(k => _adminCache.delete(k));
 }
 
+async function warmAdminCache(): Promise<void> {
+  try {
+    const { db } = await import("./db");
+    const { users: usersTable } = await import("@shared/models/auth");
+    const { wallets: walletsTable, paymentLinks: plTable, apiKeys: akTable } = await import("@shared/schema");
+    const { desc, eq, inArray } = await import("drizzle-orm");
+
+    const [userRows, walletRows, allLinks, allKeys] = await Promise.all([
+      db.select().from(usersTable).leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id)).orderBy(desc(usersTable.createdAt)),
+      db.select().from(usersTable).leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id)).orderBy(desc(usersTable.createdAt)),
+      db.select().from(plTable),
+      db.select({ id: akTable.id, userId: akTable.userId, name: akTable.name, appName: akTable.appName, keyPrefix: akTable.keyPrefix, environment: akTable.environment, isActive: akTable.isActive, adminLocked: akTable.adminLocked, isSrKey: akTable.isSrKey, createdAt: akTable.createdAt, lastUsedAt: akTable.lastUsedAt, webhookUrl: akTable.webhookUrl, websiteUrl: akTable.websiteUrl }).from(akTable),
+    ]);
+
+    const usersWithWallets = userRows.map(({ users, wallets }) => {
+      const { passwordHash: _, ...safeUser } = users as any;
+      return { ...safeUser, wallet: wallets ?? null };
+    });
+    adminCacheSet("admin-users", usersWithWallets);
+    adminCacheSet("admin-wallets", walletRows.map(({ users, wallets }) => {
+      const { passwordHash: _, ...safe } = users as any;
+      return { ...safe, wallet: wallets ?? null };
+    }));
+
+    const merchantUserIds = [...new Set([...allLinks.map((l: any) => l.userId), ...allKeys.map((k: any) => k.userId)])];
+    if (merchantUserIds.length > 0) {
+      const [merchantUsers, merchantWalletRows] = await Promise.all([
+        db.select().from(usersTable).where(inArray(usersTable.id, merchantUserIds)),
+        db.select().from(walletsTable).where(inArray(walletsTable.userId, merchantUserIds)),
+      ]);
+      const merchants = merchantUsers.map((u: any) => {
+        const { passwordHash: _, ...safeUser } = u;
+        const wallet = merchantWalletRows.find((w: any) => w.userId === u.id);
+        const links = allLinks.filter((l: any) => l.userId === u.id);
+        const keys = allKeys.filter((k: any) => k.userId === u.id);
+        return { ...safeUser, balance: (wallet as any)?.balanceXOF || "0", links, keys };
+      });
+      merchants.sort((a: any, b: any) => (b.links.length + b.keys.length) - (a.links.length + a.keys.length));
+      adminCacheSet("admin-merchants", merchants);
+    }
+
+    const plRows = await db.select().from(plTable).leftJoin(usersTable, eq(usersTable.id, plTable.userId)).orderBy(desc(plTable.createdAt));
+    const enrichedLinks = plRows.map(({ payment_links, users }: any) => {
+      const user = users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null;
+      return { ...payment_links, user };
+    });
+    adminCacheSet("admin-payment-links", enrichedLinks);
+
+    const akRows = await db.select().from(akTable).leftJoin(usersTable, eq(usersTable.id, akTable.userId)).orderBy(desc(akTable.createdAt));
+    const enrichedKeys = akRows.map(({ api_keys, users }: any) => {
+      const { keyHash: _, ...safeKey } = api_keys;
+      const user = users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null;
+      return { ...safeKey, user };
+    });
+    adminCacheSet("admin-api-keys", enrichedKeys);
+
+    console.log("[CacheWarmer] Cache admin rechargé automatiquement");
+  } catch (err) {
+    console.error("[CacheWarmer] Erreur lors du rechargement du cache admin:", err);
+  }
+}
+
+export function startAdminCacheWarmer(): void {
+  warmAdminCache();
+  setInterval(warmAdminCache, 25_000);
+  console.log("[CacheWarmer] Préchauffeur cache admin démarré (toutes les 25s)");
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
