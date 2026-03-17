@@ -1,5 +1,6 @@
 import axios from "axios";
 import FormData from "form-data";
+import crypto from "crypto";
 import { eq } from "drizzle-orm";
 import { users } from "@shared/models/auth";
 import { apiKeys } from "@shared/schema";
@@ -7,6 +8,11 @@ import { db } from "../db";
 import { sendWithdrawalEmail, sendKycStatusEmail } from "./resend";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "7671423781:AAFuF1FqSMRufUOStIX-zzexKE0hEeLGtKc";
+
+// Derive a stable webhook secret from the BOT_TOKEN so no extra env var is needed
+function getWebhookSecret(): string {
+  return crypto.createHash("sha256").update(`webhook:${BOT_TOKEN}`).digest("hex").slice(0, 64);
+}
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID || "8360195532";
 const API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
@@ -251,7 +257,14 @@ export async function setupTelegramWebhook(): Promise<void> {
       return;
     }
     const webhookUrl = `https://${domain}/api/telegram/webhook`;
-    await axios.post(`${API}/setWebhook`, { url: webhookUrl, drop_pending_updates: true });
+    const secret = getWebhookSecret();
+    // Store secret in env so the route handler can verify it
+    process.env.TELEGRAM_WEBHOOK_SECRET = secret;
+    await axios.post(`${API}/setWebhook`, {
+      url: webhookUrl,
+      secret_token: secret,
+      drop_pending_updates: true,
+    });
     console.log(`[Telegram] Webhook enregistré : ${webhookUrl}`);
   } catch (err: any) {
     console.error("[Telegram] Erreur enregistrement webhook:", err?.response?.data || err?.message);
