@@ -259,7 +259,7 @@ export async function sendKycStatusEmail(
 
   const nextStepBlock = isVerified
     ? `<p style="margin:0 0 16px;font-size:15px;color:#6b7280;line-height:1.6;">
-        Vous pouvez maintenant accéder à toutes les fonctionnalités de votre compte : retraits, transferts, création de liens de paiement et clés API.
+        Vous pouvez maintenant profiter pleinement des fonctionnalités vérifiées de votre compte : retraits et accès à la création de clés API, en toute sécurité.
       </p>`
     : `<p style="margin:0 0 16px;font-size:15px;color:#6b7280;line-height:1.6;">
         Vous pouvez soumettre à nouveau votre vérification en vous connectant à votre compte et en corrigeant les informations indiquées.
