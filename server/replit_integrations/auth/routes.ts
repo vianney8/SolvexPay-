@@ -145,7 +145,16 @@ export function registerAuthRoutes(app: Express): void {
         kycDocumentBack: backPath,
         kycSelfie: selfiePath,
       } as any);
-      notifyKycPending(kycFirstName, kycLastName, user.email || "").catch(() => {});
+      notifyKycPending({
+        userId,
+        firstName: kycFirstName,
+        lastName: kycLastName,
+        email: user.email || "",
+        documentNumber: kycDocumentNumber,
+        frontImage: frontPath,
+        backImage: backPath,
+        selfieImage: selfiePath,
+      }).catch(() => {});
       res.json(sanitizeUser(updated));
     } catch (error) {
       console.error("Error submitting KYC:", error);

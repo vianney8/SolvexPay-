@@ -7,7 +7,7 @@ import { storage, generateApiKey, generateSlug, generateReference } from "./stor
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
 import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, type OmniPayCallbackPayload } from "./services/omnipay";
 import { testResendConnection } from "./services/resend";
-import { notifyTransactionCompleted, notifyWithdrawal } from "./services/telegram";
+import { notifyTransactionCompleted, notifyWithdrawal, handleTelegramCallback } from "./services/telegram";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -433,6 +433,15 @@ export async function registerRoutes(
 ): Promise<Server> {
   await setupAuth(app);
   registerAuthRoutes(app);
+
+  // ── Telegram webhook — handles bot button callbacks ────────────────────────
+  app.post("/api/telegram/webhook", express.json(), async (req, res) => {
+    res.sendStatus(200);
+    const update = req.body;
+    if (update?.callback_query) {
+      handleTelegramCallback(update.callback_query).catch(console.error);
+    }
+  });
 
   // Serve uploaded KYC files statically
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));

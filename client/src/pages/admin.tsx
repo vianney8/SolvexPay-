@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -319,6 +319,8 @@ export default function AdminPage() {
     staleTime: Infinity,
     gcTime: Infinity,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/users"]),
   });
   const kycList = useMemo(() =>
     (users || [])
@@ -411,6 +413,8 @@ export default function AdminPage() {
     staleTime: Infinity,
     gcTime: Infinity,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/merchants"]),
   });
   const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/notifications"],

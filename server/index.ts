@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import { registerRoutes, startAdminCacheWarmer } from "./routes";
+import { setupTelegramWebhook } from "./services/telegram";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
@@ -107,6 +108,7 @@ app.use((req, res, next) => {
 
   await registerRoutes(httpServer, app);
   startAdminCacheWarmer();
+  setupTelegramWebhook().catch(() => {});
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
