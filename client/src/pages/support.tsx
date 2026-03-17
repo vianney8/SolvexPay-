@@ -139,7 +139,7 @@ export default function SupportPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-sm text-foreground">{ch.label}</span>
+                    <span className="font-bold text-sm text-foreground">{links?.[`${ch.key}_label`] || ch.label}</span>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ch.badgeBg}`}>{ch.badge}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{ch.description}</p>

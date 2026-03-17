@@ -3083,6 +3083,7 @@ export default function AdminPage() {
                     <>
                       {fields.map(f => {
                         const visKey = `${f.key}_visible`;
+                        const labelKey = `${f.key}_label`;
                         const isVisible = form[visKey] !== "0";
                         return (
                           <div key={f.key} className={`rounded-xl border p-3 space-y-2 transition-colors ${isVisible ? "border-border/50 bg-background" : "border-border/30 bg-muted/30 opacity-60"}`}>
@@ -3097,6 +3098,13 @@ export default function AdminPage() {
                                 />
                               </div>
                             </div>
+                            <Input
+                              value={form[labelKey] || ""}
+                              onChange={e => setSupportLinksForm(prev => ({ ...(prev || supportLinks || {}), [labelKey]: e.target.value }))}
+                              placeholder={`Nom affiché (ex: ${f.label})`}
+                              className="h-9 text-sm"
+                              data-testid={`input-support-label-${f.key}`}
+                            />
                             <Input
                               value={form[f.key] || ""}
                               onChange={e => setSupportLinksForm(prev => ({ ...(prev || supportLinks || {}), [f.key]: e.target.value }))}
