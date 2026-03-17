@@ -300,7 +300,7 @@ export async function sendKycStatusEmail(
                   ${nextStepBlock}
 
                   <div style="text-align:center;margin:0 0 16px;">
-                    <a href="https://solvexpay.com/kyc"
+                    <a href="${isVerified ? "https://solvexpay.com" : "https://solvexpay.com/kyc"}"
                        style="display:inline-block;background:${isVerified ? "#16a34a" : "#7c3aed"};color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:14px 32px;border-radius:12px;">
                       ${isVerified ? "Accéder à mon compte" : "Soumettre à nouveau"}
                     </a>
