@@ -581,11 +581,11 @@ export default function LandingPage() {
               <p className="text-xs font-black uppercase tracking-wider text-gray-500 mb-4">Support</p>
               <ul className="space-y-3">
                 {[
-                  [contactLinks?.support_link_whatsapp_direct || "#", contactLinks?.support_link_whatsapp_direct_label || "Telegram Support"],
-                  [contactLinks?.support_link_email || "mailto:support@solvexpay.com", contactLinks?.support_link_email_label || "Email"],
-                  [contactLinks?.support_link_facebook || "#", contactLinks?.support_link_facebook_label || "Facebook"],
-                ].map(([href, label]) => (
-                  <li key={label}><a href={href} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-400 hover:text-white transition-colors">{label}</a></li>
+                  { key: "support_link_whatsapp_direct", defaultLabel: "Telegram Support", defaultHref: "#" },
+                  { key: "support_link_email", defaultLabel: "Email", defaultHref: "mailto:support@solvexpay.com" },
+                  { key: "support_link_facebook", defaultLabel: "Facebook", defaultHref: "#" },
+                ].filter(({ key }) => !contactLinks || contactLinks[`${key}_visible`] !== "0").map(({ key, defaultLabel, defaultHref }) => (
+                  <li key={key}><a href={contactLinks?.[key] || defaultHref} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-400 hover:text-white transition-colors">{contactLinks?.[`${key}_label`] || defaultLabel}</a></li>
                 ))}
               </ul>
             </div>

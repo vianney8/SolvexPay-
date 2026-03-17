@@ -338,7 +338,7 @@ export default function AdminPage() {
   const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
   // Prefetch admin data immediately on mount
   useEffect(() => {
-    ["/api/admin/users", "/api/admin/merchants"].forEach(key => {
+    ["/api/admin/users", "/api/admin/merchants", "/api/admin/payment-links", "/api/admin/api-keys"].forEach(key => {
       if (!queryClient.getQueryData([key])) {
         queryClient.prefetchQuery({ queryKey: [key], staleTime: Infinity });
       }
@@ -359,7 +359,7 @@ export default function AdminPage() {
     gcTime: Infinity,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/users"]) ?? [],
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/users"]),
   });
   const kycList = useMemo(() =>
     (users || [])
@@ -440,12 +440,16 @@ export default function AdminPage() {
     staleTime: Infinity,
     gcTime: Infinity,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/payment-links"]),
   });
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/api-keys"],
     staleTime: Infinity,
     gcTime: Infinity,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/api-keys"]),
   });
   const { data: merchants, isLoading: merchantsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/merchants"],
@@ -453,7 +457,7 @@ export default function AdminPage() {
     gcTime: Infinity,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/merchants"]) ?? [],
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/merchants"]),
   });
   const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/notifications"],
