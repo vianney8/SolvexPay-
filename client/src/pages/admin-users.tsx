@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,12 +88,16 @@ export default function AdminUsersPage() {
   const [srDialog,    setSrDialog]    = useState<{ userId: string; name: string; enable: boolean } | null>(null);
 
   /* ── Queries ── */
-  const { data: users, isLoading } = useQuery<any[]>({
+  const { data: users, isFetching } = useQuery<any[]>({
     queryKey: ["/api/admin/users"],
     staleTime: Infinity,
     gcTime: Infinity,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/users"]),
   });
+
+  const isLoading = !users && isFetching;
 
   const { data: userTxList } = useQuery<any[]>({
     queryKey: ["/api/admin/users", expandedId, "transactions"],
@@ -350,7 +354,30 @@ export default function AdminUsersPage() {
         {/* ─── User list ─── */}
         {isLoading ? (
           <div className="space-y-3">
-            {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="rounded-2xl border border-border/50 bg-card p-4 animate-pulse">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-12 w-12 rounded-2xl flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <Skeleton className="h-3 w-48" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                  <div className="text-right space-y-1">
+                    <Skeleton className="h-3 w-12 ml-auto" />
+                    <Skeleton className="h-5 w-24 ml-auto" />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4 pt-3 border-t border-border/40">
+                  {[52, 80, 72, 48, 56, 64].map((w, j) => (
+                    <Skeleton key={j} className={`h-7 w-${w < 60 ? "12" : w < 70 ? "20" : w < 80 ? "16" : "14"} rounded-xl`} style={{ width: `${w}px` }} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">

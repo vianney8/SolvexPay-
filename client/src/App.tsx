@@ -38,6 +38,13 @@ const PREFETCH_KEYS = [
   ["/api/api-keys"],
 ];
 
+const ADMIN_PREFETCH_KEYS = [
+  ["/api/admin/users"],
+  ["/api/admin/wallets"],
+  ["/api/admin/merchants"],
+  ["/api/admin/stats"],
+];
+
 interface EBState { hasError: boolean; error?: Error }
 
 class GlobalErrorBoundary extends Component<{ children: ReactNode }, EBState> {
@@ -185,6 +192,11 @@ function Router() {
     PREFETCH_KEYS.forEach((key) => {
       queryClient.prefetchQuery({ queryKey: key, staleTime: Infinity });
     });
+    if ((user as any).isAdmin) {
+      ADMIN_PREFETCH_KEYS.forEach((key) => {
+        queryClient.prefetchQuery({ queryKey: key, staleTime: Infinity });
+      });
+    }
   }, [user?.id]);
 
   if (isLoading) {
