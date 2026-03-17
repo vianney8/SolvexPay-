@@ -8,6 +8,7 @@ import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./repli
 import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, type OmniPayCallbackPayload } from "./services/omnipay";
 import { testResendConnection } from "./services/resend";
 import { notifyTransactionCompleted, notifyWithdrawal, handleTelegramCallback } from "./services/telegram";
+import { sendKycStatusEmail } from "./services/resend";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -2551,6 +2552,14 @@ export async function registerRoutes(
       if (kycStatus === "verified") updateData.kycRejectionReason = null;
       const [updated] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
+      if ((kycStatus === "verified" || kycStatus === "rejected") && updated.email) {
+        sendKycStatusEmail(
+          updated.email,
+          (updated as any).firstName || updated.email,
+          kycStatus as "verified" | "rejected",
+          kycStatus === "rejected" ? rejectionReason : null
+        ).catch(e => console.error("[Admin KYC email]", e?.message));
+      }
       const { passwordHash: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {

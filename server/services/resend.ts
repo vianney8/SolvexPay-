@@ -237,6 +237,102 @@ export async function sendWithdrawalEmail(
   return data;
 }
 
+export async function sendKycStatusEmail(
+  to: string,
+  firstName: string,
+  status: "verified" | "rejected",
+  rejectionReason?: string | null
+) {
+  const { client, fromEmail } = getResendClient();
+  const isVerified = status === "verified";
+
+  const subject = isVerified
+    ? "Votre identité a été vérifiée ✅ - SolvexPay"
+    : "Votre vérification KYC a été rejetée - SolvexPay";
+
+  const reasonBlock = (!isVerified && rejectionReason)
+    ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px 20px;margin:0 0 24px;">
+        <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#dc2626;">Motif du rejet :</p>
+        <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">${rejectionReason}</p>
+      </div>`
+    : "";
+
+  const nextStepBlock = isVerified
+    ? `<p style="margin:0 0 16px;font-size:15px;color:#6b7280;line-height:1.6;">
+        Vous pouvez maintenant accéder à toutes les fonctionnalités de votre compte : retraits, transferts, création de liens de paiement et clés API.
+      </p>`
+    : `<p style="margin:0 0 16px;font-size:15px;color:#6b7280;line-height:1.6;">
+        Vous pouvez soumettre à nouveau votre vérification en vous connectant à votre compte et en corrigeant les informations indiquées.
+      </p>`;
+
+  const { data, error } = await client.emails.send({
+    from: fromEmail,
+    to,
+    subject,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+      <body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 20px;">
+          <tr><td align="center">
+            <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#6d28d9 0%,#7c3aed 50%,#0891b2 100%);padding:36px 40px;text-align:center;">
+                  <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:900;letter-spacing:-0.5px;">SolvexPay</h1>
+                  <p style="margin:6px 0 0;color:rgba(255,255,255,0.7);font-size:13px;">Passerelle de paiement pan-africaine</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:40px;">
+                  <p style="margin:0 0 20px;font-size:16px;color:#374151;">Bonjour <strong>${firstName}</strong>,</p>
+
+                  <div style="text-align:center;margin:0 0 28px;">
+                    <div style="display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;background:${isVerified ? "#16a34a" : "#dc2626"};border-radius:50%;margin:0 0 12px;">
+                      <span style="color:#fff;font-size:28px;">${isVerified ? "✓" : "✗"}</span>
+                    </div>
+                    <p style="margin:0;font-size:20px;font-weight:900;color:${isVerified ? "#16a34a" : "#dc2626"};">
+                      ${isVerified ? "Identité vérifiée !" : "Vérification rejetée"}
+                    </p>
+                  </div>
+
+                  ${reasonBlock}
+                  ${nextStepBlock}
+
+                  <div style="text-align:center;margin:0 0 16px;">
+                    <a href="https://solvexpay.com/kyc"
+                       style="display:inline-block;background:${isVerified ? "#16a34a" : "#7c3aed"};color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:14px 32px;border-radius:12px;">
+                      ${isVerified ? "Accéder à mon compte" : "Soumettre à nouveau"}
+                    </a>
+                  </div>
+
+                  <p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;">
+                    Pour toute question, contactez notre support via WhatsApp ou email.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+                  <p style="margin:0;font-size:12px;color:#9ca3af;">© 2025 SolvexPay · Sécurisé par TLS</p>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+      </html>
+    `,
+  });
+
+  if (error) {
+    console.error("[Resend] KYC email error:", JSON.stringify(error));
+    throw new Error(`Resend API error: ${error.message || JSON.stringify(error)}`);
+  }
+
+  console.log(`[Resend] KYC ${status} email sent to ${to}. ID: ${data?.id}`);
+  return data;
+}
+
 export async function testResendConnection(to: string) {
   const { client, fromEmail } = getResendClient();
   console.log(`[Resend] Testing with from_email: "${fromEmail}"`);

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { users } from "@shared/models/auth";
 import { apiKeys } from "@shared/schema";
 import { db } from "../db";
-import { sendWithdrawalEmail } from "./resend";
+import { sendWithdrawalEmail, sendKycStatusEmail } from "./resend";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "7671423781:AAFuF1FqSMRufUOStIX-zzexKE0hEeLGtKc";
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID || "8360195532";
@@ -307,17 +307,27 @@ async function updateKycStatus(userId: string, status: "verified" | "rejected", 
     if (status === "rejected" && reason) updateData.kycRejectionReason = reason;
     if (status === "verified") updateData.kycRejectionReason = null;
 
-    await db.update(users).set(updateData).where(eq(users.id, userId));
+    const [updated] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
 
     const icon = status === "verified" ? "✅" : "❌";
     const label = status === "verified" ? "KYC VÉRIFIÉ" : "KYC REJETÉ";
     const extra = reason ? `\n📝 Motif: <i>${reason}</i>` : "";
-    const confirmText = `${icon} <b>${label}</b> — Utilisateur <code>${userId}</code>${extra}\n🕐 ${now()}`;
+    const name = updated ? [updated.firstName, updated.lastName].filter(Boolean).join(" ") : userId;
+    const confirmText = `${icon} <b>${label}</b>\n👤 ${name}${extra}\n🕐 ${now()}`;
 
     if (messageId) {
       await editMsg(messageId, confirmText);
     } else {
       await send(confirmText);
+    }
+
+    if (updated?.email) {
+      sendKycStatusEmail(
+        updated.email,
+        updated.firstName || updated.email,
+        status,
+        reason
+      ).catch(e => console.error("[Telegram] KYC email error:", e?.message));
     }
   } catch (err) {
     console.error("updateKycStatus error:", err);
