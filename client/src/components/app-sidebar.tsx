@@ -30,6 +30,7 @@ import {
   Shield,
   BookOpen,
   HeadphonesIcon,
+  Users,
 } from "lucide-react";
 import solvexpayIcon from "../assets/images/solvexpay-icon.jpg";
 
@@ -46,6 +47,7 @@ const menuItems = [
 
 const adminMenuItems = [
   { title: "Administration", url: "/admin", icon: Shield, bg: "bg-red-100", iconColor: "text-red-600" },
+  { title: "Utilisateurs", url: "/admin/users", icon: Users, bg: "bg-indigo-100", iconColor: "text-indigo-600" },
 ];
 
 export function AppSidebar() {
