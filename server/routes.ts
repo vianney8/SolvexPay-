@@ -15,6 +15,20 @@ import path from "path";
 import crypto from "crypto";
 import axios from "axios";
 
+function safeUserSelect(t: any) {
+  return {
+    id: t.id, email: t.email, firstName: t.firstName, lastName: t.lastName,
+    phone: t.phone, profileImageUrl: t.profileImageUrl, isAdmin: t.isAdmin,
+    apiSrEnabled: t.apiSrEnabled, kycStatus: t.kycStatus,
+    kycRejectionReason: t.kycRejectionReason, kycFirstName: t.kycFirstName,
+    kycLastName: t.kycLastName, kycDocumentNumber: t.kycDocumentNumber,
+    merchantName: t.merchantName, isBlocked: t.isBlocked,
+    customFeeRate: t.customFeeRate, withdrawalCountry: t.withdrawalCountry,
+    withdrawalOperator: t.withdrawalOperator, withdrawalPhone: t.withdrawalPhone,
+    emailVerified: t.emailVerified, createdAt: t.createdAt, updatedAt: t.updatedAt,
+  };
+}
+
 const paymentLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -357,17 +371,16 @@ async function warmAdminCache(): Promise<void> {
     const { wallets: walletsTable, paymentLinks: plTable, apiKeys: akTable } = await import("@shared/schema");
     const { desc, eq, inArray } = await import("drizzle-orm");
 
-    /* ── 1. Utilisateurs + Wallets (une seule requête jointure) ── */
+    /* ── 1. Utilisateurs + Wallets (colonnes allégées — sans images KYC) ── */
     const userRows = await db
-      .select()
+      .select({ user: safeUserSelect(usersTable), wallet: walletsTable })
       .from(usersTable)
       .leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id))
       .orderBy(desc(usersTable.createdAt));
 
-    const usersWithWallets = userRows.map(({ users, wallets }) => {
-      const { passwordHash: _, ...safeUser } = users as any;
-      return { ...safeUser, wallet: wallets ?? null };
-    });
+    const usersWithWallets = userRows.map(({ user, wallet }) => ({
+      ...user, wallet: wallet ?? null,
+    }));
     adminCacheSet("admin-users", usersWithWallets);
     adminCacheSet("admin-wallets", usersWithWallets);
 
@@ -387,14 +400,13 @@ async function warmAdminCache(): Promise<void> {
     /* ── 4. Marchands ── */
     const merchantUserIds = [...new Set([...allLinks.map((l: any) => l.userId), ...allKeys.map((k: any) => k.userId)])];
     if (merchantUserIds.length > 0) {
-      const merchantUsers = await db.select().from(usersTable).where(inArray(usersTable.id, merchantUserIds));
+      const merchantUsers = await db.select(safeUserSelect(usersTable)).from(usersTable).where(inArray(usersTable.id, merchantUserIds));
       const merchantWalletRows = await db.select().from(walletsTable).where(inArray(walletsTable.userId, merchantUserIds));
       const merchants = merchantUsers.map((u: any) => {
-        const { passwordHash: _, ...safeUser } = u;
         const wallet = merchantWalletRows.find((w: any) => w.userId === u.id);
         const links = allLinks.filter((l: any) => l.userId === u.id);
         const keys = allKeys.filter((k: any) => k.userId === u.id);
-        return { ...safeUser, balance: (wallet as any)?.balanceXOF || "0", links, keys };
+        return { ...u, balance: (wallet as any)?.balanceXOF || "0", links, keys };
       });
       merchants.sort((a: any, b: any) => (b.links.length + b.keys.length) - (a.links.length + a.keys.length));
       adminCacheSet("admin-merchants", merchants);
@@ -2211,14 +2223,11 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { desc, eq } = await import("drizzle-orm");
       const rows = await db
-        .select()
+        .select({ user: safeUserSelect(usersTable), wallet: walletsTable })
         .from(usersTable)
         .leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id))
         .orderBy(desc(usersTable.createdAt));
-      const usersWithWallets = rows.map(({ users, wallets }) => {
-        const { passwordHash: _, ...safeUser } = users as any;
-        return { ...safeUser, wallet: wallets ?? null };
-      });
+      const usersWithWallets = rows.map(({ user, wallet }) => ({ ...user, wallet: wallet ?? null }));
       adminCacheSet("admin-users", usersWithWallets);
       res.json(usersWithWallets);
     } catch (error) {
@@ -2564,6 +2573,23 @@ export async function registerRoutes(
       res.json(safeUser);
     } catch (error) {
       console.error("Admin KYC update error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/users/:id/kyc-images", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [user] = await db
+        .select({ kycDocumentFront: usersTable.kycDocumentFront, kycDocumentBack: usersTable.kycDocumentBack, kycSelfie: usersTable.kycSelfie })
+        .from(usersTable)
+        .where(eq(usersTable.id, id));
+      if (!user) return res.status(404).json({ message: "Utilisateur introuvable" });
+      res.json(user);
+    } catch (error) {
       res.status(500).json({ message: "Erreur serveur" });
     }
   });
@@ -3323,16 +3349,15 @@ export async function registerRoutes(
       if (merchantUserIds.length === 0) return res.json([]);
 
       const [merchantUsers, merchantWallets] = await Promise.all([
-        db.select().from(usersTable).where(inArray(usersTable.id, merchantUserIds)),
+        db.select(safeUserSelect(usersTable)).from(usersTable).where(inArray(usersTable.id, merchantUserIds)),
         db.select().from(walletsTable).where(inArray(walletsTable.userId, merchantUserIds)),
       ]);
 
       const result = merchantUsers.map(u => {
-        const { passwordHash: _, ...safeUser } = u as any;
         const wallet = merchantWallets.find(w => w.userId === u.id);
         const links = allLinks.filter(l => l.userId === u.id);
         const keys = allKeys.filter(k => k.userId === u.id);
-        return { ...safeUser, balance: wallet?.balanceXOF || "0", links, keys };
+        return { ...u, balance: wallet?.balanceXOF || "0", links, keys };
       });
 
       // Sort: blocked first, then by most links+keys

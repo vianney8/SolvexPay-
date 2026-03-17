@@ -178,6 +178,36 @@ function TxChip({ status }: { status: string }) {
   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-slate-500/15 text-slate-500 border-slate-500/30">{status}</span>;
 }
 
+function LazyKycImages({ userId }: { userId: string }) {
+  const { data, isLoading } = useQuery<{ kycDocumentFront: string | null; kycDocumentBack: string | null; kycSelfie: string | null }>({
+    queryKey: ["/api/admin/users", userId, "kyc-images"],
+    queryFn: () => fetch(`/api/admin/users/${userId}/kyc-images`, { credentials: "include" }).then(r => r.json()),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  const items = [
+    { src: data?.kycDocumentFront, label: "Recto", testId: `img-kyc-front-${userId}` },
+    { src: data?.kycDocumentBack, label: "Verso", testId: `img-kyc-back-${userId}` },
+    { src: data?.kycSelfie, label: "Selfie", testId: `img-kyc-selfie-${userId}` },
+  ];
+  if (isLoading) return (
+    <div className="grid grid-cols-3 gap-2 pt-1">
+      {[1,2,3].map(i => <div key={i} className="space-y-1"><p className="text-[10px] text-muted-foreground font-medium text-center">Chargement...</p><Skeleton className="w-full aspect-[4/3] rounded-xl" /></div>)}
+    </div>
+  );
+  return (
+    <div className="grid grid-cols-3 gap-2 pt-1">
+      {items.map(({ src, label, testId }) => (
+        <div key={label} className="space-y-1">
+          <p className="text-[10px] text-muted-foreground font-medium text-center">{label}</p>
+          {src ? <KycImage src={src} alt={label} testId={testId} />
+            : <div className="w-full aspect-[4/3] rounded-xl bg-muted/50 border border-border/40 flex items-center justify-center" data-testid={testId}><p className="text-[10px] text-muted-foreground font-medium">Non fourni</p></div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const PERIOD_OPTS = [{ v: "day", l: "24h" }, { v: "week", l: "7j" }, { v: "month", l: "Ce mois" }];
 
 function WithdrawalModeCard() {
@@ -306,6 +336,15 @@ export default function AdminPage() {
   const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue", linkUrl: "", linkLabel: "" });
   const [editNotifDialog, setEditNotifDialog] = useState<{ id: string; title: string; message: string; color: string; linkUrl: string; linkLabel: string } | null>(null);
   const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
+  // Prefetch admin data immediately on mount
+  useEffect(() => {
+    ["/api/admin/users", "/api/admin/merchants"].forEach(key => {
+      if (!queryClient.getQueryData([key])) {
+        queryClient.prefetchQuery({ queryKey: [key], staleTime: Infinity });
+      }
+    });
+  }, []);
+
   // Queries
   const { data: stats } = useQuery<any>({ queryKey: ["/api/admin/stats"], staleTime: 60000 });
   const { data: periodStats, isLoading: pLoading } = useQuery<any>({
@@ -1815,24 +1854,8 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* KYC Photos */}
-                      <div className="grid grid-cols-3 gap-2 pt-1">
-                        {[
-                          { src: u.kycDocumentFront, label: "Recto", testId: `img-kyc-front-${u.id}` },
-                          { src: u.kycDocumentBack, label: "Verso", testId: `img-kyc-back-${u.id}` },
-                          { src: u.kycSelfie, label: "Selfie", testId: `img-kyc-selfie-${u.id}` },
-                        ].map(({ src, label, testId }) => (
-                          <div key={label} className="space-y-1">
-                            <p className="text-[10px] text-muted-foreground font-medium text-center">{label}</p>
-                            {src
-                              ? <KycImage src={src} alt={label} testId={testId} />
-                              : <div className="w-full aspect-[4/3] rounded-xl bg-muted/50 border border-border/40 flex items-center justify-center" data-testid={testId}>
-                                  <p className="text-[10px] text-muted-foreground font-medium">Non fourni</p>
-                                </div>
-                            }
-                          </div>
-                        ))}
-                      </div>
+                      {/* KYC Photos — chargement à la demande */}
+                      <LazyKycImages userId={u.id} />
                     </CardContent>
                   </Card>
                 ))}
