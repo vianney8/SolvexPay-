@@ -25,7 +25,7 @@ import {
   TrendingDown, Building2, ArrowRightLeft, Plus, DollarSign,
   Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
   Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon, Code2, User,
-  ShieldCheck, Pencil, Loader2,
+  ShieldCheck, Pencil, Loader2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
@@ -305,6 +305,7 @@ export default function AdminPage() {
   const [debouncedTxSearch, setDebouncedTxSearch] = useState("");
   const [txStatus, setTxStatus] = useState("all");
   const [txType, setTxType] = useState("all");
+  const [txPage, setTxPage] = useState(1);
   const [statsPeriod, setStatsPeriod] = useState("month");
   const [activeTab, setActiveTab] = useState("overview");
   // Dialogs
@@ -369,22 +370,32 @@ export default function AdminPage() {
   );
   const kycLoading = usersLoading;
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedTxSearch(txSearch), 400);
+    const t = setTimeout(() => { setDebouncedTxSearch(txSearch); setTxPage(1); }, 400);
     return () => clearTimeout(t);
   }, [txSearch]);
 
-  const { data: allTx, isLoading: txLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/transactions", debouncedTxSearch],
+  // Reset page when filters change
+  useEffect(() => { setTxPage(1); }, [txStatus, txType]);
+
+  const { data: txResult, isLoading: txLoading } = useQuery<{ data: any[]; total: number; page: number; pageSize: number }>({
+    queryKey: ["/api/admin/transactions", debouncedTxSearch, txStatus, txType, txPage],
     queryFn: async () => {
-      const params = new URLSearchParams({ limit: "700" });
+      const params = new URLSearchParams({ page: String(txPage) });
       if (debouncedTxSearch) params.set("search", debouncedTxSearch);
-      const res = await fetch(`/api/admin/transactions?${params}`);
+      if (txStatus !== "all") params.set("status", txStatus);
+      if (txType !== "all") params.set("type", txType);
+      const res = await fetch(`/api/admin/transactions?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Erreur serveur");
       return res.json();
     },
     enabled: activeTab === "transactions",
     staleTime: 30000,
+    placeholderData: keepPreviousData,
   });
+  const allTx = txResult?.data || [];
+  const txTotal = txResult?.total ?? 0;
+  const txPageSize = txResult?.pageSize ?? 20;
+  const txTotalPages = Math.max(1, Math.ceil(txTotal / txPageSize));
   const { data: wallets, isLoading: walletsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/wallets"],
     staleTime: Infinity,
@@ -797,15 +808,22 @@ export default function AdminPage() {
       return 0;
     });
 
-  const filteredTx = (allTx || []).filter(tx => {
-    const { label, extra } = getTxSourceInfo(tx);
-    const searchFields = [tx.reference, tx.phoneNumber, tx.description, tx.userDisplayName, tx.userEmail, tx.payerName, tx.payerEmail, tx.provider, label, extra].filter(Boolean).join(" ");
-    const m = !txSearch || searchFields.toLowerCase().includes(txSearch.toLowerCase());
-    return m && (txStatus === "all" || tx.status === txStatus) && (txType === "all" || tx.type === txType);
-  });
+  // Filtering is now server-side; allTx is already the filtered+paginated page
+  const filteredTx = allTx;
 
   const pendingKyc = (kycList || []).filter((u: any) => u.kycStatus === "pending");
-  const pendingWithdrawals = (allTx || []).filter(t => t.type === "withdrawal" && t.status === "pending");
+  // Dedicated query for pending withdrawals (always active, not affected by pagination filters)
+  const { data: pendingWithdrawalsData } = useQuery<{ data: any[]; total: number }>({
+    queryKey: ["/api/admin/transactions", "pending-withdrawals"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/transactions?status=pending&type=withdrawal&page=1", { credentials: "include" });
+      if (!res.ok) throw new Error("Erreur serveur");
+      return res.json();
+    },
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+  const pendingWithdrawals = pendingWithdrawalsData?.data || [];
 
   const totalWalletBalance = (wallets || []).reduce((s: number, u: any) => s + parseFloat(u.wallet?.balanceXOF || "0"), 0);
   const filteredPaymentLinks = (allPaymentLinks || []).filter(l =>
@@ -2910,7 +2928,9 @@ export default function AdminPage() {
               </Select>
             </div>
 
-            <p className="text-xs text-muted-foreground font-medium">{filteredTx.length} transaction(s)</p>
+            <p className="text-xs text-muted-foreground font-medium">
+              {txLoading ? "Chargement…" : `${txTotal} transaction(s) — page ${txPage}/${txTotalPages}`}
+            </p>
 
             {txLoading ? (
               <div className="space-y-2">{[1,2,3,4].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
@@ -2963,6 +2983,32 @@ export default function AdminPage() {
                   ))}
                 </CardContent>
               </Card>
+            )}
+
+            {/* Pagination */}
+            {!txLoading && txTotalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-xs text-muted-foreground">
+                  {`${(txPage - 1) * txPageSize + 1}–${Math.min(txPage * txPageSize, txTotal)} sur ${txTotal}`}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={txPage <= 1} onClick={() => setTxPage(p => p - 1)} data-testid="btn-prev-tx-page">
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: Math.min(5, txTotalPages) }, (_, i) => {
+                    const start = Math.max(1, Math.min(txPage - 2, txTotalPages - 4));
+                    const pg = start + i;
+                    return (
+                      <Button key={pg} variant={pg === txPage ? "default" : "outline"} size="icon" className="h-8 w-8 text-xs" onClick={() => setTxPage(pg)} data-testid={`btn-tx-page-${pg}`}>
+                        {pg}
+                      </Button>
+                    );
+                  })}
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={txPage >= txTotalPages} onClick={() => setTxPage(p => p + 1)} data-testid="btn-next-tx-page">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </TabsContent>
 

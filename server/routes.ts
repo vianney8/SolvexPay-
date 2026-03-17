@@ -2370,16 +2370,52 @@ export async function registerRoutes(
     }
   });
 
+  // Admin transactions cache (TTL 30s, keyed by params)
+  const adminTxCache = new Map<string, { data: any; ts: number }>();
+  const ADMIN_TX_TTL = 30_000;
+
   app.get("/api/admin/transactions", isAdmin, async (req, res) => {
     try {
       const { db } = await import("./db");
-      const { desc, eq: eqOp } = await import("drizzle-orm");
+      const { desc, eq: eqOp, and: andOp, count: countFn } = await import("drizzle-orm");
       const { transactions: txTable } = await import("@shared/schema");
       const { users: usersTable } = await import("@shared/models/auth");
       const { or, ilike, sql: sqlExpr } = await import("drizzle-orm");
-      const limit = parseInt(req.query.limit as string) || 700;
+      const PAGE_SIZE = 20;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const search = (req.query.search as string || "").trim();
-      let query = db
+      const statusFilter = (req.query.status as string || "all").trim();
+      const typeFilter = (req.query.type as string || "all").trim();
+      const cacheKey = `${page}|${search}|${statusFilter}|${typeFilter}`;
+      const cached = adminTxCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < ADMIN_TX_TTL) return res.json(cached.data);
+
+      const buildWhere = () => {
+        const conditions: any[] = [];
+        if (search) {
+          const like = `%${search}%`;
+          conditions.push(
+            or(
+              ilike(txTable.reference, like),
+              ilike(txTable.phoneNumber, like),
+              ilike(txTable.description, like),
+              ilike(txTable.payerName, like),
+              ilike(txTable.provider, like),
+              ilike(txTable.apiKeyId, like),
+              ilike(usersTable.firstName, like),
+              ilike(usersTable.lastName, like),
+              ilike(usersTable.email, like),
+              sqlExpr`(${usersTable.firstName} || ' ' || ${usersTable.lastName}) ilike ${like}`,
+            ) as any
+          );
+        }
+        if (statusFilter !== "all") conditions.push(eqOp(txTable.status, statusFilter));
+        if (typeFilter !== "all") conditions.push(eqOp(txTable.type, typeFilter));
+        return conditions.length > 0 ? andOp(...conditions) : undefined;
+      };
+
+      const where = buildWhere();
+      const baseQuery = db
         .select({
           tx: txTable,
           userFirstName: usersTable.firstName,
@@ -2391,25 +2427,18 @@ export async function registerRoutes(
         .leftJoin(usersTable, eqOp(txTable.userId, usersTable.id))
         .orderBy(desc(txTable.createdAt))
         .$dynamic();
-      if (search) {
-        const like = `%${search}%`;
-        query = query.where(
-          or(
-            ilike(txTable.reference, like),
-            ilike(txTable.phoneNumber, like),
-            ilike(txTable.description, like),
-            ilike(txTable.payerName, like),
-            ilike(txTable.provider, like),
-            ilike(txTable.apiKeyId, like),
-            ilike(usersTable.firstName, like),
-            ilike(usersTable.lastName, like),
-            ilike(usersTable.email, like),
-            sqlExpr`(${usersTable.firstName} || ' ' || ${usersTable.lastName}) ilike ${like}`,
-          ) as any
-        );
-      }
-      const rows = await query.limit(limit);
-      const allTx = rows.map(r => ({
+      const countQuery = db
+        .select({ total: countFn() })
+        .from(txTable)
+        .leftJoin(usersTable, eqOp(txTable.userId, usersTable.id))
+        .$dynamic();
+
+      const [rows, countRows] = await Promise.all([
+        (where ? baseQuery.where(where) : baseQuery).limit(PAGE_SIZE).offset((page - 1) * PAGE_SIZE),
+        (where ? countQuery.where(where) : countQuery),
+      ]);
+
+      const data = rows.map(r => ({
         ...r.tx,
         userDisplayName: r.userFirstName && r.userLastName
           ? `${r.userFirstName} ${r.userLastName}`
@@ -2417,7 +2446,9 @@ export async function registerRoutes(
         userEmail: r.userEmail,
         userPhone: (r as any).userPhone,
       }));
-      res.json(allTx);
+      const result = { data, total: countRows[0]?.total ?? 0, page, pageSize: PAGE_SIZE };
+      adminTxCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.json(result);
     } catch (error) {
       console.error("Admin transactions error:", error);
       res.status(500).json({ message: "Erreur serveur" });
@@ -2497,10 +2528,12 @@ export async function registerRoutes(
         await storage.updateWalletBalance(transaction.userId, transaction.currency, refundAmt + refundFeesLocal);
         const tx = await storage.getTransactionById(id);
         if (tx) notifyWithdrawal(tx, "failed").catch(() => {});
+        adminTxCache.clear();
         return res.json({ ...tx, refunded: true });
       }
 
       const tx = await storage.updateTransactionStatus(id, status);
+      adminTxCache.clear();
       res.json(tx);
     } catch (error) {
       console.error("Admin update tx status error:", error);
@@ -3574,6 +3607,7 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { transactions: txTable } = await import("@shared/schema");
       await db.delete(txTable);
+      adminTxCache.clear();
       res.json({ success: true, message: "Toutes les statistiques ont été réinitialisées" });
     } catch (error) {
       console.error("Admin stats reset error:", error);
