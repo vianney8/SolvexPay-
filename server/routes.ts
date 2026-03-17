@@ -323,11 +323,17 @@ async function forwardToMerchantWebhooks(transaction: any) {
 }
 
 const _adminCache = new Map<string, { data: any; expiresAt: number }>();
-const ADMIN_CACHE_TTL = 65_000;
+const ADMIN_CACHE_TTL = 120_000;
+
 function adminCacheGet(key: string): any | null {
   const entry = _adminCache.get(key);
-  if (!entry || Date.now() > entry.expiresAt) { _adminCache.delete(key); return null; }
+  if (!entry) return null;
   return entry.data;
+}
+function adminCacheIsStale(key: string): boolean {
+  const entry = _adminCache.get(key);
+  if (!entry) return true;
+  return Date.now() > entry.expiresAt;
 }
 function adminCacheSet(key: string, data: any): void {
   _adminCache.set(key, { data, expiresAt: Date.now() + ADMIN_CACHE_TTL });
@@ -336,36 +342,52 @@ function adminCacheDel(...keys: string[]): void {
   keys.forEach(k => _adminCache.delete(k));
 }
 
+let _warmerRunning = false;
+
 async function warmAdminCache(): Promise<void> {
+  if (_warmerRunning) {
+    console.log("[CacheWarmer] Déjà en cours, on passe ce cycle.");
+    return;
+  }
+  _warmerRunning = true;
   try {
     const { db } = await import("./db");
     const { users: usersTable } = await import("@shared/models/auth");
     const { wallets: walletsTable, paymentLinks: plTable, apiKeys: akTable } = await import("@shared/schema");
     const { desc, eq, inArray } = await import("drizzle-orm");
 
-    const [userRows, walletRows, allLinks, allKeys] = await Promise.all([
-      db.select().from(usersTable).leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id)).orderBy(desc(usersTable.createdAt)),
-      db.select().from(usersTable).leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id)).orderBy(desc(usersTable.createdAt)),
-      db.select().from(plTable),
-      db.select({ id: akTable.id, userId: akTable.userId, name: akTable.name, appName: akTable.appName, keyPrefix: akTable.keyPrefix, environment: akTable.environment, isActive: akTable.isActive, adminLocked: akTable.adminLocked, isSrKey: akTable.isSrKey, createdAt: akTable.createdAt, lastUsedAt: akTable.lastUsedAt, webhookUrl: akTable.webhookUrl, websiteUrl: akTable.websiteUrl }).from(akTable),
-    ]);
+    /* ── 1. Utilisateurs + Wallets (une seule requête jointure) ── */
+    const userRows = await db
+      .select()
+      .from(usersTable)
+      .leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id))
+      .orderBy(desc(usersTable.createdAt));
 
     const usersWithWallets = userRows.map(({ users, wallets }) => {
       const { passwordHash: _, ...safeUser } = users as any;
       return { ...safeUser, wallet: wallets ?? null };
     });
     adminCacheSet("admin-users", usersWithWallets);
-    adminCacheSet("admin-wallets", walletRows.map(({ users, wallets }) => {
-      const { passwordHash: _, ...safe } = users as any;
-      return { ...safe, wallet: wallets ?? null };
-    }));
+    adminCacheSet("admin-wallets", usersWithWallets);
 
+    /* ── 2. Liens de paiement ── */
+    const allLinks = await db.select().from(plTable);
+
+    /* ── 3. Clés API ── */
+    const allKeys = await db.select({
+      id: akTable.id, userId: akTable.userId, name: akTable.name,
+      appName: akTable.appName, keyPrefix: akTable.keyPrefix,
+      environment: akTable.environment, isActive: akTable.isActive,
+      adminLocked: akTable.adminLocked, isSrKey: akTable.isSrKey,
+      createdAt: akTable.createdAt, lastUsedAt: akTable.lastUsedAt,
+      webhookUrl: akTable.webhookUrl, websiteUrl: akTable.websiteUrl,
+    }).from(akTable);
+
+    /* ── 4. Marchands ── */
     const merchantUserIds = [...new Set([...allLinks.map((l: any) => l.userId), ...allKeys.map((k: any) => k.userId)])];
     if (merchantUserIds.length > 0) {
-      const [merchantUsers, merchantWalletRows] = await Promise.all([
-        db.select().from(usersTable).where(inArray(usersTable.id, merchantUserIds)),
-        db.select().from(walletsTable).where(inArray(walletsTable.userId, merchantUserIds)),
-      ]);
+      const merchantUsers = await db.select().from(usersTable).where(inArray(usersTable.id, merchantUserIds));
+      const merchantWalletRows = await db.select().from(walletsTable).where(inArray(walletsTable.userId, merchantUserIds));
       const merchants = merchantUsers.map((u: any) => {
         const { passwordHash: _, ...safeUser } = u;
         const wallet = merchantWalletRows.find((w: any) => w.userId === u.id);
@@ -377,31 +399,32 @@ async function warmAdminCache(): Promise<void> {
       adminCacheSet("admin-merchants", merchants);
     }
 
+    /* ── 5. Liens enrichis ── */
     const plRows = await db.select().from(plTable).leftJoin(usersTable, eq(usersTable.id, plTable.userId)).orderBy(desc(plTable.createdAt));
-    const enrichedLinks = plRows.map(({ payment_links, users }: any) => {
-      const user = users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null;
-      return { ...payment_links, user };
-    });
-    adminCacheSet("admin-payment-links", enrichedLinks);
+    adminCacheSet("admin-payment-links", plRows.map(({ payment_links, users }: any) => ({
+      ...payment_links,
+      user: users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null,
+    })));
 
+    /* ── 6. Clés enrichies ── */
     const akRows = await db.select().from(akTable).leftJoin(usersTable, eq(usersTable.id, akTable.userId)).orderBy(desc(akTable.createdAt));
-    const enrichedKeys = akRows.map(({ api_keys, users }: any) => {
+    adminCacheSet("admin-api-keys", akRows.map(({ api_keys, users }: any) => {
       const { keyHash: _, ...safeKey } = api_keys;
-      const user = users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null;
-      return { ...safeKey, user };
-    });
-    adminCacheSet("admin-api-keys", enrichedKeys);
+      return { ...safeKey, user: users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null };
+    }));
 
     console.log("[CacheWarmer] Cache admin rechargé automatiquement");
   } catch (err) {
     console.error("[CacheWarmer] Erreur lors du rechargement du cache admin:", err);
+  } finally {
+    _warmerRunning = false;
   }
 }
 
 export function startAdminCacheWarmer(): void {
   warmAdminCache();
-  setInterval(warmAdminCache, 60_000);
-  console.log("[CacheWarmer] Préchauffeur cache admin démarré (toutes les 60s)");
+  setInterval(warmAdminCache, 90_000);
+  console.log("[CacheWarmer] Préchauffeur cache admin démarré (toutes les 90s)");
 }
 
 export async function registerRoutes(
@@ -2169,7 +2192,10 @@ export async function registerRoutes(
   app.get("/api/admin/users", isAdmin, async (_req, res) => {
     try {
       const cached = adminCacheGet("admin-users");
-      if (cached) return res.json(cached);
+      if (cached) {
+        if (adminCacheIsStale("admin-users")) warmAdminCache().catch(() => {});
+        return res.json(cached);
+      }
       const { users: usersTable } = await import("@shared/models/auth");
       const { wallets: walletsTable } = await import("@shared/schema");
       const { db } = await import("./db");
@@ -3149,7 +3175,10 @@ export async function registerRoutes(
   app.get("/api/admin/wallets", isAdmin, async (req, res) => {
     try {
       const cached = adminCacheGet("admin-wallets");
-      if (cached) return res.json(cached);
+      if (cached) {
+        if (adminCacheIsStale("admin-wallets")) warmAdminCache().catch(() => {});
+        return res.json(cached);
+      }
       const { users: usersTable } = await import("@shared/models/auth");
       const { wallets: walletsTable } = await import("@shared/schema");
       const { db } = await import("./db");
@@ -3256,7 +3285,10 @@ export async function registerRoutes(
   app.get("/api/admin/merchants", isAdmin, async (req, res) => {
     try {
       const cached = adminCacheGet("admin-merchants");
-      if (cached) return res.json(cached);
+      if (cached) {
+        if (adminCacheIsStale("admin-merchants")) warmAdminCache().catch(() => {});
+        return res.json(cached);
+      }
       const { db } = await import("./db");
       const { users: usersTable } = await import("@shared/models/auth");
       const { paymentLinks: plTable, apiKeys: akTable, wallets: walletsTable } = await import("@shared/schema");
@@ -3361,7 +3393,10 @@ export async function registerRoutes(
   app.get("/api/admin/payment-links", isAdmin, async (req, res) => {
     try {
       const cached = adminCacheGet("admin-payment-links");
-      if (cached) return res.json(cached);
+      if (cached) {
+        if (adminCacheIsStale("admin-payment-links")) warmAdminCache().catch(() => {});
+        return res.json(cached);
+      }
       const { db } = await import("./db");
       const { paymentLinks: plTable } = await import("@shared/schema");
       const { users: usersTable } = await import("@shared/models/auth");
@@ -3401,7 +3436,10 @@ export async function registerRoutes(
   app.get("/api/admin/api-keys", isAdmin, async (req, res) => {
     try {
       const cached = adminCacheGet("admin-api-keys");
-      if (cached) return res.json(cached);
+      if (cached) {
+        if (adminCacheIsStale("admin-api-keys")) warmAdminCache().catch(() => {});
+        return res.json(cached);
+      }
       const { db } = await import("./db");
       const { apiKeys: akTable } = await import("@shared/schema");
       const { users: usersTable } = await import("@shared/models/auth");
