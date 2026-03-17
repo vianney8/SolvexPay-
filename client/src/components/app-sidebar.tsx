@@ -47,7 +47,7 @@ const menuItems = [
 
 const adminMenuItems = [
   { title: "Administration", url: "/admin", icon: Shield, bg: "bg-red-100", iconColor: "text-red-600" },
-  { title: "Utilisateurs", url: "/admin/users", icon: Users, bg: "bg-indigo-100", iconColor: "text-indigo-600" },
+  { title: "Marchands", url: "/admin/merchants", icon: Link2, bg: "bg-violet-100", iconColor: "text-violet-600" },
 ];
 
 export function AppSidebar() {

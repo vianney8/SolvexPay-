@@ -1634,14 +1634,20 @@ export default function AdminPage() {
               <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0">
                 <Link2 className="h-5 w-5 text-white" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="font-black text-base">Marchands actifs</p>
                 <p className="text-xs text-muted-foreground">Utilisateurs ayant créé au moins 1 lien de paiement ou 1 clé API</p>
               </div>
-              <div className="ml-auto text-right flex-shrink-0">
+              <div className="text-right flex-shrink-0">
                 <p className="text-2xl font-black text-violet-600">{merchantsLoading ? "—" : (merchants || []).length}</p>
                 <p className="text-xs text-muted-foreground">marchands</p>
               </div>
+              <Link href="/admin/merchants">
+                <button className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 transition-colors text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm flex-shrink-0" data-testid="btn-go-admin-merchants">
+                  <Link2 className="h-3.5 w-3.5" />
+                  Marchands
+                </button>
+              </Link>
             </div>
 
             {merchantsLoading ? (
