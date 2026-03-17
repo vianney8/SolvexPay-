@@ -38,13 +38,24 @@ export default function AdminMerchantsPage() {
   const blockM = useMutation({
     mutationFn: (d: { userId: string; isBlocked: boolean }) =>
       apiRequest("PATCH", `/api/admin/users/${d.userId}/block`, { isBlocked: d.isBlocked }),
-    onSuccess: () => {
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/admin/merchants"] });
+      const prev = queryClient.getQueryData<any[]>(["/api/admin/merchants"]);
+      queryClient.setQueryData<any[]>(["/api/admin/merchants"], old =>
+        (old || []).map(u => u.id === vars.userId ? { ...u, isBlocked: vars.isBlocked } : u)
+      );
+      return { prev };
+    },
+    onSuccess: (_, vars) => {
+      setBlockDialog(null);
+      toast({ title: vars.isBlocked ? "Compte bloqué" : "Compte débloqué" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      setBlockDialog(null);
-      toast({ title: blockDialog?.isBlocked ? "Compte débloqué" : "Compte bloqué" });
     },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+    onError: (e: any, _, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["/api/admin/merchants"], ctx.prev);
+      toast({ title: "Erreur", description: e?.message, variant: "destructive" });
+    },
   });
 
   const toggleLinkM = useMutation({

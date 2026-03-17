@@ -2487,6 +2487,7 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { eq } = await import("drizzle-orm");
       await db.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, id));
+      adminCacheDel("admin-users");
       res.json({ success: true });
     } catch (error) {
       console.error("Admin change password error:", error);
@@ -2538,6 +2539,7 @@ export async function registerRoutes(
         .set({ isAdmin: !!adminVal, updatedAt: new Date() })
         .where(eq(usersTable.id, id))
         .returning();
+      adminCacheDel("admin-users");
       const { passwordHash: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
@@ -2569,6 +2571,7 @@ export async function registerRoutes(
           kycStatus === "rejected" ? rejectionReason : null
         ).catch(e => console.error("[Admin KYC email]", e?.message));
       }
+      adminCacheDel("admin-users");
       const { passwordHash: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
@@ -2621,6 +2624,7 @@ export async function registerRoutes(
       const { eq } = await import("drizzle-orm");
       const [updated] = await db.update(usersTable).set({ customFeeRate: customFeeRate ? String(customFeeRate) : null, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
+      adminCacheDel("admin-users");
       const { passwordHash: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
@@ -2634,6 +2638,7 @@ export async function registerRoutes(
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
       const updated = await db.update(usersTable).set({ apiSrEnabled: true, updatedAt: new Date() }).returning({ id: usersTable.id });
+      adminCacheDel("admin-users");
       res.json({ success: true, count: updated.length });
     } catch (error) {
       console.error("Admin enable-sr-all error:", error);
@@ -2653,6 +2658,7 @@ export async function registerRoutes(
       const { eq } = await import("drizzle-orm");
       const [updated] = await db.update(usersTable).set({ apiSrEnabled, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
+      adminCacheDel("admin-users");
       res.json({ success: true, apiSrEnabled: updated.apiSrEnabled });
     } catch (error) {
       console.error("Admin enable-sr error:", error);
@@ -3274,6 +3280,7 @@ export async function registerRoutes(
         status: "completed",
         description: `Dépôt admin via OmniPay: ${motif || "Alimentation wallet"}`,
       });
+      adminCacheDel("admin-users", "admin-wallets");
       res.json({ success: true, transaction: tx, omnipayRef: depositResult.reference });
     } catch (error) {
       console.error("Admin wallet deposit error:", error);
@@ -3318,6 +3325,7 @@ export async function registerRoutes(
         ]);
       });
 
+      adminCacheDel("admin-users", "admin-wallets");
       res.json({ success: true });
     } catch (error) {
       console.error("Admin wallet migrate error:", error);

@@ -128,34 +128,67 @@ export default function AdminUsersPage() {
   const blockM = useMutation({
     mutationFn: (d: { userId: string; isBlocked: boolean }) =>
       apiRequest("PATCH", `/api/admin/users/${d.userId}/block`, { isBlocked: d.isBlocked }),
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/admin/users"] });
+      const prev = queryClient.getQueryData<any[]>(["/api/admin/users"]);
+      queryClient.setQueryData<any[]>(["/api/admin/users"], old =>
+        (old || []).map(u => u.id === vars.userId ? { ...u, isBlocked: vars.isBlocked } : u)
+      );
+      return { prev };
+    },
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({ title: vars.isBlocked ? "Compte bloqué" : "Compte débloqué" });
       setBlockDialog(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
     },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+    onError: (e: any, _, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["/api/admin/users"], ctx.prev);
+      toast({ title: "Erreur", description: e?.message, variant: "destructive" });
+    },
   });
 
   const kycM = useMutation({
     mutationFn: (d: { userId: string; kycStatus: string; rejectionReason?: string }) =>
       apiRequest("PATCH", `/api/admin/users/${d.userId}/kyc`, d),
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/admin/users"] });
+      const prev = queryClient.getQueryData<any[]>(["/api/admin/users"]);
+      queryClient.setQueryData<any[]>(["/api/admin/users"], old =>
+        (old || []).map(u => u.id === vars.userId ? { ...u, kycStatus: vars.kycStatus, kycRejectionReason: vars.rejectionReason || u.kycRejectionReason } : u)
+      );
+      return { prev };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({ title: "KYC mis à jour" });
       setKycDialog(null); setKycReason("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
     },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+    onError: (e: any, _, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["/api/admin/users"], ctx.prev);
+      toast({ title: "Erreur", description: e?.message, variant: "destructive" });
+    },
   });
 
   const srM = useMutation({
     mutationFn: (d: { userId: string; apiSrEnabled: boolean }) =>
       apiRequest("PATCH", `/api/admin/users/${d.userId}/enable-sr`, { apiSrEnabled: d.apiSrEnabled }),
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/admin/users"] });
+      const prev = queryClient.getQueryData<any[]>(["/api/admin/users"]);
+      queryClient.setQueryData<any[]>(["/api/admin/users"], old =>
+        (old || []).map(u => u.id === vars.userId ? { ...u, apiSrEnabled: vars.apiSrEnabled } : u)
+      );
+      return { prev };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({ title: "Option API SR mise à jour" });
       setSrDialog(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
     },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+    onError: (e: any, _, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["/api/admin/users"], ctx.prev);
+      toast({ title: "Erreur", description: e?.message, variant: "destructive" });
+    },
   });
 
   /* ── Derived stats ── */
