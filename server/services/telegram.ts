@@ -273,6 +273,13 @@ export async function handleTelegramCallback(callbackQuery: any): Promise<void> 
   } else if (data.startsWith("krs_")) {
     const [, userId] = data.split("krs_");
     const kycMsgId = messageId;
+    try {
+      await axios.post(`${API}/editMessageReplyMarkup`, {
+        chat_id: CHAT_ID,
+        message_id: kycMsgId,
+        reply_markup: { inline_keyboard: [] },
+      });
+    } catch (_) {}
     const keyboard = {
       inline_keyboard: [
         [{ text: "📷 Document illisible", callback_data: `kr1_${userId}_${kycMsgId}` }],
