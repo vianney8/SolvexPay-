@@ -179,17 +179,7 @@ export default function PayPage() {
 
   useEffect(() => {
     if (!pendingReference || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
-    let attempts = 0;
-    const MAX_ATTEMPTS = 120; // 10 minutes max (120 × 5s)
     const interval = setInterval(async () => {
-      attempts++;
-      if (attempts >= MAX_ATTEMPTS) {
-        clearInterval(interval);
-        setVerifyStatus("FAILED");
-        setPaymentStatus("error");
-        toast({ title: "Délai dépassé", description: "Impossible de confirmer le paiement. Vérifiez votre historique de transactions.", variant: "destructive" });
-        return;
-      }
       try {
         const res = await fetch("/api/payment-links/verify-public", {
           method: "POST",
@@ -201,9 +191,7 @@ export default function PayPage() {
           if (data.status) setVerifyStatus(data.status);
           setVerifyCount(c => c + 1);
         }
-      } catch {
-        // Network error — continue polling unless max attempts reached
-      }
+      } catch {}
     }, 5000);
     return () => clearInterval(interval);
   }, [pendingReference, verifyStatus]);

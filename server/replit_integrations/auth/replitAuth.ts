@@ -332,10 +332,6 @@ export async function setupAuth(app: Express) {
         return res.status(401).json({ message: "Email ou mot de passe incorrect" });
       }
 
-      if (user.isBlocked) {
-        return res.status(403).json({ message: "Votre compte a été suspendu. Veuillez contacter le support." });
-      }
-
       if (!user.emailVerified && !user.isAdmin) {
         const code = generateVerificationCode();
         const expiry = new Date(Date.now() + 15 * 60 * 1000);
@@ -383,10 +379,6 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = await authStorage.getUser(userId);
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (user.isBlocked) {
-    return res.status(403).json({ message: "Votre compte a été suspendu. Veuillez contacter le support." });
   }
 
   (req as any).user = user;

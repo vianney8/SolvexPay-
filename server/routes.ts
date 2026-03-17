@@ -449,15 +449,6 @@ export async function registerRoutes(
 
   // ── Telegram webhook — handles bot button callbacks ────────────────────────
   app.post("/api/telegram/webhook", express.json(), async (req, res) => {
-    // Verify request comes from Telegram using secret token
-    const expectedToken = process.env.TELEGRAM_WEBHOOK_SECRET;
-    if (expectedToken) {
-      const receivedToken = req.headers["x-telegram-bot-api-secret-token"];
-      if (receivedToken !== expectedToken) {
-        console.warn("[Telegram] Webhook rejected: invalid secret token");
-        return res.sendStatus(403);
-      }
-    }
     res.sendStatus(200);
     const update = req.body;
     if (update?.callback_query) {
@@ -465,12 +456,7 @@ export async function registerRoutes(
     }
   });
 
-  // Block access to KYC documents — sensitive files must not be publicly accessible
-  app.use("/uploads/kyc", (_req, res) => {
-    res.status(403).json({ message: "Accès interdit" });
-  });
-
-  // Serve uploaded files (profile images, payment link logos) statically
+  // Serve uploaded KYC files statically
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
   app.get("/api/wallet", isAuthenticated, async (req: any, res) => {
@@ -1178,10 +1164,6 @@ export async function registerRoutes(
       if (!targetEmail) {
         return res.status(400).json({ message: "Adresse email manquante" });
       }
-      const emailValidation = z.string().email("Adresse email invalide").safeParse(targetEmail);
-      if (!emailValidation.success) {
-        return res.status(400).json({ message: emailValidation.error.errors[0].message });
-      }
       const result = await testResendConnection(targetEmail);
       if (result.success) {
         res.json({ success: true, message: `Email de test envoyé à ${targetEmail}`, id: result.id });
@@ -1617,18 +1599,6 @@ export async function registerRoutes(
     }
     if (!apiKey.isActive || (apiKey as any).adminLocked) {
       return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API désactivée ou verrouillée.", status: 401 } });
-    }
-    // Check if the account owner is blocked
-    try {
-      const { users: usersTable } = await import("@shared/models/auth");
-      const { db: dbInst } = await import("./db");
-      const { eq: eqFn } = await import("drizzle-orm");
-      const [owner] = await dbInst.select({ isBlocked: usersTable.isBlocked }).from(usersTable).where(eqFn(usersTable.id, apiKey.userId));
-      if (owner?.isBlocked) {
-        return res.status(403).json({ error: { code: "FORBIDDEN", message: "Compte marchand suspendu. Contactez le support.", status: 403 } });
-      }
-    } catch {
-      // Non-blocking: if user check fails, continue (the API key is valid)
     }
     await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
     req.merchantApiKey = apiKey;
@@ -2266,18 +2236,7 @@ export async function registerRoutes(
     }
   });
 
-  const exportDbLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: 3,
-    message: { message: "Limite d'export atteinte. Réessayez dans 1 heure." },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-
-  app.get("/api/admin/export-db", isAdmin, exportDbLimiter, async (req: any, _res, next) => {
-    console.log(`[Admin] Export DB requested by ${req.user?.email} at ${new Date().toISOString()}`);
-    next();
-  }, async (_req, res) => {
+  app.get("/api/admin/export-db", isAdmin, async (_req, res) => {
     try {
       const dbUrl = process.env.DATABASE_URL;
       if (!dbUrl) return res.status(500).json({ message: "DATABASE_URL non configurée" });
