@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -798,7 +799,6 @@ export default function AdminPage() {
                 { v: "overview", label: "Vue d'ensemble", Icon: BarChart3, badge: 0 },
                 { v: "liquidity", label: "Liquidité OmniPay", Icon: Activity, badge: liquidityCriticalCount },
                 { v: "benefices", label: "Bénéfices", Icon: Coins, badge: 0 },
-                { v: "users", label: "Utilisateurs", Icon: Users, badge: 0 },
                 { v: "marchands", label: "Marchands", Icon: Link2, badge: 0 },
                 { v: "kyc", label: "KYC", Icon: BadgeCheck, badge: pendingKyc.length },
                 { v: "wallets", label: "Wallets & Solde", Icon: Wallet, badge: 0 },
@@ -832,10 +832,16 @@ export default function AdminPage() {
               <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
                 <Users className="h-5 w-5 text-white" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-2xl font-black text-foreground" data-testid="total-users-count">{(stats?.userCount ?? totalUsersCount) || "—"}</p>
                 <p className="text-xs text-muted-foreground">Utilisateurs inscrits sur la plateforme</p>
               </div>
+              <Link href="/admin/users">
+                <button className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 transition-colors text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm" data-testid="btn-go-admin-users">
+                  <Users className="h-3.5 w-3.5" />
+                  Utilisateurs
+                </button>
+              </Link>
             </div>
 
             {/* ── RÉSUMÉ RAPIDE LIQUIDITÉ ── */}
@@ -1615,174 +1621,6 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
-          {/* ══════════════════════════════════════
-              TAB 2 — UTILISATEURS
-          ══════════════════════════════════════ */}
-          <TabsContent value="users" forceMount className="space-y-4 mt-5 data-[state=inactive]:hidden">
-            <div className="flex gap-2 flex-wrap">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Rechercher utilisateur..." className="pl-10 h-10" data-testid="input-search-users" />
-              </div>
-              <button
-                onClick={() => setSrFilter(v => !v)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${srFilter ? "bg-green-600 text-white border-green-600 shadow-sm" : "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 hover:bg-green-500/20"}`}
-                data-testid="btn-filter-sr"
-              >
-                <Zap className="h-3.5 w-3.5" />
-                SR activé{srFilter ? ` (${filteredUsers.length})` : ""}
-              </button>
-              <button
-                onClick={() => setBlockedFilter(v => !v)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${blockedFilter ? "bg-red-600 text-white border-red-600 shadow-sm" : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 hover:bg-red-500/20"}`}
-                data-testid="btn-filter-blocked"
-              >
-                <Lock className="h-3.5 w-3.5" />
-                Bloqués{blockedUsersCount > 0 ? ` (${blockedUsersCount})` : ""}
-              </button>
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Trier par solde :</span>
-                {[
-                  { v: "balance_desc" as const, label: "Plus grand" },
-                  { v: "balance_asc" as const, label: "Plus petit" },
-                  { v: "default" as const, label: "Par défaut" },
-                ].map(opt => (
-                  <button
-                    key={opt.v}
-                    onClick={() => setUserSort(opt.v)}
-                    className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${userSort === opt.v ? "bg-indigo-600 text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                    data-testid={`btn-sort-users-${opt.v}`}
-                  >
-                    {opt.v === "balance_desc" && <ChevronDown className="h-3 w-3" />}
-                    {opt.v === "balance_asc" && <ChevronUp className="h-3 w-3" />}
-                    {opt.v === "default" && <ArrowUpDown className="h-3 w-3" />}
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {usersLoading ? (
-              <CountdownLoader label="Utilisateurs" icon="👥" />
-            ) : (
-              <div className="space-y-3">
-                {filteredUsers.map((u: any) => {
-                  const bal = parseFloat(u.wallet?.balanceXOF || "0");
-                  const isExp = expandedUserId === u.id;
-                  const initials = ((u.firstName?.[0] || "") + (u.lastName?.[0] || u.email?.[0] || "?")).toUpperCase();
-                  return (
-                    <Card key={u.id} className={`border-border/50 overflow-hidden ${u.isBlocked ? "border-red-500/30" : ""}`} data-testid={`card-user-${u.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <div className={`h-11 w-11 rounded-2xl flex items-center justify-center text-sm font-black flex-shrink-0 ${u.isBlocked ? "bg-red-500/20 text-red-600" : "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400"}`}>
-                            {initials}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <p className="font-bold text-sm" data-testid={`text-user-name-${u.id}`}>{u.firstName} {u.lastName}</p>
-                              <KycChip status={u.kycStatus || "not_started"} />
-                              {u.isAdmin && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-rose-500/15 text-rose-600 border-rose-500/30"><Shield className="h-3 w-3" />Admin</span>}
-                              {u.isBlocked && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-red-500/15 text-red-600 border-red-500/30"><Lock className="h-3 w-3" />Bloqué</span>}
-                              {(u as any).apiSrEnabled && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400">API SR</span>}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{u.email}</p>
-                            <p className="text-xs text-muted-foreground">{u.phone || "—"}</p>
-                            <p className="text-[10px] text-muted-foreground/70 flex items-center gap-1 mt-0.5" data-testid={`text-created-${u.id}`}>
-                              <CalendarDays className="h-3 w-3" />
-                              Inscrit le {u.createdAt ? new Date(u.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
-                            </p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-xs text-muted-foreground">Solde</p>
-                            <p className="font-black text-base" data-testid={`text-balance-${u.id}`}>{fmt(bal)}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-1.5 flex-wrap mt-3">
-                          <button onClick={() => { setPwdDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}` }); setPwd(""); }}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-500/10 hover:bg-slate-500/15 text-xs font-semibold text-muted-foreground transition-colors"
-                            data-testid={`btn-pwd-${u.id}`}><KeyRound className="h-3.5 w-3.5" />MDP</button>
-                          <button onClick={() => { setBalDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, bal }); setBalAmount(""); setBalMotif(""); }}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-colors"
-                            data-testid={`btn-bal-${u.id}`}><PenLine className="h-3.5 w-3.5" />Solde</button>
-                          <button
-                            onClick={() => setBlockDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, isBlocked: u.isBlocked })}
-                            disabled={blockM.isPending}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.isBlocked ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
-                            data-testid={`btn-block-${u.id}`}>
-                            {u.isBlocked ? <><Unlock className="h-3.5 w-3.5" />Débloquer</> : <><Lock className="h-3.5 w-3.5" />Bloquer</>}
-                          </button>
-                          <button onClick={() => setExpandedUserId(isExp ? null : u.id)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 text-xs font-semibold text-indigo-700 dark:text-indigo-400 transition-colors"
-                            data-testid={`btn-expand-${u.id}`}>
-                            <FileText className="h-3.5 w-3.5" />Historique {isExp ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                          </button>
-                          <button
-                            onClick={() => { setKycDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, status: u.kycStatus || "not_started" }); setKycAction(null); setKycReason(""); }}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${u.kycStatus === "verified" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-violet-500/10 text-violet-700 dark:text-violet-400 hover:bg-violet-500/15"}`}
-                            data-testid={`btn-kyc-${u.id}`}>
-                            <BadgeCheck className="h-3.5 w-3.5" />Vérification KYC
-                          </button>
-                          <button
-                            onClick={() => setSrConfirmDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, enable: !(u as any).apiSrEnabled })}
-                            disabled={enableSrM.isPending}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors border ${(u as any).apiSrEnabled ? "bg-green-500/15 text-green-700 dark:text-green-400 hover:bg-green-500/25 border-green-500/30" : "bg-orange-500/10 text-orange-700 dark:text-orange-400 hover:bg-orange-500/20 border-orange-500/30"}`}
-                            data-testid={`btn-sr-${u.id}`}>
-                            <Zap className="h-3.5 w-3.5" />
-                            {(u as any).apiSrEnabled ? "✓ API SR" : "Activer SR"}
-                          </button>
-                        </div>
-
-                        {isExp && (
-                          <div className="mt-4 space-y-3">
-                            {/* Transaction history */}
-                            <div className="rounded-2xl border border-border/50 overflow-hidden">
-                              <div className="bg-muted/40 px-3 py-2 flex items-center gap-2">
-                                <Activity className="h-3.5 w-3.5 text-indigo-500" />
-                                <p className="text-xs font-bold">Transactions récentes</p>
-                              </div>
-                              {!userTxList ? (
-                                <div className="p-4 text-center text-xs text-muted-foreground">Chargement...</div>
-                              ) : userTxList.length === 0 ? (
-                                <div className="p-4 text-center text-xs text-muted-foreground">Aucune transaction</div>
-                              ) : (
-                                <div className="divide-y divide-border/30 max-h-52 overflow-y-auto">
-                                  {userTxList.slice(0, 10).map((tx: any) => (
-                                    <div key={tx.id} className="flex items-center gap-2 px-3 py-2">
-                                      <TypeChip type={tx.type} tx={tx} />
-                                      <TxChip status={tx.status} />
-                                      <div className="flex-1 min-w-0">
-                                        <span className="text-xs font-bold">{fmt(parseFloat(tx.amount))} {tx.currency || "XOF"}</span>
-                                        {tx.fees && parseFloat(tx.fees) > 0 && (
-                                          <span className="text-[10px] text-orange-500 ml-1">(-{fmt(parseFloat(tx.fees))})</span>
-                                        )}
-                                      </div>
-                                      <span className="text-xs text-muted-foreground">{fmtDate(tx.createdAt)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {u.kycStatus === "rejected" && u.kycRejectionReason && (
-                              <div className="p-3 rounded-xl bg-red-500/8 border border-red-500/20">
-                                <p className="text-xs text-red-600 dark:text-red-400"><strong>Motif de rejet KYC :</strong> {u.kycRejectionReason}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-                {filteredUsers.length === 0 && (
-                  <div className="text-center py-12 text-sm text-muted-foreground">
-                    {blockedFilter ? "Aucun utilisateur bloqué" : "Aucun utilisateur trouvé"}
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
 
           {/* ══════════════════════════════════════
               TAB 3 — KYC
