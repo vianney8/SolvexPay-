@@ -94,10 +94,10 @@ export default function AdminUsersPage() {
     gcTime: Infinity,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/users"]),
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/users"]) ?? [],
   });
 
-  const isLoading = !users && isFetching;
+  const isLoading = false;
 
   const { data: userTxList } = useQuery<any[]>({
     queryKey: ["/api/admin/users", expandedId, "transactions"],

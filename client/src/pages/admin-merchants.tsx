@@ -29,10 +29,10 @@ export default function AdminMerchantsPage() {
     gcTime: Infinity,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/merchants"]),
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/merchants"]) ?? [],
   });
 
-  const isLoading = !merchants && isFetching;
+  const isLoading = false;
 
   /* ── Mutations ── */
   const blockM = useMutation({

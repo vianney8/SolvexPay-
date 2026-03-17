@@ -320,7 +320,7 @@ export default function AdminPage() {
     gcTime: Infinity,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/users"]),
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/users"]) ?? [],
   });
   const kycList = useMemo(() =>
     (users || [])
@@ -414,7 +414,7 @@ export default function AdminPage() {
     gcTime: Infinity,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/merchants"]),
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/merchants"]) ?? [],
   });
   const { data: adminNotifications, isLoading: notifsLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/notifications"],
