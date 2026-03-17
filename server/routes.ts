@@ -486,11 +486,42 @@ export async function registerRoutes(
     }
   });
 
+  // Per-user transaction cache (TTL: 30s)
+  const userTxCache = new Map<string, { data: any; ts: number }>();
+  const TX_CACHE_TTL = 30_000;
+  function userTxCacheDel(userId: string) { userTxCache.delete(`recent:${userId}`); userTxCache.delete(`all:${userId}`); }
+
+  app.get("/api/transactions/recent", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const cacheKey = `recent:${userId}`;
+      const cached = userTxCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < TX_CACHE_TTL) return res.json(cached.data);
+      const data = await storage.getRecentTransactions(userId, 5);
+      userTxCache.set(cacheKey, { data, ts: Date.now() });
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching recent transactions:", error);
+      res.status(500).json({ message: "Failed to fetch recent transactions" });
+    }
+  });
+
   app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const transactions = await storage.getTransactions(userId);
-      res.json(transactions);
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      if (req.query.page) {
+        const result = await storage.getTransactionsPaginated(userId, page, limit);
+        return res.json(result);
+      }
+      // Legacy: full list (used by history page with client-side filtering)
+      const cacheKey = `all:${userId}`;
+      const cached = userTxCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < TX_CACHE_TTL) return res.json(cached.data);
+      const data = await storage.getTransactions(userId);
+      userTxCache.set(cacheKey, { data, ts: Date.now() });
+      res.json(data);
     } catch (error) {
       console.error("Error fetching transactions:", error);
       res.status(500).json({ message: "Failed to fetch transactions" });
@@ -556,6 +587,7 @@ export async function registerRoutes(
         description: description || "Depot SolvexPay",
         fees: String(depositFees),
       } as any);
+      userTxCacheDel(userId);
 
       res.json({
         ...transaction,
@@ -686,6 +718,7 @@ export async function registerRoutes(
         description: `Retrait vers ${phoneNumber} via ${operator}`,
         fees: String(withdrawalFees),
       } as any);
+      userTxCacheDel(userId);
 
       // Deduct amount + fees from wallet (user receives exact amount, fees taken on top)
       await storage.updateWalletBalance(userId, localCurrency, -(amount + feesLocal));
@@ -768,6 +801,7 @@ export async function registerRoutes(
         description: `Transfert vers ${firstName} ${lastName} (${phoneNumber})`,
         fees: String(transferFees),
       } as any);
+      userTxCacheDel(userId);
 
       await storage.updateWalletBalance(userId, "XOF", -totalDeductedXOF);
 

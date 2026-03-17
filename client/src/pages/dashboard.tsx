@@ -75,15 +75,25 @@ export default function DashboardPage() {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [dismissedNotifs, setDismissedNotifs] = useState<string[]>([]);
 
-  const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
-  const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({ queryKey: ["/api/transactions"], staleTime: 30000, gcTime: 60000 });
+  const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"], staleTime: 30000 });
+  // Recent transactions: lightweight endpoint (only 5 rows) — renders instantly
+  const { data: recentTransactions, isLoading: recentLoading } = useQuery<Transaction[]>({
+    queryKey: ["/api/transactions/recent"],
+    staleTime: 30000,
+    gcTime: 60000,
+  });
+  // Full transaction history loaded in background for stats (5 min cache)
+  const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({
+    queryKey: ["/api/transactions"],
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
   const { data: activeNotifications } = useQuery<any[]>({ queryKey: ["/api/notifications"] });
   const { data: stats } = useQuery<{
     totalDeposits: number; totalWithdrawals: number; transactionCount: number; paymentLinksCount: number;
   }>({ queryKey: ["/api/stats"] });
   const { data: paymentLinks } = useQuery<PaymentLink[]>({ queryKey: ["/api/payment-links"] });
 
-  const recentTransactions = transactions?.slice(0, 5) || [];
   const isUserBlocked = !!(user as any)?.isBlocked;
   const firstName = isUserBlocked ? "Utilisateur SolvexPay" : (user?.firstName || user?.email?.split("@")[0] || "là");
 
@@ -282,7 +292,7 @@ export default function DashboardPage() {
                     <p className="font-bold text-red-500 text-sm">Erreur</p>
                     <p className="text-xs text-muted-foreground mt-1">Compte suspendu</p>
                   </div>
-                ) : transactionsLoading ? (
+                ) : recentLoading ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="flex items-center gap-3 p-2">
@@ -292,7 +302,7 @@ export default function DashboardPage() {
                       </div>
                     ))}
                   </div>
-                ) : recentTransactions.length === 0 ? (
+                ) : (recentTransactions || []).length === 0 ? (
                   <div className="text-center py-10">
                     <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-3">
                       <Activity className="h-7 w-7 text-muted-foreground" />
@@ -307,7 +317,7 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="divide-y divide-border/40">
-                    {recentTransactions.map((tx) => {
+                    {(recentTransactions || []).map((tx) => {
                       const isPayLink = tx.description?.startsWith("Paiement via lien:");
                       const isSrPay = tx.description?.startsWith("Paiement API SR");
                       const isApiPay = !!(tx as any).apiKeyId || tx.description?.startsWith("Paiement via API") || tx.description?.startsWith("Dépôt via API") || isSrPay;

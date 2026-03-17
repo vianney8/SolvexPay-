@@ -27,6 +27,8 @@ export interface IStorage {
   updateWalletBalance(userId: string, currency: string, amount: number): Promise<Wallet>;
   
   getTransactions(userId: string): Promise<Transaction[]>;
+  getRecentTransactions(userId: string, limit?: number): Promise<Transaction[]>;
+  getTransactionsPaginated(userId: string, page: number, limit: number): Promise<{ data: Transaction[]; total: number }>;
   getTransactionById(id: string): Promise<Transaction | undefined>;
   getTransactionByReference(reference: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -117,6 +119,28 @@ export class DatabaseStorage implements IStorage {
       .from(transactions)
       .where(eq(transactions.userId, userId))
       .orderBy(desc(transactions.createdAt));
+  }
+
+  async getRecentTransactions(userId: string, limit = 5): Promise<Transaction[]> {
+    return db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.userId, userId))
+      .orderBy(desc(transactions.createdAt))
+      .limit(limit);
+  }
+
+  async getTransactionsPaginated(userId: string, page: number, limit: number): Promise<{ data: Transaction[]; total: number }> {
+    const [rows, countRows] = await Promise.all([
+      db.select().from(transactions)
+        .where(eq(transactions.userId, userId))
+        .orderBy(desc(transactions.createdAt))
+        .limit(limit)
+        .offset((page - 1) * limit),
+      db.select({ count: sql<number>`count(*)::int` }).from(transactions)
+        .where(eq(transactions.userId, userId)),
+    ]);
+    return { data: rows, total: countRows[0]?.count ?? 0 };
   }
 
   async getTransactionById(id: string): Promise<Transaction | undefined> {

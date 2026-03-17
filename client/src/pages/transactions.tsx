@@ -13,8 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Search, Activity, TrendingUp, CheckCircle2, Clock, X, ExternalLink, User, Mail, Phone, Globe, Zap, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Search, Activity, TrendingUp, CheckCircle2, Clock, X, ExternalLink, User, Mail, Phone, Globe, Zap, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useEffect } from "react";
 import type { Transaction } from "@shared/schema";
 
 function formatCurrency(amount: string | number, currency = "XOF") {
@@ -204,6 +204,8 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
   );
 }
 
+const PAGE_SIZE = 20;
+
 export default function TransactionsPage() {
   const { user } = useAuth();
   const isBlocked = !!(user as any)?.isBlocked;
@@ -211,8 +213,16 @@ export default function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: transactions, isLoading } = useQuery<Transaction[]>({ queryKey: ["/api/transactions"], staleTime: 30000, gcTime: 60000 });
+  const { data: transactions, isLoading } = useQuery<Transaction[]>({
+    queryKey: ["/api/transactions"],
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setCurrentPage(1); }, [search, typeFilter, statusFilter]);
 
   const filteredTransactions = transactions?.filter((tx) => {
     const matchesSearch = !search ||
@@ -226,6 +236,11 @@ export default function TransactionsPage() {
     const matchesStatus = statusFilter === "all" || getEffectiveStatus(tx) === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
   }) || [];
+
+  const totalFiltered = filteredTransactions.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedTransactions = filteredTransactions.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
 
   const completed = transactions?.filter(t => getEffectiveStatus(t) === "completed").length || 0;
   const pending = transactions?.filter(t => getEffectiveStatus(t) === "pending").length || 0;
@@ -340,7 +355,7 @@ export default function TransactionsPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {filteredTransactions.map((tx) => {
+                {paginatedTransactions.map((tx) => {
                   const typeStyle = getTypeIcon(tx);
                   const TypeIcon = typeStyle.icon;
                   const displayProvider = getDisplayProvider(tx);
@@ -380,6 +395,32 @@ export default function TransactionsPage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Pagination controls */}
+            {!isLoading && totalPages > 1 && (
+              <div className="flex items-center justify-between mt-5 pt-4 border-t border-border/50">
+                <p className="text-xs text-muted-foreground">
+                  {totalFiltered === 0 ? "0" : `${(safeCurrentPage - 1) * PAGE_SIZE + 1}–${Math.min(safeCurrentPage * PAGE_SIZE, totalFiltered)}`} sur {totalFiltered}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={safeCurrentPage <= 1} onClick={() => setCurrentPage(p => p - 1)} data-testid="btn-prev-page">
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const start = Math.max(1, Math.min(safeCurrentPage - 2, totalPages - 4));
+                    const pg = start + i;
+                    return (
+                      <Button key={pg} variant={pg === safeCurrentPage ? "default" : "outline"} size="icon" className="h-8 w-8 text-xs" onClick={() => setCurrentPage(pg)} data-testid={`btn-page-${pg}`}>
+                        {pg}
+                      </Button>
+                    );
+                  })}
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={safeCurrentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} data-testid="btn-next-page">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
