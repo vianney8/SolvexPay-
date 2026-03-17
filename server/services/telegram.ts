@@ -271,33 +271,35 @@ export async function handleTelegramCallback(callbackQuery: any): Promise<void> 
     await updateKycStatus(userId, "verified", null, messageId);
 
   } else if (data.startsWith("krs_")) {
-    const userId = data.slice(4);
+    const [, userId] = data.split("krs_");
+    const kycMsgId = messageId;
     const keyboard = {
       inline_keyboard: [
-        [{ text: "📷 Document illisible", callback_data: `kr1_${userId}` }],
-        [{ text: "ℹ️ Informations incorrectes", callback_data: `kr2_${userId}` }],
-        [{ text: "❌ Document invalide/expiré", callback_data: `kr3_${userId}` }],
-        [{ text: "🚫 Photo non conforme (selfie)", callback_data: `kr4_${userId}` }],
-        [{ text: "🔕 Rejeter sans motif", callback_data: `kr0_${userId}` }],
+        [{ text: "📷 Document illisible", callback_data: `kr1_${userId}_${kycMsgId}` }],
+        [{ text: "ℹ️ Informations incorrectes", callback_data: `kr2_${userId}_${kycMsgId}` }],
+        [{ text: "❌ Document invalide/expiré", callback_data: `kr3_${userId}_${kycMsgId}` }],
+        [{ text: "🚫 Photo non conforme (selfie)", callback_data: `kr4_${userId}_${kycMsgId}` }],
+        [{ text: "🔕 Rejeter sans motif", callback_data: `kr0_${userId}_${kycMsgId}` }],
       ],
     };
     await send(`❌ <b>Choisir le motif de rejet :</b>`, { reply_markup: keyboard });
 
-  } else if (data.startsWith("kr0_")) {
-    const userId = data.slice(4);
-    await updateKycStatus(userId, "rejected", null, messageId);
-  } else if (data.startsWith("kr1_")) {
-    const userId = data.slice(4);
-    await updateKycStatus(userId, "rejected", "Document illisible. Veuillez soumettre des photos claires.", messageId);
-  } else if (data.startsWith("kr2_")) {
-    const userId = data.slice(4);
-    await updateKycStatus(userId, "rejected", "Les informations sur la pièce ne correspondent pas à votre profil.", messageId);
-  } else if (data.startsWith("kr3_")) {
-    const userId = data.slice(4);
-    await updateKycStatus(userId, "rejected", "Document invalide ou expiré. Veuillez utiliser un document en cours de validité.", messageId);
-  } else if (data.startsWith("kr4_")) {
-    const userId = data.slice(4);
-    await updateKycStatus(userId, "rejected", "Le selfie ne correspond pas aux exigences (visage non visible ou document non tenu).", messageId);
+  } else if (data.startsWith("kr0_") || data.startsWith("kr1_") || data.startsWith("kr2_") || data.startsWith("kr3_") || data.startsWith("kr4_")) {
+    const prefix = data.slice(0, 4);
+    const rest = data.slice(4);
+    const lastUnderscore = rest.lastIndexOf("_");
+    const userId = rest.slice(0, lastUnderscore);
+    const kycMsgId = parseInt(rest.slice(lastUnderscore + 1), 10) || messageId;
+    const reasons: Record<string, string | null> = {
+      "kr0_": null,
+      "kr1_": "Document illisible. Veuillez soumettre des photos claires.",
+      "kr2_": "Les informations sur la pièce ne correspondent pas à votre profil.",
+      "kr3_": "Document invalide ou expiré. Veuillez utiliser un document en cours de validité.",
+      "kr4_": "Le selfie ne correspond pas aux exigences (visage non visible ou document non tenu).",
+    };
+    const reason = reasons[prefix] ?? null;
+    await editMsg(messageId, `🗑 <i>Motif sélectionné — traitement en cours...</i>`, { reply_markup: { inline_keyboard: [] } });
+    await updateKycStatus(userId, "rejected", reason, kycMsgId);
   }
 }
 
@@ -316,7 +318,7 @@ async function updateKycStatus(userId: string, status: "verified" | "rejected", 
     const confirmText = `${icon} <b>${label}</b>\n👤 ${name}${extra}\n🕐 ${now()}`;
 
     if (messageId) {
-      await editMsg(messageId, confirmText);
+      await editMsg(messageId, confirmText, { reply_markup: { inline_keyboard: [] } });
     } else {
       await send(confirmText);
     }
