@@ -827,7 +827,7 @@ export default function AdminPage() {
 
   const totalWalletBalance = (wallets || []).reduce((s: number, u: any) => s + parseFloat(u.wallet?.balanceXOF || "0"), 0);
   const filteredPaymentLinks = (allPaymentLinks || []).filter(l =>
-    !linksSearch || [l.name, l.slug, l.user?.email, l.user?.firstName, l.user?.lastName].join(" ").toLowerCase().includes(linksSearch.toLowerCase())
+    !linksSearch || [l.name, l.slug, `/pay/${l.slug}`, `solvexpay.com/pay/${l.slug}`, l.user?.email, l.user?.firstName, l.user?.lastName].join(" ").toLowerCase().includes(linksSearch.toLowerCase())
   );
   const filteredApiKeys = (allApiKeys || []).filter(k =>
     !k.isSrKey && (!apiKeysSearch || [k.name, k.keyPrefix, k.websiteUrl, k.user?.email, k.user?.firstName, k.user?.lastName].join(" ").toLowerCase().includes(apiKeysSearch.toLowerCase()))
@@ -2057,7 +2057,7 @@ export default function AdminPage() {
                   </CardTitle>
                   <div className="relative w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input placeholder="Rechercher…" value={linksSearch} onChange={e => setLinksSearch(e.target.value)} className="pl-8 h-8 text-xs rounded-xl" data-testid="input-links-search" />
+                    <Input placeholder="Nom, lien /pay/…, email…" value={linksSearch} onChange={e => setLinksSearch(e.target.value)} className="pl-8 h-8 text-xs rounded-xl" data-testid="input-links-search" />
                   </div>
                 </div>
               </CardHeader>
