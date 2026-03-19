@@ -491,30 +491,33 @@ export async function registerRoutes(
       const userId = req.user.id;
       const { db } = await import("./db");
       const { transactions: txTable, paymentLinks: plTable } = await import("@shared/schema");
-      const { eq, and, gte, lt, sum, count, desc, isNotNull } = await import("drizzle-orm");
+      const { eq, and, gte, lt, sum, count, desc, isNotNull, sql } = await import("drizzle-orm");
 
       const now = new Date();
       const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
+      // Net amount = amount - fees (montant réellement reçu après déduction des frais)
+      const netAmount = sql<string>`SUM(CAST(${txTable.amount} AS NUMERIC) - COALESCE(CAST(${txTable.fees} AS NUMERIC), 0))`;
+
       const [thisMonthRow] = await db
-        .select({ total: sum(txTable.amount) })
+        .select({ total: netAmount })
         .from(txTable)
         .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed"), gte(txTable.createdAt, startOfThisMonth)));
 
       const [lastMonthRow] = await db
-        .select({ total: sum(txTable.amount) })
+        .select({ total: netAmount })
         .from(txTable)
         .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed"), gte(txTable.createdAt, startOfLastMonth), lt(txTable.createdAt, endOfLastMonth)));
 
       const [thisMonthWRow] = await db
-        .select({ total: sum(txTable.amount) })
+        .select({ total: netAmount })
         .from(txTable)
         .where(and(eq(txTable.userId, userId), eq(txTable.type, "withdrawal"), eq(txTable.status, "completed"), gte(txTable.createdAt, startOfThisMonth)));
 
       const [avgRow] = await db
-        .select({ total: sum(txTable.amount), cnt: count() })
+        .select({ total: netAmount, cnt: count() })
         .from(txTable)
         .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed")));
 
