@@ -1535,8 +1535,8 @@ export async function registerRoutes(
         const { apiKeys: akTable } = await import("@shared/schema");
         const { eq, and } = await import("drizzle-orm");
         const existingSrKeys = await db.select().from(akTable).where(and(eq(akTable.userId, userId), eq(akTable.isSrKey, true)));
-        if (existingSrKeys.length >= 1) {
-          return res.status(409).json({ message: "Vous avez déjà une clé API SR. Limite : 1 clé SR par compte." });
+        if (existingSrKeys.length >= 3) {
+          return res.status(409).json({ message: "Limite atteinte : 3 clés SR maximum par compte." });
         }
       } else {
         if (req.user.kycStatus !== "verified") {

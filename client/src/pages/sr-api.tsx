@@ -256,9 +256,12 @@ export default function SrApiPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [createSrOpen, setCreateSrOpen] = useState(false);
   const [srKeyName, setSrKeyName] = useState("");
-  const [visibleSrKey, setVisibleSrKey] = useState(false);
+  const [visibleSrKeys, setVisibleSrKeys] = useState<Record<string, boolean>>({});
   const [deleteSrId, setDeleteSrId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
+  const [srWebhookUrls, setSrWebhookUrls] = useState<Record<string, string>>({});
+  const [srRedirectUrls, setSrRedirectUrls] = useState<Record<string, string>>({});
+  const [webhookSavedId, setWebhookSavedId] = useState<string | null>(null);
 
   const { data: supportLinks } = useQuery<Record<string, string>>({
     queryKey: ["/api/support-links"],
@@ -274,7 +277,7 @@ export default function SrApiPage() {
   const activeSrCountries = SR_COUNTRIES.filter(c => !suspendedCodes.includes(c.code));
   const activeSrOperators = SR_OPERATORS.filter(op => op.countries.some(c => !suspendedCodes.includes(c)));
 
-  const srKey = (apiKeys || []).find((k) => (k as any).isSrKey);
+  const srKeys = (apiKeys || []).filter((k) => (k as any).isSrKey);
 
   const createSrMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -304,13 +307,9 @@ export default function SrApiPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] }),
   });
 
-  const [srWebhookUrl, setSrWebhookUrl] = useState("");
-  const [srRedirectUrl, setSrRedirectUrl] = useState("");
-  const [webhookSaved, setWebhookSaved] = useState(false);
-
   const updateWebhookM = useMutation({
-    mutationFn: (data: any) => apiRequest("PATCH", `/api/api-keys/${srKey?.id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] }); setWebhookSaved(true); setTimeout(() => setWebhookSaved(false), 2000); toast({ title: "Configuration webhook sauvegardée" }); },
+    mutationFn: ({ id, ...data }: { id: string; webhookUrl: string; redirectUrl: string }) => apiRequest("PATCH", `/api/api-keys/${id}`, data),
+    onSuccess: (_data, variables) => { queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] }); setWebhookSavedId(variables.id); setTimeout(() => setWebhookSavedId(null), 2000); toast({ title: "Configuration webhook sauvegardée" }); },
     onError: () => toast({ title: "Erreur", description: "Impossible de sauvegarder.", variant: "destructive" }),
   });
 
@@ -322,8 +321,6 @@ export default function SrApiPage() {
     setTimeout(() => setCopiedAll(false), 3000);
   };
 
-  const currentWebhookUrl = srKey ? ((srKey as any).webhookUrl || "") : "";
-  const currentRedirectUrl = srKey ? ((srKey as any).redirectUrl || "") : "";
 
   if (authLoading) {
     return (
@@ -422,98 +419,113 @@ export default function SrApiPage() {
               </Button>
             </div>
 
-            {/* SR Key card */}
-            {!srKey ? (
-              <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-green-200">Aucune clé SR créée</p>
-                  <p className="text-xs text-green-300/50 mt-0.5">1 seule clé SR autorisée par compte.</p>
-                </div>
-                <Button size="sm" className="bg-green-600 hover:bg-green-500 text-white font-bold gap-2 flex-shrink-0" onClick={() => setCreateSrOpen(true)} data-testid="button-create-sr-key">
-                  <Plus className="h-3.5 w-3.5" /> Créer ma clé SR
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm text-green-200">{srKey.name}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${srKey.isActive ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"}`}>
-                        {srKey.isActive ? "Active" : "Inactive"}
-                      </span>
-                      {(srKey as any).webhookUrl && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center gap-1"><Webhook className="h-2.5 w-2.5" />Webhook configuré</span>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={srKey.isActive} onCheckedChange={(checked) => toggleSrMutation.mutate({ id: srKey.id, isActive: checked })} data-testid="switch-sr-key" />
-                      <Button variant="outline" size="icon" className="h-8 w-8 border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => setDeleteSrId(srKey.id)} data-testid="button-delete-sr-key"><Trash2 className="h-3.5 w-3.5" /></Button>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0 bg-black/40 rounded-xl px-4 py-2.5 border border-green-500/20">
-                      <code className="text-xs font-mono truncate block text-green-300" data-testid="text-sr-key-value">
-                        {visibleSrKey ? ((srKey as any).fullKey || `${srKey.keyPrefix}...`) : `${srKey.keyPrefix}${"•".repeat(24)}`}
-                      </code>
-                    </div>
-                    <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0 border-green-500/30 text-green-400 hover:bg-green-500/10" onClick={() => setVisibleSrKey(v => !v)} data-testid="button-toggle-sr-key">
-                      {visibleSrKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                    <Button variant="outline" size="icon" className="flex-shrink-0 border-green-500/30 text-green-400 hover:bg-green-500/10 h-8 w-8"
-                      onClick={() => { navigator.clipboard.writeText((srKey as any).fullKey || srKey.keyPrefix); toast({ title: "Clé SR copiée" }); }} data-testid="button-copy-sr-key">
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <p className="text-[10px] text-green-300/40">Créée le {formatDate(srKey.createdAt)} · Dernière utilisation : {formatDate(srKey.lastUsedAt)}</p>
-                </div>
-
-                {/* Webhook Config */}
-                <div className="bg-black/30 border border-green-500/15 rounded-2xl p-4 space-y-3">
-                  <p className="text-xs font-bold text-green-300 flex items-center gap-1.5"><Webhook className="h-3.5 w-3.5" /> Configuration Webhook SR</p>
-                  <div className="space-y-2">
-                    <Label className="text-[11px] text-green-300/80 font-semibold">URL Webhook (notification de paiement)</Label>
-                    <p className="text-[10px] text-green-300/50">SolvexPay envoie un POST ici dès qu'un paiement est confirmé ou échoue.</p>
-                    <Input
-                      defaultValue={currentWebhookUrl}
-                      onChange={(e) => setSrWebhookUrl(e.target.value)}
-                      key={`wh-${srKey.id}`}
-                      placeholder="https://monsite.com/api/webhook/solvexpay"
-                      className="h-8 text-xs bg-black/40 border-green-500/20 text-green-200 placeholder:text-green-300/30"
-                      data-testid="input-sr-webhook-url"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[11px] text-green-300/80 font-semibold flex items-center gap-1.5">
-                      URL de redirection
-                      <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[9px] font-bold uppercase tracking-wide">Requis pour Wave</span>
-                    </Label>
-                    <p className="text-[10px] text-green-300/50">Wave redirige le client vers cette URL après paiement. Obligatoire si vous utilisez l'opérateur <strong className="text-amber-400">wave</strong>. Peut être votre site principal (ex: https://monsite.com).</p>
-                    <Input
-                      defaultValue={currentRedirectUrl}
-                      onChange={(e) => setSrRedirectUrl(e.target.value)}
-                      key={`rd-${srKey.id}`}
-                      placeholder="https://monsite.com"
-                      className={`h-8 text-xs bg-black/40 text-green-200 placeholder:text-green-300/30 ${!currentRedirectUrl ? "border-amber-500/40 focus:border-amber-500/60" : "border-green-500/20"}`}
-                      data-testid="input-sr-redirect-url"
-                    />
-                    {!currentRedirectUrl && (
-                      <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                        <AlertCircle className="h-3 w-3 text-amber-400 flex-shrink-0" />
-                        <p className="text-[10px] text-amber-300/80">Non configurée — les paiements Wave échoueront avec l'erreur <code className="bg-black/40 px-1 rounded">MISSING_REDIRECT_URL</code></p>
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs font-bold gap-1.5 bg-green-700 hover:bg-green-600 text-white border-0"
-                    onClick={() => updateWebhookM.mutate({ webhookUrl: srWebhookUrl || currentWebhookUrl, redirectUrl: srRedirectUrl || currentRedirectUrl })}
-                    disabled={updateWebhookM.isPending}
-                    data-testid="button-save-sr-webhook"
-                  >
-                    {webhookSaved ? <><Check className="h-3.5 w-3.5" /> Sauvegardé</> : updateWebhookM.isPending ? "Sauvegarde..." : "Sauvegarder"}
+            {/* SR Keys section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-green-300/50">{srKeys.length}/3 clé{srKeys.length > 1 ? "s" : ""} SR</p>
+                {srKeys.length < 3 && (
+                  <Button size="sm" className="bg-green-600 hover:bg-green-500 text-white font-bold gap-2 flex-shrink-0" onClick={() => setCreateSrOpen(true)} data-testid="button-create-sr-key">
+                    <Plus className="h-3.5 w-3.5" /> {srKeys.length === 0 ? "Créer ma clé SR" : "Ajouter une clé SR"}
                   </Button>
-                </div>
+                )}
               </div>
-            )}
+
+              {srKeys.length === 0 ? (
+                <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-4">
+                  <p className="text-sm font-semibold text-green-200">Aucune clé SR créée</p>
+                  <p className="text-xs text-green-300/50 mt-0.5">Jusqu'à 3 clés SR autorisées par compte.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {srKeys.map((srKey) => {
+                    const currentWebhookUrl = (srKey as any).webhookUrl || "";
+                    const currentRedirectUrl = (srKey as any).redirectUrl || "";
+                    const isVisible = visibleSrKeys[srKey.id] ?? false;
+                    return (
+                      <div key={srKey.id} className="space-y-2">
+                        <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-4 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-green-200">{srKey.name}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${srKey.isActive ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"}`}>
+                                {srKey.isActive ? "Active" : "Inactive"}
+                              </span>
+                              {currentWebhookUrl && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center gap-1"><Webhook className="h-2.5 w-2.5" />Webhook</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Switch checked={srKey.isActive} onCheckedChange={(checked) => toggleSrMutation.mutate({ id: srKey.id, isActive: checked })} data-testid={`switch-sr-key-${srKey.id}`} />
+                              <Button variant="outline" size="icon" className="h-8 w-8 border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => setDeleteSrId(srKey.id)} data-testid={`button-delete-sr-key-${srKey.id}`}><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0 bg-black/40 rounded-xl px-4 py-2.5 border border-green-500/20">
+                              <code className="text-xs font-mono truncate block text-green-300" data-testid={`text-sr-key-value-${srKey.id}`}>
+                                {isVisible ? ((srKey as any).fullKey || `${srKey.keyPrefix}...`) : `${srKey.keyPrefix}${"•".repeat(24)}`}
+                              </code>
+                            </div>
+                            <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0 border-green-500/30 text-green-400 hover:bg-green-500/10" onClick={() => setVisibleSrKeys(v => ({ ...v, [srKey.id]: !v[srKey.id] }))} data-testid={`button-toggle-sr-key-${srKey.id}`}>
+                              {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                            <Button variant="outline" size="icon" className="flex-shrink-0 border-green-500/30 text-green-400 hover:bg-green-500/10 h-8 w-8"
+                              onClick={() => { navigator.clipboard.writeText((srKey as any).fullKey || srKey.keyPrefix); toast({ title: "Clé SR copiée" }); }} data-testid={`button-copy-sr-key-${srKey.id}`}>
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-green-300/40">Créée le {formatDate(srKey.createdAt)} · Dernière utilisation : {formatDate(srKey.lastUsedAt)}</p>
+                        </div>
+
+                        {/* Webhook Config per key */}
+                        <div className="bg-black/30 border border-green-500/15 rounded-2xl p-4 space-y-3">
+                          <p className="text-xs font-bold text-green-300 flex items-center gap-1.5"><Webhook className="h-3.5 w-3.5" /> Webhook — {srKey.name}</p>
+                          <div className="space-y-2">
+                            <Label className="text-[11px] text-green-300/80 font-semibold">URL Webhook (notification de paiement)</Label>
+                            <p className="text-[10px] text-green-300/50">SolvexPay envoie un POST ici dès qu'un paiement est confirmé ou échoue.</p>
+                            <Input
+                              defaultValue={currentWebhookUrl}
+                              onChange={(e) => setSrWebhookUrls(v => ({ ...v, [srKey.id]: e.target.value }))}
+                              key={`wh-${srKey.id}`}
+                              placeholder="https://monsite.com/api/webhook/solvexpay"
+                              className="h-8 text-xs bg-black/40 border-green-500/20 text-green-200 placeholder:text-green-300/30"
+                              data-testid={`input-sr-webhook-url-${srKey.id}`}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[11px] text-green-300/80 font-semibold flex items-center gap-1.5">
+                              URL de redirection
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[9px] font-bold uppercase tracking-wide">Requis pour Wave</span>
+                            </Label>
+                            <p className="text-[10px] text-green-300/50">Wave redirige le client vers cette URL après paiement. Obligatoire si vous utilisez l'opérateur <strong className="text-amber-400">wave</strong>.</p>
+                            <Input
+                              defaultValue={currentRedirectUrl}
+                              onChange={(e) => setSrRedirectUrls(v => ({ ...v, [srKey.id]: e.target.value }))}
+                              key={`rd-${srKey.id}`}
+                              placeholder="https://monsite.com"
+                              className={`h-8 text-xs bg-black/40 text-green-200 placeholder:text-green-300/30 ${!currentRedirectUrl ? "border-amber-500/40 focus:border-amber-500/60" : "border-green-500/20"}`}
+                              data-testid={`input-sr-redirect-url-${srKey.id}`}
+                            />
+                            {!currentRedirectUrl && (
+                              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                                <AlertCircle className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                                <p className="text-[10px] text-amber-300/80">Non configurée — les paiements Wave échoueront avec l'erreur <code className="bg-black/40 px-1 rounded">MISSING_REDIRECT_URL</code></p>
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            className="h-8 text-xs font-bold gap-1.5 bg-green-700 hover:bg-green-600 text-white border-0"
+                            onClick={() => updateWebhookM.mutate({ id: srKey.id, webhookUrl: srWebhookUrls[srKey.id] ?? currentWebhookUrl, redirectUrl: srRedirectUrls[srKey.id] ?? currentRedirectUrl })}
+                            disabled={updateWebhookM.isPending}
+                            data-testid={`button-save-sr-webhook-${srKey.id}`}
+                          >
+                            {webhookSavedId === srKey.id ? <><Check className="h-3.5 w-3.5" /> Sauvegardé</> : updateWebhookM.isPending ? "Sauvegarde..." : "Sauvegarder"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
