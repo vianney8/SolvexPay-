@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Search, Activity, TrendingUp, CheckCircle2, Clock, X, ExternalLink, User, Mail, Phone, Globe, Zap, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Search, Activity, TrendingUp, CheckCircle2, Clock, X, ExternalLink, User, Mail, Phone, Globe, Zap, AlertTriangle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Transaction } from "@shared/schema";
 
@@ -204,7 +204,7 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
   );
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 100;
 
 export default function TransactionsPage() {
   const { user } = useAuth();
@@ -215,10 +215,13 @@ export default function TransactionsPage() {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: transactions, isLoading } = useQuery<Transaction[]>({
+  const { data: transactions, isLoading, isFetching } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 0,
+    gcTime: 5 * 60 * 1000,
+    refetchInterval: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // Reset to page 1 whenever filters change
@@ -277,8 +280,20 @@ export default function TransactionsPage() {
                 <Activity className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="font-bold text-base">Historique des transactions</p>
-                <p className="text-white/70 text-xs">Toutes vos opérations financières</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-base">Historique des transactions</p>
+                  {!isLoading && (
+                    <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white/90">
+                      {isFetching ? (
+                        <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                      ) : (
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                      )}
+                      En direct
+                    </span>
+                  )}
+                </div>
+                <p className="text-white/70 text-xs">Toutes vos opérations financières · actualisation auto 30s</p>
               </div>
             </div>
             <div className="text-right flex-shrink-0 min-w-0">
