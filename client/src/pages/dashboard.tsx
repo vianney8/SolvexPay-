@@ -78,8 +78,11 @@ export default function DashboardPage() {
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"], staleTime: 30000 });
   const { data: recentTransactions, isLoading: recentLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions/recent"],
-    staleTime: 30000,
+    staleTime: 0,
     gcTime: 60000,
+    refetchInterval: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
   const { data: activeNotifications } = useQuery<any[]>({ queryKey: ["/api/notifications"] });
   const { data: stats } = useQuery<{
@@ -100,7 +103,7 @@ export default function DashboardPage() {
     pendingTotal: number;
     topLinks: Array<{ id: string; name: string; count: number; totalAmount: number }>;
     topCountries: Array<{ country: string; count: number; totalAmount: number }>;
-  }>({ queryKey: ["/api/dashboard-stats"], staleTime: 2 * 60 * 1000 });
+  }>({ queryKey: ["/api/dashboard-stats"], staleTime: 0, refetchInterval: 30_000, refetchOnMount: true, refetchOnWindowFocus: true });
 
   const isUserBlocked = !!(user as any)?.isBlocked;
   const firstName = isUserBlocked ? "Utilisateur SolvexPay" : (user?.firstName || user?.email?.split("@")[0] || "là");
