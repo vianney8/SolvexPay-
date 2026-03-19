@@ -4,16 +4,42 @@ import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const DEFAULT_SETTINGS: Record<string, string> = {
-  fee_deposit: "7",
-  fee_withdrawal: "7",
-  fee_api: "7",
+  // ── Frais globaux ──
+  fee_deposit: "6",
+  fee_withdrawal: "5",
+  fee_transfer: "6",
+  fee_api: "6",
+
+  // ── Taux OmniPay ──
   omnipay_rate_deposit: "3",
   omnipay_rate_withdrawal: "3",
-  support_link_whatsapp_direct: "https://wa.me/22891840498",
-  support_link_whatsapp_group: "https://chat.whatsapp.com/FeGmjzHa1VG7v4VGo0Rxbd",
+
+  // ── Mode de retrait ──
+  withdrawalMode: "auto",
+
+  // ── Liens de support — URLs ──
+  support_link_whatsapp_direct: "https://wa.me/+22964440084",
+  support_link_whatsapp_group: "https://chat.whatsapp.com/BU8fF9ys87eD3BfrnfPUDz",
   support_link_email: "mailto:support@solvexpay.com",
-  support_link_whatsapp_channel: "https://whatsapp.com/channel/0029Vb3WFkb2ZjCZTb0Dq11F",
-  support_link_facebook: "https://www.facebook.com/profile.php?id=61574706268491",
+  support_link_whatsapp_channel: "https://whatsapp.com/channel/0029VbBDhXf0LKZ6KPgmfw04",
+  support_link_facebook: "https://www.facebook.com/profile.php?id=61586343275256",
+
+  // ── Liens de support — Noms affichés ──
+  support_link_whatsapp_direct_label: "Telegram Support",
+  support_link_whatsapp_group_label: "Groupe Télégramme",
+  support_link_email_label: "Email Support",
+  support_link_whatsapp_channel_label: "Canal WhatsApp",
+  support_link_facebook_label: "Page Facebook",
+
+  // ── Liens de support — Visibilité (1 = visible, 0 = masqué) ──
+  support_link_whatsapp_direct_visible: "1",
+  support_link_whatsapp_group_visible: "0",
+  support_link_email_visible: "1",
+  support_link_whatsapp_channel_visible: "1",
+  support_link_facebook_visible: "1",
+
+  // ── Pays suspendus ──
+  suspended_countries: "[]",
 };
 
 export async function seedDefaults() {
