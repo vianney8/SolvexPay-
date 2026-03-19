@@ -546,8 +546,11 @@ export async function registerRoutes(
         .from(txTable)
         .where(and(eq(txTable.userId, userId), eq(txTable.status, "pending")));
 
+      const netAmountExpr = sql<string>`SUM(CAST(${txTable.amount} AS NUMERIC) - COALESCE(CAST(${txTable.fees} AS NUMERIC), 0))`;
+      const netAmountOrder = sql`SUM(CAST(${txTable.amount} AS NUMERIC) - COALESCE(CAST(${txTable.fees} AS NUMERIC), 0))`;
+
       const linkRows = await db
-        .select({ cnt: count(), total: sum(txTable.amount), id: txTable.paymentLinkId })
+        .select({ cnt: count(), total: netAmountExpr, id: txTable.paymentLinkId })
         .from(txTable)
         .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed"), isNotNull(txTable.paymentLinkId)))
         .groupBy(txTable.paymentLinkId)
@@ -562,11 +565,11 @@ export async function registerRoutes(
       );
 
       const countryRows = await db
-        .select({ country: txTable.payerCountry, total: sum(txTable.amount), cnt: count() })
+        .select({ country: txTable.payerCountry, total: netAmountExpr, cnt: count() })
         .from(txTable)
         .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed"), isNotNull(txTable.payerCountry)))
         .groupBy(txTable.payerCountry)
-        .orderBy(desc(sum(txTable.amount)))
+        .orderBy(desc(netAmountOrder))
         .limit(3);
 
       const topCountries = countryRows.map((r) => ({
