@@ -486,6 +486,117 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/dashboard-stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { db } = await import("./db");
+      const { transactions: txTable, paymentLinks: plTable } = await import("@shared/schema");
+      const { eq, and, gte, lt, sum, count, desc, isNotNull } = await import("drizzle-orm");
+
+      const now = new Date();
+      const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const [thisMonthRow] = await db
+        .select({ total: sum(txTable.amount) })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed"), gte(txTable.createdAt, startOfThisMonth)));
+
+      const [lastMonthRow] = await db
+        .select({ total: sum(txTable.amount) })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed"), gte(txTable.createdAt, startOfLastMonth), lt(txTable.createdAt, endOfLastMonth)));
+
+      const [thisMonthWRow] = await db
+        .select({ total: sum(txTable.amount) })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.type, "withdrawal"), eq(txTable.status, "completed"), gte(txTable.createdAt, startOfThisMonth)));
+
+      const [avgRow] = await db
+        .select({ total: sum(txTable.amount), cnt: count() })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed")));
+
+      const [successRow] = await db
+        .select({ cnt: count() })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.status, "completed")));
+
+      const [totalRow] = await db
+        .select({ cnt: count() })
+        .from(txTable)
+        .where(eq(txTable.userId, userId));
+
+      const [depositCountRow] = await db
+        .select({ cnt: count(), total: sum(txTable.amount) })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed")));
+
+      const [withdrawalCountRow] = await db
+        .select({ cnt: count(), total: sum(txTable.amount) })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.type, "withdrawal"), eq(txTable.status, "completed")));
+
+      const [pendingCountRow] = await db
+        .select({ cnt: count(), total: sum(txTable.amount) })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.status, "pending")));
+
+      const linkRows = await db
+        .select({ cnt: count(), total: sum(txTable.amount), id: txTable.paymentLinkId })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed"), isNotNull(txTable.paymentLinkId)))
+        .groupBy(txTable.paymentLinkId)
+        .orderBy(desc(count()))
+        .limit(3);
+
+      const topLinks = await Promise.all(
+        linkRows.map(async (row) => {
+          const [link] = await db.select({ name: plTable.name }).from(plTable).where(eq(plTable.id, row.id!));
+          return { id: row.id, name: link?.name || "Lien supprimé", count: Number(row.cnt), totalAmount: parseFloat(row.total || "0") };
+        })
+      );
+
+      const countryRows = await db
+        .select({ country: txTable.payerCountry, total: sum(txTable.amount), cnt: count() })
+        .from(txTable)
+        .where(and(eq(txTable.userId, userId), eq(txTable.type, "deposit"), eq(txTable.status, "completed"), isNotNull(txTable.payerCountry)))
+        .groupBy(txTable.payerCountry)
+        .orderBy(desc(sum(txTable.amount)))
+        .limit(3);
+
+      const topCountries = countryRows.map((r) => ({
+        country: r.country!,
+        count: Number(r.cnt),
+        totalAmount: parseFloat(r.total || "0"),
+      }));
+
+      const avgTotal = parseFloat(avgRow?.total || "0");
+      const avgCnt = Number(avgRow?.cnt || 0);
+
+      res.json({
+        thisMonthDeposits: parseFloat(thisMonthRow?.total || "0"),
+        lastMonthDeposits: parseFloat(lastMonthRow?.total || "0"),
+        thisMonthWithdrawals: parseFloat(thisMonthWRow?.total || "0"),
+        avgTicket: avgCnt > 0 ? Math.round(avgTotal / avgCnt) : 0,
+        successRate: Number(totalRow?.cnt) > 0 ? Math.round((Number(successRow?.cnt) / Number(totalRow?.cnt)) * 100) : 0,
+        totalTransactions: Number(totalRow?.cnt),
+        depositCount: Number(depositCountRow?.cnt ?? 0),
+        depositTotal: parseFloat(depositCountRow?.total || "0"),
+        withdrawalCount: Number(withdrawalCountRow?.cnt ?? 0),
+        withdrawalTotal: parseFloat(withdrawalCountRow?.total || "0"),
+        pendingCount: Number(pendingCountRow?.cnt ?? 0),
+        pendingTotal: parseFloat(pendingCountRow?.total || "0"),
+        topLinks,
+        topCountries,
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
   // Per-user transaction cache (TTL: 30s)
   const userTxCache = new Map<string, { data: any; ts: number }>();
   const TX_CACHE_TTL = 30_000;
@@ -1492,6 +1603,7 @@ export async function registerRoutes(
         payerEmail: customerEmail || undefined,
         payerCountry: country,
         payerOperator: operator,
+        paymentLinkId: paymentLink.id,
       } as any);
 
       await storage.incrementPaymentLinkUsage(paymentLink.id);

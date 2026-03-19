@@ -22,6 +22,7 @@ export const transactions = pgTable("transactions", {
   payerCountry: text("payer_country"),
   payerOperator: text("payer_operator"),
   apiKeyId: varchar("api_key_id"),
+  paymentLinkId: varchar("payment_link_id"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_transactions_user").on(table.userId),

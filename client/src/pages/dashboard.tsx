@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import type { Transaction, Wallet as WalletType, PaymentLink } from "@shared/schema";
+import type { Transaction, Wallet as WalletType } from "@shared/schema";
 
 function formatCurrency(amount: string | number) {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -76,23 +76,31 @@ export default function DashboardPage() {
   const [dismissedNotifs, setDismissedNotifs] = useState<string[]>([]);
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"], staleTime: 30000 });
-  // Recent transactions: lightweight endpoint (only 5 rows) — renders instantly
   const { data: recentTransactions, isLoading: recentLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions/recent"],
     staleTime: 30000,
     gcTime: 60000,
   });
-  // Full transaction history loaded in background for stats (5 min cache)
-  const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({
-    queryKey: ["/api/transactions"],
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
   const { data: activeNotifications } = useQuery<any[]>({ queryKey: ["/api/notifications"] });
   const { data: stats } = useQuery<{
     totalDeposits: number; totalWithdrawals: number; transactionCount: number; paymentLinksCount: number;
   }>({ queryKey: ["/api/stats"] });
-  const { data: paymentLinks } = useQuery<PaymentLink[]>({ queryKey: ["/api/payment-links"] });
+  const { data: dashStats } = useQuery<{
+    thisMonthDeposits: number;
+    lastMonthDeposits: number;
+    thisMonthWithdrawals: number;
+    avgTicket: number;
+    successRate: number;
+    totalTransactions: number;
+    depositCount: number;
+    depositTotal: number;
+    withdrawalCount: number;
+    withdrawalTotal: number;
+    pendingCount: number;
+    pendingTotal: number;
+    topLinks: Array<{ id: string; name: string; count: number; totalAmount: number }>;
+    topCountries: Array<{ country: string; count: number; totalAmount: number }>;
+  }>({ queryKey: ["/api/dashboard-stats"], staleTime: 2 * 60 * 1000 });
 
   const isUserBlocked = !!(user as any)?.isBlocked;
   const firstName = isUserBlocked ? "Utilisateur SolvexPay" : (user?.firstName || user?.email?.split("@")[0] || "là");
@@ -103,46 +111,16 @@ export default function DashboardPage() {
     setDismissedNotifs(prev => [...prev, id]);
   }
 
-  const depositTx = transactions?.filter(t => t.type === "deposit" && t.status === "completed") || [];
-  const withdrawalTx = transactions?.filter(t => t.type === "withdrawal" && t.status === "completed") || [];
-  const pendingTx = transactions?.filter(t => t.status === "pending") || [];
-
-  const now = new Date();
-  const curMonth = now.getMonth();
-  const curYear = now.getFullYear();
-  const prevMonth = curMonth === 0 ? 11 : curMonth - 1;
-  const prevMonthYear = curMonth === 0 ? curYear - 1 : curYear;
-
-  const completedDeposits = transactions?.filter(t => t.type === "deposit" && t.status === "completed") || [];
-  const thisMonthReceived = completedDeposits
-    .filter(t => { const d = new Date(t.createdAt!); return d.getMonth() === curMonth && d.getFullYear() === curYear; })
-    .reduce((s, t) => s + parseFloat(t.amount), 0);
-  const lastMonthReceived = completedDeposits
-    .filter(t => { const d = new Date(t.createdAt!); return d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear; })
-    .reduce((s, t) => s + parseFloat(t.amount), 0);
-
-  const thisMonthTx = transactions?.filter(t => { const d = new Date(t.createdAt!); return d.getMonth() === curMonth && d.getFullYear() === curYear; }) || [];
-  const thisMonthWithdrawals = thisMonthTx.filter(t => t.type === "withdrawal" || t.type === "transfer").reduce((s, t) => s + parseFloat(t.amount), 0);
-  const avgTicket = completedDeposits.length > 0 ? Math.round(completedDeposits.reduce((s, t) => s + parseFloat(t.amount), 0) / completedDeposits.length) : 0;
+  const thisMonthReceived = dashStats?.thisMonthDeposits ?? 0;
+  const lastMonthReceived = dashStats?.lastMonthDeposits ?? 0;
+  const thisMonthWithdrawals = dashStats?.thisMonthWithdrawals ?? 0;
+  const avgTicket = dashStats?.avgTicket ?? 0;
   const growthPct = lastMonthReceived > 0 ? Math.round(((thisMonthReceived - lastMonthReceived) / lastMonthReceived) * 100) : null;
 
-  const countryStats = completedDeposits.reduce((acc, t) => {
-    const country = (t as any).payerCountry as string | null;
-    if (!country) return acc;
-    if (!acc[country]) acc[country] = { amount: 0, count: 0 };
-    acc[country].amount += parseFloat(t.amount);
-    acc[country].count += 1;
-    return acc;
-  }, {} as Record<string, { amount: number; count: number }>);
-  const topCountries = Object.entries(countryStats)
-    .sort(([, a], [, b]) => b.amount - a.amount)
-    .slice(0, 3);
-  const maxCountryAmount = topCountries[0]?.[1]?.amount || 1;
+  const topCountries = (dashStats?.topCountries || []).map(c => [c.country, { amount: c.totalAmount, count: c.count }] as [string, { amount: number; count: number }]);
+  const maxCountryAmount = (dashStats?.topCountries?.[0]?.totalAmount) || 1;
 
-  const topLinks = [...(paymentLinks || [])]
-    .filter(l => parseFloat(String(l.timesUsed)) > 0)
-    .sort((a, b) => parseFloat(String(b.timesUsed)) - parseFloat(String(a.timesUsed)))
-    .slice(0, 3);
+  const topLinks = dashStats?.topLinks || [];
 
   return (
     <DashboardLayout title="" breadcrumbs={[]}>
@@ -358,12 +336,13 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Dépôts", count: depositTx.length, amount: depositTx.reduce((s, t) => s + parseFloat(t.amount), 0), color: "from-emerald-500/20 to-teal-500/10", icon: ArrowDownLeft, iconColor: "text-emerald-600 dark:text-emerald-400", barColor: "bg-gradient-to-r from-emerald-500 to-teal-500" },
-                { label: "Retraits", count: withdrawalTx.length, amount: withdrawalTx.reduce((s, t) => s + parseFloat(t.amount), 0), color: "from-orange-500/20 to-red-500/10", icon: ArrowUpRight, iconColor: "text-orange-600 dark:text-orange-400", barColor: "bg-gradient-to-r from-orange-500 to-red-500" },
-                { label: "En attente", count: pendingTx.length, amount: pendingTx.reduce((s, t) => s + parseFloat(t.amount), 0), color: "from-amber-500/20 to-yellow-500/10", icon: Clock, iconColor: "text-amber-600", barColor: "bg-gradient-to-r from-amber-500 to-yellow-500" },
+                { label: "Dépôts", count: dashStats?.depositCount ?? 0, amount: dashStats?.depositTotal ?? 0, color: "from-emerald-500/20 to-teal-500/10", icon: ArrowDownLeft, iconColor: "text-emerald-600 dark:text-emerald-400", barColor: "bg-gradient-to-r from-emerald-500 to-teal-500" },
+                { label: "Retraits", count: dashStats?.withdrawalCount ?? 0, amount: dashStats?.withdrawalTotal ?? 0, color: "from-orange-500/20 to-red-500/10", icon: ArrowUpRight, iconColor: "text-orange-600 dark:text-orange-400", barColor: "bg-gradient-to-r from-orange-500 to-red-500" },
+                { label: "En attente", count: dashStats?.pendingCount ?? 0, amount: dashStats?.pendingTotal ?? 0, color: "from-amber-500/20 to-yellow-500/10", icon: Clock, iconColor: "text-amber-600", barColor: "bg-gradient-to-r from-amber-500 to-yellow-500" },
               ].map((item) => {
                 const Icon = item.icon;
-                const pct = transactions && transactions.length > 0 ? (item.count / transactions.length) * 100 : 0;
+                const total = dashStats?.totalTransactions || 1;
+                const pct = (item.count / total) * 100;
                 return (
                   <Card key={item.label} className="border-border/60 overflow-hidden">
                     <div className={`h-1 bg-gradient-to-r ${item.color}`} />
@@ -415,8 +394,8 @@ export default function DashboardPage() {
 
                 <div className="space-y-2.5">
                   {[
-                    { label: "Taux de succès", value: transactions && transactions.length > 0 ? Math.round((transactions.filter(t => t.status === "completed").length / transactions.length) * 100) : 0, suffix: "%" },
-                    { label: "Total transactions", value: transactions?.length || 0, suffix: "" },
+                    { label: "Taux de succès", value: dashStats?.successRate ?? 0, suffix: "%" },
+                    { label: "Total transactions", value: dashStats?.totalTransactions ?? 0, suffix: "" },
                     { label: "Liens actifs", value: stats?.paymentLinksCount || 0, suffix: "" },
                   ].map((item) => (
                     <div key={item.label} className="flex items-center justify-between">
@@ -544,7 +523,7 @@ export default function DashboardPage() {
               {topLinks.length === 0 ? (
                 <div className="py-6 text-center">
                   <Link2 className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground">Aucun lien utilisé pour l'instant</p>
+                  <p className="text-xs text-muted-foreground">Aucun paiement complété via lien</p>
                   <Link href="/payment-links">
                     <Button size="sm" variant="outline" className="mt-3 text-xs gap-1.5">
                       <Plus className="h-3 w-3" /> Créer un lien
@@ -554,11 +533,9 @@ export default function DashboardPage() {
               ) : (
                 <div className="space-y-3">
                   {topLinks.map((link, idx) => {
-                    const uses = parseFloat(String(link.timesUsed));
-                    const estimated = uses * parseFloat(String(link.amount));
                     const medals = ["🥇", "🥈", "🥉"];
-                    const maxUses = parseFloat(String(topLinks[0].timesUsed)) || 1;
-                    const pct = Math.round((uses / maxUses) * 100);
+                    const maxCount = topLinks[0].count || 1;
+                    const pct = Math.round((link.count / maxCount) * 100);
                     return (
                       <div key={link.id} className="space-y-1.5" data-testid={`link-stat-${link.id}`}>
                         <div className="flex items-center justify-between gap-2">
@@ -566,11 +543,11 @@ export default function DashboardPage() {
                             <span className="text-base flex-shrink-0">{medals[idx]}</span>
                             <div className="min-w-0">
                               <p className="text-sm font-semibold truncate">{link.name}</p>
-                              <p className="text-xs text-muted-foreground">{uses} utilisation{uses > 1 ? "s" : ""} · {formatCurrency(link.amount)} XOF</p>
+                              <p className="text-xs text-muted-foreground">{link.count} paiement{link.count > 1 ? "s" : ""} complété{link.count > 1 ? "s" : ""}</p>
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className="text-sm font-black text-fuchsia-600 dark:text-fuchsia-400">{formatCurrency(estimated)} XOF</p>
+                            <p className="text-sm font-black text-fuchsia-600 dark:text-fuchsia-400">{formatCurrency(link.totalAmount)} XOF</p>
                             <Link href="/payment-links">
                               <span className="text-xs text-muted-foreground hover:text-primary flex items-center gap-0.5 justify-end cursor-pointer">
                                 <ExternalLink className="h-2.5 w-2.5" /> voir
