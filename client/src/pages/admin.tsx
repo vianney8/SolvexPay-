@@ -660,6 +660,16 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
+  const doSaveOtp = (pmCode: string, country: string, requiresOtp: boolean, defaultOtp: string) => {
+    const pm = (paymentMethods ?? []).find((p: any) => p.code === pmCode);
+    if (!pm) return;
+    const newOtpConfig = { ...(pm.otpConfig ?? {}) };
+    newOtpConfig[country] = { requiresOtp, defaultOtp: defaultOtp.trim() || null };
+    pmM.mutate({ code: pm.code, otpConfig: newOtpConfig });
+    setOtpConfirmDialog(null);
+    setOtpCodeEdit(prev => { const n = { ...prev }; delete n[`${pmCode}__${country}`]; return n; });
+  };
+
   const globalMaintM = useMutation({
     mutationFn: (inMaintenance: boolean) => apiRequest("POST", "/api/admin/payment-methods/global-maintenance", { inMaintenance }),
     onSuccess: (_, inMaintenance) => {
@@ -3270,20 +3280,6 @@ export default function AdminPage() {
               };
               const DEFAULT_COLOR = { bg: "from-slate-500 to-slate-400", border: "border-slate-300 dark:border-slate-600", badge: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300", text: "text-slate-900 dark:text-slate-100", dot: "bg-slate-500" };
 
-              const doSaveOtp = (pmCode: string, country: string, requiresOtp: boolean, defaultOtp: string) => {
-                const pm = (paymentMethods ?? []).find((p: any) => p.code === pmCode);
-                if (!pm) return;
-                const newOtpConfig = { ...(pm.otpConfig ?? {}) };
-                newOtpConfig[country] = { requiresOtp, defaultOtp: defaultOtp.trim() || null };
-                pmM.mutate({ code: pm.code, otpConfig: newOtpConfig }, {
-                  onSuccess: () => {
-                    const key = `${pmCode}__${country}`;
-                    setOtpCodeEdit(prev => { const n = { ...prev }; delete n[key]; return n; });
-                    queryClient.invalidateQueries({ queryKey: ["/api/payment-methods/public"] });
-                  }
-                });
-                setOtpConfirmDialog(null);
-              };
 
               const pmsWithCountries = (paymentMethods ?? []).filter((pm: any) => (pm.countries ?? []).some((c: string) => !suspendedCountryCodes.includes(c)));
               if (pmsWithCountries.length === 0) return null;
