@@ -326,6 +326,7 @@ export default function AdminPage() {
   const [pmCountryFeeEdit, setPmCountryFeeEdit] = useState<Record<string, { deposit: string; withdrawal: string; plink: string; api: string }>>({});
   const [expandedCountryFees, setExpandedCountryFees] = useState<Set<string>>(new Set());
   const [otpCodeEdit, setOtpCodeEdit] = useState<Record<string, string>>({});
+  const [otpConfirmDialog, setOtpConfirmDialog] = useState<{ pmCode: string; country: string; flag: string; countryName: string; requiresOtp: boolean; defaultOtp: string } | null>(null);
   const [omnipayRateEdit, setOmnipayRateEdit] = useState<{ deposit: string; withdrawal: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
@@ -3252,101 +3253,237 @@ export default function AdminPage() {
           <TabsContent value="settings" className="space-y-5 mt-5">
             <WithdrawalModeCard />
             {/* ── OTP CONFIG ── */}
-            <Card className="border-border/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-indigo-500" />
-                  Configuration OTP
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Activez ou désactivez l'OTP par opérateur et par pays. Si un code est renseigné, il sera envoyé en arrière-plan sans interaction de l'utilisateur. Les pays suspendus sont exclus.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {(() => {
-                  const OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
-                    Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
-                    Moov: { CI: { requiresOtp: true } },
-                  };
-                  const rows: Array<{ pmCode: string; country: string; flag: string; countryName: string; requiresOtp: boolean; defaultOtp: string }> = [];
-                  (paymentMethods ?? []).forEach((pm: any) => {
-                    (pm.countries ?? []).forEach((ctry: string) => {
-                      if (suspendedCountryCodes.includes(ctry)) return;
-                      const info = COUNTRIES.find(c => c.code === ctry);
-                      const saved = pm.otpConfig?.[ctry];
-                      const fallback = OTP_DEFAULTS[pm.code]?.[ctry];
-                      const requiresOtp = saved !== undefined ? saved.requiresOtp : (fallback?.requiresOtp ?? false);
-                      const defaultOtp = saved !== undefined ? (saved.defaultOtp ?? "") : (fallback?.defaultOtp ?? "");
-                      rows.push({ pmCode: pm.code, country: ctry, flag: info?.flag ?? "🌍", countryName: info?.name ?? ctry, requiresOtp, defaultOtp });
-                    });
-                  });
-                  if (rows.length === 0) return <p className="text-xs text-muted-foreground">Aucun moyen de paiement configuré.</p>;
+            {(() => {
+              const OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
+                Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
+                Moov: { CI: { requiresOtp: true } },
+              };
+              const PM_COLORS: Record<string, { bg: string; border: string; badge: string; text: string; dot: string }> = {
+                MTN:     { bg: "from-amber-500 to-yellow-400",  border: "border-amber-300 dark:border-amber-700",   badge: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200",   text: "text-amber-900 dark:text-amber-100", dot: "bg-amber-500" },
+                Orange:  { bg: "from-orange-500 to-orange-400", border: "border-orange-300 dark:border-orange-700", badge: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200", text: "text-orange-900 dark:text-orange-100", dot: "bg-orange-500" },
+                Moov:    { bg: "from-blue-600 to-blue-400",     border: "border-blue-300 dark:border-blue-700",     badge: "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200",       text: "text-blue-900 dark:text-blue-100",   dot: "bg-blue-500" },
+                Wave:    { bg: "from-teal-500 to-cyan-400",     border: "border-teal-300 dark:border-teal-700",     badge: "bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-200",       text: "text-teal-900 dark:text-teal-100",   dot: "bg-teal-500" },
+                TMoney:  { bg: "from-violet-600 to-purple-400", border: "border-violet-300 dark:border-violet-700", badge: "bg-violet-100 dark:bg-violet-900/40 text-violet-800 dark:text-violet-200", text: "text-violet-900 dark:text-violet-100", dot: "bg-violet-500" },
+                Free:    { bg: "from-rose-500 to-pink-400",     border: "border-rose-300 dark:border-rose-700",     badge: "bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-200",       text: "text-rose-900 dark:text-rose-100",   dot: "bg-rose-500" },
+                Airtel:  { bg: "from-red-600 to-red-400",       border: "border-red-300 dark:border-red-700",       badge: "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200",           text: "text-red-900 dark:text-red-100",     dot: "bg-red-500" },
+                Vodacom: { bg: "from-red-700 to-red-500",       border: "border-red-400 dark:border-red-800",       badge: "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200",           text: "text-red-900 dark:text-red-100",     dot: "bg-red-600" },
+              };
+              const DEFAULT_COLOR = { bg: "from-slate-500 to-slate-400", border: "border-slate-300 dark:border-slate-600", badge: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300", text: "text-slate-900 dark:text-slate-100", dot: "bg-slate-500" };
 
-                  const saveOtp = (pmCode: string, country: string, requiresOtp: boolean, defaultOtp: string) => {
-                    const pm = (paymentMethods ?? []).find((p: any) => p.code === pmCode);
-                    if (!pm) return;
-                    const newOtpConfig = { ...(pm.otpConfig ?? {}) };
-                    newOtpConfig[country] = { requiresOtp, defaultOtp: defaultOtp.trim() || null };
-                    pmM.mutate({ code: pm.code, otpConfig: newOtpConfig });
-                  };
+              const doSaveOtp = (pmCode: string, country: string, requiresOtp: boolean, defaultOtp: string) => {
+                const pm = (paymentMethods ?? []).find((p: any) => p.code === pmCode);
+                if (!pm) return;
+                const newOtpConfig = { ...(pm.otpConfig ?? {}) };
+                newOtpConfig[country] = { requiresOtp, defaultOtp: defaultOtp.trim() || null };
+                pmM.mutate({ code: pm.code, otpConfig: newOtpConfig }, {
+                  onSuccess: () => {
+                    const key = `${pmCode}__${country}`;
+                    setOtpCodeEdit(prev => { const n = { ...prev }; delete n[key]; return n; });
+                    queryClient.invalidateQueries({ queryKey: ["/api/payment-methods/public"] });
+                  }
+                });
+                setOtpConfirmDialog(null);
+              };
 
-                  return (
-                    <div className="rounded-xl border border-border/50 divide-y divide-border/40 overflow-hidden">
-                      {rows.map(row => {
-                        const key = `${row.pmCode}__${row.country}`;
-                        const codeVal = otpCodeEdit[key] ?? row.defaultOtp;
-                        const codeChanged = codeVal !== row.defaultOtp;
-                        return (
-                          <div key={key} className="flex items-center gap-2 px-3 py-2.5 hover:bg-muted/20">
-                            <div className="flex-1 min-w-0">
-                              <span className="font-semibold text-xs">{row.pmCode}</span>
-                              <span className="text-xs text-muted-foreground ml-2">{row.flag} {row.countryName}</span>
+              const pmsWithCountries = (paymentMethods ?? []).filter((pm: any) => (pm.countries ?? []).some((c: string) => !suspendedCountryCodes.includes(c)));
+              if (pmsWithCountries.length === 0) return null;
+
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-indigo-500" />
+                    <h3 className="text-sm font-bold">Configuration OTP</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground -mt-1">
+                    Activez l'OTP par opérateur et par pays pour les dépôts, paiements par lien ou API.
+                    Si un code est renseigné, il est envoyé en arrière-plan à OmniPay sans interaction de l'utilisateur.
+                    Les pays suspendus sont exclus.
+                  </p>
+                  <div className="grid gap-3">
+                    {pmsWithCountries.map((pm: any) => {
+                      const col = PM_COLORS[pm.code] ?? DEFAULT_COLOR;
+                      const activeCountries = (pm.countries ?? []).filter((c: string) => !suspendedCountryCodes.includes(c));
+                      const otpActiveCount = activeCountries.filter((c: string) => {
+                        const saved = pm.otpConfig?.[c];
+                        const fallback = OTP_DEFAULTS[pm.code]?.[c];
+                        return saved !== undefined ? saved.requiresOtp : (fallback?.requiresOtp ?? false);
+                      }).length;
+
+                      return (
+                        <div key={pm.code} className={`rounded-2xl border ${col.border} overflow-hidden shadow-sm`}>
+                          {/* Header */}
+                          <div className={`bg-gradient-to-r ${col.bg} px-4 py-3 flex items-center justify-between`}>
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-8 w-8 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+                                <Smartphone className="h-4 w-4 text-white" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-sm text-white">{pm.name}</p>
+                                <p className="text-[10px] text-white/75">{activeCountries.length} pays disponibles</p>
+                              </div>
                             </div>
-                            <button
-                              type="button"
-                              disabled={pmM.isPending}
-                              onClick={() => saveOtp(row.pmCode, row.country, !row.requiresOtp, row.defaultOtp)}
-                              className={`flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors border ${row.requiresOtp ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-600"}`}
-                              data-testid={`otp-toggle-${key}`}
-                            >
-                              {row.requiresOtp ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                              {row.requiresOtp ? "OTP actif" : "Sans OTP"}
-                            </button>
-                            {row.requiresOtp && (
-                              <input
-                                type="text"
-                                value={codeVal}
-                                onChange={e => setOtpCodeEdit(prev => ({ ...prev, [key]: e.target.value }))}
-                                placeholder="Code auto"
-                                maxLength={8}
-                                className="w-20 flex-shrink-0 px-2 py-1 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                data-testid={`otp-code-${key}`}
-                              />
-                            )}
-                            <div className="w-7 flex-shrink-0 flex justify-end">
-                              {row.requiresOtp && codeChanged && (
-                                <button
-                                  type="button"
-                                  disabled={pmM.isPending}
-                                  onClick={() => {
-                                    saveOtp(row.pmCode, row.country, row.requiresOtp, codeVal);
-                                    setOtpCodeEdit(prev => { const n = { ...prev }; delete n[key]; return n; });
-                                  }}
-                                  className="h-6 w-6 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center"
-                                  data-testid={`otp-save-code-${key}`}
-                                >
-                                  {pmM.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-                                </button>
+                            <div className="flex items-center gap-2">
+                              {otpActiveCount > 0 ? (
+                                <span className="text-[10px] font-bold bg-white/25 text-white border border-white/30 px-2 py-0.5 rounded-full">
+                                  {otpActiveCount} OTP actif{otpActiveCount > 1 ? "s" : ""}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold bg-white/15 text-white/80 border border-white/20 px-2 py-0.5 rounded-full">
+                                  Aucun OTP
+                                </span>
                               )}
                             </div>
                           </div>
-                        );
-                      })}
+
+                          {/* Country rows */}
+                          <div className="bg-background divide-y divide-border/40">
+                            {activeCountries.map((ctry: string) => {
+                              const info = COUNTRIES.find(c => c.code === ctry);
+                              const saved = pm.otpConfig?.[ctry];
+                              const fallback = OTP_DEFAULTS[pm.code]?.[ctry];
+                              const requiresOtp = saved !== undefined ? saved.requiresOtp : (fallback?.requiresOtp ?? false);
+                              const currentDefaultOtp = saved !== undefined ? (saved.defaultOtp ?? "") : (fallback?.defaultOtp ?? "");
+                              const key = `${pm.code}__${ctry}`;
+                              const codeVal = otpCodeEdit[key] ?? currentDefaultOtp;
+                              const codeChanged = codeVal !== currentDefaultOtp;
+                              const flag = info?.flag ?? "🌍";
+                              const countryName = info?.name ?? ctry;
+
+                              return (
+                                <div key={ctry} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+                                  {/* Country info */}
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <span className="text-lg leading-none">{flag}</span>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-semibold truncate">{countryName}</p>
+                                      <p className="text-[10px] text-muted-foreground">{ctry}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Silent OTP code input (visible only if OTP active) */}
+                                  {requiresOtp && (
+                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          value={codeVal}
+                                          onChange={e => setOtpCodeEdit(prev => ({ ...prev, [key]: e.target.value }))}
+                                          placeholder="Code auto"
+                                          maxLength={8}
+                                          className="w-24 pl-2.5 pr-2 py-1.5 rounded-lg border border-border bg-muted/40 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 placeholder:text-muted-foreground/60 font-mono"
+                                          data-testid={`otp-code-${key}`}
+                                        />
+                                      </div>
+                                      {codeChanged && (
+                                        <button
+                                          type="button"
+                                          disabled={pmM.isPending}
+                                          onClick={() => setOtpConfirmDialog({ pmCode: pm.code, country: ctry, flag, countryName, requiresOtp: true, defaultOtp: codeVal })}
+                                          className="flex-shrink-0 h-7 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold flex items-center gap-1 transition-colors shadow-sm"
+                                          data-testid={`otp-save-code-${key}`}
+                                        >
+                                          <CheckCircle2 className="h-3 w-3" /> Sauver
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* OTP toggle */}
+                                  <button
+                                    type="button"
+                                    disabled={pmM.isPending}
+                                    onClick={() => setOtpConfirmDialog({ pmCode: pm.code, country: ctry, flag, countryName, requiresOtp: !requiresOtp, defaultOtp: requiresOtp ? currentDefaultOtp : codeVal })}
+                                    className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-sm ${
+                                      requiresOtp
+                                        ? "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-600 shadow-emerald-200 dark:shadow-emerald-900/30"
+                                        : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600"
+                                    }`}
+                                    data-testid={`otp-toggle-${key}`}
+                                  >
+                                    {requiresOtp ? <ShieldCheck className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                                    {requiresOtp ? "OTP actif" : "Sans OTP"}
+                                  </button>
+
+                                  {/* Silent indicator */}
+                                  {requiresOtp && currentDefaultOtp && (
+                                    <span className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700">
+                                      <Zap className="h-2.5 w-2.5" /> Silencieux
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── OTP CONFIRM DIALOG ── */}
+            <Dialog open={!!otpConfirmDialog} onOpenChange={(o) => { if (!o) setOtpConfirmDialog(null); }}>
+              <DialogContent className="max-w-sm rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-base">
+                    <ShieldCheck className="h-5 w-5 text-indigo-500" />
+                    Confirmer la modification OTP
+                  </DialogTitle>
+                  <DialogDescription className="text-sm">
+                    Voulez-vous appliquer ce changement ? Il sera effectif immédiatement sur le site.
+                  </DialogDescription>
+                </DialogHeader>
+                {otpConfirmDialog && (
+                  <div className="rounded-xl border border-border/60 bg-muted/40 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{otpConfirmDialog.flag}</span>
+                      <div>
+                        <p className="font-bold text-sm">{otpConfirmDialog.pmCode} — {otpConfirmDialog.countryName}</p>
+                        <p className="text-xs text-muted-foreground">{otpConfirmDialog.country}</p>
+                      </div>
                     </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-xs text-muted-foreground">OTP :</span>
+                      {otpConfirmDialog.requiresOtp ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                          <CheckCircle2 className="h-3 w-3" /> Activer
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600">
+                          <XCircle className="h-3 w-3" /> Désactiver
+                        </span>
+                      )}
+                    </div>
+                    {otpConfirmDialog.requiresOtp && otpConfirmDialog.defaultOtp.trim() && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Code auto :</span>
+                        <span className="font-mono font-bold text-sm text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/40 px-2 py-0.5 rounded-lg border border-violet-300 dark:border-violet-700">
+                          {otpConfirmDialog.defaultOtp}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">(envoyé en arrière-plan)</span>
+                      </div>
+                    )}
+                    {otpConfirmDialog.requiresOtp && !otpConfirmDialog.defaultOtp.trim() && (
+                      <p className="text-xs text-muted-foreground">L'utilisateur devra saisir son code OTP manuellement.</p>
+                    )}
+                  </div>
+                )}
+                <DialogFooter className="flex gap-2 mt-2">
+                  <Button variant="outline" onClick={() => setOtpConfirmDialog(null)} className="flex-1 rounded-xl">
+                    Annuler
+                  </Button>
+                  <Button
+                    disabled={pmM.isPending}
+                    onClick={() => otpConfirmDialog && doSaveOtp(otpConfirmDialog.pmCode, otpConfirmDialog.country, otpConfirmDialog.requiresOtp, otpConfirmDialog.defaultOtp)}
+                    className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    {pmM.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                    Confirmer
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Card className="border-border/50">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-bold flex items-center gap-2">
