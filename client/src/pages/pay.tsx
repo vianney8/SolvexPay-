@@ -90,6 +90,8 @@ export default function PayPage() {
       if (!res.ok) return [];
       return res.json();
     },
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
   });
 
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
@@ -135,6 +137,9 @@ export default function PayPage() {
       if (!res.ok) throw new Error("not found");
       return res.json();
     },
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
   });
 
   const redirectUrl = (paymentLink as any)?.redirectUrl as string | undefined;

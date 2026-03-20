@@ -1453,6 +1453,7 @@ export async function registerRoutes(
   // ── Pays suspendus (public) ──────────────────────────────────────────────
   app.get("/api/public/suspended-countries", async (req, res) => {
     try {
+      res.set("Cache-Control", "public, max-age=120");
       const raw = await storage.getSystemSetting("suspended_countries");
       const codes: string[] = raw ? JSON.parse(raw) : [];
       res.json({ codes });
@@ -1483,9 +1484,15 @@ export async function registerRoutes(
     }
   });
 
+  let paymentMethodsCache: { data: unknown[]; ts: number } | null = null;
+  const PM_CACHE_TTL = 5 * 60_000; // 5 minutes
+
   app.get("/api/payment-methods/public", async (req, res) => {
     try {
-      res.set("Cache-Control", "no-cache");
+      res.set("Cache-Control", "public, max-age=240");
+      if (paymentMethodsCache && Date.now() - paymentMethodsCache.ts < PM_CACHE_TTL) {
+        return res.json(paymentMethodsCache.data);
+      }
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const methods = await db.select().from(pmTable);
@@ -1501,8 +1508,10 @@ export async function registerRoutes(
           { code: "Vodacom", name: "Vodacom M-Pesa", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["COD"] },
         ];
         const inserted = await db.insert(pmTable).values(defaultMethods as any).returning();
+        paymentMethodsCache = { data: inserted, ts: Date.now() };
         return res.json(inserted);
       }
+      paymentMethodsCache = { data: methods, ts: Date.now() };
       res.json(methods);
     } catch (error) {
       console.error("Public payment methods error:", error);
@@ -1510,11 +1519,21 @@ export async function registerRoutes(
     }
   });
 
+  // Cache des liens publics : slug → {data, ts}
+  const publicLinkCache = new Map<string, { data: Record<string, unknown>; ts: number }>();
+  const PUBLIC_LINK_TTL = 30_000; // 30 secondes
+
   app.get("/api/payment-links/public/:slug", async (req, res) => {
     try {
       const { slug } = req.params as Record<string, string>;
+      res.set("Cache-Control", "public, max-age=20");
+
+      const cached = publicLinkCache.get(slug);
+      if (cached && Date.now() - cached.ts < PUBLIC_LINK_TTL) {
+        return res.json(cached.data);
+      }
+
       const paymentLink = await storage.getPaymentLinkBySlug(slug);
-      
       if (!paymentLink) {
         return res.status(404).json({ message: "Payment link not found" });
       }
@@ -1529,8 +1548,9 @@ export async function registerRoutes(
       }).from(usersTable).where(eqFn(usersTable.id, paymentLink.userId));
 
       const displayName = creator?.merchantName || (creator ? `${creator.firstName || ""} ${creator.lastName || ""}`.trim() : "") || "SolvexPay";
-
-      res.json({ ...paymentLink, merchantName: displayName });
+      const data = { ...paymentLink, merchantName: displayName } as Record<string, unknown>;
+      publicLinkCache.set(slug, { data, ts: Date.now() });
+      res.json(data);
     } catch (error) {
       console.error("Error fetching payment link:", error);
       res.status(500).json({ message: "Failed to fetch payment link" });
