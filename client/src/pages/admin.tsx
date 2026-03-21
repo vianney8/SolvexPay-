@@ -451,10 +451,12 @@ export default function AdminPage() {
   const { data: allPaymentLinks, isLoading: plLoading, isFetching: plFetching } = useQuery<any[]>({
     queryKey: ["/api/admin/payment-links"],
     staleTime: 10_000,
-    gcTime: 60_000,
+    gcTime: 5 * 60_000,
     refetchInterval: 15_000,
     refetchOnWindowFocus: true,
     placeholderData: keepPreviousData,
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/payment-links"]),
+    initialDataUpdatedAt: 0,
   });
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/api-keys"],
@@ -2081,7 +2083,9 @@ export default function AdminPage() {
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
                     <Link2 className="h-4 w-4 text-violet-500" />
                     Liens de paiement
-                    <Badge variant="secondary" className="text-xs">{(allPaymentLinks || []).length}</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {plLoading && !allPaymentLinks ? <Loader2 className="h-3 w-3 animate-spin" /> : (allPaymentLinks || []).length}
+                    </Badge>
                     {plFetching && !plLoading && (
                       <span className="flex items-center gap-1 text-[10px] font-normal text-violet-500">
                         <Loader2 className="h-3 w-3 animate-spin" />
