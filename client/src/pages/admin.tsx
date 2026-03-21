@@ -448,35 +448,14 @@ export default function AdminPage() {
     enabled: !!expandedUserId,
     queryFn: () => fetch(`/api/admin/users/${expandedUserId}/transactions`, { credentials: "include" }).then(r => r.json()),
   });
-  const { data: allPaymentLinks, isLoading: plLoading, isFetching: plFetching } = useQuery<any[]>({
+  const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/payment-links"],
-    staleTime: 10_000,
-    gcTime: 5 * 60_000,
-    refetchInterval: 15_000,
-    refetchOnWindowFocus: true,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    initialData: () => {
-      const fromCache = queryClient.getQueryData<any[]>(["/api/admin/payment-links"]);
-      if (fromCache) return fromCache;
-      try {
-        const raw = sessionStorage.getItem("adm_pl");
-        if (raw) return JSON.parse(raw) as any[];
-      } catch {}
-      return undefined;
-    },
-    initialDataUpdatedAt: () => {
-      const ts = sessionStorage.getItem("adm_pl_ts");
-      return ts ? parseInt(ts, 10) : 0;
-    },
+    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/payment-links"]),
   });
-  useEffect(() => {
-    if (allPaymentLinks && allPaymentLinks.length > 0) {
-      try {
-        sessionStorage.setItem("adm_pl", JSON.stringify(allPaymentLinks));
-        sessionStorage.setItem("adm_pl_ts", String(Date.now()));
-      } catch {}
-    }
-  }, [allPaymentLinks]);
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/api-keys"],
     staleTime: Infinity,
@@ -726,12 +705,9 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
-  const clearPlCache = () => { try { sessionStorage.removeItem("adm_pl"); sessionStorage.removeItem("adm_pl_ts"); } catch {} };
-
   const toggleLinkM = useMutation({
     mutationFn: (d: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/admin/payment-links/${d.id}/toggle`, { isActive: d.isActive }),
     onSuccess: () => {
-      clearPlCache();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
       setToggleConfirmDialog(null);
@@ -743,7 +719,6 @@ export default function AdminPage() {
   const hideLinksM = useMutation({
     mutationFn: (d: { id: string; hideLinks: boolean }) => apiRequest("PATCH", `/api/admin/payment-links/${d.id}/hide-links`, { hideLinks: d.hideLinks }),
     onSuccess: () => {
-      clearPlCache();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
       toast({ title: "Option mise à jour" });
@@ -879,9 +854,6 @@ export default function AdminPage() {
   );
   const linksTotalPages = Math.max(1, Math.ceil(filteredPaymentLinks.length / LINKS_PER_PAGE));
   const pagedPaymentLinks = filteredPaymentLinks.slice((linksPage - 1) * LINKS_PER_PAGE, linksPage * LINKS_PER_PAGE);
-  useEffect(() => {
-    if (!linksSearch) setLinksPage(1);
-  }, [(allPaymentLinks || []).length]);
   const filteredApiKeys = (allApiKeys || []).filter(k =>
     !k.isSrKey && (!apiKeysSearch || [k.name, k.keyPrefix, k.websiteUrl, k.user?.email, k.user?.firstName, k.user?.lastName].join(" ").toLowerCase().includes(apiKeysSearch.toLowerCase()))
   );
@@ -2106,15 +2078,7 @@ export default function AdminPage() {
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
                     <Link2 className="h-4 w-4 text-violet-500" />
                     Liens de paiement
-                    <Badge variant="secondary" className="text-xs">
-                      {plLoading && !allPaymentLinks ? <Loader2 className="h-3 w-3 animate-spin" /> : (allPaymentLinks || []).length}
-                    </Badge>
-                    {plFetching && !plLoading && (
-                      <span className="flex items-center gap-1 text-[10px] font-normal text-violet-500">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Actualisation…
-                      </span>
-                    )}
+                    <Badge variant="secondary" className="text-xs">{(allPaymentLinks || []).length}</Badge>
                   </CardTitle>
                   <div className="relative w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
