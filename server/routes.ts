@@ -2099,6 +2099,10 @@ export async function registerRoutes(
       if (opMaintenanceMsg) {
         return res.status(503).json({ error: { code: "OPERATOR_MAINTENANCE", message: opMaintenanceMsg, status: 503 } });
       }
+      const depMaintenanceMsg = await checkDepositMaintenance(operatorUpper, countryUpper);
+      if (depMaintenanceMsg) {
+        return res.status(503).json({ error: { code: "DEPOSIT_MAINTENANCE", message: depMaintenanceMsg, status: 503 } });
+      }
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });

@@ -127,7 +127,9 @@ export default function PayPage() {
     if (!pm) return { available: true, maintenance: false };
     const globalMaint = pm.inMaintenance === true;
     const countryMaint = (pm.maintenanceCountries || []).includes(country);
-    return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint };
+    const depositGlobalMaint = pm.depositMaintenance === true;
+    const depositCountryMaint = (pm.depositMaintenanceCountries || []).includes(country);
+    return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint || depositGlobalMaint || depositCountryMaint };
   }
 
   const { data: paymentLink, isLoading, error } = useQuery<PaymentLink>({
