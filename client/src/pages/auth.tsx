@@ -477,6 +477,10 @@ export function RegisterPage() {
       toast({ title: "Erreur", description: "Le mot de passe doit contenir au moins 6 caractères", variant: "destructive" });
       return;
     }
+    if (!formData.phone.trim()) {
+      toast({ title: "Erreur", description: "Le numéro de téléphone est obligatoire", variant: "destructive" });
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       toast({ title: "Erreur", description: "Les mots de passe ne correspondent pas", variant: "destructive" });
       return;
@@ -584,7 +588,7 @@ export function RegisterPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de Téléphone <span className="normal-case font-normal text-muted-foreground/70">(optionnel)</span></label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Numéro de Téléphone</label>
               <div className="flex gap-2">
                 <div className="relative">
                   <button
