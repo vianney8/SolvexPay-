@@ -8,18 +8,18 @@ import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone, ArrowRight, ChevronDown,
 import { OperatorLogo } from "@/components/operator-logo";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 import { apiRequest } from "@/lib/queryClient";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
-const countryCodes = [
-  { code: "+229", country: "Bénin", flag: "🇧🇯" },
-  { code: "+225", country: "Côte d'Ivoire", flag: "🇨🇮" },
-  { code: "+226", country: "Burkina Faso", flag: "🇧🇫" },
-  { code: "+228", country: "Togo", flag: "🇹🇬" },
-  { code: "+221", country: "Sénégal", flag: "🇸🇳" },
-  { code: "+223", country: "Mali", flag: "🇲🇱" },
-  { code: "+237", country: "Cameroun", flag: "🇨🇲" },
-  { code: "+243", country: "RD Congo", flag: "🇨🇩" },
-  { code: "+242", country: "Congo-Brazza.", flag: "🇨🇬" },
+const ALL_COUNTRY_CODES = [
+  { code: "+229", iso: "BJ",  country: "Bénin",          flag: "🇧🇯" },
+  { code: "+225", iso: "CI",  country: "Côte d'Ivoire",  flag: "🇨🇮" },
+  { code: "+226", iso: "BF",  country: "Burkina Faso",   flag: "🇧🇫" },
+  { code: "+228", iso: "TG",  country: "Togo",           flag: "🇹🇬" },
+  { code: "+221", iso: "SN",  country: "Sénégal",        flag: "🇸🇳" },
+  { code: "+223", iso: "ML",  country: "Mali",           flag: "🇲🇱" },
+  { code: "+237", iso: "CM",  country: "Cameroun",       flag: "🇨🇲" },
+  { code: "+243", iso: "COD", country: "RD Congo",       flag: "🇨🇩" },
+  { code: "+242", iso: "COG", country: "Congo-Brazza.",  flag: "🇨🇬" },
 ];
 
 const operators = ["MTN", "Orange", "Wave", "Moov", "TMoney", "Airtel", "Vodacom", "Free"];
