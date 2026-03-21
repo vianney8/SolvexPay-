@@ -651,7 +651,7 @@ export default function AdminPage() {
   });
 
   const pmM = useMutation({
-    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[]; withdrawalMaintenance?: boolean; withdrawalMaintenanceCountries?: string[]; feeDeposit?: string | null; feeWithdrawal?: string | null; feePLink?: string | null; feeApi?: string | null; countryFees?: Record<string, any>; otpConfig?: Record<string, any> }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
+    mutationFn: (d: { code: string; isActive?: boolean; inMaintenance?: boolean; maintenanceCountries?: string[]; depositMaintenance?: boolean; depositMaintenanceCountries?: string[]; withdrawalMaintenance?: boolean; withdrawalMaintenanceCountries?: string[]; feeDeposit?: string | null; feeWithdrawal?: string | null; feePLink?: string | null; feeApi?: string | null; countryFees?: Record<string, any>; otpConfig?: Record<string, any> }) => apiRequest("PATCH", `/api/admin/payment-methods/${d.code}`, d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payment-methods/public"] });
@@ -2519,18 +2519,26 @@ export default function AdminPage() {
               <div className="space-y-3">
                 {(paymentMethods || []).map((pm: any) => {
                   const maintCountries: string[] = pm.maintenanceCountries || [];
+                  const dmCountries: string[] = pm.depositMaintenanceCountries || [];
                   const wmCountries: string[] = pm.withdrawalMaintenanceCountries || [];
                   const pmCountries: string[] = pm.countries || [];
                   const hasMaint = pm.inMaintenance || maintCountries.length > 0;
+                  const hasDepositMaint = pm.depositMaintenance || dmCountries.length > 0;
                   const hasWithdrawalMaint = pm.withdrawalMaintenance || wmCountries.length > 0;
                   const statusBand = pm.inMaintenance ? "bg-amber-500" : !pm.isActive ? "bg-red-500" : hasMaint ? "bg-amber-400" : "bg-emerald-500";
 
                   function toggleCountryMaint(countryCode: string) {
-                    const current = maintCountries;
-                    const updated = current.includes(countryCode)
-                      ? current.filter((c: string) => c !== countryCode)
-                      : [...current, countryCode];
+                    const updated = maintCountries.includes(countryCode)
+                      ? maintCountries.filter((c: string) => c !== countryCode)
+                      : [...maintCountries, countryCode];
                     pmM.mutate({ code: pm.code, maintenanceCountries: updated });
+                  }
+
+                  function toggleDepositCountryMaint(countryCode: string) {
+                    const updated = dmCountries.includes(countryCode)
+                      ? dmCountries.filter((c: string) => c !== countryCode)
+                      : [...dmCountries, countryCode];
+                    pmM.mutate({ code: pm.code, depositMaintenanceCountries: updated });
                   }
 
                   function toggleWithdrawalCountryMaint(countryCode: string) {
@@ -2593,6 +2601,46 @@ export default function AdminPage() {
                                         <span>{cInfo?.flag || "🌍"}</span>
                                         <span>{cc}</span>
                                         {isMaint && <ZapOff className="h-2.5 w-2.5 ml-auto" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Deposit maintenance */}
+                            <div className="border border-sky-500/30 rounded-xl overflow-hidden mt-2">
+                              <div className="bg-sky-500/10 px-3 py-1.5 flex items-center justify-between">
+                                <p className="text-xs font-bold text-sky-700 dark:text-sky-400 flex items-center gap-1.5">
+                                  <ZapOff className="h-3 w-3" />Maintenance dépôts
+                                  {hasDepositMaint && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-600 text-[10px]">Actif</span>}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={pm.depositMaintenance}
+                                    onCheckedChange={(v) => pmM.mutate({ code: pm.code, depositMaintenance: v })}
+                                    disabled={pmM.isPending}
+                                    data-testid={`switch-deposit-maint-${pm.code}`}
+                                  />
+                                  <span className="text-xs text-muted-foreground">{pm.depositMaintenance ? "Tous les pays" : "Sélectif"}</span>
+                                </div>
+                              </div>
+                              {!pm.depositMaintenance && (
+                                <div className="p-2 grid grid-cols-3 gap-1.5">
+                                  {pmCountries.map((cc: string) => {
+                                    const cInfo = COUNTRIES.find(c => c.code === cc);
+                                    const isDMaint = dmCountries.includes(cc);
+                                    return (
+                                      <button
+                                        key={cc}
+                                        onClick={() => toggleDepositCountryMaint(cc)}
+                                        disabled={pmM.isPending}
+                                        className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${isDMaint ? "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400" : "border-border/40 bg-muted/20 text-muted-foreground hover:bg-muted/40"}`}
+                                        data-testid={`btn-deposit-maint-${pm.code}-${cc}`}
+                                      >
+                                        <span>{cInfo?.flag || "🌍"}</span>
+                                        <span>{cc}</span>
+                                        {isDMaint && <ZapOff className="h-2.5 w-2.5 ml-auto" />}
                                       </button>
                                     );
                                   })}

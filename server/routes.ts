@@ -223,6 +223,23 @@ async function checkOperatorMaintenance(operator: string, country: string): Prom
   }
 }
 
+async function checkDepositMaintenance(operator: string, country: string): Promise<string | null> {
+  try {
+    const { db } = await import("./db");
+    const { paymentMethods: pmTable } = await import("@shared/schema");
+    const allMethods = await db.select().from(pmTable);
+    const pm = allMethods.find(m => m.code.toUpperCase() === operator.toUpperCase());
+    if (!pm) return null;
+    if (pm.isActive === false) return `L'opérateur ${pm.code} n'est pas disponible`;
+    if ((pm as any).depositMaintenance) return `Les dépôts via ${pm.code} sont temporairement indisponibles`;
+    const dmCountries: string[] = ((pm as any).depositMaintenanceCountries || []);
+    if (dmCountries.includes(country.toUpperCase())) return `Les dépôts via ${pm.code} ne sont pas disponibles pour ce pays (${country})`;
+    return null;
+  } catch {
+    return `Service temporairement indisponible. Réessayez dans quelques instants.`;
+  }
+}
+
 // ── Per-operator fee lookup (falls back to global systemSetting if not configured) ──
 async function getOperatorFeeRate(
   operatorCode: string | null | undefined,
@@ -657,6 +674,12 @@ export async function registerRoutes(
       
       const { amount, currency, phoneNumber, operator, country, customerName, firstName, lastName, otp, description } = validation.data;
 
+      // ── Vérification maintenance générale + maintenance dépôt ──
+      const genMaintMsg = await checkOperatorMaintenance(operator, country);
+      if (genMaintMsg) return res.status(503).json({ message: genMaintMsg });
+      const depMaintMsg = await checkDepositMaintenance(operator, country);
+      if (depMaintMsg) return res.status(503).json({ message: depMaintMsg });
+
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configure" });
       }
@@ -771,14 +794,14 @@ export async function registerRoutes(
       {
         const { db } = await import("./db");
         const { paymentMethods: pmTable } = await import("@shared/schema");
-        const { eq } = await import("drizzle-orm");
-        const [pm] = await db.select().from(pmTable).where(eq(pmTable.code, operator));
+        const allMethods = await db.select().from(pmTable);
+        const pm = allMethods.find(m => m.code.toUpperCase() === operator.toUpperCase());
         if (pm) {
           if (pm.withdrawalMaintenance) {
             return res.status(503).json({ message: `Les retraits via ${pm.name} sont temporairement indisponibles.` });
           }
           const wmCountries: string[] = (pm.withdrawalMaintenanceCountries as string[]) || [];
-          if (wmCountries.includes(country)) {
+          if (wmCountries.includes(country.toUpperCase())) {
             return res.status(503).json({ message: `Les retraits via ${pm.name} ne sont pas disponibles pour ce pays.` });
           }
         }
@@ -1102,9 +1125,9 @@ export async function registerRoutes(
       const { phoneNumber, operator, country, customerName, customerEmail, otp } = validation.data;
 
       const maintError = await checkOperatorMaintenance(operator, country);
-      if (maintError) {
-        return res.status(400).json({ message: maintError });
-      }
+      if (maintError) return res.status(503).json({ message: maintError });
+      const depMaintErr = await checkDepositMaintenance(operator, country);
+      if (depMaintErr) return res.status(503).json({ message: depMaintErr });
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configuré" });
@@ -1579,9 +1602,9 @@ export async function registerRoutes(
       }
 
       const maintError = await checkOperatorMaintenance(operator, country);
-      if (maintError) {
-        return res.status(400).json({ message: maintError });
-      }
+      if (maintError) return res.status(503).json({ message: maintError });
+      const depMaintErrPL = await checkDepositMaintenance(operator, country);
+      if (depMaintErrPL) return res.status(503).json({ message: depMaintErrPL });
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configure" });
@@ -3313,7 +3336,7 @@ export async function registerRoutes(
   app.patch("/api/admin/payment-methods/:code", isAdmin, async (req, res) => {
     try {
       const { code } = req.params as Record<string, string>;
-      const { isActive, inMaintenance, maintenanceCountries, withdrawalMaintenance, withdrawalMaintenanceCountries, feeValue, feeType, feeDeposit, feeWithdrawal, feePLink, feeApi, countryFees } = req.body;
+      const { isActive, inMaintenance, maintenanceCountries, depositMaintenance, depositMaintenanceCountries, withdrawalMaintenance, withdrawalMaintenanceCountries, feeValue, feeType, feeDeposit, feeWithdrawal, feePLink, feeApi, countryFees } = req.body;
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
@@ -3321,6 +3344,8 @@ export async function registerRoutes(
       if (isActive !== undefined) updateData.isActive = isActive;
       if (inMaintenance !== undefined) updateData.inMaintenance = inMaintenance;
       if (maintenanceCountries !== undefined) updateData.maintenanceCountries = maintenanceCountries;
+      if (depositMaintenance !== undefined) updateData.depositMaintenance = depositMaintenance;
+      if (depositMaintenanceCountries !== undefined) updateData.depositMaintenanceCountries = depositMaintenanceCountries;
       if (withdrawalMaintenance !== undefined) updateData.withdrawalMaintenance = withdrawalMaintenance;
       if (withdrawalMaintenanceCountries !== undefined) updateData.withdrawalMaintenanceCountries = withdrawalMaintenanceCountries;
       if (feeValue !== undefined) updateData.feeValue = String(feeValue);
