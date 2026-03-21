@@ -211,12 +211,12 @@ async function checkOperatorMaintenance(operator: string, country: string): Prom
   try {
     const { db } = await import("./db");
     const { paymentMethods: pmTable } = await import("@shared/schema");
-    const { eq } = await import("drizzle-orm");
-    const [pm] = await db.select().from(pmTable).where(eq(pmTable.code, operator));
+    const allMethods = await db.select().from(pmTable);
+    const pm = allMethods.find(m => m.code.toUpperCase() === operator.toUpperCase());
     if (!pm) return null;
-    if (pm.isActive === false) return `L'opérateur ${operator} n'est pas disponible`;
-    if (pm.inMaintenance) return `${operator} est actuellement en maintenance`;
-    if ((pm.maintenanceCountries || []).includes(country)) return `${operator} est en maintenance dans ce pays`;
+    if (pm.isActive === false) return `L'opérateur ${pm.code} n'est pas disponible`;
+    if (pm.inMaintenance) return `${pm.code} est actuellement en maintenance`;
+    if ((pm.maintenanceCountries || []).includes(country.toUpperCase())) return `${pm.code} est en maintenance dans ce pays (${country})`;
     return null;
   } catch {
     return `Service temporairement indisponible. Réessayez dans quelques instants.`;
