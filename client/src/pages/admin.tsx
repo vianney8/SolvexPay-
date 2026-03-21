@@ -448,13 +448,16 @@ export default function AdminPage() {
     enabled: !!expandedUserId,
     queryFn: () => fetch(`/api/admin/users/${expandedUserId}/transactions`, { credentials: "include" }).then(r => r.json()),
   });
-  const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/payment-links"],
-    staleTime: Infinity,
-    gcTime: Infinity,
+  const { data: linksResult, isLoading: plLoading } = useQuery<{ data: any[]; total: number; page: number; totalPages: number }>({
+    queryKey: ["/api/admin/payment-links", linksPage, linksSearch],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(linksPage), limit: "15" });
+      if (linksSearch) params.set("search", linksSearch);
+      return fetch(`/api/admin/payment-links?${params}`, { credentials: "include" }).then(r => r.json());
+    },
+    staleTime: 30_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/payment-links"]),
   });
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/api-keys"],
@@ -848,12 +851,8 @@ export default function AdminPage() {
   const pendingWithdrawals = pendingWithdrawalsData?.data || [];
 
   const totalWalletBalance = (wallets || []).reduce((s: number, u: any) => s + parseFloat(u.wallet?.balanceXOF || "0"), 0);
-  const LINKS_PER_PAGE = 15;
-  const filteredPaymentLinks = (allPaymentLinks || []).filter(l =>
-    !linksSearch || [l.name, l.slug, `/pay/${l.slug}`, `solvexpay.com/pay/${l.slug}`, l.user?.email, l.user?.firstName, l.user?.lastName].join(" ").toLowerCase().includes(linksSearch.toLowerCase())
-  );
-  const linksTotalPages = Math.max(1, Math.ceil(filteredPaymentLinks.length / LINKS_PER_PAGE));
-  const pagedPaymentLinks = filteredPaymentLinks.slice((linksPage - 1) * LINKS_PER_PAGE, linksPage * LINKS_PER_PAGE);
+  const pagedPaymentLinks = linksResult?.data || [];
+  const linksTotalPages = linksResult?.totalPages ?? 1;
   const filteredApiKeys = (allApiKeys || []).filter(k =>
     !k.isSrKey && (!apiKeysSearch || [k.name, k.keyPrefix, k.websiteUrl, k.user?.email, k.user?.firstName, k.user?.lastName].join(" ").toLowerCase().includes(apiKeysSearch.toLowerCase()))
   );
@@ -904,7 +903,7 @@ export default function AdminPage() {
                   { label: "Total utilisateurs", value: stats?.userCount ?? totalUsersCount, color: "text-cyan-300" },
                   { label: "KYC en attente", value: pendingKyc.length, color: "text-amber-300" },
                   { label: "Retraits pendants", value: isAutoWithdrawal ? 0 : pendingWithdrawals.length, color: "text-rose-300" },
-                  { label: "Liens de paiement", value: (allPaymentLinks || []).length, color: "text-violet-300" },
+                  { label: "Liens de paiement", value: linksResult?.total ?? 0, color: "text-violet-300" },
                   { label: "Clés API", value: (allApiKeys || []).filter((k: any) => !k.isSrKey).length, color: "text-emerald-300" },
                   { label: "Clés SR", value: (allApiKeys || []).filter((k: any) => k.isSrKey).length, color: "text-green-300" },
                 ].map((s, i) => (
@@ -2078,7 +2077,7 @@ export default function AdminPage() {
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
                     <Link2 className="h-4 w-4 text-violet-500" />
                     Liens de paiement
-                    <Badge variant="secondary" className="text-xs">{(allPaymentLinks || []).length}</Badge>
+                    <Badge variant="secondary" className="text-xs">{linksResult?.total ?? 0}</Badge>
                   </CardTitle>
                   <div className="relative w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -2089,7 +2088,7 @@ export default function AdminPage() {
               <CardContent className="p-0">
                 {plLoading ? (
                   <div className="p-4 space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
-                ) : filteredPaymentLinks.length === 0 ? (
+                ) : pagedPaymentLinks.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground text-sm">Aucun lien de paiement</div>
                 ) : (
                   <div className="divide-y divide-border/40">
@@ -2141,7 +2140,7 @@ export default function AdminPage() {
                 {linksTotalPages > 1 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t border-border/40 bg-muted/20">
                     <p className="text-xs text-muted-foreground">
-                      Page {linksPage} / {linksTotalPages} — {filteredPaymentLinks.length} lien(s)
+                      Page {linksPage} / {linksTotalPages} — {linksResult?.total ?? 0} lien(s)
                     </p>
                     <div className="flex items-center gap-1">
                       <button

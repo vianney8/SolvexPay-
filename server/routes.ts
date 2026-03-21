@@ -3693,24 +3693,42 @@ export async function registerRoutes(
   // All payment links (admin view)
   app.get("/api/admin/payment-links", isAdmin, async (req, res) => {
     try {
-      const cached = adminCacheGet("admin-payment-links");
-      if (cached) {
-        if (adminCacheIsStale("admin-payment-links")) warmAdminCache().catch(() => {});
-        return res.json(cached);
-      }
+      const page = Math.max(1, parseInt((req.query.page as string) || "1"));
+      const limit = Math.min(50, Math.max(1, parseInt((req.query.limit as string) || "15")));
+      const search = ((req.query.search as string) || "").trim().toLowerCase();
+      const offset = (page - 1) * limit;
+
       const { db } = await import("./db");
       const { paymentLinks: plTable } = await import("@shared/schema");
       const { users: usersTable } = await import("@shared/models/auth");
-      const { desc, eq } = await import("drizzle-orm");
+      const { desc, eq, or, ilike, sql } = await import("drizzle-orm");
+
+      // If no search and page 1, try cache for total count only
+      const cacheKey = "admin-payment-links-total";
+
+      // Build base query with join
       const rows = await db.select().from(plTable)
         .leftJoin(usersTable, eq(usersTable.id, plTable.userId))
         .orderBy(desc(plTable.createdAt));
-      const enriched = rows.map(({ payment_links, users }) => {
+
+      const allEnriched = rows.map(({ payment_links, users }) => {
         const user = users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null;
         return { ...payment_links, user };
       });
-      adminCacheSet("admin-payment-links", enriched);
-      res.json(enriched);
+
+      // Filter in JS (fast enough since it's in memory after single DB call)
+      const filtered = search
+        ? allEnriched.filter(l =>
+            [l.name, l.slug, l.user?.email, l.user?.firstName, l.user?.lastName]
+              .join(" ").toLowerCase().includes(search)
+          )
+        : allEnriched;
+
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const data = filtered.slice(offset, offset + limit);
+
+      res.json({ data, total, page, totalPages, limit });
     } catch (error) {
       console.error("Admin payment links error:", error);
       res.status(500).json({ message: "Erreur serveur" });
