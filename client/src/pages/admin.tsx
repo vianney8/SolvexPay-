@@ -455,9 +455,28 @@ export default function AdminPage() {
     refetchInterval: 15_000,
     refetchOnWindowFocus: true,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/payment-links"]),
-    initialDataUpdatedAt: 0,
+    initialData: () => {
+      const fromCache = queryClient.getQueryData<any[]>(["/api/admin/payment-links"]);
+      if (fromCache) return fromCache;
+      try {
+        const raw = sessionStorage.getItem("adm_pl");
+        if (raw) return JSON.parse(raw) as any[];
+      } catch {}
+      return undefined;
+    },
+    initialDataUpdatedAt: () => {
+      const ts = sessionStorage.getItem("adm_pl_ts");
+      return ts ? parseInt(ts, 10) : 0;
+    },
   });
+  useEffect(() => {
+    if (allPaymentLinks && allPaymentLinks.length > 0) {
+      try {
+        sessionStorage.setItem("adm_pl", JSON.stringify(allPaymentLinks));
+        sessionStorage.setItem("adm_pl_ts", String(Date.now()));
+      } catch {}
+    }
+  }, [allPaymentLinks]);
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/api-keys"],
     staleTime: Infinity,
@@ -707,9 +726,12 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
+  const clearPlCache = () => { try { sessionStorage.removeItem("adm_pl"); sessionStorage.removeItem("adm_pl_ts"); } catch {} };
+
   const toggleLinkM = useMutation({
     mutationFn: (d: { id: string; isActive: boolean }) => apiRequest("PATCH", `/api/admin/payment-links/${d.id}/toggle`, { isActive: d.isActive }),
     onSuccess: () => {
+      clearPlCache();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
       setToggleConfirmDialog(null);
@@ -721,6 +743,7 @@ export default function AdminPage() {
   const hideLinksM = useMutation({
     mutationFn: (d: { id: string; hideLinks: boolean }) => apiRequest("PATCH", `/api/admin/payment-links/${d.id}/hide-links`, { hideLinks: d.hideLinks }),
     onSuccess: () => {
+      clearPlCache();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
       toast({ title: "Option mise à jour" });
