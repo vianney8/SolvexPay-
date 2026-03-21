@@ -86,6 +86,7 @@ async function sendPhoto(imageData: string, caption?: string, extra?: object): P
 
 interface UserInfo {
   merchantName: string;
+  realName: string;
   firstName: string;
   email: string;
 }
@@ -99,11 +100,13 @@ async function getUserInfo(userId: string): Promise<UserInfo> {
       email: users.email,
     }).from(users).where(eq(users.id, userId));
     const firstName = u?.firstName || "";
-    const merchantName = u?.merchantName || [u?.firstName, u?.lastName].filter(Boolean).join(" ") || "Inconnu";
-    return { merchantName, firstName, email: u?.email || "" };
+    const lastName = u?.lastName || "";
+    const realName = [firstName, lastName].filter(Boolean).join(" ") || "—";
+    const merchantName = u?.merchantName || realName || "Inconnu";
+    return { merchantName, realName, firstName, email: u?.email || "" };
   } catch (err) {
     console.error("getUserInfo error:", err);
-    return { merchantName: "Inconnu", firstName: "", email: "" };
+    return { merchantName: "Inconnu", realName: "—", firstName: "", email: "" };
   }
 }
 
@@ -137,7 +140,7 @@ function getSourceLabel(tx: any, apiKeyName?: string): string {
 
 export async function notifyTransactionCompleted(tx: any): Promise<void> {
   try {
-    const merchantName = await getMerchantName(tx.userId);
+    const userInfo = await getUserInfo(tx.userId);
     const apiKeyName = tx.apiKeyId ? await getApiKeyName(tx.apiKeyId) : undefined;
     const sourceLabel = getSourceLabel(tx, apiKeyName);
     const amount = parseFloat(tx.amount || "0");
@@ -148,7 +151,8 @@ export async function notifyTransactionCompleted(tx: any): Promise<void> {
     await send(
       `✅ <b>Paiement réussi</b>\n\n` +
       `📋 Référence: <code>${tx.reference}</code>\n` +
-      `👤 Marchand: <b>${merchantName}</b>\n` +
+      `👤 Marchand: <b>${userInfo.merchantName}</b>\n` +
+      `🪪 Utilisateur: <b>${userInfo.realName}</b>\n` +
       `📱 Numéro: <code>${phone}</code>\n` +
       `📡 Opérateur: ${operator}\n` +
       `💰 Montant: <b>${fmt(amount, currency)}</b>\n` +
@@ -175,6 +179,7 @@ export async function notifyWithdrawal(tx: any, statusLabel: "success" | "failed
       `${icon} <b>${label}</b>\n\n` +
       `📋 Référence: <code>${tx.reference}</code>\n` +
       `👤 Marchand: <b>${userInfo.merchantName}</b>\n` +
+      `🪪 Utilisateur: <b>${userInfo.realName}</b>\n` +
       `📱 Numéro: <code>${phone}</code>\n` +
       `💰 Montant: <b>${fmt(amount, currency)}</b>\n` +
       `📡 Opérateur: ${operator}\n` +
