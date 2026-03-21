@@ -1512,7 +1512,7 @@ export async function registerRoutes(
 
   app.get("/api/payment-methods/public", async (req, res) => {
     try {
-      res.set("Cache-Control", "public, max-age=240");
+      res.set("Cache-Control", "no-store");
       if (paymentMethodsCache && Date.now() - paymentMethodsCache.ts < PM_CACHE_TTL) {
         return res.json(paymentMethodsCache.data);
       }
