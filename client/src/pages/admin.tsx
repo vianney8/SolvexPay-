@@ -332,6 +332,7 @@ export default function AdminPage() {
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [srAllDialog, setSrAllDialog] = useState(false);
   const [linksSearch, setLinksSearch] = useState("");
+  const [linksPage, setLinksPage] = useState(1);
   const [apiKeysSearch, setApiKeysSearch] = useState("");
   const [wdDialog, setWdDialog] = useState(false);
   const [wdForm, setWdForm] = useState({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
@@ -847,9 +848,12 @@ export default function AdminPage() {
   const pendingWithdrawals = pendingWithdrawalsData?.data || [];
 
   const totalWalletBalance = (wallets || []).reduce((s: number, u: any) => s + parseFloat(u.wallet?.balanceXOF || "0"), 0);
+  const LINKS_PER_PAGE = 15;
   const filteredPaymentLinks = (allPaymentLinks || []).filter(l =>
     !linksSearch || [l.name, l.slug, `/pay/${l.slug}`, `solvexpay.com/pay/${l.slug}`, l.user?.email, l.user?.firstName, l.user?.lastName].join(" ").toLowerCase().includes(linksSearch.toLowerCase())
   );
+  const linksTotalPages = Math.max(1, Math.ceil(filteredPaymentLinks.length / LINKS_PER_PAGE));
+  const pagedPaymentLinks = filteredPaymentLinks.slice((linksPage - 1) * LINKS_PER_PAGE, linksPage * LINKS_PER_PAGE);
   const filteredApiKeys = (allApiKeys || []).filter(k =>
     !k.isSrKey && (!apiKeysSearch || [k.name, k.keyPrefix, k.websiteUrl, k.user?.email, k.user?.firstName, k.user?.lastName].join(" ").toLowerCase().includes(apiKeysSearch.toLowerCase()))
   );
@@ -2078,7 +2082,7 @@ export default function AdminPage() {
                   </CardTitle>
                   <div className="relative w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input placeholder="Nom, lien /pay/…, email…" value={linksSearch} onChange={e => setLinksSearch(e.target.value)} className="pl-8 h-8 text-xs rounded-xl" data-testid="input-links-search" />
+                    <Input placeholder="Nom, lien /pay/…, email…" value={linksSearch} onChange={e => { setLinksSearch(e.target.value); setLinksPage(1); }} className="pl-8 h-8 text-xs rounded-xl" data-testid="input-links-search" />
                   </div>
                 </div>
               </CardHeader>
@@ -2089,7 +2093,7 @@ export default function AdminPage() {
                   <div className="p-8 text-center text-muted-foreground text-sm">Aucun lien de paiement</div>
                 ) : (
                   <div className="divide-y divide-border/40">
-                    {filteredPaymentLinks.map((link: any) => (
+                    {pagedPaymentLinks.map((link: any) => (
                       <div key={link.id} className="px-4 py-3 flex items-start gap-3 hover:bg-muted/30 transition-colors" data-testid={`payment-link-${link.id}`}>
                         <div className={`mt-0.5 h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${link.isActive ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-rose-100 dark:bg-rose-900/30"}`}>
                           <Link2 className={`h-4 w-4 ${link.isActive ? "text-emerald-600" : "text-rose-500"}`} />
@@ -2132,6 +2136,44 @@ export default function AdminPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+                {linksTotalPages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-border/40 bg-muted/20">
+                    <p className="text-xs text-muted-foreground">
+                      Page {linksPage} / {linksTotalPages} — {filteredPaymentLinks.length} lien(s)
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setLinksPage(p => Math.max(1, p - 1))}
+                        disabled={linksPage === 1}
+                        className="h-7 w-7 rounded-lg border border-border/50 flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        data-testid="button-links-prev"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </button>
+                      {Array.from({ length: linksTotalPages }, (_, i) => i + 1).filter(p => p === 1 || p === linksTotalPages || Math.abs(p - linksPage) <= 1).map((p, idx, arr) => (
+                        <>
+                          {idx > 0 && arr[idx - 1] !== p - 1 && <span key={`dots-${p}`} className="text-xs text-muted-foreground px-1">…</span>}
+                          <button
+                            key={p}
+                            onClick={() => setLinksPage(p)}
+                            className={`h-7 min-w-[28px] px-1.5 rounded-lg text-xs font-semibold transition-colors ${linksPage === p ? "bg-violet-600 text-white" : "border border-border/50 text-muted-foreground hover:bg-muted"}`}
+                            data-testid={`button-links-page-${p}`}
+                          >
+                            {p}
+                          </button>
+                        </>
+                      ))}
+                      <button
+                        onClick={() => setLinksPage(p => Math.min(linksTotalPages, p + 1))}
+                        disabled={linksPage === linksTotalPages}
+                        className="h-7 w-7 rounded-lg border border-border/50 flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        data-testid="button-links-next"
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </CardContent>
