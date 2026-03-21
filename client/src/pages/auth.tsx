@@ -465,10 +465,6 @@ export function RegisterPage() {
       toast({ title: "Erreur", description: "Le nom complet doit contenir au moins 2 caractères", variant: "destructive" });
       return;
     }
-    if (formData.phone.trim() && formData.phone.replace(/\s/g, "").length < 8) {
-      toast({ title: "Erreur", description: "Numéro de téléphone invalide (8 chiffres minimum)", variant: "destructive" });
-      return;
-    }
     if (!passwordChecks.minLength) {
       toast({ title: "Erreur", description: "Le mot de passe doit contenir au moins 6 caractères", variant: "destructive" });
       return;

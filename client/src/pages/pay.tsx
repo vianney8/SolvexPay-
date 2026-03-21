@@ -795,23 +795,21 @@ export default function PayPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Prénom <span className="text-red-500">*</span></Label>
+                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Prénom</Label>
                 <Input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Jean"
-                  required
                   className="h-11 border-gray-200 rounded-xl"
                   data-testid="input-pay-firstname"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Nom <span className="text-red-500">*</span></Label>
+                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Nom</Label>
                 <Input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Dupont"
-                  required
                   className="h-11 border-gray-200 rounded-xl"
                   data-testid="input-pay-lastname"
                 />
