@@ -17,6 +17,7 @@ const BASE_URL = "https://solvexpay.com";
 
 const SECTIONS = [
   { id: "intro", label: "Introduction", icon: BookOpen },
+  { id: "countries", label: "Pays supportés", icon: Globe },
   { id: "auth", label: "Authentification", icon: Key },
   { id: "deposit", label: "Initier un dépôt", icon: ArrowDownToLine },
   { id: "status", label: "Vérifier le statut", icon: CheckCircle2 },
@@ -24,6 +25,26 @@ const SECTIONS = [
   { id: "webhooks", label: "Webhooks", icon: Webhook },
   { id: "errors", label: "Codes d'erreur", icon: AlertCircle },
 ];
+
+const COUNTRIES_DATA: Array<{ code: string; name: string; flag: string; currency: string; operators: string[] }> = [
+  { code: "BJ", name: "Bénin",             flag: "🇧🇯", currency: "XOF", operators: ["MTN", "Moov"] },
+  { code: "CI", name: "Côte d'Ivoire",     flag: "🇨🇮", currency: "XOF", operators: ["MTN", "Moov", "Orange", "Wave"] },
+  { code: "SN", name: "Sénégal",           flag: "🇸🇳", currency: "XOF", operators: ["Orange", "Wave", "Free"] },
+  { code: "BF", name: "Burkina Faso",      flag: "🇧🇫", currency: "XOF", operators: ["Moov", "Orange"] },
+  { code: "TG", name: "Togo",              flag: "🇹🇬", currency: "XOF", operators: ["Moov", "TMoney"] },
+  { code: "CM", name: "Cameroun",          flag: "🇨🇲", currency: "XAF", operators: ["MTN", "Orange"] },
+  { code: "COG", name: "Congo-Brazzaville", flag: "🇨🇬", currency: "XAF", operators: ["MTN", "Airtel"] },
+];
+
+const OPERATOR_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+  MTN:    { bg: "bg-amber-100 dark:bg-amber-900/40",  text: "text-amber-800 dark:text-amber-200",  dot: "bg-amber-500" },
+  Orange: { bg: "bg-orange-100 dark:bg-orange-900/40", text: "text-orange-800 dark:text-orange-200", dot: "bg-orange-500" },
+  Moov:   { bg: "bg-blue-100 dark:bg-blue-900/40",    text: "text-blue-800 dark:text-blue-200",    dot: "bg-blue-500" },
+  Wave:   { bg: "bg-teal-100 dark:bg-teal-900/40",    text: "text-teal-800 dark:text-teal-200",    dot: "bg-teal-500" },
+  TMoney: { bg: "bg-violet-100 dark:bg-violet-900/40", text: "text-violet-800 dark:text-violet-200", dot: "bg-violet-500" },
+  Airtel: { bg: "bg-red-100 dark:bg-red-900/40",      text: "text-red-800 dark:text-red-200",      dot: "bg-red-500" },
+  Free:   { bg: "bg-rose-100 dark:bg-rose-900/40",    text: "text-rose-800 dark:text-rose-200",    dot: "bg-rose-500" },
+};
 
 const OPERATORS = [
   { code: "MTN", countries: "BJ, CI, CM, COG" },
@@ -198,6 +219,111 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
                   <p className="text-xs text-muted-foreground mt-2">Toutes les requêtes doivent utiliser HTTPS. Les requêtes HTTP sont rejetées.</p>
                 </CardContent>
               </Card>
+            </section>
+
+            {/* PAYS & OPÉRATEURS */}
+            <section id="countries" className="space-y-5 scroll-mt-20">
+              <div>
+                <h2 className="text-xl font-black flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-primary" /> Pays et opérateurs supportés
+                </h2>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Les pays et opérateurs disponibles en temps réel. Les pays suspendus sont automatiquement exclus.
+                </p>
+              </div>
+
+              {(() => {
+                const activeCountries = COUNTRIES_DATA.filter(c => !suspendedCodes.includes(c.code));
+                if (activeCountries.length === 0) {
+                  return (
+                    <Card className="border-border/60">
+                      <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                        Aucun pays disponible pour le moment.
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                const xofCountries = activeCountries.filter(c => c.currency === "XOF");
+                const xafCountries = activeCountries.filter(c => c.currency === "XAF");
+
+                const CountryCard = ({ c }: { c: typeof COUNTRIES_DATA[0] }) => (
+                  <div className="rounded-2xl border border-border/60 overflow-hidden hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/40">
+                      <span className="text-2xl">{c.flag}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm truncate">{c.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{c.code}</p>
+                      </div>
+                      <span className={`flex-shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-black border font-mono ${
+                        c.currency === "XOF"
+                          ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
+                          : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"
+                      }`}>{c.currency}</span>
+                    </div>
+                    <div className="px-4 py-3 flex flex-wrap gap-1.5">
+                      {c.operators.map(op => {
+                        const s = OPERATOR_STYLES[op] ?? { bg: "bg-slate-100 dark:bg-slate-800", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-400" };
+                        return (
+                          <span key={op} className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold border border-transparent ${s.bg} ${s.text}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
+                            {op}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+
+                return (
+                  <div className="space-y-6">
+                    {xofCountries.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs font-black border border-emerald-300 dark:border-emerald-700 font-mono">XOF</span>
+                          <span className="text-xs text-muted-foreground">Zone franc CFA — Afrique de l'Ouest</span>
+                        </div>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {xofCountries.map(c => <CountryCard key={c.code} c={c} />)}
+                        </div>
+                      </div>
+                    )}
+                    {xafCountries.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-black border border-blue-300 dark:border-blue-700 font-mono">XAF</span>
+                          <span className="text-xs text-muted-foreground">Zone franc CFA — Afrique Centrale</span>
+                        </div>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {xafCountries.map(c => <CountryCard key={c.code} c={c} />)}
+                        </div>
+                      </div>
+                    )}
+                    <Card className="border-border/60 bg-muted/20">
+                      <CardContent className="p-4">
+                        <p className="text-xs font-bold mb-2">Valeurs à utiliser dans l'API</p>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Paramètre <code className="font-mono bg-muted px-1 rounded">country</code></p>
+                            <div className="flex flex-wrap gap-1">
+                              {activeCountries.map(c => (
+                                <code key={c.code} className="px-1.5 py-0.5 rounded bg-muted border border-border/60 text-[10px] font-mono font-bold">{c.code}</code>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Paramètre <code className="font-mono bg-muted px-1 rounded">operator</code></p>
+                            <div className="flex flex-wrap gap-1">
+                              {["MTN","Orange","Moov","Wave","TMoney","Airtel","Free"].map(op => (
+                                <code key={op} className="px-1.5 py-0.5 rounded bg-muted border border-border/60 text-[10px] font-mono font-bold">{op}</code>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })()}
             </section>
 
             {/* AUTHENTIFICATION */}
