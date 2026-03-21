@@ -3336,6 +3336,7 @@ export async function registerRoutes(
       const { otpConfig } = req.body;
       if (otpConfig !== undefined) updateData.otpConfig = otpConfig || {};
       const [updated] = await db.update(pmTable).set(updateData).where(eq(pmTable.code, code)).returning();
+      paymentMethodsCache = null; // invalide le cache public immédiatement
       res.json(updated);
     } catch (error) {
       console.error("Admin update payment method error:", error);
@@ -3350,6 +3351,7 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
       await db.update(pmTable).set({ inMaintenance: !!inMaintenance, maintenanceCountries: [], updatedAt: new Date() });
+      paymentMethodsCache = null; // invalide le cache public immédiatement
       const methods = await db.select().from(pmTable);
       res.json(methods);
     } catch (error) {
