@@ -92,7 +92,7 @@ function AuthPanel() {
         <div className="space-y-2">
           <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Pays couverts</p>
           <div className="flex flex-wrap gap-2">
-            {countryCodes.map((c) => (
+            {ALL_COUNTRY_CODES.map((c) => (
               <div
                 key={c.code}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/6 border border-white/10"
@@ -446,6 +446,14 @@ export function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [countryCode, setCountryCode] = useState("+229");
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+
+  const { data: suspendedData } = useQuery<{ codes: string[] }>({
+    queryKey: ["/api/public/suspended-countries"],
+    queryFn: async () => { const r = await fetch("/api/public/suspended-countries"); return r.json(); },
+    staleTime: 60_000,
+  });
+  const suspendedIsoCodes = suspendedData?.codes || [];
+  const countryCodes = ALL_COUNTRY_CODES.filter(c => !suspendedIsoCodes.includes(c.iso));
   const [verificationData, setVerificationData] = useState<{ userId: string; email: string } | null>(null);
   const [formData, setFormData] = useState({
     fullName: "",
