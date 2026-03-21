@@ -1271,6 +1271,7 @@ export async function registerRoutes(
         isActive: true,
       });
 
+      adminCacheDel("admin-payment-links", "admin-merchants");
       res.json(paymentLink);
     } catch (error) {
       console.error("Error creating payment link:", error);
@@ -1315,6 +1316,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Ce lien a été verrouillé par l'administrateur.", adminLocked: true });
       }
       await storage.deletePaymentLink(id);
+      adminCacheDel("admin-payment-links", "admin-merchants");
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting payment link:", error);

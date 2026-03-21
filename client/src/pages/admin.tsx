@@ -448,13 +448,13 @@ export default function AdminPage() {
     enabled: !!expandedUserId,
     queryFn: () => fetch(`/api/admin/users/${expandedUserId}/transactions`, { credentials: "include" }).then(r => r.json()),
   });
-  const { data: allPaymentLinks, isLoading: plLoading } = useQuery<any[]>({
+  const { data: allPaymentLinks, isLoading: plLoading, isFetching: plFetching } = useQuery<any[]>({
     queryKey: ["/api/admin/payment-links"],
-    staleTime: Infinity,
-    gcTime: Infinity,
-    refetchOnWindowFocus: false,
+    staleTime: 10_000,
+    gcTime: 60_000,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/payment-links"]),
   });
   const { data: allApiKeys, isLoading: akLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/api-keys"],
@@ -854,6 +854,9 @@ export default function AdminPage() {
   );
   const linksTotalPages = Math.max(1, Math.ceil(filteredPaymentLinks.length / LINKS_PER_PAGE));
   const pagedPaymentLinks = filteredPaymentLinks.slice((linksPage - 1) * LINKS_PER_PAGE, linksPage * LINKS_PER_PAGE);
+  useEffect(() => {
+    if (!linksSearch) setLinksPage(1);
+  }, [(allPaymentLinks || []).length]);
   const filteredApiKeys = (allApiKeys || []).filter(k =>
     !k.isSrKey && (!apiKeysSearch || [k.name, k.keyPrefix, k.websiteUrl, k.user?.email, k.user?.firstName, k.user?.lastName].join(" ").toLowerCase().includes(apiKeysSearch.toLowerCase()))
   );
@@ -2079,6 +2082,12 @@ export default function AdminPage() {
                     <Link2 className="h-4 w-4 text-violet-500" />
                     Liens de paiement
                     <Badge variant="secondary" className="text-xs">{(allPaymentLinks || []).length}</Badge>
+                    {plFetching && !plLoading && (
+                      <span className="flex items-center gap-1 text-[10px] font-normal text-violet-500">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Actualisation…
+                      </span>
+                    )}
                   </CardTitle>
                   <div className="relative w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
