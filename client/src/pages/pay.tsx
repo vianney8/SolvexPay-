@@ -34,14 +34,21 @@ const OPERATOR_LABEL: Record<string, string> = {
   TMoney: "T-Money", Vodacom: "Vodacom M-Pesa", Airtel: "Airtel Money", Free: "Free Money",
 };
 
-function PageWrapper({ children }: { children: React.ReactNode }) {
+function PageWrapper({ children, hideLinks = false }: { children: React.ReactNode; hideLinks?: boolean }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-xl object-cover" />
-          <span className="font-black text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
-        </a>
+        {hideLinks ? (
+          <div className="flex items-center gap-2">
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-xl object-cover" />
+            <span className="font-black text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+          </div>
+        ) : (
+          <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <img src={solvexpayLogo} alt="SolvexPay" className="w-8 h-8 rounded-xl object-cover" />
+            <span className="font-black text-lg bg-gradient-to-r from-violet-600 to-violet-400 bg-clip-text text-transparent">SolvexPay</span>
+          </a>
+        )}
         <Badge variant="outline" className="text-xs font-mono border-gray-300 text-gray-500">Paiement sécurisé</Badge>
       </header>
       <div className="flex-1 flex items-start justify-center p-4 pt-6">
@@ -53,7 +60,11 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
         <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400">
           <Shield className="h-3.5 w-3.5" />
           <span>Paiement sécurisé par{" "}
-            <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="text-violet-600 font-semibold hover:underline">SolvexPay</a>
+            {hideLinks ? (
+              <span className="text-violet-600 font-semibold">SolvexPay</span>
+            ) : (
+              <a href="https://solvexpay.com" target="_blank" rel="noopener noreferrer" className="text-violet-600 font-semibold hover:underline">SolvexPay</a>
+            )}
           </span>
         </div>
       </footer>
@@ -483,7 +494,7 @@ export default function PayPage() {
   const truncatedDesc = descriptionText.length > 600 ? descriptionText.slice(0, 600) + "..." : descriptionText;
 
   return (
-    <PageWrapper>
+    <PageWrapper hideLinks={!!(paymentLink as any)?.hideLinks}>
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
         {paymentLink.imageUrl && (
           <div className="w-full h-52 overflow-hidden">

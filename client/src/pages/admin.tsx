@@ -23,7 +23,7 @@ import {
   Globe, Percent, Eye, CreditCard, Send, Activity, Star, ZapOff,
   Zap, CalendarDays, BadgeCheck, UserX, Coins, FileText, ArrowUpDown,
   TrendingDown, Building2, ArrowRightLeft, Plus, DollarSign,
-  Layers, Settings2, MapPin, RotateCcw, Link2, Key, ExternalLink,
+  Layers, Settings2, MapPin, RotateCcw, Link2, Link2Off, Key, ExternalLink,
   Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon, Code2, User,
   ShieldCheck, Pencil, Loader2, ChevronLeft, ChevronRight,
 } from "lucide-react";
@@ -711,6 +711,16 @@ export default function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
       setToggleConfirmDialog(null);
       toast({ title: "Lien de paiement mis à jour" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
+  });
+
+  const hideLinksM = useMutation({
+    mutationFn: (d: { id: string; hideLinks: boolean }) => apiRequest("PATCH", `/api/admin/payment-links/${d.id}/hide-links`, { hideLinks: d.hideLinks }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      toast({ title: "Option mise à jour" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
@@ -2104,11 +2114,22 @@ export default function AdminPage() {
                             {link.description && <p className="text-xs text-muted-foreground italic truncate max-w-xs">"{link.description}"</p>}
                           </div>
                         </div>
-                        <Switch
-                          checked={!!link.isActive}
-                          onCheckedChange={() => setToggleConfirmDialog({ type: "link", id: link.id, name: link.name || "ce lien", isCurrentlyActive: !!link.isActive })}
-                          data-testid={`toggle-link-${link.id}`}
-                        />
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => hideLinksM.mutate({ id: link.id, hideLinks: !link.hideLinks })}
+                            title={link.hideLinks ? "Liens SolvexPay masqués (cliquer pour réactiver)" : "Cliquer pour masquer les liens SolvexPay"}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${link.hideLinks ? "bg-amber-500/10 text-amber-600 hover:bg-amber-500/15 border border-amber-500/30" : "bg-muted/60 text-muted-foreground hover:bg-muted border border-border/40"}`}
+                            data-testid={`toggle-hidelinks-${link.id}`}
+                          >
+                            {link.hideLinks ? <Link2Off className="h-3 w-3" /> : <Link2 className="h-3 w-3" />}
+                            {link.hideLinks ? "Liens OFF" : "Liens ON"}
+                          </button>
+                          <Switch
+                            checked={!!link.isActive}
+                            onCheckedChange={() => setToggleConfirmDialog({ type: "link", id: link.id, name: link.name || "ce lien", isCurrentlyActive: !!link.isActive })}
+                            data-testid={`toggle-link-${link.id}`}
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

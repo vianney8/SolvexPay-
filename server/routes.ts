@@ -3733,6 +3733,22 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/admin/payment-links/:id/hide-links", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params as Record<string, string>;
+      const { hideLinks } = req.body;
+      const { db } = await import("./db");
+      const { paymentLinks: plTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await db.update(plTable).set({ hideLinks: !!hideLinks }).where(eq(plTable.id, id)).returning();
+      adminCacheDel("admin-payment-links", "admin-merchants");
+      res.json(updated);
+    } catch (error) {
+      console.error("Admin hide-links error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   // All API keys (admin view)
   app.get("/api/admin/api-keys", isAdmin, async (req, res) => {
     try {
