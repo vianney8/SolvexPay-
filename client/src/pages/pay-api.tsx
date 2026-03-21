@@ -106,6 +106,8 @@ export default function PayApiPage() {
       if (!res.ok) return [];
       return res.json();
     },
+    staleTime: 0,
+    refetchInterval: 10_000,
   });
 
   const selectedCountry = COUNTRIES.find((c) => c.code === country) || COUNTRIES[0];
