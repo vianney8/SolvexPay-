@@ -10,6 +10,18 @@ import {
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 
+const ALL_COUNTRIES = [
+  { iso: "BJ",  flag: "🇧🇯", name: "Bénin" },
+  { iso: "CI",  flag: "🇨🇮", name: "Côte d'Ivoire" },
+  { iso: "SN",  flag: "🇸🇳", name: "Sénégal" },
+  { iso: "CM",  flag: "🇨🇲", name: "Cameroun" },
+  { iso: "COD", flag: "🇨🇩", name: "RD Congo" },
+  { iso: "BF",  flag: "🇧🇫", name: "Burkina Faso" },
+  { iso: "TG",  flag: "🇹🇬", name: "Togo" },
+  { iso: "ML",  flag: "🇲🇱", name: "Mali" },
+  { iso: "COG", flag: "🇨🇬", name: "Congo-Brazzaville" },
+];
+
 const FAQS = [
   { q: "Comment fonctionne SolvexPay ?", a: "SolvexPay est une passerelle de paiement Mobile Money pan-africaine. Après inscription, vous créez des liens de paiement ou utilisez notre API pour encaisser via MTN, Orange, Wave, Moov et plus. Tout le flux de paiement est hébergé sur notre plateforme sécurisée." },
   { q: "Quels sont les frais ?", a: "Les frais sont simples et transparents. Consultez la section Tarifs pour les taux exacts en vigueur. Aucun abonnement mensuel, aucun frais caché." },
@@ -52,11 +64,20 @@ export default function LandingPage() {
   const statsRef = useRef<HTMLDivElement>(null);
   const { data: contactLinks } = useQuery<Record<string, string>>({ queryKey: ["/api/support-links"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
+  const { data: suspendedData } = useQuery<{ codes: string[] }>({
+    queryKey: ["/api/public/suspended-countries"],
+    queryFn: async () => { const r = await fetch("/api/public/suspended-countries"); return r.json(); },
+    staleTime: 60_000,
+  });
+  const suspendedCodes = suspendedData?.codes || [];
+  const activeCountries = ALL_COUNTRIES.filter(c => !suspendedCodes.includes(c.iso));
+  const activeCount = activeCountries.length;
+
   const feeDeposit = serviceFees?.deposit ?? 7;
   const feeWithdrawal = serviceFees?.withdrawal ?? 7;
   const feeTransfer = serviceFees?.transfer ?? 7;
 
-  const stat1 = useCountUp(9, 1800, statsVisible);
+  const stat1 = useCountUp(activeCount, 1800, statsVisible);
   const stat2 = useCountUp(10, 2000, statsVisible);
   const stat3 = useCountUp(999, 2200, statsVisible);
   const stat4 = useCountUp(24, 1500, statsVisible);
@@ -145,7 +166,7 @@ export default function LandingPage() {
               <div className="anim-up">
                 <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-violet-100 text-violet-700 border border-violet-200 mb-5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  9 pays africains couverts
+                  {activeCount} pays africain{activeCount > 1 ? "s" : ""} couvert{activeCount > 1 ? "s" : ""}
                 </span>
                 <h1 className="text-5xl sm:text-6xl lg:text-[64px] font-black leading-[1.05] tracking-tight text-gray-900">
                   Encaissez en<br />
@@ -558,7 +579,7 @@ export default function LandingPage() {
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">La passerelle de paiement Mobile Money pour l'Afrique. Simple, sécurisée, instantanée.</p>
               <div className="flex gap-1.5 flex-wrap">
-                {["🇧🇯","🇨🇮","🇸🇳","🇨🇲","🇨🇩","🇧🇫","🇹🇬","🇲🇱","🇨🇬"].map(f => <span key={f} className="text-base">{f}</span>)}
+                {activeCountries.map(c => <span key={c.iso} className="text-base">{c.flag}</span>)}
               </div>
             </div>
             <div>
