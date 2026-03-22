@@ -298,7 +298,7 @@ export default function AdminPage() {
   const [srFilter, setSrFilter] = useState(false);
   const [blockedFilter, setBlockedFilter] = useState(false);
   const [blockDialog, setBlockDialog] = useState<{ userId: string; name: string; isBlocked: boolean } | null>(null);
-  const [toggleConfirmDialog, setToggleConfirmDialog] = useState<{ type: "link" | "key"; id: string; name: string; isCurrentlyActive: boolean } | null>(null);
+  const [toggleConfirmDialog, setToggleConfirmDialog] = useState<{ type: "link" | "key" | "hideLinks"; id: string; name: string; isCurrentlyActive: boolean } | null>(null);
   const [srConfirmDialog, setSrConfirmDialog] = useState<{ userId: string; name: string; enable: boolean } | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [txSearch, setTxSearch] = useState("");
@@ -332,6 +332,7 @@ export default function AdminPage() {
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [srAllDialog, setSrAllDialog] = useState(false);
   const [linksSearch, setLinksSearch] = useState("");
+  const [linksSearchDebounced, setLinksSearchDebounced] = useState("");
   const [linksPage, setLinksPage] = useState(1);
   const [apiKeysSearch, setApiKeysSearch] = useState("");
   const [wdDialog, setWdDialog] = useState(false);
@@ -378,6 +379,10 @@ export default function AdminPage() {
 
   // Reset page when filters change
   useEffect(() => { setTxPage(1); }, [txStatus, txType]);
+  useEffect(() => {
+    const t = setTimeout(() => { setLinksSearchDebounced(linksSearch); setLinksPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [linksSearch]);
 
   const { data: txResult, isLoading: txLoading } = useQuery<{ data: any[]; total: number; page: number; pageSize: number }>({
     queryKey: ["/api/admin/transactions", debouncedTxSearch, txStatus, txType, txPage],
@@ -449,10 +454,10 @@ export default function AdminPage() {
     queryFn: () => fetch(`/api/admin/users/${expandedUserId}/transactions`, { credentials: "include" }).then(r => r.json()),
   });
   const { data: linksResult, isLoading: plLoading } = useQuery<{ data: any[]; total: number; page: number; totalPages: number }>({
-    queryKey: ["/api/admin/payment-links", linksPage, linksSearch],
+    queryKey: ["/api/admin/payment-links", linksPage, linksSearchDebounced],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(linksPage), limit: "15" });
-      if (linksSearch) params.set("search", linksSearch);
+      if (linksSearchDebounced) params.set("search", linksSearchDebounced);
       return fetch(`/api/admin/payment-links?${params}`, { credentials: "include" }).then(r => r.json());
     },
     staleTime: 30_000,
@@ -724,6 +729,7 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      setToggleConfirmDialog(null);
       toast({ title: "Option mise à jour" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
@@ -2081,7 +2087,7 @@ export default function AdminPage() {
                   </CardTitle>
                   <div className="relative w-56">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input placeholder="Nom, lien /pay/…, email…" value={linksSearch} onChange={e => { setLinksSearch(e.target.value); setLinksPage(1); }} className="pl-8 h-8 text-xs rounded-xl" data-testid="input-links-search" />
+                    <Input placeholder="Nom, lien /pay/…, email…" value={linksSearch} onChange={e => setLinksSearch(e.target.value)} className="pl-8 h-8 text-xs rounded-xl" data-testid="input-links-search" />
                   </div>
                 </div>
               </CardHeader>
@@ -2119,8 +2125,8 @@ export default function AdminPage() {
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button
-                            onClick={() => hideLinksM.mutate({ id: link.id, hideLinks: !link.hideLinks })}
-                            title={link.hideLinks ? "Liens SolvexPay masqués (cliquer pour réactiver)" : "Cliquer pour masquer les liens SolvexPay"}
+                            onClick={() => setToggleConfirmDialog({ type: "hideLinks", id: link.id, name: link.name || "ce lien", isCurrentlyActive: !!link.hideLinks })}
+                            title={link.hideLinks ? "Liens SolvexPay masqués — cliquer pour réactiver" : "Cliquer pour masquer les liens SolvexPay"}
                             className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${link.hideLinks ? "bg-amber-500/10 text-amber-600 hover:bg-amber-500/15 border border-amber-500/30" : "bg-muted/60 text-muted-foreground hover:bg-muted border border-border/40"}`}
                             data-testid={`toggle-hidelinks-${link.id}`}
                           >
@@ -4152,42 +4158,72 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ════ TOGGLE LINK / KEY CONFIRMATION DIALOG ════ */}
+      {/* ════ TOGGLE LINK / KEY / HIDELINKS CONFIRMATION DIALOG ════ */}
       <Dialog open={!!toggleConfirmDialog} onOpenChange={(o) => { if (!o) setToggleConfirmDialog(null); }}>
         <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
-            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ${toggleConfirmDialog?.isCurrentlyActive ? "bg-gradient-to-br from-red-500 to-red-600" : "bg-gradient-to-br from-emerald-500 to-emerald-600"}`}>
-              {toggleConfirmDialog?.isCurrentlyActive ? <Lock className="h-7 w-7 text-white" /> : <Unlock className="h-7 w-7 text-white" />}
-            </div>
-            <DialogTitle className="text-center">
-              {toggleConfirmDialog?.isCurrentlyActive
-                ? `Bloquer ${toggleConfirmDialog?.type === "link" ? "ce lien" : "cette clé"} ?`
-                : `Activer ${toggleConfirmDialog?.type === "link" ? "ce lien" : "cette clé"} ?`}
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              <strong>{toggleConfirmDialog?.name}</strong>
-              {toggleConfirmDialog?.isCurrentlyActive
-                ? ` sera désactivé${toggleConfirmDialog?.type === "link" ? "" : "e"} et inaccessible aux utilisateurs.`
-                : ` sera réactivé${toggleConfirmDialog?.type === "link" ? "" : "e"} et accessible aux utilisateurs.`}
-            </DialogDescription>
+            {toggleConfirmDialog?.type === "hideLinks" ? (
+              <>
+                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ${toggleConfirmDialog.isCurrentlyActive ? "bg-gradient-to-br from-emerald-500 to-emerald-600" : "bg-gradient-to-br from-amber-500 to-amber-600"}`}>
+                  {toggleConfirmDialog.isCurrentlyActive ? <Link2 className="h-7 w-7 text-white" /> : <Link2Off className="h-7 w-7 text-white" />}
+                </div>
+                <DialogTitle className="text-center">
+                  {toggleConfirmDialog.isCurrentlyActive ? "Réactiver les liens ?" : "Masquer les liens SolvexPay ?"}
+                </DialogTitle>
+                <DialogDescription className="text-center">
+                  Sur le lien <strong>{toggleConfirmDialog.name}</strong>,{" "}
+                  {toggleConfirmDialog.isCurrentlyActive
+                    ? "le logo et \"Paiement sécurisé par SolvexPay\" redeviendront cliquables."
+                    : "le logo et \"Paiement sécurisé par SolvexPay\" ne seront plus cliquables."}
+                </DialogDescription>
+              </>
+            ) : (
+              <>
+                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ${toggleConfirmDialog?.isCurrentlyActive ? "bg-gradient-to-br from-red-500 to-red-600" : "bg-gradient-to-br from-emerald-500 to-emerald-600"}`}>
+                  {toggleConfirmDialog?.isCurrentlyActive ? <Lock className="h-7 w-7 text-white" /> : <Unlock className="h-7 w-7 text-white" />}
+                </div>
+                <DialogTitle className="text-center">
+                  {toggleConfirmDialog?.isCurrentlyActive
+                    ? `Bloquer ${toggleConfirmDialog?.type === "link" ? "ce lien" : "cette clé"} ?`
+                    : `Activer ${toggleConfirmDialog?.type === "link" ? "ce lien" : "cette clé"} ?`}
+                </DialogTitle>
+                <DialogDescription className="text-center">
+                  <strong>{toggleConfirmDialog?.name}</strong>
+                  {toggleConfirmDialog?.isCurrentlyActive
+                    ? ` sera désactivé${toggleConfirmDialog?.type === "link" ? "" : "e"} et inaccessible aux utilisateurs.`
+                    : ` sera réactivé${toggleConfirmDialog?.type === "link" ? "" : "e"} et accessible aux utilisateurs.`}
+                </DialogDescription>
+              </>
+            )}
           </DialogHeader>
           <DialogFooter className="flex gap-2 mt-2">
             <Button variant="outline" className="flex-1 h-10" onClick={() => setToggleConfirmDialog(null)}>Annuler</Button>
             <Button
-              className={`flex-1 h-10 font-bold text-white ${toggleConfirmDialog?.isCurrentlyActive ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
-              disabled={toggleLinkM.isPending || toggleApiKeyM.isPending}
+              className={`flex-1 h-10 font-bold text-white ${
+                toggleConfirmDialog?.type === "hideLinks"
+                  ? toggleConfirmDialog.isCurrentlyActive ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"
+                  : toggleConfirmDialog?.isCurrentlyActive ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
+              disabled={toggleLinkM.isPending || toggleApiKeyM.isPending || hideLinksM.isPending}
               onClick={() => {
                 if (!toggleConfirmDialog) return;
-                const newActive = !toggleConfirmDialog.isCurrentlyActive;
-                if (toggleConfirmDialog.type === "link") {
-                  toggleLinkM.mutate({ id: toggleConfirmDialog.id, isActive: newActive });
+                if (toggleConfirmDialog.type === "hideLinks") {
+                  hideLinksM.mutate({ id: toggleConfirmDialog.id, hideLinks: !toggleConfirmDialog.isCurrentlyActive });
                 } else {
-                  toggleApiKeyM.mutate({ id: toggleConfirmDialog.id, isActive: newActive });
+                  const newActive = !toggleConfirmDialog.isCurrentlyActive;
+                  if (toggleConfirmDialog.type === "link") {
+                    toggleLinkM.mutate({ id: toggleConfirmDialog.id, isActive: newActive });
+                  } else {
+                    toggleApiKeyM.mutate({ id: toggleConfirmDialog.id, isActive: newActive });
+                  }
                 }
               }}
               data-testid="btn-confirm-toggle"
             >
-              {(toggleLinkM.isPending || toggleApiKeyM.isPending) ? "En cours..." : toggleConfirmDialog?.isCurrentlyActive ? "Confirmer le blocage" : "Confirmer l'activation"}
+              {(toggleLinkM.isPending || toggleApiKeyM.isPending || hideLinksM.isPending) ? "En cours..." :
+                toggleConfirmDialog?.type === "hideLinks"
+                  ? (toggleConfirmDialog.isCurrentlyActive ? "Réactiver les liens" : "Masquer les liens")
+                  : (toggleConfirmDialog?.isCurrentlyActive ? "Confirmer le blocage" : "Confirmer l'activation")}
             </Button>
           </DialogFooter>
         </DialogContent>

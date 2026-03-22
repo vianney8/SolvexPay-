@@ -3698,27 +3698,27 @@ export async function registerRoutes(
       const search = ((req.query.search as string) || "").trim().toLowerCase();
       const offset = (page - 1) * limit;
 
-      const { db } = await import("./db");
-      const { paymentLinks: plTable } = await import("@shared/schema");
-      const { users: usersTable } = await import("@shared/models/auth");
-      const { desc, eq, or, ilike, sql } = await import("drizzle-orm");
+      // Use the in-memory cache populated by warmAdminCache (quasi instantaneous)
+      let allEnriched: any[] | null = adminCacheGet("admin-payment-links") as any[] | null;
+      if (!allEnriched) {
+        const { db } = await import("./db");
+        const { paymentLinks: plTable } = await import("@shared/schema");
+        const { users: usersTable } = await import("@shared/models/auth");
+        const { desc, eq } = await import("drizzle-orm");
+        const rows = await db.select().from(plTable)
+          .leftJoin(usersTable, eq(usersTable.id, plTable.userId))
+          .orderBy(desc(plTable.createdAt));
+        allEnriched = rows.map(({ payment_links, users }) => ({
+          ...payment_links,
+          user: users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null,
+        }));
+        adminCacheSet("admin-payment-links", allEnriched);
+        if (adminCacheIsStale("admin-payment-links")) warmAdminCache().catch(() => {});
+      }
 
-      // If no search and page 1, try cache for total count only
-      const cacheKey = "admin-payment-links-total";
-
-      // Build base query with join
-      const rows = await db.select().from(plTable)
-        .leftJoin(usersTable, eq(usersTable.id, plTable.userId))
-        .orderBy(desc(plTable.createdAt));
-
-      const allEnriched = rows.map(({ payment_links, users }) => {
-        const user = users ? { firstName: users.firstName, lastName: users.lastName, email: users.email } : null;
-        return { ...payment_links, user };
-      });
-
-      // Filter in JS (fast enough since it's in memory after single DB call)
+      // Filter and paginate from memory
       const filtered = search
-        ? allEnriched.filter(l =>
+        ? allEnriched.filter((l: any) =>
             [l.name, l.slug, l.user?.email, l.user?.firstName, l.user?.lastName]
               .join(" ").toLowerCase().includes(search)
           )
