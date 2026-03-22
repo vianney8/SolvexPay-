@@ -765,7 +765,7 @@ export default function PayApiPage() {
               type="submit"
               className="w-full h-14 text-base font-black rounded-2xl shadow-lg gap-2"
               style={{ background: !phone || !operator ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
-              disabled={payMutation.isPending || !phone || !operator || !country || (operator ? getOperatorStatus(operator).maintenance || !getOperatorStatus(operator).available : false)}
+              disabled={payMutation.isPending || !phone || !operator || !country || !firstName.trim() || !lastName.trim() || (operator ? getOperatorStatus(operator).maintenance || !getOperatorStatus(operator).available : false)}
               data-testid="button-confirm-pay"
             >
               {payMutation.isPending ? (
