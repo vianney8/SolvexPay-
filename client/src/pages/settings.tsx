@@ -17,7 +17,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   User, Mail, Lock, Eye, EyeOff, Save, Loader2, Shield,
   Smartphone, Upload, BadgeCheck, AlertTriangle,
-  ChevronRight,
+  ChevronRight, Store,
 } from "lucide-react";
 
 const countryCodes = [
@@ -390,6 +390,15 @@ export default function SettingsPage() {
                           <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="votre@email.com" className="pl-10 h-11 border-border/70" data-testid="input-settings-email" />
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom marchand</Label>
+                        <div className="relative">
+                          <Store className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          <Input value={merchantName} onChange={(e) => setMerchantName(e.target.value)} placeholder="Nom de votre boutique ou entreprise" className="pl-10 h-11 border-border/70" data-testid="input-merchant-name" />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Affiché dans les notifications de paiement et sur vos liens.</p>
                       </div>
 
                       <div className="space-y-2">

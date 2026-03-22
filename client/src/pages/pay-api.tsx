@@ -743,12 +743,12 @@ export default function PayApiPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Prénom <span className="text-red-500">*</span></Label>
-                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jean" required className="h-11 border-gray-200 rounded-xl" data-testid="input-pay-firstname" />
+                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Prénom</Label>
+                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jean" className="h-11 border-gray-200 rounded-xl" data-testid="input-pay-firstname" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Nom <span className="text-red-500">*</span></Label>
-                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Dupont" required className="h-11 border-gray-200 rounded-xl" data-testid="input-pay-lastname" />
+                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Nom</Label>
+                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Dupont" className="h-11 border-gray-200 rounded-xl" data-testid="input-pay-lastname" />
               </div>
             </div>
 
@@ -761,7 +761,7 @@ export default function PayApiPage() {
               type="submit"
               className="w-full h-14 text-base font-black rounded-2xl shadow-lg gap-2"
               style={{ background: !phone || !operator ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
-              disabled={payMutation.isPending || !phone || !operator || !country || !firstName.trim() || !lastName.trim() || (operator ? getOperatorStatus(operator).maintenance || !getOperatorStatus(operator).available : false)}
+              disabled={payMutation.isPending || !phone || !operator || !country || (operator ? getOperatorStatus(operator).maintenance || !getOperatorStatus(operator).available : false)}
               data-testid="button-confirm-pay"
             >
               {payMutation.isPending ? (
