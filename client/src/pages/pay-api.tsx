@@ -11,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { OperatorLogo } from "@/components/operator-logo";
 import {
   CheckCircle2, XCircle, Loader2, ChevronDown, Shield,
-  ChevronUp, Smartphone, RefreshCw, Clock, Wifi, ShieldCheck, ArrowLeft,
+  ChevronUp, Smartphone, RefreshCw, Clock, Wifi, ShieldCheck, ArrowLeft, Store,
 } from "lucide-react";
 import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 
@@ -494,17 +494,21 @@ export default function PayApiPage() {
     <PageWrapper>
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
         <div className="p-6 space-y-5">
-          <div className="text-center">
-            <p className="text-xs text-gray-400 font-medium mb-0.5">Total à payer</p>
-            <p className="text-4xl font-black text-blue-600 tracking-tight leading-none" data-testid="text-payment-amount">
-              {formatAmount(paymentInfo.amount)} <span className="text-xl font-bold text-blue-400">{paymentInfo.currency}</span>
-            </p>
-            {paymentInfo.appName && (
-              <p className="text-sm font-bold text-gray-700 mt-2" data-testid="text-payment-name">{paymentInfo.appName}</p>
-            )}
-            {paymentInfo.merchantName && paymentInfo.merchantName !== paymentInfo.appName && (
-              <p className="text-xs text-gray-400 mt-0.5" data-testid="text-payment-merchant">via {paymentInfo.merchantName}</p>
-            )}
+          <div>
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center shadow-sm">
+                <Store className="w-9 h-9 text-blue-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-400 font-medium mb-0.5">Total à payer</p>
+                <p className="text-4xl font-black text-blue-600 tracking-tight leading-none" data-testid="text-payment-amount">
+                  {formatAmount(paymentInfo.amount)} <span className="text-xl font-bold text-blue-400">{paymentInfo.currency}</span>
+                </p>
+                {paymentInfo.appName && (
+                  <p className="text-base font-extrabold text-gray-800 mt-2 truncate" data-testid="text-payment-name">{paymentInfo.appName}</p>
+                )}
+              </div>
+            </div>
             {descriptionText && (
               <div className="mt-3 text-left px-1">
                 <p className="text-xs text-gray-500 leading-relaxed">
