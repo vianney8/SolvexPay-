@@ -23,7 +23,7 @@ function safeUserSelect(t: any) {
     kycRejectionReason: t.kycRejectionReason, kycFirstName: t.kycFirstName,
     kycLastName: t.kycLastName, kycDocumentNumber: t.kycDocumentNumber,
     merchantName: t.merchantName, isBlocked: t.isBlocked,
-    customFeeRate: t.customFeeRate, withdrawalCountry: t.withdrawalCountry,
+    customFeeRate: t.customFeeRate, customWithdrawalFeeRate: t.customWithdrawalFeeRate, withdrawalCountry: t.withdrawalCountry,
     withdrawalOperator: t.withdrawalOperator, withdrawalPhone: t.withdrawalPhone,
     emailVerified: t.emailVerified, createdAt: t.createdAt, updatedAt: t.updatedAt,
   };
@@ -787,7 +787,9 @@ export async function registerRoutes(
       }
 
       const globalWithdrawalFee = parseFloat((await storage.getSystemSetting("fee_withdrawal")) || "7");
-      const withdrawalFeeRate = (await getOperatorFeeRate(operator, "feeWithdrawal", globalWithdrawalFee, country)) / 100;
+      const operatorFeeRate = await getOperatorFeeRate(operator, "feeWithdrawal", globalWithdrawalFee, country);
+      const userCustomWithdrawal = req.user.customWithdrawalFeeRate != null ? parseFloat(req.user.customWithdrawalFeeRate) : null;
+      const withdrawalFeeRate = (userCustomWithdrawal !== null ? userCustomWithdrawal : operatorFeeRate) / 100;
       const withdrawalFees = Math.round(amountXOF * withdrawalFeeRate);
 
       // Fees in local currency for wallet deduction
@@ -2877,11 +2879,14 @@ export async function registerRoutes(
   app.patch("/api/admin/users/:id/fee", isAdmin, async (req, res) => {
     try {
       const { id } = req.params as Record<string, string>;
-      const { customFeeRate } = req.body;
+      const { customFeeRate, customWithdrawalFeeRate } = req.body;
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
       const { eq } = await import("drizzle-orm");
-      const [updated] = await db.update(usersTable).set({ customFeeRate: customFeeRate ? String(customFeeRate) : null, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
+      const updateData: Record<string, any> = { updatedAt: new Date() };
+      if ("customFeeRate" in req.body) updateData.customFeeRate = customFeeRate != null ? String(customFeeRate) : null;
+      if ("customWithdrawalFeeRate" in req.body) updateData.customWithdrawalFeeRate = customWithdrawalFeeRate != null ? String(customWithdrawalFeeRate) : null;
+      const [updated] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
       adminCacheDel("admin-users");
       const { passwordHash: _, ...safeUser } = updated;

@@ -298,6 +298,10 @@ export default function AdminPage() {
   const [srFilter, setSrFilter] = useState(false);
   const [blockedFilter, setBlockedFilter] = useState(false);
   const [blockDialog, setBlockDialog] = useState<{ userId: string; name: string; isBlocked: boolean } | null>(null);
+  const [userFeeDialog, setUserFeeDialog] = useState<{ userId: string; name: string; currentDeposit: string; currentWithdrawal: string } | null>(null);
+  const [userFeeDeposit, setUserFeeDeposit] = useState("");
+  const [userFeeWithdrawal, setUserFeeWithdrawal] = useState("");
+  const [userFeeConfirm, setUserFeeConfirm] = useState(false);
   const [toggleConfirmDialog, setToggleConfirmDialog] = useState<{ type: "link" | "key" | "hideLinks"; id: string; name: string; isCurrentlyActive: boolean } | null>(null);
   const [srConfirmDialog, setSrConfirmDialog] = useState<{ userId: string; name: string; enable: boolean } | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
@@ -574,6 +578,18 @@ export default function AdminPage() {
       if (ctx?.prev) queryClient.setQueryData(["/api/admin/users"], ctx.prev);
       toast({ title: "Erreur", description: e?.message, variant: "destructive" });
     },
+  });
+
+  const userFeeM = useMutation({
+    mutationFn: (d: { userId: string; customFeeRate: string | null; customWithdrawalFeeRate: string | null }) =>
+      apiRequest("PATCH", `/api/admin/users/${d.userId}/fee`, { customFeeRate: d.customFeeRate, customWithdrawalFeeRate: d.customWithdrawalFeeRate }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Frais personnalisés mis à jour" });
+      setUserFeeDialog(null);
+      setUserFeeConfirm(false);
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
   const kycM = useMutation({
@@ -1809,14 +1825,34 @@ export default function AdminPage() {
                       </div>
 
                       {/* Stats row */}
-                      <div className="flex gap-2 mb-3">
+                      <div className="flex gap-2 mb-3 flex-wrap">
                         <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-400 text-xs font-semibold">
                           <Link2 className="h-3 w-3" />{m.links.length} lien{m.links.length !== 1 ? "s" : ""}
                         </div>
                         <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 text-xs font-semibold">
                           <Zap className="h-3 w-3" />{m.keys.length} clé{m.keys.length !== 1 ? "s" : ""}
                         </div>
-                        <div className="ml-auto">
+                        {(m.customFeeRate != null || m.customWithdrawalFeeRate != null) && (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-semibold">
+                            <Percent className="h-3 w-3" />
+                            {m.customFeeRate != null && `D:${m.customFeeRate}%`}
+                            {m.customFeeRate != null && m.customWithdrawalFeeRate != null && " · "}
+                            {m.customWithdrawalFeeRate != null && `R:${m.customWithdrawalFeeRate}%`}
+                          </div>
+                        )}
+                        <div className="ml-auto flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              setUserFeeDeposit(m.customFeeRate ?? "");
+                              setUserFeeWithdrawal(m.customWithdrawalFeeRate ?? "");
+                              setUserFeeConfirm(false);
+                              setUserFeeDialog({ userId: m.id, name: `${m.firstName} ${m.lastName}`, currentDeposit: m.customFeeRate ?? "", currentWithdrawal: m.customWithdrawalFeeRate ?? "" });
+                            }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/15"
+                            data-testid={`btn-fee-user-${m.id}`}
+                          >
+                            <Percent className="h-3.5 w-3.5" />Frais
+                          </button>
                           <button
                             onClick={() => setBlockDialog({ userId: m.id, name: `${m.firstName} ${m.lastName}`, isBlocked: m.isBlocked })}
                             disabled={blockM.isPending}
@@ -3756,6 +3792,93 @@ export default function AdminPage() {
               {kycM.isPending ? "Enregistrement..." : kycAction === "verified" ? "Marquer comme vérifié" : kycAction === "not_started" ? "Réinitialiser" : kycAction === "rejected" ? "Rejeter" : "Confirmer"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ USER FEE DIALOG ════ */}
+      <Dialog open={!!userFeeDialog} onOpenChange={(o) => { if (!o) { setUserFeeDialog(null); setUserFeeConfirm(false); } }}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <div className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg bg-gradient-to-br from-indigo-500 to-indigo-600">
+              <Percent className="h-7 w-7 text-white" />
+            </div>
+            <DialogTitle className="text-center">Frais personnalisés</DialogTitle>
+            <DialogDescription className="text-center">
+              {userFeeDialog?.name} — laissez vide pour utiliser les frais globaux.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Frais dépôt (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={userFeeDeposit}
+                onChange={e => setUserFeeDeposit(e.target.value)}
+                placeholder="Global (par défaut)"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                data-testid="input-custom-fee-deposit"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Frais retrait (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={userFeeWithdrawal}
+                onChange={e => setUserFeeWithdrawal(e.target.value)}
+                placeholder="Global (par défaut)"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                data-testid="input-custom-fee-withdrawal"
+              />
+            </div>
+            {!userFeeConfirm ? (
+              <button
+                onClick={() => setUserFeeConfirm(true)}
+                className="w-full mt-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-colors"
+                data-testid="btn-fee-confirm-step1"
+              >
+                Continuer
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-center text-muted-foreground">Confirmez les frais personnalisés pour <strong>{userFeeDialog?.name}</strong> :</p>
+                <div className="flex gap-2 text-sm font-semibold justify-center">
+                  <span className="px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400">
+                    Dépôt : {userFeeDeposit !== "" ? `${userFeeDeposit}%` : "global"}
+                  </span>
+                  <span className="px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400">
+                    Retrait : {userFeeWithdrawal !== "" ? `${userFeeWithdrawal}%` : "global"}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setUserFeeConfirm(false)}
+                    className="flex-1 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+                    data-testid="btn-fee-back"
+                  >
+                    Retour
+                  </button>
+                  <button
+                    onClick={() => userFeeM.mutate({
+                      userId: userFeeDialog!.userId,
+                      customFeeRate: userFeeDeposit !== "" ? userFeeDeposit : null,
+                      customWithdrawalFeeRate: userFeeWithdrawal !== "" ? userFeeWithdrawal : null,
+                    })}
+                    disabled={userFeeM.isPending}
+                    className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-colors disabled:opacity-50"
+                    data-testid="btn-fee-confirm-final"
+                  >
+                    {userFeeM.isPending ? "..." : "Confirmer"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
