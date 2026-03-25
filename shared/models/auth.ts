@@ -50,6 +50,8 @@ export const users = pgTable("users", {
 }, (table) => [
   index("idx_users_kyc_status").on(table.kycStatus),
   index("idx_users_created_at").on(table.createdAt),
+  index("idx_users_email").on(table.email),
+  index("idx_users_name").on(table.firstName, table.lastName),
 ]);
 
 export const insertUserSchema = createInsertSchema(users).omit({

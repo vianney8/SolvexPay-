@@ -3604,42 +3604,55 @@ export async function registerRoutes(
   // Merchants — users with at least 1 payment link or API key
   app.get("/api/admin/merchants", isAdmin, async (req, res) => {
     try {
-      const cached = adminCacheGet("admin-merchants");
-      if (cached) {
+      const q = ((req.query.q as string) || "").toLowerCase().trim();
+      const pageParam = req.query.page as string | undefined;
+      const page = pageParam ? Math.max(1, parseInt(pageParam) || 1) : null;
+      const limit = page ? Math.min(100, Math.max(1, parseInt((req.query.limit as string) || "20") || 20)) : null;
+
+      let cached: any[] | null = adminCacheGet("admin-merchants");
+      if (!cached) {
+        const { db } = await import("./db");
+        const { users: usersTable } = await import("@shared/models/auth");
+        const { paymentLinks: plTable, apiKeys: akTable, wallets: walletsTable } = await import("@shared/schema");
+        const { eq, inArray } = await import("drizzle-orm");
+
+        const [allLinks, allKeys] = await Promise.all([
+          db.select().from(plTable),
+          db.select({ id: akTable.id, userId: akTable.userId, name: akTable.name, appName: akTable.appName, keyPrefix: akTable.keyPrefix, environment: akTable.environment, isActive: akTable.isActive, adminLocked: akTable.adminLocked, isSrKey: akTable.isSrKey, createdAt: akTable.createdAt, lastUsedAt: akTable.lastUsedAt, webhookUrl: akTable.webhookUrl, websiteUrl: akTable.websiteUrl }).from(akTable),
+        ]);
+        const merchantUserIds = [...new Set([...allLinks.map(l => l.userId), ...allKeys.map(k => k.userId)])];
+        if (merchantUserIds.length === 0) {
+          return page !== null ? res.json({ data: [], total: 0, page: 1, limit: limit!, totalPages: 0 }) : res.json([]);
+        }
+        const [merchantUsers, merchantWallets] = await Promise.all([
+          db.select(safeUserSelect(usersTable)).from(usersTable).where(inArray(usersTable.id, merchantUserIds)),
+          db.select().from(walletsTable).where(inArray(walletsTable.userId, merchantUserIds)),
+        ]);
+        const result = merchantUsers.map(u => {
+          const wallet = merchantWallets.find(w => w.userId === u.id);
+          return { ...u, balance: wallet?.balanceXOF || "0", links: allLinks.filter(l => l.userId === u.id), keys: allKeys.filter(k => k.userId === u.id) };
+        });
+        result.sort((a, b) => (b.links.length + b.keys.length) - (a.links.length + a.keys.length));
+        adminCacheSet("admin-merchants", result);
+        cached = result;
+      } else {
         if (adminCacheIsStale("admin-merchants")) warmAdminCache().catch(() => {});
-        return res.json(cached);
       }
-      const { db } = await import("./db");
-      const { users: usersTable } = await import("@shared/models/auth");
-      const { paymentLinks: plTable, apiKeys: akTable, wallets: walletsTable } = await import("@shared/schema");
-      const { eq, inArray } = await import("drizzle-orm");
 
-      // Get all payment links and API keys to find which users have them
-      const [allLinks, allKeys] = await Promise.all([
-        db.select().from(plTable),
-        db.select({ id: akTable.id, userId: akTable.userId, name: akTable.name, appName: akTable.appName, keyPrefix: akTable.keyPrefix, environment: akTable.environment, isActive: akTable.isActive, adminLocked: akTable.adminLocked, isSrKey: akTable.isSrKey, createdAt: akTable.createdAt, lastUsedAt: akTable.lastUsedAt, webhookUrl: akTable.webhookUrl, websiteUrl: akTable.websiteUrl }).from(akTable),
-      ]);
+      // Filter in-memory (cache is always the full list)
+      const filtered = q
+        ? cached.filter((m: any) => `${m.firstName} ${m.lastName} ${m.email} ${m.phone || ""}`.toLowerCase().includes(q))
+        : cached;
 
-      // Find unique user IDs that have at least 1 link or key
-      const merchantUserIds = [...new Set([...allLinks.map(l => l.userId), ...allKeys.map(k => k.userId)])];
-      if (merchantUserIds.length === 0) return res.json([]);
+      // If no pagination requested → backward-compatible full array (used by admin.tsx)
+      if (page === null || limit === null) return res.json(filtered);
 
-      const [merchantUsers, merchantWallets] = await Promise.all([
-        db.select(safeUserSelect(usersTable)).from(usersTable).where(inArray(usersTable.id, merchantUserIds)),
-        db.select().from(walletsTable).where(inArray(walletsTable.userId, merchantUserIds)),
-      ]);
-
-      const result = merchantUsers.map(u => {
-        const wallet = merchantWallets.find(w => w.userId === u.id);
-        const links = allLinks.filter(l => l.userId === u.id);
-        const keys = allKeys.filter(k => k.userId === u.id);
-        return { ...u, balance: wallet?.balanceXOF || "0", links, keys };
-      });
-
-      // Sort: blocked first, then by most links+keys
-      result.sort((a, b) => (b.links.length + b.keys.length) - (a.links.length + a.keys.length));
-      adminCacheSet("admin-merchants", result);
-      res.json(result);
+      // Paginated response
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const safePage = Math.min(page, totalPages);
+      const data = filtered.slice((safePage - 1) * limit, safePage * limit);
+      res.json({ data, total, page: safePage, limit, totalPages });
     } catch (error) {
       console.error("Admin merchants error:", error);
       res.status(500).json({ message: "Erreur serveur" });

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,8 +8,11 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Link2, Lock, Unlock, Search, Zap, AlertTriangle, CheckCircle2, Percent,
+  ChevronLeft, ChevronRight, RefreshCw,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const PAGE_SIZE = 20;
 
 function fmt(n: number) {
   return new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " XOF";
@@ -19,6 +22,10 @@ export default function AdminMerchantsPage() {
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [blockDialog, setBlockDialog] = useState<{ userId: string; name: string; isBlocked: boolean } | null>(null);
   const [toggleConfirmDialog, setToggleConfirmDialog] = useState<{ type: "link" | "key"; id: string; name: string; isCurrentlyActive: boolean } | null>(null);
   const [userFeeDialog, setUserFeeDialog] = useState<{ userId: string; name: string } | null>(null);
@@ -26,38 +33,61 @@ export default function AdminMerchantsPage() {
   const [userFeeWithdrawal, setUserFeeWithdrawal] = useState("");
   const [userFeeConfirm, setUserFeeConfirm] = useState(false);
 
-  /* ── Query — instant since cache is warm ── */
-  const { data: merchants, isFetching } = useQuery<any[]>({
-    queryKey: ["/api/admin/merchants"],
-    staleTime: Infinity,
-    gcTime: Infinity,
-    refetchOnWindowFocus: false,
+  /* ── Debounce search → reset page ── */
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 350);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [search]);
+
+  /* ── Query — paginated + server-side search ── */
+  const queryKey = ["/api/admin/merchants", { q: debouncedSearch, page }];
+  const { data: result, isFetching, isLoading } = useQuery<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>({
+    queryKey,
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+      if (debouncedSearch) params.set("q", debouncedSearch);
+      return fetch(`/api/admin/merchants?${params}`, { credentials: "include" }).then(r => r.json());
+    },
+    staleTime: 25_000,
+    gcTime: 120_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
     placeholderData: keepPreviousData,
-    initialData: () => queryClient.getQueryData<any[]>(["/api/admin/merchants"]) ?? [],
   });
 
-  const isLoading = false;
+  const merchants: any[] = result?.data ?? [];
+  const total: number = result?.total ?? 0;
+  const totalPages: number = result?.totalPages ?? 1;
 
   /* ── Mutations ── */
+  function invalidateMerchants() {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+  }
+
   const blockM = useMutation({
     mutationFn: (d: { userId: string; isBlocked: boolean }) =>
       apiRequest("PATCH", `/api/admin/users/${d.userId}/block`, { isBlocked: d.isBlocked }),
     onMutate: async (vars) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/admin/merchants"] });
-      const prev = queryClient.getQueryData<any[]>(["/api/admin/merchants"]);
-      queryClient.setQueryData<any[]>(["/api/admin/merchants"], old =>
-        (old || []).map(u => u.id === vars.userId ? { ...u, isBlocked: vars.isBlocked } : u)
+      await queryClient.cancelQueries({ queryKey });
+      const prev = queryClient.getQueryData<any>(queryKey);
+      queryClient.setQueryData<any>(queryKey, (old: any) => old
+        ? { ...old, data: old.data.map((u: any) => u.id === vars.userId ? { ...u, isBlocked: vars.isBlocked } : u) }
+        : old
       );
       return { prev };
     },
     onSuccess: (_, vars) => {
       setBlockDialog(null);
       toast({ title: vars.isBlocked ? "Compte bloqué" : "Compte débloqué" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      invalidateMerchants();
     },
     onError: (e: any, _, ctx: any) => {
-      if (ctx?.prev) queryClient.setQueryData(["/api/admin/merchants"], ctx.prev);
+      if (ctx?.prev) queryClient.setQueryData(queryKey, ctx.prev);
       toast({ title: "Erreur", description: e?.message, variant: "destructive" });
     },
   });
@@ -67,7 +97,7 @@ export default function AdminMerchantsPage() {
       apiRequest("PATCH", `/api/admin/payment-links/${d.id}/toggle`, { isActive: d.isActive }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-links"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      invalidateMerchants();
       setToggleConfirmDialog(null);
       toast({ title: "Lien de paiement mis à jour" });
     },
@@ -79,7 +109,7 @@ export default function AdminMerchantsPage() {
       apiRequest("PATCH", `/api/admin/api-keys/${d.id}/toggle`, { isActive: d.isActive }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/api-keys"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      invalidateMerchants();
       setToggleConfirmDialog(null);
       toast({ title: "Clé API mise à jour" });
     },
@@ -90,24 +120,13 @@ export default function AdminMerchantsPage() {
     mutationFn: (d: { userId: string; customFeeRate: string | null; customWithdrawalFeeRate: string | null }) =>
       apiRequest("PATCH", `/api/admin/users/${d.userId}/fee`, { customFeeRate: d.customFeeRate, customWithdrawalFeeRate: d.customWithdrawalFeeRate }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      invalidateMerchants();
       toast({ title: "Frais personnalisés mis à jour" });
       setUserFeeDialog(null);
       setUserFeeConfirm(false);
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
-
-  /* ── Filtered list ── */
-  const filtered = useMemo(() => {
-    if (!merchants) return [];
-    const q = search.toLowerCase().trim();
-    if (!q) return merchants;
-    return merchants.filter((m: any) =>
-      (m.firstName + " " + m.lastName + " " + m.email + " " + m.phone).toLowerCase().includes(q)
-    );
-  }, [merchants, search]);
 
   return (
     <DashboardLayout title="Marchands" breadcrumbs={[{ label: "Administration", href: "/admin" }, { label: "Marchands" }]}>
@@ -128,8 +147,8 @@ export default function AdminMerchantsPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-black text-violet-300">{isLoading ? "—" : (merchants || []).length}</p>
-                <p className="text-white/60 text-xs">marchands actifs</p>
+                <p className="text-3xl font-black text-violet-300">{total > 0 ? total : (isLoading ? "—" : "0")}</p>
+                <p className="text-white/60 text-xs">{debouncedSearch ? "résultats" : "marchands actifs"}</p>
               </div>
             </div>
           </div>
@@ -145,12 +164,15 @@ export default function AdminMerchantsPage() {
             className="pl-10 h-10"
             data-testid="input-search-merchants"
           />
+          {isFetching && (
+            <RefreshCw className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-violet-500 animate-spin" />
+          )}
         </div>
 
         {/* ═══ LIST ═══ */}
         {isLoading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3, 4, 5].map(i => (
               <div key={i} className="rounded-2xl border border-border/50 p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-10 w-10 rounded-xl" />
@@ -160,134 +182,177 @@ export default function AdminMerchantsPage() {
                   </div>
                   <Skeleton className="h-6 w-20" />
                 </div>
-                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-8 w-full rounded-xl" />
               </div>
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : merchants.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground text-sm">
-            {search ? "Aucun marchand trouvé pour cette recherche" : "Aucun marchand pour l'instant"}
+            {debouncedSearch ? "Aucun marchand trouvé pour cette recherche" : "Aucun marchand pour l'instant"}
           </div>
         ) : (
-          <div className="space-y-3">
-            {filtered.map((m: any) => (
-              <Card key={m.id} className={`border-border/50 overflow-hidden ${m.isBlocked ? "border-red-500/40 bg-red-500/5" : ""}`} data-testid={`card-merchant-${m.id}`}>
-                <CardContent className="p-4">
+          <>
+            <div className={`space-y-3 transition-opacity duration-150 ${isFetching ? "opacity-60" : "opacity-100"}`}>
+              {merchants.map((m: any) => (
+                <Card key={m.id} className={`border-border/50 overflow-hidden ${m.isBlocked ? "border-red-500/40 bg-red-500/5" : ""}`} data-testid={`card-merchant-${m.id}`}>
+                  <CardContent className="p-4">
 
-                  {/* Header */}
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${m.isBlocked ? "bg-red-500/15 text-red-600" : "bg-violet-500/15 text-violet-600"}`}>
-                      {(m.firstName?.[0] || m.email?.[0] || "?").toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-bold text-sm truncate" data-testid={`text-merchant-name-${m.id}`}>{m.firstName} {m.lastName}</p>
-                        {m.isBlocked && <span className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 text-[10px] font-bold">Bloqué</span>}
+                    {/* Header */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${m.isBlocked ? "bg-red-500/15 text-red-600" : "bg-violet-500/15 text-violet-600"}`}>
+                        {(m.firstName?.[0] || m.email?.[0] || "?").toUpperCase()}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-sm truncate" data-testid={`text-merchant-name-${m.id}`}>{m.firstName} {m.lastName}</p>
+                          {m.isBlocked && <span className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 text-[10px] font-bold">Bloqué</span>}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs text-muted-foreground">Solde</p>
+                        <p className="font-black text-sm text-emerald-600" data-testid={`text-balance-${m.id}`}>{fmt(parseFloat(m.balance || "0"))}</p>
+                      </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xs text-muted-foreground">Solde</p>
-                      <p className="font-black text-sm text-emerald-600" data-testid={`text-balance-${m.id}`}>{fmt(parseFloat(m.balance || "0"))}</p>
-                    </div>
-                  </div>
 
-                  {/* Stats + block button */}
-                  <div className="flex gap-2 mb-3 flex-wrap">
-                    <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-400 text-xs font-semibold">
-                      <Link2 className="h-3 w-3" />{m.links.length} lien{m.links.length !== 1 ? "s" : ""}
+                    {/* Stats + buttons */}
+                    <div className="flex gap-2 mb-3 flex-wrap">
+                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-400 text-xs font-semibold">
+                        <Link2 className="h-3 w-3" />{m.links.length} lien{m.links.length !== 1 ? "s" : ""}
+                      </div>
+                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 text-xs font-semibold">
+                        <Zap className="h-3 w-3" />{m.keys.length} clé{m.keys.length !== 1 ? "s" : ""}
+                      </div>
+                      {(m.customFeeRate != null || m.customWithdrawalFeeRate != null) && (
+                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-semibold">
+                          <Percent className="h-3 w-3" />
+                          {m.customFeeRate != null && `D:${m.customFeeRate}%`}
+                          {m.customFeeRate != null && m.customWithdrawalFeeRate != null && " · "}
+                          {m.customWithdrawalFeeRate != null && `R:${m.customWithdrawalFeeRate}%`}
+                        </div>
+                      )}
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setUserFeeDeposit(m.customFeeRate ?? "");
+                            setUserFeeWithdrawal(m.customWithdrawalFeeRate ?? "");
+                            setUserFeeConfirm(false);
+                            setUserFeeDialog({ userId: m.id, name: `${m.firstName} ${m.lastName}` });
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/15"
+                          data-testid={`btn-fee-merchant-${m.id}`}
+                        >
+                          <Percent className="h-3.5 w-3.5" />Frais
+                        </button>
+                        <button
+                          onClick={() => setBlockDialog({ userId: m.id, name: `${m.firstName} ${m.lastName}`, isBlocked: m.isBlocked })}
+                          disabled={blockM.isPending}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${m.isBlocked ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
+                          data-testid={`btn-block-merchant-${m.id}`}
+                        >
+                          {m.isBlocked ? <><Unlock className="h-3.5 w-3.5" />Débloquer</> : <><Lock className="h-3.5 w-3.5" />Bloquer</>}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 text-xs font-semibold">
-                      <Zap className="h-3 w-3" />{m.keys.length} clé{m.keys.length !== 1 ? "s" : ""}
-                    </div>
-                    {(m.customFeeRate != null || m.customWithdrawalFeeRate != null) && (
-                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-semibold">
-                        <Percent className="h-3 w-3" />
-                        {m.customFeeRate != null && `D:${m.customFeeRate}%`}
-                        {m.customFeeRate != null && m.customWithdrawalFeeRate != null && " · "}
-                        {m.customWithdrawalFeeRate != null && `R:${m.customWithdrawalFeeRate}%`}
+
+                    {/* Payment Links */}
+                    {m.links.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Liens de paiement</p>
+                        <div className="space-y-1.5">
+                          {m.links.map((link: any) => (
+                            <div key={link.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${link.adminLocked ? "border-red-500/30 bg-red-500/5" : "border-border/40 bg-muted/30"}`} data-testid={`row-link-${link.id}`}>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold truncate">{link.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{fmt(parseFloat(link.amount))} {link.currency} · utilisé {link.timesUsed}×</p>
+                              </div>
+                              {link.adminLocked && <span className="px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-600 text-[9px] font-bold flex-shrink-0">Bloqué</span>}
+                              <button
+                                onClick={() => setToggleConfirmDialog({ type: "link", id: link.id, name: link.name || "ce lien", isCurrentlyActive: !link.adminLocked })}
+                                className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${link.adminLocked ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
+                                data-testid={`btn-toggle-link-${link.id}`}
+                              >
+                                {link.adminLocked ? <><Unlock className="h-3 w-3" />Déverrouiller</> : <><Lock className="h-3 w-3" />Bloquer</>}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
-                    <div className="ml-auto flex items-center gap-1.5">
-                      <button
-                        onClick={() => {
-                          setUserFeeDeposit(m.customFeeRate ?? "");
-                          setUserFeeWithdrawal(m.customWithdrawalFeeRate ?? "");
-                          setUserFeeConfirm(false);
-                          setUserFeeDialog({ userId: m.id, name: `${m.firstName} ${m.lastName}` });
-                        }}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/15"
-                        data-testid={`btn-fee-merchant-${m.id}`}
-                      >
-                        <Percent className="h-3.5 w-3.5" />Frais
-                      </button>
-                      <button
-                        onClick={() => setBlockDialog({ userId: m.id, name: `${m.firstName} ${m.lastName}`, isBlocked: m.isBlocked })}
-                        disabled={blockM.isPending}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${m.isBlocked ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
-                        data-testid={`btn-block-merchant-${m.id}`}
-                      >
-                        {m.isBlocked ? <><Unlock className="h-3.5 w-3.5" />Débloquer</> : <><Lock className="h-3.5 w-3.5" />Bloquer</>}
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Payment Links */}
-                  {m.links.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Liens de paiement</p>
-                      <div className="space-y-1.5">
-                        {m.links.map((link: any) => (
-                          <div key={link.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${link.adminLocked ? "border-red-500/30 bg-red-500/5" : "border-border/40 bg-muted/30"}`} data-testid={`row-link-${link.id}`}>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold truncate">{link.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{fmt(parseFloat(link.amount))} {link.currency} · utilisé {link.timesUsed}×</p>
-                            </div>
-                            {link.adminLocked && <span className="px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-600 text-[9px] font-bold flex-shrink-0">Bloqué</span>}
-                            <button
-                              onClick={() => setToggleConfirmDialog({ type: "link", id: link.id, name: link.name || "ce lien", isCurrentlyActive: !link.adminLocked })}
-                              className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${link.adminLocked ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
-                              data-testid={`btn-toggle-link-${link.id}`}
-                            >
-                              {link.adminLocked ? <><Unlock className="h-3 w-3" />Déverrouiller</> : <><Lock className="h-3 w-3" />Bloquer</>}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* API Keys */}
-                  {m.keys.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Clés API</p>
-                      <div className="space-y-1.5">
-                        {m.keys.map((key: any) => (
-                          <div key={key.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${key.adminLocked ? "border-red-500/30 bg-red-500/5" : "border-border/40 bg-muted/30"}`} data-testid={`row-key-${key.id}`}>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="text-xs font-semibold truncate">{key.name || key.appName}</p>
-                                {key.isSrKey && <span className="px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-600 text-[9px] font-bold">SR</span>}
-                                {key.adminLocked && <span className="px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-600 text-[9px] font-bold">Bloqué</span>}
+                    {/* API Keys */}
+                    {m.keys.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Clés API</p>
+                        <div className="space-y-1.5">
+                          {m.keys.map((key: any) => (
+                            <div key={key.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${key.adminLocked ? "border-red-500/30 bg-red-500/5" : "border-border/40 bg-muted/30"}`} data-testid={`row-key-${key.id}`}>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-semibold truncate">{key.name || key.appName}</p>
+                                  {key.isSrKey && <span className="px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-600 text-[9px] font-bold">SR</span>}
+                                  {key.adminLocked && <span className="px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-600 text-[9px] font-bold">Bloqué</span>}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground font-mono">{key.keyPrefix}••••</p>
                               </div>
-                              <p className="text-[10px] text-muted-foreground font-mono">{key.keyPrefix}••••</p>
+                              <button
+                                onClick={() => setToggleConfirmDialog({ type: "key", id: key.id, name: key.name || key.appName || "cette clé", isCurrentlyActive: !key.adminLocked })}
+                                className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${key.adminLocked ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
+                                data-testid={`btn-toggle-key-${key.id}`}
+                              >
+                                {key.adminLocked ? <><Unlock className="h-3 w-3" />Déverrouiller</> : <><Lock className="h-3 w-3" />Bloquer</>}
+                              </button>
                             </div>
-                            <button
-                              onClick={() => setToggleConfirmDialog({ type: "key", id: key.id, name: key.name || key.appName || "cette clé", isCurrentlyActive: !key.adminLocked })}
-                              className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${key.adminLocked ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15" : "bg-red-500/10 text-red-600 hover:bg-red-500/15"}`}
-                              data-testid={`btn-toggle-key-${key.id}`}
-                            >
-                              {key.adminLocked ? <><Unlock className="h-3 w-3" />Déverrouiller</> : <><Lock className="h-3 w-3" />Bloquer</>}
-                            </button>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* ═══ PAGINATION ═══ */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-xs text-muted-foreground">
+                  Page {page} sur {totalPages} · {total} marchand{total !== 1 ? "s" : ""}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page <= 1 || isFetching}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    data-testid="btn-merchants-prev"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />Préc.
+                  </button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    const p = totalPages <= 5 ? i + 1 : page <= 3 ? i + 1 : page >= totalPages - 2 ? totalPages - 4 + i : page - 2 + i;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        disabled={isFetching}
+                        className={`w-8 h-8 rounded-xl text-xs font-bold transition-colors ${p === page ? "bg-violet-600 text-white" : "border border-border hover:bg-muted"}`}
+                        data-testid={`btn-merchants-page-${p}`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages || isFetching}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    data-testid="btn-merchants-next"
+                  >
+                    Suiv.<ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -307,10 +372,7 @@ export default function AdminMerchantsPage() {
             <div>
               <label className="text-xs font-semibold text-muted-foreground mb-1 block">Frais dépôt (%)</label>
               <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
+                type="number" min="0" max="100" step="0.1"
                 value={userFeeDeposit}
                 onChange={e => setUserFeeDeposit(e.target.value)}
                 placeholder="Global (par défaut)"
@@ -321,10 +383,7 @@ export default function AdminMerchantsPage() {
             <div>
               <label className="text-xs font-semibold text-muted-foreground mb-1 block">Frais retrait (%)</label>
               <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
+                type="number" min="0" max="100" step="0.1"
                 value={userFeeWithdrawal}
                 onChange={e => setUserFeeWithdrawal(e.target.value)}
                 placeholder="Global (par défaut)"
@@ -352,10 +411,7 @@ export default function AdminMerchantsPage() {
                   </span>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setUserFeeConfirm(false)}
-                    className="flex-1 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-                  >
+                  <button onClick={() => setUserFeeConfirm(false)} className="flex-1 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors">
                     Retour
                   </button>
                   <button
