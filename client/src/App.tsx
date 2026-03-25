@@ -180,6 +180,13 @@ function MaintenancePage() {
         <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-amber-700 dark:text-amber-400 font-medium">
           Toutes vos données sont en sécurité. Merci de votre patience.
         </div>
+        <a
+          href="/"
+          data-testid="link-maintenance-home"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl border border-border bg-background hover:bg-muted text-sm font-semibold transition-colors"
+        >
+          ← Retour à l'accueil
+        </a>
       </div>
     </div>
   );
@@ -217,9 +224,8 @@ function Router() {
     queryKey: ["/api/public/maintenance-status"],
     refetchInterval: 30_000,
     staleTime: 25_000,
-    enabled: !!user && !isAdmin,
   });
-  const isInMaintenance = maintenanceData?.maintenance ?? false;
+  const isInMaintenance = (maintenanceData?.maintenance ?? false) && !isAdmin;
 
   useEffect(() => {
     if (!user) return;
@@ -251,7 +257,7 @@ function Router() {
       <Route path="/pay-api/:id" component={PayApiPage} />
       <Route path="/documentation" component={DocumentationPage} />
       {user ? (
-        isInMaintenance && !isAdmin ? <MaintenancePage /> : <AuthenticatedRoutes />
+        isInMaintenance ? <MaintenancePage /> : <AuthenticatedRoutes />
       ) : (
         <>
           <Route path="/" component={LandingPage} />
