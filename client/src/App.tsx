@@ -174,13 +174,12 @@ function MaintenancePage() {
         <div className="space-y-2">
           <h1 className="text-2xl font-black text-foreground">Maintenance en cours</h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            SolvexPay est temporairement indisponible pour maintenance. Nous revenons très bientôt !
+            SolvexPay est temporairement indisponible en raison d'une opération de maintenance. Nos équipes techniques sont mobilisées pour rétablir le service dans les plus brefs délais. Merci pour votre patience et votre compréhension.
           </p>
         </div>
         <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-amber-700 dark:text-amber-400 font-medium">
           Toutes vos données sont en sécurité. Merci de votre patience.
         </div>
-        <p className="text-xs text-muted-foreground">Si vous êtes administrateur, connectez-vous normalement.</p>
       </div>
     </div>
   );
