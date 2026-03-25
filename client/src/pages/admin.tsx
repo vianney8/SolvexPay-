@@ -250,6 +250,127 @@ function WithdrawalModeCard() {
   );
 }
 
+function GlobalMaintenanceCard() {
+  const { toast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingValue, setPendingValue] = useState<boolean>(false);
+
+  const { data, isLoading } = useQuery<{ withdrawalMode: string; globalMaintenance: boolean }>({
+    queryKey: ["/api/admin/system-settings"],
+    staleTime: 30_000,
+  });
+
+  const mutation = useMutation({
+    mutationFn: (val: boolean) =>
+      apiRequest("PATCH", "/api/admin/system-settings", { globalMaintenance: val }).then(r => r.json()),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/system-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/maintenance-status"] });
+      toast({
+        title: data.globalMaintenance ? "⚠ Maintenance activée" : "✓ Site remis en ligne",
+        description: data.globalMaintenance
+          ? "Le site est maintenant en maintenance pour tous les utilisateurs."
+          : "Le site est de nouveau accessible à tous les utilisateurs.",
+      });
+      setConfirmOpen(false);
+    },
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const isActive = data?.globalMaintenance ?? false;
+
+  function handleToggleRequest() {
+    setPendingValue(!isActive);
+    setConfirmOpen(true);
+  }
+
+  return (
+    <>
+      <Card className={`border-2 ${isActive ? "border-red-500/60 bg-red-500/5" : "border-border/50"} transition-colors`}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+            Maintenance globale du site
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Lorsque la maintenance est activée, toutes les opérations utilisateur sont bloquées (dépôts, retraits, transferts, liens de paiement, clés API SR). Les administrateurs continuent d'accéder normalement.
+          </p>
+          {isActive && (
+            <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 flex items-center gap-3">
+              <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+              <p className="text-sm font-bold text-red-600 dark:text-red-400">Site actuellement EN MAINTENANCE</p>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 p-4">
+            <div className="space-y-1">
+              <p className="font-bold text-sm">{isLoading ? "Chargement..." : isActive ? "Maintenance activée" : "Site en ligne"}</p>
+              <p className="text-xs text-muted-foreground">{isActive ? "Les utilisateurs voient une page de maintenance." : "Fonctionnement normal, tout est accessible."}</p>
+            </div>
+            <button
+              onClick={handleToggleRequest}
+              disabled={isLoading || mutation.isPending}
+              data-testid="btn-toggle-global-maintenance"
+              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isActive ? "bg-red-500" : "bg-muted-foreground/30"} ${isLoading || mutation.isPending ? "opacity-50 pointer-events-none" : ""}`}
+            >
+              <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${isActive ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+          <button
+            onClick={handleToggleRequest}
+            disabled={isLoading || mutation.isPending}
+            data-testid="btn-maintenance-action"
+            className={`w-full py-3 rounded-2xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
+              isActive
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                : "bg-red-600 hover:bg-red-700 text-white"
+            } disabled:opacity-50`}
+          >
+            <AlertTriangle className="h-4 w-4" />
+            {isActive ? "Remettre le site en ligne" : "Activer la maintenance"}
+          </button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={confirmOpen} onOpenChange={o => { if (!o) setConfirmOpen(false); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <div className={`h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ${pendingValue ? "bg-gradient-to-br from-red-500 to-red-600" : "bg-gradient-to-br from-emerald-500 to-emerald-600"}`}>
+              <AlertTriangle className="h-8 w-8 text-white" />
+            </div>
+            <DialogTitle className="text-center text-lg">
+              {pendingValue ? "Activer la maintenance ?" : "Remettre en ligne ?"}
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm">
+              {pendingValue
+                ? "Tous les utilisateurs verront une page de maintenance. Aucune opération ne sera possible jusqu'à la désactivation."
+                : "Le site sera de nouveau pleinement accessible à tous les utilisateurs."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setConfirmOpen(false)}
+              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              data-testid="btn-maintenance-cancel"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={() => mutation.mutate(pendingValue)}
+              disabled={mutation.isPending}
+              data-testid="btn-maintenance-confirm"
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-50 ${pendingValue ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
+            >
+              {mutation.isPending ? "..." : "Confirmer"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function CountdownLoader({ label, icon }: { label: string; icon: string }) {
   const [count, setCount] = useState(5);
   useEffect(() => {
@@ -3413,6 +3534,7 @@ export default function AdminPage() {
               TAB 11 — PARAMÈTRES ADMIN
           ══════════════════════════════════════ */}
           <TabsContent value="settings" className="space-y-5 mt-5">
+            <GlobalMaintenanceCard />
             <WithdrawalModeCard />
             {/* ── OTP CONFIG ── */}
             {(() => {

@@ -1,7 +1,7 @@
 import { Switch, Route, useLocation } from "wouter";
 import { useEffect, Component, ReactNode } from "react";
+import { useQuery, QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -162,6 +162,30 @@ function AuthenticatedRoutes() {
   );
 }
 
+function MaintenancePage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-6" data-testid="maintenance-page">
+      <div className="max-w-sm w-full text-center space-y-6">
+        <div className="h-24 w-24 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto shadow-2xl">
+          <svg className="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+          </svg>
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-black text-foreground">Maintenance en cours</h1>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            SolvexPay est temporairement indisponible pour maintenance. Nous revenons très bientôt !
+          </p>
+        </div>
+        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-amber-700 dark:text-amber-400 font-medium">
+          Toutes vos données sont en sécurité. Merci de votre patience.
+        </div>
+        <p className="text-xs text-muted-foreground">Si vous êtes administrateur, connectez-vous normalement.</p>
+      </div>
+    </div>
+  );
+}
+
 function BlockedPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
@@ -188,13 +212,22 @@ function BlockedPage() {
 
 function Router() {
   const { user, isLoading, isBlocked } = useAuth();
+  const isAdmin = !!(user as any)?.isAdmin;
+
+  const { data: maintenanceData } = useQuery<{ maintenance: boolean }>({
+    queryKey: ["/api/public/maintenance-status"],
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+    enabled: !!user && !isAdmin,
+  });
+  const isInMaintenance = maintenanceData?.maintenance ?? false;
 
   useEffect(() => {
     if (!user) return;
     PREFETCH_KEYS.forEach((key) => {
       queryClient.prefetchQuery({ queryKey: key, staleTime: Infinity });
     });
-    if ((user as any).isAdmin) {
+    if (isAdmin) {
       ADMIN_PREFETCH_KEYS.forEach((key) => {
         queryClient.prefetchQuery({ queryKey: key, staleTime: Infinity });
       });
@@ -219,7 +252,7 @@ function Router() {
       <Route path="/pay-api/:id" component={PayApiPage} />
       <Route path="/documentation" component={DocumentationPage} />
       {user ? (
-        <AuthenticatedRoutes />
+        isInMaintenance && !isAdmin ? <MaintenancePage /> : <AuthenticatedRoutes />
       ) : (
         <>
           <Route path="/" component={LandingPage} />

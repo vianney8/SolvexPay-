@@ -357,6 +357,30 @@ async function forwardToMerchantWebhooks(transaction: any) {
 const _adminCache = new Map<string, { data: any; expiresAt: number }>();
 const ADMIN_CACHE_TTL = 120_000;
 
+// ── Global maintenance mode cache ────────────────────────────────────────────
+let _globalMaintenance: boolean = false;
+let _globalMaintenanceFetchedAt: number = 0;
+async function getGlobalMaintenance(): Promise<boolean> {
+  if (Date.now() - _globalMaintenanceFetchedAt < 30_000) return _globalMaintenance;
+  try {
+    const val = await storage.getSystemSetting("globalMaintenance");
+    _globalMaintenance = val === "true";
+    _globalMaintenanceFetchedAt = Date.now();
+  } catch { /* keep last known value */ }
+  return _globalMaintenance;
+}
+function setGlobalMaintenanceCache(val: boolean) {
+  _globalMaintenance = val;
+  _globalMaintenanceFetchedAt = Date.now();
+}
+async function requireNotMaintenance(req: any, res: any, next: any) {
+  const maintenance = await getGlobalMaintenance();
+  if (maintenance && !req.user?.isAdmin) {
+    return res.status(503).json({ maintenance: true, message: "Le site est actuellement en maintenance. Veuillez réessayer plus tard." });
+  }
+  next();
+}
+
 function adminCacheGet(key: string): any | null {
   const entry = _adminCache.get(key);
   if (!entry) return null;
@@ -675,7 +699,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/deposit", isAuthenticated, paymentLimiter, async (req: any, res) => {
+  app.post("/api/transactions/deposit", isAuthenticated, requireNotMaintenance, paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
       if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
@@ -761,7 +785,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/withdraw", isAuthenticated, paymentLimiter, async (req: any, res) => {
+  app.post("/api/transactions/withdraw", isAuthenticated, requireNotMaintenance, paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
       if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
@@ -896,7 +920,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/transfer", isAuthenticated, paymentLimiter, async (req: any, res) => {
+  app.post("/api/transactions/transfer", isAuthenticated, requireNotMaintenance, paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
       if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
@@ -1126,7 +1150,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/payment-api/public/:id/pay", async (req, res) => {
+  app.post("/api/payment-api/public/:id/pay", requireNotMaintenance, async (req, res) => {
     try {
       const { id } = req.params as Record<string, string>;
       const transaction = await storage.getTransactionById(id);
@@ -1595,7 +1619,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/payment-links/public/:slug/pay", async (req, res) => {
+  app.post("/api/payment-links/public/:slug/pay", requireNotMaintenance, async (req, res) => {
     try {
       const { slug } = req.params as Record<string, string>;
       
@@ -2055,7 +2079,7 @@ export async function registerRoutes(
 
   // ─── SR API — PAIEMENT DIRECT SANS REDIRECTION ───────────────────────────────
 
-  app.post("/api/v1/sr/pay", async (req: any, res) => {
+  app.post("/api/v1/sr/pay", requireNotMaintenance, async (req: any, res) => {
     try {
       // ── Authentification clé SR ──
       const authHeader = req.headers.authorization as string | undefined;
@@ -3863,10 +3887,18 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/public/maintenance-status", async (_req, res) => {
+    const maintenance = await getGlobalMaintenance();
+    res.json({ maintenance });
+  });
+
   app.get("/api/admin/system-settings", isAdmin, async (_req, res) => {
     try {
-      const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
-      res.json({ withdrawalMode });
+      const [withdrawalMode, maintenanceVal] = await Promise.all([
+        storage.getSystemSetting("withdrawalMode"),
+        storage.getSystemSetting("globalMaintenance"),
+      ]);
+      res.json({ withdrawalMode: withdrawalMode || "auto", globalMaintenance: maintenanceVal === "true" });
     } catch (error) {
       res.status(500).json({ message: "Erreur" });
     }
@@ -3874,11 +3906,19 @@ export async function registerRoutes(
 
   app.patch("/api/admin/system-settings", isAdmin, async (req, res) => {
     try {
-      const { withdrawalMode } = req.body;
+      const { withdrawalMode, globalMaintenance } = req.body;
       if (withdrawalMode && ["auto", "manual"].includes(withdrawalMode)) {
         await storage.setSystemSetting("withdrawalMode", withdrawalMode);
       }
-      res.json({ withdrawalMode: withdrawalMode || "auto" });
+      if (typeof globalMaintenance === "boolean") {
+        await storage.setSystemSetting("globalMaintenance", globalMaintenance ? "true" : "false");
+        setGlobalMaintenanceCache(globalMaintenance);
+      }
+      const [wMode, mVal] = await Promise.all([
+        storage.getSystemSetting("withdrawalMode"),
+        storage.getSystemSetting("globalMaintenance"),
+      ]);
+      res.json({ withdrawalMode: wMode || "auto", globalMaintenance: mVal === "true" });
     } catch (error) {
       res.status(500).json({ message: "Erreur" });
     }
