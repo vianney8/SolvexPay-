@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { useEffect, Component, ReactNode } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -233,15 +233,22 @@ function Router() {
   );
 }
 
+function RouteAwareRouter() {
+  const [location] = useLocation();
+  return (
+    <GlobalErrorBoundary key={location}>
+      <Router />
+    </GlobalErrorBoundary>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
           <Toaster />
-          <GlobalErrorBoundary>
-            <Router />
-          </GlobalErrorBoundary>
+          <RouteAwareRouter />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

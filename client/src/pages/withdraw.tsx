@@ -92,7 +92,7 @@ export default function WithdrawPage() {
   }, [suspendedCodes.join(",")]); // eslint-disable-line
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
-  const { data: allTransactions } = useQuery<any[]>({ queryKey: ["/api/transactions"] });
+  const { data: txResponse } = useQuery<any>({ queryKey: ["/api/transactions"] });
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
 
@@ -144,9 +144,8 @@ export default function WithdrawPage() {
   const totalDebitXOF = withdrawAmountXOF + feesXOF;
   const insufficientFunds = totalDebitXOF > balanceXOF && withdrawAmount > 0;
 
-  const recentWithdrawals = allTransactions
-    ?.filter((t: any) => t.type === "withdrawal")
-    .slice(0, 5) || [];
+  const txArray: any[] = Array.isArray(txResponse) ? txResponse : (txResponse?.data ?? []);
+  const recentWithdrawals = txArray.filter((t: any) => t.type === "withdrawal").slice(0, 5);
 
   const withdrawMutation = useMutation({
     mutationFn: async (data: { amount: number; phoneNumber: string; operator: string; country: string }) => {
