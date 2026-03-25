@@ -558,10 +558,20 @@ export async function registerRoutes(
         .from(txTable)
         .where(and(eq(txTable.userId, userId), eq(txTable.type, "withdrawal"), eq(txTable.status, "completed")));
 
+      // Pending count: withdrawals always count, deposits/transfers expire after 12min (mirrors frontend isExpiredPending logic)
+      const twelveMinAgo = new Date(Date.now() - 12 * 60 * 1000);
+      const { or: orDrizzle, ne: neDrizzle, gte: gteDrizzle } = await import("drizzle-orm");
       const [pendingCountRow] = await db
         .select({ cnt: count(), total: sum(txTable.amount) })
         .from(txTable)
-        .where(and(eq(txTable.userId, userId), eq(txTable.status, "pending")));
+        .where(and(
+          eq(txTable.userId, userId),
+          eq(txTable.status, "pending"),
+          orDrizzle(
+            eq(txTable.type, "withdrawal"),
+            gteDrizzle(txTable.createdAt, twelveMinAgo),
+          )
+        ));
 
       const netAmountExpr = sql<string>`SUM(CAST(${txTable.amount} AS NUMERIC) - COALESCE(CAST(${txTable.fees} AS NUMERIC), 0))`;
       const netAmountOrder = sql`SUM(CAST(${txTable.amount} AS NUMERIC) - COALESCE(CAST(${txTable.fees} AS NUMERIC), 0))`;

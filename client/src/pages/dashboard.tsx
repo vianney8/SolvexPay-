@@ -103,7 +103,7 @@ export default function DashboardPage() {
     pendingTotal: number;
     topLinks: Array<{ id: string; name: string; count: number; totalAmount: number }>;
     topCountries: Array<{ country: string; count: number; totalAmount: number }>;
-  }>({ queryKey: ["/api/dashboard-stats"], staleTime: 0, refetchInterval: 30_000, refetchOnMount: true, refetchOnWindowFocus: true });
+  }>({ queryKey: ["/api/dashboard-stats"], staleTime: 0, refetchInterval: (query) => ((query.state.data as any)?.pendingCount > 0 ? 8_000 : 30_000), refetchOnMount: true, refetchOnWindowFocus: true });
 
   const isUserBlocked = !!(user as any)?.isBlocked;
   const firstName = isUserBlocked ? "Utilisateur SolvexPay" : (user?.firstName || user?.email?.split("@")[0] || "là");
