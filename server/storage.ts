@@ -28,7 +28,7 @@ export interface IStorage {
   
   getTransactions(userId: string): Promise<Transaction[]>;
   getRecentTransactions(userId: string, limit?: number): Promise<Transaction[]>;
-  getTransactionsPaginated(userId: string, page: number, limit: number, filters?: { type?: string; status?: string; search?: string }): Promise<{ data: Transaction[]; total: number; hasPending: boolean }>;
+  getTransactionsPaginated(userId: string, page: number, limit: number, filters?: { type?: string; status?: string; search?: string }): Promise<{ data: Transaction[]; total: number; hasPending: boolean; totalCompleted: number; totalPending: number }>;
   getTransactionById(id: string): Promise<Transaction | undefined>;
   getTransactionByReference(reference: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -130,7 +130,7 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getTransactionsPaginated(userId: string, page: number, limit: number, filters?: { type?: string; status?: string; search?: string }): Promise<{ data: Transaction[]; total: number; hasPending: boolean }> {
+  async getTransactionsPaginated(userId: string, page: number, limit: number, filters?: { type?: string; status?: string; search?: string }): Promise<{ data: Transaction[]; total: number; hasPending: boolean; totalCompleted: number; totalPending: number }> {
     const conditions: any[] = [eq(transactions.userId, userId)];
     if (filters?.type && filters.type !== "all") conditions.push(eq(transactions.type, filters.type));
     if (filters?.status && filters.status !== "all") conditions.push(eq(transactions.status, filters.status));
@@ -146,7 +146,8 @@ export class DatabaseStorage implements IStorage {
       )!);
     }
     const where = and(...conditions);
-    const [rows, countRows, pendingRows] = await Promise.all([
+    const twelveMinAgo = new Date(Date.now() - 12 * 60 * 1000);
+    const [rows, countRows, completedRows, pendingRows] = await Promise.all([
       db.select().from(transactions)
         .where(where)
         .orderBy(desc(transactions.createdAt))
@@ -154,9 +155,22 @@ export class DatabaseStorage implements IStorage {
         .offset((page - 1) * limit),
       db.select({ count: sql<number>`count(*)::int` }).from(transactions).where(where),
       db.select({ count: sql<number>`count(*)::int` }).from(transactions)
-        .where(and(eq(transactions.userId, userId), eq(transactions.status, "pending"))),
+        .where(and(eq(transactions.userId, userId), eq(transactions.status, "completed"))),
+      db.select({ count: sql<number>`count(*)::int` }).from(transactions)
+        .where(and(
+          eq(transactions.userId, userId),
+          eq(transactions.status, "pending"),
+          or(eq(transactions.type, "withdrawal"), sql`${transactions.createdAt} >= ${twelveMinAgo}`)!,
+        )),
     ]);
-    return { data: rows, total: countRows[0]?.count ?? 0, hasPending: (pendingRows[0]?.count ?? 0) > 0 };
+    const totalPending = pendingRows[0]?.count ?? 0;
+    return {
+      data: rows,
+      total: countRows[0]?.count ?? 0,
+      hasPending: totalPending > 0,
+      totalCompleted: completedRows[0]?.count ?? 0,
+      totalPending,
+    };
   }
 
   async getTransactionById(id: string): Promise<Transaction | undefined> {

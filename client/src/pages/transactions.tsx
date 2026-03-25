@@ -227,7 +227,7 @@ export default function TransactionsPage() {
 
   const queryKey = ["/api/transactions", currentPage, PAGE_SIZE, typeFilter, statusFilter, searchDebounced];
 
-  const { data, isLoading, isFetching } = useQuery<{ data: Transaction[]; total: number; hasPending: boolean }>({
+  const { data, isLoading, isFetching } = useQuery<{ data: Transaction[]; total: number; hasPending: boolean; totalCompleted: number; totalPending: number }>({
     queryKey,
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -255,9 +255,8 @@ export default function TransactionsPage() {
   const transactions = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  const completed = transactions.filter(t => getEffectiveStatus(t) === "completed").length;
-  const pending = transactions.filter(t => getEffectiveStatus(t) === "pending").length;
+  const totalCompleted = data?.totalCompleted ?? 0;
+  const totalPending = data?.totalPending ?? 0;
 
   const goToPage = useCallback((p: number) => setCurrentPage(Math.max(1, Math.min(p, totalPages))), [totalPages]);
 
@@ -313,8 +312,8 @@ export default function TransactionsPage() {
           </div>
           <div className="relative mt-4 grid grid-cols-3 gap-2">
             {[
-              { label: "Réussies", value: completed, icon: CheckCircle2 },
-              { label: "En attente", value: pending, icon: Clock },
+              { label: "Réussies", value: totalCompleted, icon: CheckCircle2 },
+              { label: "En attente", value: totalPending, icon: Clock },
               { label: "Page", value: `${currentPage}/${totalPages}`, icon: TrendingUp },
             ].map((card) => (
               <div key={card.label} className="bg-white/10 rounded-2xl p-2.5 backdrop-blur-sm min-w-0">
