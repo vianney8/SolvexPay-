@@ -620,17 +620,22 @@ export async function registerRoutes(
     }
   });
 
-  // Per-user transaction cache (TTL: 30s)
+  // Per-user transaction cache — keyed by userId+params, TTL 10s
   const userTxCache = new Map<string, { data: any; ts: number }>();
-  const TX_CACHE_TTL = 30_000;
-  function userTxCacheDel(userId: string) { userTxCache.delete(`recent:${userId}`); userTxCache.delete(`all:${userId}`); }
+  const TX_CACHE_TTL = 10_000;
+  const TX_RECENT_TTL = 8_000;
+  function userTxCacheDel(userId: string) {
+    for (const key of userTxCache.keys()) {
+      if (key.startsWith(`${userId}:`)) userTxCache.delete(key);
+    }
+  }
 
   app.get("/api/transactions/recent", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const cacheKey = `recent:${userId}`;
+      const cacheKey = `${userId}:recent`;
       const cached = userTxCache.get(cacheKey);
-      if (cached && Date.now() - cached.ts < TX_CACHE_TTL) return res.json(cached.data);
+      if (cached && Date.now() - cached.ts < TX_RECENT_TTL) return res.json(cached.data);
       const data = await storage.getRecentTransactions(userId, 5);
       userTxCache.set(cacheKey, { data, ts: Date.now() });
       res.json(data);
@@ -644,18 +649,16 @@ export async function registerRoutes(
     try {
       const userId = req.user.id;
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-      if (req.query.page) {
-        const result = await storage.getTransactionsPaginated(userId, page, limit);
-        return res.json(result);
-      }
-      // Legacy: full list (used by history page with client-side filtering)
-      const cacheKey = `all:${userId}`;
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const type = (req.query.type as string) || "all";
+      const status = (req.query.status as string) || "all";
+      const search = (req.query.search as string) || "";
+      const cacheKey = `${userId}:${page}:${limit}:${type}:${status}:${search}`;
       const cached = userTxCache.get(cacheKey);
       if (cached && Date.now() - cached.ts < TX_CACHE_TTL) return res.json(cached.data);
-      const data = await storage.getTransactions(userId);
-      userTxCache.set(cacheKey, { data, ts: Date.now() });
-      res.json(data);
+      const result = await storage.getTransactionsPaginated(userId, page, limit, { type, status, search });
+      userTxCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching transactions:", error);
       res.status(500).json({ message: "Failed to fetch transactions" });

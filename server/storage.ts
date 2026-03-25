@@ -17,7 +17,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, ne } from "drizzle-orm";
+import { eq, desc, and, sql, ne, or, ilike } from "drizzle-orm";
 import { randomBytes, createHash } from "crypto";
 import { users } from "@shared/models/auth";
 
@@ -28,7 +28,7 @@ export interface IStorage {
   
   getTransactions(userId: string): Promise<Transaction[]>;
   getRecentTransactions(userId: string, limit?: number): Promise<Transaction[]>;
-  getTransactionsPaginated(userId: string, page: number, limit: number): Promise<{ data: Transaction[]; total: number }>;
+  getTransactionsPaginated(userId: string, page: number, limit: number, filters?: { type?: string; status?: string; search?: string }): Promise<{ data: Transaction[]; total: number; hasPending: boolean }>;
   getTransactionById(id: string): Promise<Transaction | undefined>;
   getTransactionByReference(reference: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -130,17 +130,33 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getTransactionsPaginated(userId: string, page: number, limit: number): Promise<{ data: Transaction[]; total: number }> {
-    const [rows, countRows] = await Promise.all([
+  async getTransactionsPaginated(userId: string, page: number, limit: number, filters?: { type?: string; status?: string; search?: string }): Promise<{ data: Transaction[]; total: number; hasPending: boolean }> {
+    const conditions: any[] = [eq(transactions.userId, userId)];
+    if (filters?.type && filters.type !== "all") conditions.push(eq(transactions.type, filters.type));
+    if (filters?.status && filters.status !== "all") conditions.push(eq(transactions.status, filters.status));
+    if (filters?.search) {
+      const s = `%${filters.search.trim()}%`;
+      conditions.push(or(
+        ilike(transactions.reference, s),
+        ilike(transactions.provider, s),
+        ilike(transactions.phoneNumber, s),
+        ilike(transactions.description, s),
+        ilike(transactions.payerName, s),
+        ilike(transactions.payerEmail, s),
+      )!);
+    }
+    const where = and(...conditions);
+    const [rows, countRows, pendingRows] = await Promise.all([
       db.select().from(transactions)
-        .where(eq(transactions.userId, userId))
+        .where(where)
         .orderBy(desc(transactions.createdAt))
         .limit(limit)
         .offset((page - 1) * limit),
+      db.select({ count: sql<number>`count(*)::int` }).from(transactions).where(where),
       db.select({ count: sql<number>`count(*)::int` }).from(transactions)
-        .where(eq(transactions.userId, userId)),
+        .where(and(eq(transactions.userId, userId), eq(transactions.status, "pending"))),
     ]);
-    return { data: rows, total: countRows[0]?.count ?? 0 };
+    return { data: rows, total: countRows[0]?.count ?? 0, hasPending: (pendingRows[0]?.count ?? 0) > 0 };
   }
 
   async getTransactionById(id: string): Promise<Transaction | undefined> {

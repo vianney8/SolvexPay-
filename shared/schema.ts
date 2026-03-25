@@ -27,6 +27,9 @@ export const transactions = pgTable("transactions", {
 }, (table) => [
   index("idx_transactions_user").on(table.userId),
   index("idx_transactions_user_created").on(table.userId, table.createdAt),
+  index("idx_transactions_user_status").on(table.userId, table.status),
+  index("idx_transactions_user_type").on(table.userId, table.type),
+  index("idx_transactions_filter").on(table.userId, table.status, table.type, table.createdAt),
 ]);
 
 export const paymentLinks = pgTable("payment_links", {

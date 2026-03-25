@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -13,9 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Search, Activity, TrendingUp, CheckCircle2, Clock, X, ExternalLink, User, Mail, Phone, Globe, Zap, AlertTriangle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
-import { useState, useEffect } from "react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Search, Activity, TrendingUp, CheckCircle2, Clock, X, Phone, Globe, Zap, AlertTriangle, ChevronLeft, ChevronRight, RefreshCw, User, Mail } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import type { Transaction } from "@shared/schema";
+
+const PAGE_SIZE = 20;
 
 function formatCurrency(amount: string | number, currency = "XOF") {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -204,56 +207,59 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
   );
 }
 
-const PAGE_SIZE = 100;
-
 export default function TransactionsPage() {
   const { user } = useAuth();
   const isBlocked = !!(user as any)?.isBlocked;
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: transactions, isLoading, isFetching } = useQuery<Transaction[]>({
-    queryKey: ["/api/transactions"],
-    staleTime: 0,
-    gcTime: 5 * 60 * 1000,
-    refetchInterval: 30_000,
+  const [search, setSearch] = useState("");
+  const [searchDebounced, setSearchDebounced] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(search.trim()), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchDebounced, typeFilter, statusFilter]);
+
+  const queryKey = ["/api/transactions", currentPage, PAGE_SIZE, typeFilter, statusFilter, searchDebounced];
+
+  const { data, isLoading, isFetching } = useQuery<{ data: Transaction[]; total: number; hasPending: boolean }>({
+    queryKey,
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(PAGE_SIZE),
+        type: typeFilter,
+        status: statusFilter,
+        ...(searchDebounced ? { search: searchDebounced } : {}),
+      });
+      const res = await fetch(`/api/transactions?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch transactions");
+      return res.json();
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 8_000,
+    gcTime: 2 * 60 * 1000,
+    refetchInterval: (query) => {
+      const d = query.state.data as any;
+      return d?.hasPending ? 8_000 : 30_000;
+    },
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
 
-  // Reset to page 1 whenever filters change
-  useEffect(() => { setCurrentPage(1); }, [search, typeFilter, statusFilter]);
+  const transactions = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const filteredTransactions = transactions?.filter((tx) => {
-    const matchesSearch = !search ||
-      tx.reference.toLowerCase().includes(search.toLowerCase()) ||
-      tx.provider?.toLowerCase().includes(search.toLowerCase()) ||
-      tx.phoneNumber?.toLowerCase().includes(search.toLowerCase()) ||
-      tx.description?.toLowerCase().includes(search.toLowerCase()) ||
-      (tx as any).payerName?.toLowerCase().includes(search.toLowerCase()) ||
-      (tx as any).payerEmail?.toLowerCase().includes(search.toLowerCase());
-    const matchesType = typeFilter === "all" || tx.type === typeFilter;
-    const matchesStatus = statusFilter === "all" || getEffectiveStatus(tx) === statusFilter;
-    return matchesSearch && matchesType && matchesStatus;
-  }) || [];
+  const completed = transactions.filter(t => getEffectiveStatus(t) === "completed").length;
+  const pending = transactions.filter(t => getEffectiveStatus(t) === "pending").length;
 
-  const totalFiltered = filteredTransactions.length;
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedTransactions = filteredTransactions.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
-
-  const completed = transactions?.filter(t => getEffectiveStatus(t) === "completed").length || 0;
-  const pending = transactions?.filter(t => getEffectiveStatus(t) === "pending").length || 0;
-
-  const summaryCards = [
-    { label: "Total", value: transactions?.length || 0, icon: Activity, color: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
-    { label: "Réussies", value: completed, icon: CheckCircle2, color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-    { label: "En attente", value: pending, icon: Clock, color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-    { label: "Taux succès", value: `${transactions && transactions.length > 0 ? Math.round((completed / transactions.length) * 100) : 0}%`, icon: TrendingUp, color: "bg-pink-500/10 text-pink-600 dark:text-pink-400" },
-  ];
+  const goToPage = useCallback((p: number) => setCurrentPage(Math.max(1, Math.min(p, totalPages))), [totalPages]);
 
   return (
     <DashboardLayout title="Transactions" breadcrumbs={[{ label: "Transactions" }]} backTo="/dashboard">
@@ -269,6 +275,7 @@ export default function TransactionsPage() {
             </div>
           </div>
         )}
+
         <div
           className="relative rounded-3xl p-5 text-white overflow-hidden shadow-xl"
           style={{ background: "linear-gradient(135deg, hsl(262 83% 46%) 0%, hsl(250 80% 55%) 60%, hsl(240 78% 52%) 100%)" }}
@@ -289,20 +296,27 @@ export default function TransactionsPage() {
                       ) : (
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
                       )}
-                      En direct
+                      {data?.hasPending ? "Mise à jour 8s" : "En direct"}
                     </span>
                   )}
                 </div>
-                <p className="text-white/70 text-xs">Toutes vos opérations financières · actualisation auto 30s</p>
+                <p className="text-white/70 text-xs">
+                  {total > 0 ? `${total} transaction${total > 1 ? "s" : ""} au total` : "Vos opérations financières"}
+                  {data?.hasPending ? " · actualisation rapide" : " · actualisation auto 30s"}
+                </p>
               </div>
             </div>
             <div className="text-right flex-shrink-0 min-w-0">
               <p className="text-white/60 text-xs">Total</p>
-              <p className="font-black text-lg leading-tight tabular-nums">{isLoading ? "—" : transactions?.length || 0}</p>
+              <p className="font-black text-lg leading-tight tabular-nums">{isLoading ? "—" : total}</p>
             </div>
           </div>
           <div className="relative mt-4 grid grid-cols-3 gap-2">
-            {summaryCards.slice(1).map((card) => (
+            {[
+              { label: "Réussies", value: completed, icon: CheckCircle2 },
+              { label: "En attente", value: pending, icon: Clock },
+              { label: "Page", value: `${currentPage}/${totalPages}`, icon: TrendingUp },
+            ].map((card) => (
               <div key={card.label} className="bg-white/10 rounded-2xl p-2.5 backdrop-blur-sm min-w-0">
                 <p className="text-white/60 text-[10px] font-medium mb-1 leading-tight">{card.label}</p>
                 {isLoading ? <div className="h-5 w-10 bg-white/20 rounded animate-pulse" /> : (
@@ -352,25 +366,29 @@ export default function TransactionsPage() {
 
             {isLoading ? (
               <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map((i) => (
+                {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
-                    <Skeleton className="h-10 w-10 rounded-xl" />
+                    <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
                     <div className="flex-1"><Skeleton className="h-4 w-32 mb-1.5" /><Skeleton className="h-3 w-24" /></div>
                     <Skeleton className="h-5 w-28" />
                   </div>
                 ))}
               </div>
-            ) : filteredTransactions.length === 0 ? (
+            ) : transactions.length === 0 ? (
               <div className="text-center py-16">
                 <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
                   <Activity className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <p className="font-bold text-foreground mb-1">Aucune transaction trouvée</p>
-                <p className="text-sm text-muted-foreground">Vos transactions apparaîtront ici</p>
+                <p className="text-sm text-muted-foreground">
+                  {search || typeFilter !== "all" || statusFilter !== "all"
+                    ? "Modifiez vos filtres pour afficher plus de résultats"
+                    : "Vos transactions apparaîtront ici"}
+                </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {paginatedTransactions.map((tx) => {
+              <div className={`space-y-2 transition-opacity duration-150 ${isFetching ? "opacity-70" : "opacity-100"}`}>
+                {transactions.map((tx) => {
                   const typeStyle = getTypeIcon(tx);
                   const TypeIcon = typeStyle.icon;
                   const displayProvider = getDisplayProvider(tx);
@@ -413,26 +431,25 @@ export default function TransactionsPage() {
               </div>
             )}
 
-            {/* Pagination controls */}
             {!isLoading && totalPages > 1 && (
               <div className="flex items-center justify-between mt-5 pt-4 border-t border-border/50">
                 <p className="text-xs text-muted-foreground">
-                  {totalFiltered === 0 ? "0" : `${(safeCurrentPage - 1) * PAGE_SIZE + 1}–${Math.min(safeCurrentPage * PAGE_SIZE, totalFiltered)}`} sur {totalFiltered}
+                  {total === 0 ? "0" : `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, total)}`} sur {total}
                 </p>
                 <div className="flex items-center gap-1">
-                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={safeCurrentPage <= 1} onClick={() => setCurrentPage(p => p - 1)} data-testid="btn-prev-page">
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage <= 1 || isFetching} onClick={() => goToPage(currentPage - 1)} data-testid="btn-prev-page">
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const start = Math.max(1, Math.min(safeCurrentPage - 2, totalPages - 4));
+                    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
                     const pg = start + i;
                     return (
-                      <Button key={pg} variant={pg === safeCurrentPage ? "default" : "outline"} size="icon" className="h-8 w-8 text-xs" onClick={() => setCurrentPage(pg)} data-testid={`btn-page-${pg}`}>
+                      <Button key={pg} variant={pg === currentPage ? "default" : "outline"} size="icon" className="h-8 w-8 text-xs" onClick={() => goToPage(pg)} disabled={isFetching} data-testid={`btn-page-${pg}`}>
                         {pg}
                       </Button>
                     );
                   })}
-                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={safeCurrentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} data-testid="btn-next-page">
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages || isFetching} onClick={() => goToPage(currentPage + 1)} data-testid="btn-next-page">
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
