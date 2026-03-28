@@ -114,8 +114,12 @@ export default function WithdrawPage() {
   const balance = currency === "CDF" ? Math.floor(balanceXOF / 0.22) : balanceXOF;
   const withdrawAmount = parseFloat(amount) || 0;
 
-  // Calcul du taux effectif : par pays > par opérateur > global (même logique que le backend)
+  // Calcul du taux effectif : frais personnalisés > par pays > par opérateur > global (même logique que le backend)
   function getEffectiveWithdrawalFeeRate(): number {
+    // 0. Frais personnalisés par utilisateur (priorité maximale)
+    if ((user as any)?.customWithdrawalFeeRate !== null && (user as any)?.customWithdrawalFeeRate !== undefined && (user as any)?.customWithdrawalFeeRate !== "") {
+      return parseFloat(String((user as any).customWithdrawalFeeRate));
+    }
     const globalRate = serviceFees?.withdrawal ?? 7;
     if (!operator || !paymentMethods) return globalRate;
     const pm = paymentMethods.find((m: any) => m.code === operator);

@@ -93,8 +93,12 @@ export default function DepositPage() {
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
 
-  // Calcul du taux effectif : par pays > par opérateur > global (même logique que le backend)
+  // Calcul du taux effectif : frais personnalisés > par pays > par opérateur > global (même logique que le backend)
   function getEffectiveFeeRate(): number {
+    // 0. Frais personnalisés par utilisateur (priorité maximale)
+    if ((user as any)?.customFeeRate !== null && (user as any)?.customFeeRate !== undefined && (user as any)?.customFeeRate !== "") {
+      return parseFloat(String((user as any).customFeeRate));
+    }
     const globalRate = serviceFees?.deposit ?? 7;
     if (!operator || !paymentMethods) return globalRate;
     const pm = paymentMethods.find((m: any) => m.code === operator);
