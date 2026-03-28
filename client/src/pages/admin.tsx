@@ -706,6 +706,7 @@ export default function AdminPage() {
       apiRequest("PATCH", `/api/admin/users/${d.userId}/fee`, { customFeeRate: d.customFeeRate, customWithdrawalFeeRate: d.customWithdrawalFeeRate }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
       toast({ title: "Frais personnalisés mis à jour" });
       setUserFeeDialog(null);
       setUserFeeConfirm(false);
@@ -2206,15 +2207,33 @@ export default function AdminPage() {
                             {((u.firstName?.[0] || "") + (u.lastName?.[0] || u.email?.[0] || "?")).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold truncate">{u.firstName} {u.lastName}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-semibold truncate">{u.firstName} {u.lastName}</p>
+                              {(u.customFeeRate != null || u.customWithdrawalFeeRate != null) && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-600 text-[10px] font-bold">
+                                  {u.customFeeRate != null && `D:${u.customFeeRate}%`}
+                                  {u.customFeeRate != null && u.customWithdrawalFeeRate != null && " · "}
+                                  {u.customWithdrawalFeeRate != null && `R:${u.customWithdrawalFeeRate}%`}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                           </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
                             <p className={`font-black text-sm ${bal > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>{fmt(bal)}</p>
+                            <button
+                              onClick={() => { setUserFeeDeposit(u.customFeeRate ?? ""); setUserFeeWithdrawal(u.customWithdrawalFeeRate ?? ""); setUserFeeConfirm(false); setUserFeeDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, currentDeposit: u.customFeeRate ?? "", currentWithdrawal: u.customWithdrawalFeeRate ?? "" }); }}
+                              className="h-7 w-7 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 flex items-center justify-center transition-colors"
+                              data-testid={`btn-fee-wallet-${u.id}`}
+                              title="Configurer les frais"
+                            >
+                              <Percent className="h-3.5 w-3.5 text-violet-600" />
+                            </button>
                             <button
                               onClick={() => { setDepositDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}` }); setDepositData({ amount: "", phone: u.phone || "", operator: "", motif: "" }); }}
                               className="h-7 w-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-center transition-colors"
                               data-testid={`btn-deposit-wallet-${u.id}`}
+                              title="Dépôt"
                             >
                               <Plus className="h-3.5 w-3.5 text-emerald-600" />
                             </button>

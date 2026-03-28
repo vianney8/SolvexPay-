@@ -2912,7 +2912,7 @@ export async function registerRoutes(
       if ("customWithdrawalFeeRate" in req.body) updateData.customWithdrawalFeeRate = customWithdrawalFeeRate != null ? String(customWithdrawalFeeRate) : null;
       const [updated] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
-      adminCacheDel("admin-users");
+      adminCacheDel("admin-users", "admin-wallets", "admin-merchants");
       const { passwordHash: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
