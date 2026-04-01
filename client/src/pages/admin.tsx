@@ -540,6 +540,13 @@ export default function AdminPage() {
     staleTime: 10000,
     refetchInterval: activeTab === "overview" ? 10000 : false,
   });
+  const { data: omnipayMovements, isLoading: movementsLoading, refetch: refetchMovements } = useQuery<any>({
+    queryKey: ["/api/admin/omnipay-movements"],
+    enabled: activeTab === "wallets",
+    refetchInterval: activeTab === "wallets" ? 60_000 : false,
+    staleTime: 30_000,
+  });
+
   const { data: liquidityData } = useQuery<{ walletsByCountry: any[]; pendingByCountry: any[] }>({
     queryKey: ["/api/admin/liquidity-analysis"],
     enabled: ["overview", "liquidity"].includes(activeTab),
@@ -2245,6 +2252,158 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* ══ OmniPay Movements ══ */}
+            {(() => {
+              const COUNTRY_INFO: Record<string, { name: string; flag: string }> = {
+                BJ: { name: "Bénin", flag: "🇧🇯" }, CI: { name: "Côte d\'Ivoire", flag: "🇨🇮" },
+                BF: { name: "Burkina Faso", flag: "🇧🇫" }, TG: { name: "Togo", flag: "🇹🇬" },
+                SN: { name: "Sénégal", flag: "🇸🇳" }, ML: { name: "Mali", flag: "🇲🇱" },
+                CM: { name: "Cameroun", flag: "🇨🇲" }, COD: { name: "RD Congo", flag: "🇨🇩" },
+                COG: { name: "Congo-Brazza.", flag: "🇨🇬" },
+              };
+              const omnipayBals: Record<string, { amount: number; currency: string }> = {};
+              (omnipayMovements?.omnipayBalances || []).forEach((b: any) => {
+                const code = b.countryCode?.toUpperCase();
+                if (code) omnipayBals[code] = { amount: parseFloat(b.amount || "0"), currency: b.currency || "XOF" };
+              });
+              const allMvts: any[] = omnipayMovements?.movements || [];
+              const byCountry: Record<string, any[]> = {};
+              for (const m of allMvts) {
+                const c = m.derivedCountry || "??";
+                if (!byCountry[c]) byCountry[c] = [];
+                if (byCountry[c].length < 50) byCountry[c].push(m);
+              }
+              const activeCountries = Array.from(new Set([
+                ...Object.keys(omnipayBals),
+                ...Object.keys(byCountry).filter(c => c !== "??"),
+              ])).sort();
+              const fmtAmt = (n: number, cur: string) =>
+                new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " " + cur;
+
+              return (
+                <Card className="border-border/50 overflow-hidden" data-testid="card-omnipay-movements">
+                  <CardHeader className="pb-3 px-5 pt-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                          <Activity className="h-4 w-4 text-indigo-500" />
+                          Mouvements OmniPay en temps réel
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground mt-0.5">50 derniers mouvements · actualisation auto toutes les 60s</p>
+                      </div>
+                      <button
+                        onClick={() => refetchMovements()}
+                        className="h-8 w-8 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 flex items-center justify-center transition-colors"
+                        data-testid="btn-refresh-omnipay-movements"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 text-indigo-600 ${movementsLoading ? "animate-spin" : ""}`} />
+                      </button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {movementsLoading ? (
+                      <div className="space-y-2 p-5">{[1,2,3].map(i => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
+                    ) : activeCountries.length === 0 ? (
+                      <div className="py-10 text-center text-sm text-muted-foreground">Aucun mouvement disponible</div>
+                    ) : (
+                      <div className="divide-y divide-border/30">
+                        {activeCountries.map(code => {
+                          const info = COUNTRY_INFO[code] || { name: code, flag: "🌍" };
+                          const bal = omnipayBals[code];
+                          const pending = omnipayMovements?.pendingByCountry?.[code] || 0;
+                          const mvts: any[] = byCountry[code] || [];
+                          let running = bal?.amount ?? 0;
+                          const enriched = mvts.map(tx => {
+                            const amt = parseFloat(tx.amount || "0");
+                            const balanceAfter = running;
+                            const balanceBefore = tx.type === "deposit" ? running - amt : running + amt;
+                            running = balanceBefore;
+                            return { ...tx, balanceBefore, balanceAfter };
+                          });
+                          const currency = bal?.currency || mvts[0]?.currency || "XOF";
+
+                          return (
+                            <div key={code}>
+                              {/* Country header */}
+                              <div className="flex flex-wrap items-center gap-3 px-5 py-3 bg-muted/20 border-b border-border/20">
+                                <span className="text-lg">{info.flag}</span>
+                                <span className="font-bold text-sm">{info.name}</span>
+                                {bal ? (
+                                  <span className="ml-auto text-sm font-black text-indigo-600">
+                                    Solde : {fmtAmt(bal.amount, currency)}
+                                  </span>
+                                ) : (
+                                  <span className="ml-auto text-sm text-muted-foreground">Solde non disponible</span>
+                                )}
+                                {pending > 0 && (
+                                  <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 text-xs font-semibold">
+                                    ⏳ Retraits en attente : {fmtAmt(pending, currency)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Movements table */}
+                              {mvts.length === 0 ? (
+                                <p className="text-xs text-muted-foreground text-center py-4">Aucun mouvement</p>
+                              ) : (
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="border-b border-border/20 text-muted-foreground">
+                                        <th className="text-left px-5 py-2 font-semibold">Date / Heure</th>
+                                        <th className="text-left px-3 py-2 font-semibold">Type</th>
+                                        <th className="text-left px-3 py-2 font-semibold">Opérateur</th>
+                                        <th className="text-right px-3 py-2 font-semibold">Montant</th>
+                                        <th className="text-right px-3 py-2 font-semibold">Solde avant</th>
+                                        <th className="text-right px-3 py-2 font-semibold">Solde après</th>
+                                        <th className="text-left px-3 py-2 font-semibold">Statut</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/10">
+                                      {enriched.map((tx: any) => {
+                                        const isDeposit = tx.type === "deposit";
+                                        const amt = parseFloat(tx.amount || "0");
+                                        return (
+                                          <tr key={tx.id} className="hover:bg-muted/20 transition-colors" data-testid={`row-movement-${tx.id}`}>
+                                            <td className="px-5 py-2 text-muted-foreground whitespace-nowrap">{fmtDate(tx.createdAt)}</td>
+                                            <td className="px-3 py-2">
+                                              <span className={`inline-flex items-center gap-1 font-semibold ${isDeposit ? "text-emerald-600" : "text-red-500"}`}>
+                                                {isDeposit ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                                {isDeposit ? "Dépôt" : "Retrait"}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2 text-muted-foreground">{tx.provider || "—"}</td>
+                                            <td className={`px-3 py-2 text-right font-bold ${isDeposit ? "text-emerald-600" : "text-red-500"}`}>
+                                              {isDeposit ? "+" : "−"}{fmtAmt(amt, currency)}
+                                            </td>
+                                            <td className="px-3 py-2 text-right text-muted-foreground">{fmtAmt(tx.balanceBefore, currency)}</td>
+                                            <td className="px-3 py-2 text-right font-semibold">{fmtAmt(tx.balanceAfter, currency)}</td>
+                                            <td className="px-3 py-2">
+                                              <span className={`px-1.5 py-0.5 rounded font-semibold ${
+                                                tx.status === "completed" ? "bg-emerald-500/10 text-emerald-600"
+                                                : tx.status === "pending" ? "bg-amber-500/10 text-amber-600"
+                                                : "bg-red-500/10 text-red-500"
+                                              }`}>
+                                                {tx.status === "completed" ? "✓" : tx.status === "pending" ? "⏳" : "✗"} {tx.status}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </TabsContent>
 
           {/* ══════════════════════════════════════

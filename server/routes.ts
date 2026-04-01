@@ -3460,6 +3460,67 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/omnipay-movements", isAdmin, async (req, res) => {
+    try {
+      const { transactions: txTable } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { desc, and, eq, inArray } = await import("drizzle-orm");
+
+      const PHONE_PREFIXES: [string, string][] = [
+        ["229", "BJ"], ["225", "CI"], ["226", "BF"], ["228", "TG"],
+        ["221", "SN"], ["223", "ML"], ["237", "CM"], ["243", "COD"], ["242", "COG"],
+      ];
+      function deriveCountry(phone?: string | null): string | null {
+        if (!phone) return null;
+        const n = phone.replace(/^\+/, "").replace(/^00/, "");
+        for (const [prefix, code] of PHONE_PREFIXES) {
+          if (n.startsWith(prefix)) return code;
+        }
+        return null;
+      }
+
+      const [recentTxs, pendingTxs] = await Promise.all([
+        db.select({
+          id: txTable.id, type: txTable.type, amount: txTable.amount,
+          fees: txTable.fees, currency: txTable.currency, status: txTable.status,
+          provider: txTable.provider, phoneNumber: txTable.phoneNumber,
+          reference: txTable.reference, createdAt: txTable.createdAt,
+        }).from(txTable)
+          .where(inArray(txTable.type, ["deposit", "withdrawal"]))
+          .orderBy(desc(txTable.createdAt))
+          .limit(100),
+        db.select({
+          phoneNumber: txTable.phoneNumber, amount: txTable.amount, fees: txTable.fees,
+        }).from(txTable)
+          .where(and(eq(txTable.type, "withdrawal"), eq(txTable.status, "pending"))),
+      ]);
+
+      let omnipayBalances: any[] = [];
+      try {
+        const balResp = await omniPayService.getBalance();
+        omnipayBalances = balResp.balance || [];
+      } catch {}
+
+      const movements = recentTxs.map(tx => ({
+        ...tx, derivedCountry: deriveCountry(tx.phoneNumber),
+      }));
+
+      const pendingByCountry: Record<string, number> = {};
+      for (const tx of pendingTxs) {
+        const country = deriveCountry(tx.phoneNumber);
+        if (country) {
+          pendingByCountry[country] = (pendingByCountry[country] || 0)
+            + parseFloat(tx.amount) + parseFloat(tx.fees || "0");
+        }
+      }
+
+      res.json({ movements, omnipayBalances, pendingByCountry });
+    } catch (error) {
+      console.error("OmniPay movements error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   app.post("/api/admin/omnipay/withdraw", isAdmin, async (req: any, res) => {
     try {
       const { amount, phoneNumber, operator, recipientName, note } = req.body;
