@@ -547,6 +547,32 @@ export default function AdminPage() {
     staleTime: 30_000,
   });
 
+  const { data: pendingWithdrawals, isLoading: pendingWLoading, refetch: refetchPendingW } = useQuery<any[]>({
+    queryKey: ["/api/admin/pending-withdrawals"],
+    enabled: activeTab === "wallets",
+    refetchInterval: activeTab === "wallets" ? 60_000 : false,
+    staleTime: 30_000,
+  });
+
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectResultMap, setRejectResultMap] = useState<Record<string, { action: string; message?: string; refundedAmount?: number; currency?: string }>>({});
+
+  const forceRejectM = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/transactions/${id}/force-reject`, {}),
+    onSuccess: (data: any, id) => {
+      setRejectingId(null);
+      setRejectResultMap(prev => ({ ...prev, [id]: data }));
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
+      const msg = data.action === "completed"
+        ? "Retrait déjà complété — statut mis à jour"
+        : `Retrait rejeté et ${new Intl.NumberFormat("fr-FR").format(Math.round(data.refundedAmount))} ${data.currency} remboursés`;
+      toast({ title: msg });
+    },
+    onError: (e: any) => { setRejectingId(null); toast({ title: "Erreur", description: e?.message, variant: "destructive" }); },
+  });
+
   const { data: liquidityData } = useQuery<{ walletsByCountry: any[]; pendingByCountry: any[] }>({
     queryKey: ["/api/admin/liquidity-analysis"],
     enabled: ["overview", "liquidity"].includes(activeTab),
@@ -2252,6 +2278,109 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* ══ Retraits en attente > 10 min ══ */}
+            {(() => {
+              const list = pendingWithdrawals || [];
+              const hasPending = list.length > 0;
+              const fmtAmt = (n: number, cur: string) =>
+                new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " " + cur;
+              const elapsed = (d: string) => {
+                const mins = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
+                return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}min` : `${mins} min`;
+              };
+              return (
+                <Card className={`border-border/50 overflow-hidden ${hasPending ? "border-amber-500/40" : ""}`} data-testid="card-pending-withdrawals">
+                  <CardHeader className="pb-3 px-5 pt-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {hasPending && <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />}
+                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-amber-500" />
+                          Retraits en attente depuis plus de 10 min
+                          {hasPending && (
+                            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-xs font-bold">{list.length}</span>
+                          )}
+                        </CardTitle>
+                      </div>
+                      <button
+                        onClick={() => refetchPendingW()}
+                        className="h-8 w-8 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 flex items-center justify-center transition-colors"
+                        data-testid="btn-refresh-pending-withdrawals"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 text-amber-600 ${pendingWLoading ? "animate-spin" : ""}`} />
+                      </button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {pendingWLoading ? (
+                      <div className="space-y-2 p-5">{[1,2].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
+                    ) : !hasPending ? (
+                      <div className="py-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+                        <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                        <p>Aucun retrait bloqué — tout est traité</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border/30">
+                        {list.map((tx: any) => {
+                          const result = rejectResultMap[tx.id];
+                          const amt = parseFloat(tx.amount || "0");
+                          const fees = parseFloat(tx.fees || "0");
+                          const total = amt + fees;
+                          const userName = tx.userFirstName ? `${tx.userFirstName} ${tx.userLastName || ""}`.trim() : tx.userEmail || "—";
+                          const isRejecting = rejectingId === tx.id && forceRejectM.isPending;
+                          return (
+                            <div key={tx.id} className={`px-5 py-4 ${result ? "opacity-60" : ""}`} data-testid={`row-pending-withdraw-${tx.id}`}>
+                              <div className="flex flex-wrap items-start gap-3">
+                                <div className="flex-1 min-w-0 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-sm">{userName}</span>
+                                    <span className="text-xs text-muted-foreground">{tx.userEmail}</span>
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 text-[10px] font-bold">
+                                      ⏳ {elapsed(tx.createdAt)}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                                    <span className="font-black text-red-500">−{fmtAmt(total, tx.currency)}</span>
+                                    <span className="text-muted-foreground">·</span>
+                                    <span className="text-muted-foreground">{tx.provider || "—"}</span>
+                                    <span className="text-muted-foreground">·</span>
+                                    <span className="font-mono text-xs text-muted-foreground">{tx.phoneNumber}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>Réf : <span className="font-mono">{tx.reference}</span></span>
+                                    <span>·</span>
+                                    <span>{fmtDate(tx.createdAt)}</span>
+                                  </div>
+                                  {result && (
+                                    <div className={`mt-1 text-xs font-semibold ${result.action === "completed" ? "text-emerald-600" : "text-blue-600"}`}>
+                                      {result.action === "completed"
+                                        ? "✓ Déjà traité par OmniPay — statut mis à jour"
+                                        : `✓ Rejeté · ${fmtAmt(result.refundedAmount || 0, result.currency || tx.currency)} remboursés`}
+                                    </div>
+                                  )}
+                                </div>
+                                {!result && (
+                                  <button
+                                    onClick={() => { setRejectingId(tx.id); forceRejectM.mutate(tx.id); }}
+                                    disabled={isRejecting || forceRejectM.isPending}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 text-xs font-bold transition-colors disabled:opacity-50"
+                                    data-testid={`btn-reject-withdrawal-${tx.id}`}
+                                  >
+                                    {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                                    {isRejecting ? "Vérification…" : "Vérifier & Rejeter"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {/* ══ OmniPay Movements ══ */}
             {(() => {

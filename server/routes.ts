@@ -3460,6 +3460,73 @@ export async function registerRoutes(
     }
   });
 
+  // Retraits en attente depuis plus de 10 minutes
+  app.get("/api/admin/pending-withdrawals", isAdmin, async (req, res) => {
+    try {
+      const { transactions: txTable } = await import("@shared/schema");
+      const { users: usersTable } = await import("@shared/models/auth");
+      const { db } = await import("./db");
+      const { and, eq, lt, desc } = await import("drizzle-orm");
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+      const rows = await db.select({
+        id: txTable.id, userId: txTable.userId, type: txTable.type,
+        amount: txTable.amount, fees: txTable.fees, currency: txTable.currency,
+        status: txTable.status, provider: txTable.provider,
+        phoneNumber: txTable.phoneNumber, reference: txTable.reference,
+        createdAt: txTable.createdAt,
+        userName: usersTable.name, userEmail: usersTable.email,
+        userFirstName: usersTable.firstName, userLastName: usersTable.lastName,
+      }).from(txTable)
+        .leftJoin(usersTable, eq(txTable.userId, usersTable.id))
+        .where(and(eq(txTable.type, "withdrawal"), eq(txTable.status, "pending"), lt(txTable.createdAt, tenMinutesAgo)))
+        .orderBy(desc(txTable.createdAt));
+      res.json(rows);
+    } catch (error) {
+      console.error("Pending withdrawals error:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // Vérifier le statut OmniPay puis rejeter/rembourser un retrait
+  app.post("/api/admin/transactions/:id/force-reject", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params as Record<string, string>;
+      const { transactions: txTable } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [tx] = await db.select().from(txTable).where(eq(txTable.id, id));
+      if (!tx) return res.status(404).json({ message: "Transaction introuvable" });
+      if (tx.type !== "withdrawal") return res.status(400).json({ message: "Seuls les retraits peuvent être rejetés" });
+      if (tx.status !== "pending") return res.status(400).json({ message: "Transaction déjà traitée" });
+
+      // Vérifier le statut OmniPay d'abord
+      let omnipayStatus = "pending";
+      try {
+        const result = await omniPayService.getStatus(tx.reference);
+        omnipayStatus = omnipayStatusToString(result.status ?? 0);
+      } catch {}
+
+      if (omnipayStatus === "completed") {
+        await storage.updateTransactionStatus(id, "completed");
+        userTxCacheDel(tx.userId);
+        return res.json({ action: "completed", message: "Le retrait a déjà été traité avec succès par OmniPay. Statut mis à jour." });
+      }
+
+      // Rejeter et rembourser le wallet utilisateur
+      await storage.updateTransactionStatus(id, "failed");
+      const refundAmt = parseFloat(tx.amount);
+      const refundFeesXOF = parseFloat((tx as any).fees || "0");
+      const refundFeesLocal = tx.currency === "CDF" ? Math.round(refundFeesXOF / 0.22) : refundFeesXOF;
+      await storage.updateWalletBalance(tx.userId, tx.currency, refundAmt + refundFeesLocal);
+      userTxCacheDel(tx.userId);
+      adminCacheDel("admin-wallets");
+      res.json({ action: "rejected", omnipayStatus, refunded: true, refundedAmount: refundAmt + refundFeesLocal, currency: tx.currency });
+    } catch (error: any) {
+      console.error("Force-reject error:", error);
+      res.status(500).json({ message: error.message || "Erreur serveur" });
+    }
+  });
+
   app.get("/api/admin/omnipay-movements", isAdmin, async (req, res) => {
     try {
       const { transactions: txTable } = await import("@shared/schema");
