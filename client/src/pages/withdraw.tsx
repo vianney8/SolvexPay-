@@ -46,6 +46,18 @@ const COUNTRIES = [
   { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"], phonePlaceholder: "06 123 45 67" },
 ];
 
+const PHONE_FORMATS: Record<string, { regex: RegExp; label: string }> = {
+  BJ:  { regex: /^\d{10}$/, label: "10 chiffres (ex: 0190123456)" },
+  CI:  { regex: /^\d{10}$/, label: "10 chiffres (ex: 0712345678)" },
+  BF:  { regex: /^\d{8}$/,  label: "8 chiffres (ex: 70123456)" },
+  TG:  { regex: /^\d{8}$/,  label: "8 chiffres (ex: 90123456)" },
+  SN:  { regex: /^\d{9}$/,  label: "9 chiffres (ex: 771234567)" },
+  ML:  { regex: /^\d{8}$/,  label: "8 chiffres (ex: 70123456)" },
+  CM:  { regex: /^6\d{8}$/, label: "9 chiffres commençant par 6 (ex: 612345678)" },
+  COD: { regex: /^\d{9}$/,  label: "9 chiffres (ex: 812345678)" },
+  COG: { regex: /^\d{9}$/,  label: "9 chiffres (ex: 061234567)" },
+};
+
 const OPERATOR_LABEL: Record<string, string> = {
   MTN: "MTN Money", Orange: "Orange Money", Moov: "Moov Money", Wave: "Wave",
   TMoney: "T-Money", Vodacom: "Vodacom M-Pesa", Airtel: "Airtel Money", Free: "Free Money",
@@ -82,6 +94,12 @@ export default function WithdrawPage() {
 
   const selectedCountry = COUNTRIES.find(c => c.code === country) || availableCountries[0] || COUNTRIES[0];
   const currency = selectedCountry.currency;
+
+  const cleanPhone = phone.replace(/\s/g, "");
+  const phoneFormat = PHONE_FORMATS[country];
+  const phoneError = cleanPhone && phoneFormat && !phoneFormat.regex.test(cleanPhone)
+    ? `Format invalide — ${phoneFormat.label} attendu`
+    : null;
 
   useEffect(() => { setOperator(""); }, [country]);
   useEffect(() => {
@@ -177,8 +195,8 @@ export default function WithdrawPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!withdrawAmount || !phone || !operator || !country || insufficientFunds) return;
-    const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
+    if (!withdrawAmount || !cleanPhone || !operator || !country || insufficientFunds || phoneError) return;
+    const fullPhone = cleanPhone.startsWith("+") ? cleanPhone : `${selectedCountry.prefix}${cleanPhone}`;
     withdrawMutation.mutate({ amount: withdrawAmount, phoneNumber: fullPhone, operator, country });
   };
 
@@ -364,10 +382,20 @@ export default function WithdrawPage() {
                     type="tel"
                     placeholder={selectedCountry.phonePlaceholder}
                     required
-                    className="flex-1 h-12 border-0 rounded-none focus-visible:ring-0 bg-transparent"
+                    className={`flex-1 h-12 border-0 rounded-none focus-visible:ring-0 bg-transparent ${phoneError ? "text-red-500" : ""}`}
                     data-testid="input-withdraw-phone"
                   />
                 </div>
+                {phoneError && (
+                  <p className="text-xs text-red-500 font-medium flex items-center gap-1" data-testid="error-phone-format">
+                    ⚠ {phoneError}
+                  </p>
+                )}
+                {phoneFormat && !phoneError && cleanPhone && (
+                  <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                    ✓ Format valide
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -425,7 +453,7 @@ export default function WithdrawPage() {
             className="w-full h-13 text-base font-bold gap-2 shadow-xl"
             style={{ background: !withdrawAmount || insufficientFunds ? undefined : "linear-gradient(135deg, hsl(200 90% 34%) 0%, hsl(220 80% 52%) 100%)" }}
             variant={insufficientFunds ? "outline" : "default"}
-            disabled={withdrawMutation.isPending || !withdrawAmount || !phone || !operator || !country || insufficientFunds}
+            disabled={withdrawMutation.isPending || !withdrawAmount || !cleanPhone || !!phoneError || !operator || !country || insufficientFunds}
             data-testid="button-confirm-withdraw"
           >
             {withdrawMutation.isPending ? (

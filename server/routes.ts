@@ -798,6 +798,25 @@ export async function registerRoutes(
       }
       
       const { amount, phoneNumber, operator, country } = validation.data;
+
+      // Validation du format du numéro par pays (après normalisation E.164 sans +)
+      const PHONE_PATTERNS_BY_COUNTRY: Record<string, RegExp> = {
+        BJ:  /^229\d{10}$/,
+        CI:  /^225\d{10}$/,
+        BF:  /^226\d{8}$/,
+        TG:  /^228\d{8}$/,
+        SN:  /^221\d{9}$/,
+        ML:  /^223\d{8}$/,
+        CM:  /^2376\d{8}$/,
+        COD: /^243\d{9}$/,
+        COG: /^242\d{9}$/,
+      };
+      const normalizedPhone = phoneNumber.replace(/^\+/, "").replace(/^00/, "");
+      const phonePattern = PHONE_PATTERNS_BY_COUNTRY[country?.toUpperCase()];
+      if (phonePattern && !phonePattern.test(normalizedPhone)) {
+        return res.status(400).json({ message: "Format du numéro de téléphone invalide pour ce pays" });
+      }
+
       const localCurrency = getCountryCurrency(country);
       const amountXOF = toXOFEquivalent(amount, localCurrency);
 
