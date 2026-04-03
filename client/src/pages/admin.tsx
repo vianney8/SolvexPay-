@@ -103,6 +103,10 @@ function getTxSourceInfo(tx: any): { label: string; extra: string | null; colorK
 
   if (type === "deposit") {
     if (tx.provider === "admin") return { label: "Ajust. Admin", extra: null, colorKey: "emerald" };
+    if (desc.startsWith("Paiement API SR")) {
+      const extra = desc.replace("Paiement API SR — ", "").replace("Paiement API SR", "").trim() || null;
+      return { label: "Dépôt API SR", extra, colorKey: "green" };
+    }
     if (tx.apiKeyId) {
       const m = desc.match(/^Activation compte (.+?) —/) || desc.match(/^Dépôt via API — (.+)/) || desc.match(/via API — (.+)/);
       return { label: "Dépôt API", extra: m ? m[1].trim() : null, colorKey: "indigo" };
@@ -124,6 +128,7 @@ const COLOR_CLASSES: Record<string, { chip: string; badge: string }> = {
   blue:    { chip: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30", badge: "bg-blue-500/20 text-blue-700 dark:text-blue-300" },
   sky:     { chip: "bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30", badge: "bg-sky-500/20 text-sky-700 dark:text-sky-300" },
   emerald: { chip: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", badge: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300" },
+  green:   { chip: "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30", badge: "bg-green-500/20 text-green-700 dark:text-green-300" },
   slate:   { chip: "bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30", badge: "bg-slate-500/20 text-slate-600 dark:text-slate-300" },
 };
 
