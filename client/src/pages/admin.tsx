@@ -2421,10 +2421,16 @@ export default function AdminPage() {
                           let running = bal?.amount ?? 0;
                           const enriched = mvts.map(tx => {
                             const amt = parseFloat(tx.amount || "0");
-                            const balanceAfter = running;
-                            const balanceBefore = tx.type === "deposit" ? running - amt : running + amt;
-                            running = balanceBefore;
-                            return { ...tx, balanceBefore, balanceAfter };
+                            const isCompleted = tx.status === "completed";
+                            // Seules les transactions complétées affectent le solde OmniPay
+                            if (isCompleted) {
+                              const balanceAfter = running;
+                              const balanceBefore = tx.type === "deposit" ? running - amt : running + amt;
+                              running = balanceBefore;
+                              return { ...tx, balanceBefore, balanceAfter };
+                            }
+                            // Transactions pending/failed : le solde ne change pas
+                            return { ...tx, balanceBefore: null, balanceAfter: null };
                           });
                           const currency = bal?.currency || mvts[0]?.currency || "XOF";
 
@@ -2482,8 +2488,12 @@ export default function AdminPage() {
                                             <td className={`px-3 py-2 text-right font-bold ${isDeposit ? "text-emerald-600" : "text-red-500"}`}>
                                               {isDeposit ? "+" : "−"}{fmtAmt(amt, currency)}
                                             </td>
-                                            <td className="px-3 py-2 text-right text-muted-foreground">{fmtAmt(tx.balanceBefore, currency)}</td>
-                                            <td className="px-3 py-2 text-right font-semibold">{fmtAmt(tx.balanceAfter, currency)}</td>
+                                            <td className="px-3 py-2 text-right text-muted-foreground">
+                                              {tx.balanceBefore !== null ? fmtAmt(tx.balanceBefore, currency) : <span className="text-muted-foreground/40 italic">—</span>}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-semibold">
+                                              {tx.balanceAfter !== null ? fmtAmt(tx.balanceAfter, currency) : <span className="text-muted-foreground/40 italic">—</span>}
+                                            </td>
                                             <td className="px-3 py-2">
                                               <span className={`px-1.5 py-0.5 rounded font-semibold ${
                                                 tx.status === "completed" ? "bg-emerald-500/10 text-emerald-600"
