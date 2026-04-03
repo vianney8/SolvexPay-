@@ -1864,9 +1864,6 @@ export async function registerRoutes(
     if (!apiKey) {
       return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API introuvable.", status: 401 } });
     }
-    if ((apiKey as any).isSrKey) {
-      return res.status(403).json({ error: { code: "FORBIDDEN", message: "Cette clé est une clé API SR. Utilisez l'endpoint POST /api/v1/sr/pay pour les paiements sans redirection.", status: 403 } });
-    }
     if (!apiKey.isActive || (apiKey as any).adminLocked) {
       return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API désactivée ou verrouillée.", status: 401 } });
     }
@@ -1937,7 +1934,8 @@ export async function registerRoutes(
 
   app.post("/api/v1/deposit", authenticateApiKey, async (req: any, res) => {
     try {
-      const { amount, phone, operator, country, description, customer_name, customer_email, metadata } = req.body;
+      const { amount, phone, operator, country, description, customer_name, customer_email, otp, metadata } = req.body;
+      const isSrKey = !!(req.merchantApiKey as any).isSrKey;
 
       if (!amount || typeof amount !== "number" || amount < 100) {
         return res.status(400).json({ error: { code: "INVALID_AMOUNT", message: "Montant invalide (minimum 100 XOF).", status: 400 } });
@@ -1954,6 +1952,118 @@ export async function registerRoutes(
         return res.status(403).json({ error: { code: "KYC_REQUIRED", message: "Vérification KYC requise pour utiliser l'API.", status: 403 } });
       }
 
+      // ── Clé SR : paiement direct via OmniPay (sans redirection) ──
+      if (isSrKey) {
+        if (!merchantUser.apiSrEnabled) {
+          return res.status(403).json({ error: { code: "FORBIDDEN", message: "API SR non activée sur ce compte.", status: 403 } });
+        }
+        if (!phone || !operator || !country) {
+          return res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Les champs phone, operator et country sont requis pour un paiement SR direct.", status: 400 } });
+        }
+        if (merchantUser.isBlocked) {
+          return res.status(403).json({ error: { code: "FORBIDDEN", message: "Compte marchand suspendu.", status: 403 } });
+        }
+
+        const operatorUpper = operator.toUpperCase();
+        const countryUpper = country.toUpperCase();
+
+        const suspRaw = await storage.getSystemSetting("suspended_countries");
+        const suspendedList: string[] = suspRaw ? JSON.parse(suspRaw) : [];
+        if (suspendedList.includes(countryUpper)) {
+          return res.status(503).json({ error: { code: "COUNTRY_SUSPENDED", message: `Les paiements depuis le pays ${countryUpper} sont temporairement suspendus.`, status: 503 } });
+        }
+
+        const opMaintenanceMsg = await checkOperatorMaintenance(operatorUpper, countryUpper);
+        if (opMaintenanceMsg) {
+          return res.status(503).json({ error: { code: "OPERATOR_MAINTENANCE", message: opMaintenanceMsg, status: 503 } });
+        }
+        const depMaintenanceMsg = await checkDepositMaintenance(operatorUpper, countryUpper);
+        if (depMaintenanceMsg) {
+          return res.status(503).json({ error: { code: "DEPOSIT_MAINTENANCE", message: depMaintenanceMsg, status: 503 } });
+        }
+
+        if (!isApiKeyConfigured()) {
+          return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
+        }
+
+        const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
+        const apiFeeRate = (await getOperatorFeeRate(operatorUpper, "feeApi", globalApiFee, countryUpper)) / 100;
+        const fees = Math.round(amount * apiFeeRate);
+        const currency = getCountryCurrency(countryUpper);
+        const reference = generateReference();
+        const omniOperator = getOmniPayOperatorCode(operatorUpper, countryUpper);
+
+        const rawName = customer_name || "Client SolvexPay";
+        const nameParts = rawName.trim().split(" ");
+        const firstName = nameParts[0] || "Client";
+        const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
+
+        const isWave = operatorUpper === "WAVE";
+
+        const transaction = await storage.createTransaction({
+          userId: merchantUser.id,
+          type: "deposit",
+          amount: amount.toString(),
+          currency,
+          provider: operatorUpper,
+          phoneNumber: phone,
+          reference,
+          status: "pending",
+          description: description ? `Paiement API SR — ${description}` : "Paiement API SR",
+          fees: String(fees),
+          payerName: customer_name || null,
+          payerEmail: customer_email || null,
+          payerCountry: countryUpper,
+          payerOperator: operatorUpper,
+          apiKeyId: req.merchantApiKey.id,
+        } as any);
+
+        const returnUrl = isWave
+          ? `https://solvexpay.com/api/v1/sr/wave-callback?id=${transaction.id}&reference=${reference}`
+          : undefined;
+
+        let omnipayResponse: any;
+        try {
+          omnipayResponse = await omniPayService.deposit({
+            msisdn: phone,
+            amount,
+            reference,
+            firstName,
+            lastName,
+            otp,
+            operator: omniOperator,
+            returnUrl,
+            callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
+          });
+        } catch (omniErr: any) {
+          await storage.updateTransactionStatus(transaction.id, "failed");
+          throw omniErr;
+        }
+
+        await storage.updateApiKey(req.merchantApiKey.id, { lastUsedAt: new Date() } as any);
+
+        const defaultMessage = isWave
+          ? "Paiement Wave initié. Redirigez le client vers payment_url pour qu'il valide le paiement."
+          : "Paiement initié. Le client doit valider sur son téléphone (USSD).";
+
+        return res.status(201).json({
+          success: true,
+          id: transaction.id,
+          status: "pending",
+          reference,
+          amount,
+          fees,
+          net_amount: amount - fees,
+          currency,
+          operator: operatorUpper,
+          phone,
+          message: omnipayResponse.message || defaultMessage,
+          ...(isWave && omnipayResponse.payment_url ? { payment_url: omnipayResponse.payment_url } : {}),
+          created_at: transaction.createdAt,
+        });
+      }
+
+      // ── Clé API classique : page de paiement hébergée SolvexPay ──
       const appName = (req.merchantApiKey as any).appName || `${merchantUser.firstName || ""} ${merchantUser.lastName || ""}`.trim() || "SolvexPay";
       const apiKeyId = req.merchantApiKey?.id;
       const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
@@ -1961,7 +2071,6 @@ export async function registerRoutes(
       const feesAmount = Math.round(amount * feeRate);
       const reference = generateReference();
 
-      // ── Toutes les intégrations → page de paiement hébergée SolvexPay ──
       const transaction = await storage.createTransaction({
         userId: req.merchantUserId,
         type: "deposit",
