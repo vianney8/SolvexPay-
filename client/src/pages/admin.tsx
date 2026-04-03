@@ -547,7 +547,7 @@ export default function AdminPage() {
     staleTime: 30_000,
   });
 
-  const { data: pendingWithdrawals, isLoading: pendingWLoading, refetch: refetchPendingW } = useQuery<any[]>({
+  const { data: pendingWithdrawalsW, isLoading: pendingWLoading, refetch: refetchPendingW } = useQuery<any[]>({
     queryKey: ["/api/admin/pending-withdrawals"],
     enabled: activeTab === "wallets",
     refetchInterval: activeTab === "wallets" ? 60_000 : false,
@@ -2281,7 +2281,7 @@ export default function AdminPage() {
 
             {/* ══ Retraits en attente > 10 min ══ */}
             {(() => {
-              const list = pendingWithdrawals || [];
+              const list = pendingWithdrawalsW || [];
               const hasPending = list.length > 0;
               const fmtAmt = (n: number, cur: string) =>
                 new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " " + cur;
