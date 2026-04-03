@@ -2246,14 +2246,6 @@ export default function AdminPage() {
                             >
                               <Percent className="h-3.5 w-3.5 text-violet-600" />
                             </button>
-                            <button
-                              onClick={() => { setDepositDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}` }); setDepositData({ amount: "", phone: u.phone || "", operator: "", motif: "" }); }}
-                              className="h-7 w-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-center transition-colors"
-                              data-testid={`btn-deposit-wallet-${u.id}`}
-                              title="Dépôt"
-                            >
-                              <Plus className="h-3.5 w-3.5 text-emerald-600" />
-                            </button>
                           </div>
                         </div>
                       );
