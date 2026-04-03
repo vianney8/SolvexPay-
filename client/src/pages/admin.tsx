@@ -2192,35 +2192,19 @@ export default function AdminPage() {
               </CardContent>
             </Card>
 
-            {/* Summary + Actions */}
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Card className="border-border/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="h-9 w-9 rounded-xl bg-indigo-500/15 flex items-center justify-center"><Wallet className="h-4.5 w-4.5 text-indigo-600" /></div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Total wallets utilisateurs</p>
-                      <p className="font-black text-lg text-indigo-600">{walletsLoading ? "—" : fmt(totalWalletBalance)}</p>
-                    </div>
+            {/* Summary */}
+            <Card className="border-border/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="h-9 w-9 rounded-xl bg-indigo-500/15 flex items-center justify-center"><Wallet className="h-4.5 w-4.5 text-indigo-600" /></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total wallets utilisateurs</p>
+                    <p className="font-black text-lg text-indigo-600">{walletsLoading ? "—" : fmt(totalWalletBalance)}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">{(wallets || []).length} wallets actifs</p>
-                </CardContent>
-              </Card>
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setDepositDialog({ userId: "", name: "" })}
-                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors"
-                  data-testid="btn-admin-deposit">
-                  <Plus className="h-5 w-5 text-emerald-600" />
-                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Dépôt OmniPay</span>
-                </button>
-                <button onClick={() => setMigrateDialog(true)}
-                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/15 transition-colors"
-                  data-testid="btn-admin-migrate">
-                  <ArrowRightLeft className="h-5 w-5 text-violet-600" />
-                  <span className="text-xs font-bold text-violet-700 dark:text-violet-400">Migration</span>
-                </button>
-              </div>
-            </div>
+                </div>
+                <p className="text-xs text-muted-foreground">{(wallets || []).length} wallets actifs</p>
+              </CardContent>
+            </Card>
 
             {/* All Wallets */}
             {walletsLoading ? (
