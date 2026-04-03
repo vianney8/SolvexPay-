@@ -1864,6 +1864,9 @@ export async function registerRoutes(
     if (!apiKey) {
       return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API introuvable.", status: 401 } });
     }
+    if ((apiKey as any).isSrKey) {
+      return res.status(403).json({ error: { code: "FORBIDDEN", message: "Cette clé est une clé API SR. Utilisez l'endpoint POST /api/v1/sr/pay pour les paiements sans redirection.", status: 403 } });
+    }
     if (!apiKey.isActive || (apiKey as any).adminLocked) {
       return res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Clé API désactivée ou verrouillée.", status: 401 } });
     }
@@ -1882,6 +1885,9 @@ export async function registerRoutes(
       const apiKey = await storage.findApiKeyByFullKey(key.trim());
       if (!apiKey || !apiKey.isActive || (apiKey as any).adminLocked) {
         return res.status(401).send("Clé API invalide ou désactivée.");
+      }
+      if ((apiKey as any).isSrKey) {
+        return res.status(403).send("Cette clé est une clé API SR. Utilisez POST /api/v1/sr/pay pour les paiements sans redirection.");
       }
 
       const amount = parseFloat(amountStr);
