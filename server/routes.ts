@@ -897,15 +897,26 @@ export async function registerRoutes(
       const isWave = operator.toLowerCase() === "wave";
 
       console.log(`Initiating OmniPay withdrawal for reference: ${reference} (Country: ${country}, Operator: ${operator}), amount: ${amount}, fees: ${withdrawalFees}, total_debit: ${amount + feesLocal}`);
-      const transferResponse = await omniPayService.transfer({
-        msisdn: phoneNumber,
-        amount: amount, // User receives exact amount they entered
-        reference,
-        firstName: resolvedFirstName,
-        lastName: resolvedLastName,
-        operator: getOmniPayOperatorCode(operator, country),
-      });
-      console.log(`OmniPay withdrawal response for ${reference}:`, transferResponse);
+
+      let transferResponse: any = null;
+      let isTimeout = false;
+
+      try {
+        transferResponse = await omniPayService.transfer({
+          msisdn: phoneNumber,
+          amount: amount,
+          reference,
+          firstName: resolvedFirstName,
+          lastName: resolvedLastName,
+          operator: getOmniPayOperatorCode(operator, country),
+        });
+        console.log(`OmniPay withdrawal response for ${reference}:`, transferResponse);
+      } catch (transferErr: any) {
+        const isTimeoutError = transferErr?.code === "ECONNABORTED" || transferErr?.message?.includes("timeout");
+        if (!isTimeoutError) throw transferErr; // propagate non-timeout errors normally
+        isTimeout = true;
+        console.warn(`[Withdrawal] Timeout on transfer ${reference} (${country}/${operator}) — creating pending tx and letting PendingChecker verify`);
+      }
 
       const transaction = await storage.createTransaction({
         userId,
@@ -924,9 +935,18 @@ export async function registerRoutes(
       // Deduct amount + fees from wallet (user receives exact amount, fees taken on top)
       await storage.updateWalletBalance(userId, localCurrency, -(amount + feesLocal));
 
+      if (isTimeout) {
+        return res.json({
+          ...transaction,
+          omnipayId: null,
+          _timedOut: true,
+          message: "Retrait en cours de traitement. Votre solde a été réservé et sera confirmé sous quelques minutes.",
+        });
+      }
+
       res.json({
         ...transaction,
-        omnipayId: transferResponse.id,
+        omnipayId: transferResponse?.id,
       });
     } catch (error: any) {
       console.error("Error creating withdrawal:", error);
@@ -4254,13 +4274,15 @@ export async function registerRoutes(
         const minAge = new Date(now.getTime() - MIN_AGE_MS);
         const maxAge = new Date(now.getTime() - MAX_AGE_MS);
 
+        const { or } = await import("drizzle-orm");
+
         const pendingTxs = await db
           .select()
           .from(txTable)
           .where(
             and(
               eqD(txTable.status, "pending"),
-              eqD(txTable.type, "deposit"),
+              or(eqD(txTable.type, "deposit"), eqD(txTable.type, "withdrawal")),
               lt(txTable.createdAt, minAge),
               gt(txTable.createdAt, maxAge)
             )
@@ -4269,33 +4291,55 @@ export async function registerRoutes(
 
         if (pendingTxs.length === 0) return;
 
-        console.log(`[PendingChecker] Checking ${pendingTxs.length} pending deposits...`);
+        const deposits = pendingTxs.filter(t => t.type === "deposit");
+        const withdrawals = pendingTxs.filter(t => t.type === "withdrawal");
+        console.log(`[PendingChecker] Checking ${deposits.length} pending deposits, ${withdrawals.length} pending withdrawals...`);
 
         for (const tx of pendingTxs) {
           try {
             const result = await omniPayService.getStatus(tx.reference);
-            const statusStr = omnipayStatusToString(result.status ?? 0);
+            const statusStr = omnipayStatusFromRaw(result.status);
 
             if (statusStr === "completed") {
               const updated = await storage.updateTransactionStatusIfPending(tx.id, "completed");
               if (updated) {
-                const grossAmt = parseFloat(tx.amount);
-                const txFees = parseFloat((tx as any).fees || "0") || 0;
-                const netAmt = grossAmt - txFees;
-                await storage.updateWalletBalance(tx.userId, tx.currency, netAmt > 0 ? netAmt : grossAmt);
+                if (tx.type === "deposit") {
+                  const grossAmt = parseFloat(tx.amount);
+                  const txFees = parseFloat((tx as any).fees || "0") || 0;
+                  const netAmt = grossAmt - txFees;
+                  await storage.updateWalletBalance(tx.userId, tx.currency, netAmt > 0 ? netAmt : grossAmt);
+                  console.log(`[PendingChecker] ✓ Deposit credited ${tx.reference}`);
+                } else {
+                  // Withdrawal confirmed — wallet already debited, nothing more to do
+                  console.log(`[PendingChecker] ✓ Withdrawal confirmed ${tx.reference}`);
+                }
                 const finalTx = await storage.getTransactionById(tx.id);
                 if (finalTx) {
                   forwardToMerchantWebhooks(finalTx);
-                  notifyTransactionCompleted(finalTx).catch(() => {});
+                  if (tx.type === "deposit") notifyTransactionCompleted(finalTx).catch(() => {});
+                  else notifyWithdrawal(finalTx, "success").catch(() => {});
                 }
-                console.log(`[PendingChecker] ✓ Credited ${tx.reference}`);
               }
             } else if (statusStr === "failed") {
               const updated = await storage.updateTransactionStatusIfPending(tx.id, "failed");
               if (updated) {
+                if (tx.type === "withdrawal") {
+                  // Refund wallet: amount + fees
+                  const refundAmt = parseFloat(tx.amount);
+                  const refundFees = parseFloat((tx as any).fees || "0") || 0;
+                  const refundLocal = tx.currency === "CDF"
+                    ? Math.round(refundFees / 0.22)
+                    : refundFees;
+                  await storage.updateWalletBalance(tx.userId, tx.currency, refundAmt + refundLocal);
+                  console.log(`[PendingChecker] ✗ Withdrawal failed, refunded ${tx.reference}`);
+                } else {
+                  console.log(`[PendingChecker] ✗ Deposit failed ${tx.reference}`);
+                }
                 const failedTx = await storage.getTransactionById(tx.id);
-                if (failedTx) forwardToMerchantWebhooks(failedTx);
-                console.log(`[PendingChecker] ✗ Failed ${tx.reference}`);
+                if (failedTx) {
+                  forwardToMerchantWebhooks(failedTx);
+                  if (tx.type === "withdrawal") notifyWithdrawal(failedTx, "failed").catch(() => {});
+                }
               }
             }
 
