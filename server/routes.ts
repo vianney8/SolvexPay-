@@ -5,7 +5,7 @@ import { execSync } from "child_process";
 import rateLimit from "express-rate-limit";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
-import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, type OmniPayCallbackPayload } from "./services/omnipay";
+import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, omnipayStatusFromRaw, type OmniPayCallbackPayload } from "./services/omnipay";
 import { testResendConnection } from "./services/resend";
 import { notifyTransactionCompleted, notifyWithdrawal, handleTelegramCallback } from "./services/telegram";
 import { sendKycStatusEmail } from "./services/resend";
@@ -313,7 +313,10 @@ async function forwardToMerchantWebhooks(transaction: any) {
       activeKeysWithWebhook = specificKey ? [specificKey] : [];
     }
 
-    if (activeKeysWithWebhook.length === 0) return;
+    if (activeKeysWithWebhook.length === 0) {
+      console.log(`[Webhook] No active keys with webhookUrl for tx ${transaction.reference || transaction.id} (apiKeyId=${transaction.apiKeyId || "none"})`);
+      return;
+    }
 
     const statusStr = transaction.status as string;
     const webhookPayload = {
@@ -2476,13 +2479,27 @@ export async function registerRoutes(
     ;(async () => {
       try {
         const { reference, status: statusCode } = payload;
-        if (!reference) return;
+        if (!reference) {
+          console.warn("[OmniPay] Callback: missing reference in payload", JSON.stringify(payload));
+          return;
+        }
 
-        const statusStr = omnipayStatusToString(Number(statusCode));
-        if (statusStr !== "completed" && statusStr !== "failed") return;
+        const statusStr = omnipayStatusFromRaw(statusCode);
+        console.log(`[OmniPay] Callback processing: reference=${reference} rawStatus=${statusCode} → ${statusStr}`);
+        if (statusStr !== "completed" && statusStr !== "failed") {
+          console.log(`[OmniPay] Callback: status "${statusCode}" is still pending — skipping`);
+          return;
+        }
 
         const transaction = await storage.getTransactionByReference(reference);
-        if (!transaction || transaction.status !== "pending") return;
+        if (!transaction) {
+          console.warn(`[OmniPay] Callback: transaction not found for reference ${reference}`);
+          return;
+        }
+        if (transaction.status !== "pending") {
+          console.log(`[OmniPay] Callback: transaction ${reference} already in status "${transaction.status}" — skipping`);
+          return;
+        }
 
         if (statusStr === "completed") {
           const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
@@ -4285,7 +4302,7 @@ export async function registerRoutes(
             // Small delay between OmniPay calls to avoid rate limiting
             await new Promise((r) => setTimeout(r, 300));
           } catch (err: any) {
-            // Silently skip — OmniPay may return error for unknown references
+            console.warn(`[PendingChecker] ⚠ Error checking ${tx.reference}: ${err?.message || err}`);
           }
         }
       } catch (err) {

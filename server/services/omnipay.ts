@@ -106,6 +106,16 @@ export function omnipayStatusToString(status: number): "pending" | "completed" |
   return "pending";
 }
 
+export function omnipayStatusFromRaw(raw: unknown): "pending" | "completed" | "failed" {
+  if (raw === null || raw === undefined) return "pending";
+  const n = Number(raw);
+  if (!isNaN(n)) return omnipayStatusToString(n);
+  const s = String(raw).toLowerCase().trim();
+  if (s === "3" || s === "completed" || s === "success" || s === "successful" || s === "confirmed") return "completed";
+  if (s === "4" || s === "failed" || s === "fail" || s === "rejected" || s === "cancelled" || s === "expired") return "failed";
+  return "pending";
+}
+
 export function verifyCallbackSignature(payload: OmniPayCallbackPayload, callbackKey: string): boolean {
   if (!callbackKey) return true;
   const { id, type, reference, msisdn, amount, fees, status, message } = payload;
