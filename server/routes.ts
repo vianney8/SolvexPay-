@@ -1105,10 +1105,17 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Reference requise" });
       }
 
+      // ── Vérification BDD en premier — évite d'appeler OmniPay inutilement ──
+      const transaction = await storage.getTransactionByReference(reference);
+      if (transaction && transaction.status !== "pending") {
+        const publicFrontendStatus = transaction.status === "completed" ? "SUCCESS" : transaction.status === "failed" ? "FAILED" : "PENDING";
+        return res.json({ success: true, status: publicFrontendStatus });
+      }
+
+      // ── Transaction encore pending → interroger OmniPay ──────────────────
       const result = await omniPayService.getStatus(reference);
       const statusStr = omnipayStatusToString(result.status ?? 0);
 
-      const transaction = await storage.getTransactionByReference(reference);
       if (transaction) {
         if (statusStr === "completed") {
           const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
