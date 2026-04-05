@@ -37,6 +37,8 @@ export const users = pgTable("users", {
   isBlocked: boolean("is_blocked").notNull().default(false),
   customFeeRate: varchar("custom_fee_rate"),
   customWithdrawalFeeRate: varchar("custom_withdrawal_fee_rate"),
+  customFeeApi: varchar("custom_fee_api"),
+  customFeePLink: varchar("custom_fee_plink"),
   withdrawalCountry: varchar("withdrawal_country"),
   withdrawalOperator: varchar("withdrawal_operator"),
   withdrawalPhone: varchar("withdrawal_phone"),

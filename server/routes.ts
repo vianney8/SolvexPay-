@@ -752,7 +752,10 @@ export async function registerRoutes(
       });
 
       const globalDepositFee = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
-      const depositFeeRate = (await getOperatorFeeRate(operator, "feeDeposit", globalDepositFee, country)) / 100;
+      const userCustomDepositFee = req.user?.customFeeRate != null ? parseFloat(req.user.customFeeRate) : null;
+      const depositFeeRate = userCustomDepositFee !== null
+        ? userCustomDepositFee / 100
+        : (await getOperatorFeeRate(operator, "feeDeposit", globalDepositFee, country)) / 100;
       const depositFees = Math.round(amount * depositFeeRate);
 
       const transaction = await storage.createTransaction({
@@ -1244,13 +1247,21 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { eq: eqFn } = await import("drizzle-orm");
       const { transactions: txTable } = await import("@shared/schema");
-      // Recalculer les frais avec le taux correct (par pays > par opérateur > global)
+      // Recalculer les frais (priorité : user custom > opérateur > global)
       // selon que c'est un lien de paiement (feePLink) ou une API simple (feeApi)
       const isPaymentLink = !(transaction as any).apiKeyId || (transaction as any).type === "payment_link";
       const feeColumn = isPaymentLink ? "feePLink" : "feeApi";
       const globalFallbackKey = isPaymentLink ? "fee_deposit" : "fee_api";
       const globalFallback = parseFloat((await storage.getSystemSetting(globalFallbackKey)) || "7");
-      const recalcFeeRate = (await getOperatorFeeRate(operator.toUpperCase(), feeColumn, globalFallback, country)) / 100;
+      // Chercher le user pour les frais personnalisés
+      const { users: usersTblPA } = await import("@shared/models/auth");
+      const [txUser] = await db.select().from(usersTblPA).where(eqFn(usersTblPA.id, transaction.userId));
+      const userCustomTxFee = isPaymentLink
+        ? (txUser?.customFeePLink != null ? parseFloat(txUser.customFeePLink) : null)
+        : (txUser?.customFeeApi != null ? parseFloat(txUser.customFeeApi) : null);
+      const recalcFeeRate = userCustomTxFee !== null
+        ? userCustomTxFee / 100
+        : (await getOperatorFeeRate(operator.toUpperCase(), feeColumn, globalFallback, country)) / 100;
       const recalcFees = Math.round(amount * recalcFeeRate);
       await db.update(txTable).set({
         phoneNumber,
@@ -1721,8 +1732,16 @@ export async function registerRoutes(
       } else {
         linkAmount = fixedAmount;
       }
+      // Récupérer le user pour vérifier les frais personnalisés
+      const { db: dbPL } = await import("./db");
+      const { users: usersTblPL } = await import("@shared/models/auth");
+      const { eq: eqPL } = await import("drizzle-orm");
+      const [linkUser] = await dbPL.select().from(usersTblPL).where(eqPL(usersTblPL.id, paymentLink.userId));
       const globalPLinkFee = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
-      const feeRate = (await getOperatorFeeRate(operator, "feePLink", globalPLinkFee, country)) / 100;
+      const userCustomPLinkFee = linkUser?.customFeePLink != null ? parseFloat(linkUser.customFeePLink) : null;
+      const feeRate = userCustomPLinkFee !== null
+        ? userCustomPLinkFee / 100
+        : (await getOperatorFeeRate(operator, "feePLink", globalPLinkFee, country)) / 100;
       const feesAmount = Math.round(linkAmount * feeRate);
 
       console.log(`Initiating payment for link ${slug} with reference: ${reference}`);
@@ -2311,9 +2330,12 @@ export async function registerRoutes(
         return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
       }
 
-      // ── Calcul des frais ──
+      // ── Calcul des frais (priorité : user custom > opérateur > global) ──
       const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
-      const apiFeeRate = (await getOperatorFeeRate(operatorUpper, "feeApi", globalApiFee, countryUpper)) / 100;
+      const userCustomApiFee = user?.customFeeApi != null ? parseFloat(user.customFeeApi) : null;
+      const apiFeeRate = userCustomApiFee !== null
+        ? userCustomApiFee / 100
+        : (await getOperatorFeeRate(operatorUpper, "feeApi", globalApiFee, countryUpper)) / 100;
       const fees = Math.round(amount * apiFeeRate);
       const currency = getCountryCurrency(countryUpper);
       const reference = generateReference();
@@ -3081,13 +3103,15 @@ export async function registerRoutes(
   app.patch("/api/admin/users/:id/fee", isAdmin, async (req, res) => {
     try {
       const { id } = req.params as Record<string, string>;
-      const { customFeeRate, customWithdrawalFeeRate } = req.body;
+      const { customFeeRate, customWithdrawalFeeRate, customFeeApi, customFeePLink } = req.body;
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
       const { eq } = await import("drizzle-orm");
       const updateData: Record<string, any> = { updatedAt: new Date() };
       if ("customFeeRate" in req.body) updateData.customFeeRate = customFeeRate != null ? String(customFeeRate) : null;
       if ("customWithdrawalFeeRate" in req.body) updateData.customWithdrawalFeeRate = customWithdrawalFeeRate != null ? String(customWithdrawalFeeRate) : null;
+      if ("customFeeApi" in req.body) updateData.customFeeApi = customFeeApi != null ? String(customFeeApi) : null;
+      if ("customFeePLink" in req.body) updateData.customFeePLink = customFeePLink != null ? String(customFeePLink) : null;
       const [updated] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
       adminCacheDel("admin-users", "admin-wallets", "admin-merchants");

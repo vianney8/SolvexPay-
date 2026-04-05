@@ -424,9 +424,11 @@ export default function AdminPage() {
   const [srFilter, setSrFilter] = useState(false);
   const [blockedFilter, setBlockedFilter] = useState(false);
   const [blockDialog, setBlockDialog] = useState<{ userId: string; name: string; isBlocked: boolean } | null>(null);
-  const [userFeeDialog, setUserFeeDialog] = useState<{ userId: string; name: string; currentDeposit: string; currentWithdrawal: string } | null>(null);
+  const [userFeeDialog, setUserFeeDialog] = useState<{ userId: string; name: string; currentDeposit: string; currentWithdrawal: string; currentFeeApi: string; currentFeePLink: string } | null>(null);
   const [userFeeDeposit, setUserFeeDeposit] = useState("");
   const [userFeeWithdrawal, setUserFeeWithdrawal] = useState("");
+  const [userFeeApi, setUserFeeApi] = useState("");
+  const [userFeePLink, setUserFeePLink] = useState("");
   const [userFeeConfirm, setUserFeeConfirm] = useState(false);
   const [toggleConfirmDialog, setToggleConfirmDialog] = useState<{ type: "link" | "key" | "hideLinks"; id: string; name: string; isCurrentlyActive: boolean } | null>(null);
   const [srConfirmDialog, setSrConfirmDialog] = useState<{ userId: string; name: string; enable: boolean } | null>(null);
@@ -740,8 +742,8 @@ export default function AdminPage() {
   });
 
   const userFeeM = useMutation({
-    mutationFn: (d: { userId: string; customFeeRate: string | null; customWithdrawalFeeRate: string | null }) =>
-      apiRequest("PATCH", `/api/admin/users/${d.userId}/fee`, { customFeeRate: d.customFeeRate, customWithdrawalFeeRate: d.customWithdrawalFeeRate }),
+    mutationFn: (d: { userId: string; customFeeRate: string | null; customWithdrawalFeeRate: string | null; customFeeApi: string | null; customFeePLink: string | null }) =>
+      apiRequest("PATCH", `/api/admin/users/${d.userId}/fee`, { customFeeRate: d.customFeeRate, customWithdrawalFeeRate: d.customWithdrawalFeeRate, customFeeApi: d.customFeeApi, customFeePLink: d.customFeePLink }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
@@ -1992,12 +1994,16 @@ export default function AdminPage() {
                         <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 text-xs font-semibold">
                           <Zap className="h-3 w-3" />{m.keys.length} clé{m.keys.length !== 1 ? "s" : ""}
                         </div>
-                        {(m.customFeeRate != null || m.customWithdrawalFeeRate != null) && (
-                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-semibold">
+                        {(m.customFeeRate != null || m.customWithdrawalFeeRate != null || m.customFeeApi != null || m.customFeePLink != null) && (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-semibold flex-wrap">
                             <Percent className="h-3 w-3" />
                             {m.customFeeRate != null && `D:${m.customFeeRate}%`}
                             {m.customFeeRate != null && m.customWithdrawalFeeRate != null && " · "}
                             {m.customWithdrawalFeeRate != null && `R:${m.customWithdrawalFeeRate}%`}
+                            {(m.customFeeRate != null || m.customWithdrawalFeeRate != null) && m.customFeeApi != null && " · "}
+                            {m.customFeeApi != null && `API:${m.customFeeApi}%`}
+                            {m.customFeeApi != null && m.customFeePLink != null && " · "}
+                            {m.customFeePLink != null && `Lien:${m.customFeePLink}%`}
                           </div>
                         )}
                         <div className="ml-auto flex items-center gap-1.5">
@@ -2005,8 +2011,10 @@ export default function AdminPage() {
                             onClick={() => {
                               setUserFeeDeposit(m.customFeeRate ?? "");
                               setUserFeeWithdrawal(m.customWithdrawalFeeRate ?? "");
+                              setUserFeeApi(m.customFeeApi ?? "");
+                              setUserFeePLink(m.customFeePLink ?? "");
                               setUserFeeConfirm(false);
-                              setUserFeeDialog({ userId: m.id, name: `${m.firstName} ${m.lastName}`, currentDeposit: m.customFeeRate ?? "", currentWithdrawal: m.customWithdrawalFeeRate ?? "" });
+                              setUserFeeDialog({ userId: m.id, name: `${m.firstName} ${m.lastName}`, currentDeposit: m.customFeeRate ?? "", currentWithdrawal: m.customWithdrawalFeeRate ?? "", currentFeeApi: m.customFeeApi ?? "", currentFeePLink: m.customFeePLink ?? "" });
                             }}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/15"
                             data-testid={`btn-fee-user-${m.id}`}
@@ -2231,11 +2239,15 @@ export default function AdminPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <p className="text-sm font-semibold truncate">{u.firstName} {u.lastName}</p>
-                              {(u.customFeeRate != null || u.customWithdrawalFeeRate != null) && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-600 text-[10px] font-bold">
+                              {(u.customFeeRate != null || u.customWithdrawalFeeRate != null || u.customFeeApi != null || u.customFeePLink != null) && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-600 text-[10px] font-bold flex-wrap">
                                   {u.customFeeRate != null && `D:${u.customFeeRate}%`}
                                   {u.customFeeRate != null && u.customWithdrawalFeeRate != null && " · "}
                                   {u.customWithdrawalFeeRate != null && `R:${u.customWithdrawalFeeRate}%`}
+                                  {(u.customFeeRate != null || u.customWithdrawalFeeRate != null) && u.customFeeApi != null && " · "}
+                                  {u.customFeeApi != null && `API:${u.customFeeApi}%`}
+                                  {u.customFeeApi != null && u.customFeePLink != null && " · "}
+                                  {u.customFeePLink != null && `Lien:${u.customFeePLink}%`}
                                 </span>
                               )}
                             </div>
@@ -2244,7 +2256,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             <p className={`font-black text-sm ${bal > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>{fmt(bal)}</p>
                             <button
-                              onClick={() => { setUserFeeDeposit(u.customFeeRate ?? ""); setUserFeeWithdrawal(u.customWithdrawalFeeRate ?? ""); setUserFeeConfirm(false); setUserFeeDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, currentDeposit: u.customFeeRate ?? "", currentWithdrawal: u.customWithdrawalFeeRate ?? "" }); }}
+                              onClick={() => { setUserFeeDeposit(u.customFeeRate ?? ""); setUserFeeWithdrawal(u.customWithdrawalFeeRate ?? ""); setUserFeeApi(u.customFeeApi ?? ""); setUserFeePLink(u.customFeePLink ?? ""); setUserFeeConfirm(false); setUserFeeDialog({ userId: u.id, name: `${u.firstName} ${u.lastName}`, currentDeposit: u.customFeeRate ?? "", currentWithdrawal: u.customWithdrawalFeeRate ?? "", currentFeeApi: u.customFeeApi ?? "", currentFeePLink: u.customFeePLink ?? "" }); }}
                               className="h-7 w-7 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 flex items-center justify-center transition-colors"
                               data-testid={`btn-fee-wallet-${u.id}`}
                               title="Configurer les frais"
@@ -4228,33 +4240,51 @@ export default function AdminPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Frais dépôt (%)</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={userFeeDeposit}
-                onChange={e => setUserFeeDeposit(e.target.value)}
-                placeholder="Global (par défaut)"
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                data-testid="input-custom-fee-deposit"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Frais retrait (%)</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={userFeeWithdrawal}
-                onChange={e => setUserFeeWithdrawal(e.target.value)}
-                placeholder="Global (par défaut)"
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                data-testid="input-custom-fee-withdrawal"
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Dépôt app (%)</label>
+                <input
+                  type="number" min="0" max="100" step="0.1"
+                  value={userFeeDeposit}
+                  onChange={e => setUserFeeDeposit(e.target.value)}
+                  placeholder="Global"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  data-testid="input-custom-fee-deposit"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Retrait (%)</label>
+                <input
+                  type="number" min="0" max="100" step="0.1"
+                  value={userFeeWithdrawal}
+                  onChange={e => setUserFeeWithdrawal(e.target.value)}
+                  placeholder="Global"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  data-testid="input-custom-fee-withdrawal"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">API (simple + SR) (%)</label>
+                <input
+                  type="number" min="0" max="100" step="0.1"
+                  value={userFeeApi}
+                  onChange={e => setUserFeeApi(e.target.value)}
+                  placeholder="Global"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  data-testid="input-custom-fee-api"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Lien de paiement (%)</label>
+                <input
+                  type="number" min="0" max="100" step="0.1"
+                  value={userFeePLink}
+                  onChange={e => setUserFeePLink(e.target.value)}
+                  placeholder="Global"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  data-testid="input-custom-fee-plink"
+                />
+              </div>
             </div>
             {!userFeeConfirm ? (
               <button
@@ -4266,13 +4296,19 @@ export default function AdminPage() {
               </button>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs text-center text-muted-foreground">Confirmez les frais personnalisés pour <strong>{userFeeDialog?.name}</strong> :</p>
-                <div className="flex gap-2 text-sm font-semibold justify-center">
-                  <span className="px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400">
+                <p className="text-xs text-center text-muted-foreground">Confirmez les frais pour <strong>{userFeeDialog?.name}</strong> :</p>
+                <div className="grid grid-cols-2 gap-1.5 text-xs font-semibold">
+                  <span className="px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-center">
                     Dépôt : {userFeeDeposit !== "" ? `${userFeeDeposit}%` : "global"}
                   </span>
-                  <span className="px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400">
+                  <span className="px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-center">
                     Retrait : {userFeeWithdrawal !== "" ? `${userFeeWithdrawal}%` : "global"}
+                  </span>
+                  <span className="px-2 py-1 rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-400 text-center">
+                    API : {userFeeApi !== "" ? `${userFeeApi}%` : "global"}
+                  </span>
+                  <span className="px-2 py-1 rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-400 text-center">
+                    Lien : {userFeePLink !== "" ? `${userFeePLink}%` : "global"}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -4288,6 +4324,8 @@ export default function AdminPage() {
                       userId: userFeeDialog!.userId,
                       customFeeRate: userFeeDeposit !== "" ? userFeeDeposit : null,
                       customWithdrawalFeeRate: userFeeWithdrawal !== "" ? userFeeWithdrawal : null,
+                      customFeeApi: userFeeApi !== "" ? userFeeApi : null,
+                      customFeePLink: userFeePLink !== "" ? userFeePLink : null,
                     })}
                     disabled={userFeeM.isPending}
                     className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-colors disabled:opacity-50"
