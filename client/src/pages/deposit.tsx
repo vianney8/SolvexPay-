@@ -49,7 +49,7 @@ export default function DepositPage() {
   const [description, setDescription] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
-  const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
+  const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"], staleTime: 60_000 });
 
   const _OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
     Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },

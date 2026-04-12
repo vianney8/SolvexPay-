@@ -111,7 +111,7 @@ export default function WithdrawPage() {
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: txResponse } = useQuery<any>({ queryKey: ["/api/transactions"] });
-  const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"] });
+  const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"], staleTime: 60_000 });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
 
   function getOperatorStatus(op: string) {
