@@ -914,11 +914,6 @@ export async function registerRoutes(
         return res.json({ ...transaction, mode: "manual" });
       }
 
-      const omnipayOnW = await getOmnipayEnabled();
-      if (!omnipayOnW) {
-        return res.status(503).json({ message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard." });
-      }
-
       const fullName = req.user?.name || req.user?.firstName || "Client";
       const nameParts = fullName.trim().split(" ");
       const resolvedFirstName = nameParts[0] || "Client";
