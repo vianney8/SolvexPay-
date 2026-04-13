@@ -2,14 +2,17 @@ import { Resend } from "resend";
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  const rawFrom = process.env.RESEND_FROM_EMAIL;
 
   if (!apiKey) {
     throw new Error("RESEND_API_KEY not configured.");
   }
-  if (!fromEmail) {
+  if (!rawFrom) {
     throw new Error("RESEND_FROM_EMAIL not configured.");
   }
+
+  // Si l'adresse n'a pas encore de nom d'affichage, on force "SolvexPay"
+  const fromEmail = rawFrom.includes("<") ? rawFrom : `SolvexPay <${rawFrom}>`;
 
   return { client: new Resend(apiKey), fromEmail };
 }
