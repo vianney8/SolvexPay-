@@ -2915,7 +2915,7 @@ export async function registerRoutes(
   app.patch("/api/admin/transactions/:id/status", isAdmin, async (req, res) => {
     try {
       const { id } = req.params as Record<string, string>;
-      const { status } = req.body;
+      const { status, motif } = req.body;
       if (!["pending", "completed", "failed"].includes(status)) {
         return res.status(400).json({ message: "Statut invalide" });
       }
@@ -2988,7 +2988,10 @@ export async function registerRoutes(
       }
 
       if (status === "failed" && transaction.type === "withdrawal" && transaction.status === "pending") {
-        await storage.updateTransactionStatus(id, "failed");
+        const rejectionDescription = motif
+          ? `Retrait rejeté — Motif : ${motif}`
+          : (transaction.description || `Retrait vers ${(transaction as any).phoneNumber} via ${(transaction as any).provider}`);
+        await storage.updateTransactionStatus(id, "failed", rejectionDescription);
         const refundAmt = parseFloat(transaction.amount);
         const refundFeesXOF = parseFloat((transaction as any).fees || "0");
         const refundFeesLocal = transaction.currency === "CDF" ? Math.round(refundFeesXOF / 0.22) : refundFeesXOF;

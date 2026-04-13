@@ -592,7 +592,7 @@ export default function AdminPage() {
   const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue", linkUrl: "", linkLabel: "" });
   const [editNotifDialog, setEditNotifDialog] = useState<{ id: string; title: string; message: string; color: string; linkUrl: string; linkLabel: string } | null>(null);
   const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
-  const [withdrawConfirm, setWithdrawConfirm] = useState<{ txId: string; status: "completed" | "failed"; tx: any } | null>(null);
+  const [withdrawConfirm, setWithdrawConfirm] = useState<{ txId: string; status: "completed" | "failed"; tx: any; motif: string } | null>(null);
   // Prefetch admin data immediately on mount
   useEffect(() => {
     ["/api/admin/users", "/api/admin/merchants", "/api/admin/payment-links", "/api/admin/api-keys"].forEach(key => {
@@ -934,8 +934,8 @@ export default function AdminPage() {
   });
 
   const txStatusM = useMutation({
-    mutationFn: async (d: { txId: string; status: string }) => {
-      const res = await apiRequest("PATCH", `/api/admin/transactions/${d.txId}/status`, { status: d.status });
+    mutationFn: async (d: { txId: string; status: string; motif?: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/transactions/${d.txId}/status`, { status: d.status, motif: d.motif });
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -3600,12 +3600,12 @@ export default function AdminPage() {
                           <p className="text-xs text-muted-foreground">{tx.userDisplayName || "—"} · {tx.phoneNumber} · {tx.provider || "—"} · {fmtDate(tx.createdAt)}</p>
                         </div>
                         <div className="flex gap-1.5">
-                          <button onClick={() => setWithdrawConfirm({ txId: tx.id, status: "completed", tx })} disabled={txStatusM.isPending}
+                          <button onClick={() => setWithdrawConfirm({ txId: tx.id, status: "completed", tx, motif: "" })} disabled={txStatusM.isPending}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-colors"
                             data-testid={`btn-validate-withdrawal-${tx.id}`}>
                             <CheckCircle2 className="h-3.5 w-3.5" />Valider
                           </button>
-                          <button onClick={() => setWithdrawConfirm({ txId: tx.id, status: "failed", tx })} disabled={txStatusM.isPending}
+                          <button onClick={() => setWithdrawConfirm({ txId: tx.id, status: "failed", tx, motif: "" })} disabled={txStatusM.isPending}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-500/15 text-red-600 text-xs font-bold hover:bg-red-500/25 transition-colors"
                             data-testid={`btn-reject-withdrawal-${tx.id}`}>
                             <XCircle className="h-3.5 w-3.5" />Rejeter
@@ -5044,6 +5044,20 @@ export default function AdminPage() {
               )}
             </DialogDescription>
           </DialogHeader>
+          {withdrawConfirm?.status === "failed" && (
+            <div className="space-y-1.5 pt-1">
+              <label className="text-xs font-semibold text-muted-foreground">Motif du rejet (optionnel)</label>
+              <textarea
+                value={withdrawConfirm.motif}
+                onChange={e => setWithdrawConfirm(p => p ? { ...p, motif: e.target.value } : null)}
+                placeholder="Ex : Numéro incorrect, compte non actif..."
+                rows={3}
+                data-testid="input-reject-motif"
+                className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground">Ce motif sera visible par l'utilisateur dans son historique.</p>
+            </div>
+          )}
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => setWithdrawConfirm(null)}
@@ -5055,7 +5069,7 @@ export default function AdminPage() {
             <button
               onClick={() => {
                 if (withdrawConfirm) {
-                  txStatusM.mutate({ txId: withdrawConfirm.txId, status: withdrawConfirm.status });
+                  txStatusM.mutate({ txId: withdrawConfirm.txId, status: withdrawConfirm.status, motif: withdrawConfirm.motif || undefined });
                   setWithdrawConfirm(null);
                 }
               }}
