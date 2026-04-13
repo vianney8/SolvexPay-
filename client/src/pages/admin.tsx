@@ -496,6 +496,178 @@ function OmniPayCard() {
   );
 }
 
+function AdminEmailCard() {
+  const { toast } = useToast();
+  const [mode, setMode] = useState<"broadcast" | "single">("broadcast");
+  const [targetEmail, setTargetEmail] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const broadcastM = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/email/broadcast", { subject, message }).then(r => r.json()),
+    onSuccess: (data: any) => {
+      toast({ title: "✓ Emails envoyés", description: `${data.sent} envoyé(s)${data.failed > 0 ? `, ${data.failed} échoué(s)` : ""} sur ${data.total} utilisateurs.` });
+      setConfirmOpen(false);
+      setSubject(""); setMessage("");
+    },
+    onError: (e: any) => {
+      let msg = e?.message || "Erreur";
+      try { msg = JSON.parse(msg.replace(/^\d+:\s*/, "")).message || msg; } catch {}
+      toast({ title: "Erreur", description: msg, variant: "destructive" });
+      setConfirmOpen(false);
+    },
+  });
+
+  const singleM = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/email/single", { email: targetEmail, subject, message }).then(r => r.json()),
+    onSuccess: (data: any) => {
+      toast({ title: "✓ Email envoyé", description: `Email envoyé à ${data.email}.` });
+      setConfirmOpen(false);
+      setSubject(""); setMessage(""); setTargetEmail("");
+    },
+    onError: (e: any) => {
+      let msg = e?.message || "Erreur";
+      try { msg = JSON.parse(msg.replace(/^\d+:\s*/, "")).message || msg; } catch {}
+      toast({ title: "Erreur", description: msg, variant: "destructive" });
+      setConfirmOpen(false);
+    },
+  });
+
+  const isPending = broadcastM.isPending || singleM.isPending;
+  const canSend = subject.trim() && message.trim() && (mode === "broadcast" || targetEmail.trim());
+
+  function handleSend() {
+    if (!canSend) return;
+    setConfirmOpen(true);
+  }
+
+  function confirmSend() {
+    if (mode === "broadcast") broadcastM.mutate();
+    else singleM.mutate();
+  }
+
+  return (
+    <>
+      <Card className="border-2 border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-blue-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <Send className="h-4 w-4 text-violet-500" />
+            Envoi d'email aux utilisateurs
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setMode("broadcast")}
+              data-testid="btn-email-mode-broadcast"
+              className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold border-2 transition-colors ${mode === "broadcast" ? "bg-violet-500 border-violet-500 text-white" : "border-border text-muted-foreground hover:border-violet-500/50"}`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Tous les utilisateurs
+            </button>
+            <button
+              onClick={() => setMode("single")}
+              data-testid="btn-email-mode-single"
+              className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold border-2 transition-colors ${mode === "single" ? "bg-violet-500 border-violet-500 text-white" : "border-border text-muted-foreground hover:border-violet-500/50"}`}
+            >
+              <User className="h-3.5 w-3.5" />
+              Un utilisateur
+            </button>
+          </div>
+
+          {mode === "single" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Email du client</label>
+              <Input
+                value={targetEmail}
+                onChange={e => setTargetEmail(e.target.value)}
+                placeholder="client@exemple.com"
+                type="email"
+                data-testid="input-email-target"
+                className="h-10 text-sm"
+              />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground">Objet</label>
+            <Input
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              placeholder="Ex : Mise à jour importante - SolvexPay"
+              data-testid="input-email-subject"
+              className="h-10 text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground">Contenu du message</label>
+            <textarea
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              placeholder="Rédigez votre message ici..."
+              rows={5}
+              data-testid="input-email-message"
+              className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            />
+            <p className="text-xs text-muted-foreground">Les sauts de ligne seront respectés dans l'email.</p>
+          </div>
+
+          <button
+            onClick={handleSend}
+            disabled={!canSend || isPending}
+            data-testid="btn-email-send"
+            className="w-full py-3 rounded-2xl font-bold text-sm transition-colors flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Send className="h-4 w-4" />
+            {mode === "broadcast" ? "Envoyer à tous les utilisateurs" : "Envoyer à cet utilisateur"}
+          </button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={confirmOpen} onOpenChange={o => { if (!o && !isPending) setConfirmOpen(false); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <div className="h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg bg-gradient-to-br from-violet-500 to-blue-600">
+              <Send className="h-8 w-8 text-white" />
+            </div>
+            <DialogTitle className="text-center text-lg">
+              {mode === "broadcast" ? "Envoyer à tous les utilisateurs ?" : `Envoyer à ${targetEmail} ?`}
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm space-y-1">
+              <span className="block font-bold text-foreground">"{subject}"</span>
+              <span className="block">
+                {mode === "broadcast"
+                  ? "Cet email sera envoyé à tous les utilisateurs inscrits sur SolvexPay."
+                  : "L'email sera envoyé uniquement à cet utilisateur."}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setConfirmOpen(false)}
+              disabled={isPending}
+              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors disabled:opacity-50"
+              data-testid="btn-email-confirm-cancel"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={confirmSend}
+              disabled={isPending}
+              data-testid="btn-email-confirm-ok"
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-50 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 flex items-center justify-center gap-2"
+            >
+              {isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Envoi...</> : "Confirmer"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function CountdownLoader({ label, icon }: { label: string; icon: string }) {
   const [count, setCount] = useState(5);
   useEffect(() => {
@@ -3968,6 +4140,7 @@ export default function AdminPage() {
             <GlobalMaintenanceCard />
             <WithdrawalModeCard />
             <OmniPayCard />
+            <AdminEmailCard />
             {/* ── OTP CONFIG ── */}
             {(() => {
               const OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {

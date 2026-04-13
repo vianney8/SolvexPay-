@@ -4350,6 +4350,64 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // ─── Admin: Email broadcast ──────────────────────────────────────────────────
+  app.post("/api/admin/email/broadcast", isAdmin, async (req, res) => {
+    try {
+      const { subject, message } = req.body;
+      if (!subject?.trim() || !message?.trim()) {
+        return res.status(400).json({ message: "Objet et contenu requis." });
+      }
+      const { sendAdminEmail } = await import("./services/resend");
+      const { db: dbE } = await import("./db");
+      const { users: usersE } = await import("@shared/models/auth");
+      const allUsers = await dbE.select({
+        email: usersE.email,
+        firstName: usersE.firstName,
+      }).from(usersE);
+
+      let sent = 0;
+      let failed = 0;
+      for (const user of allUsers) {
+        if (!user.email) continue;
+        try {
+          await sendAdminEmail(user.email, user.firstName || "Utilisateur", subject.trim(), message.trim());
+          sent++;
+          // Small delay to avoid hitting Resend rate limits
+          await new Promise(r => setTimeout(r, 100));
+        } catch {
+          failed++;
+        }
+      }
+      res.json({ sent, failed, total: allUsers.length });
+    } catch (error: any) {
+      console.error("Admin email broadcast error:", error);
+      res.status(500).json({ message: error.message || "Erreur lors de l'envoi." });
+    }
+  });
+
+  app.post("/api/admin/email/single", isAdmin, async (req, res) => {
+    try {
+      const { email, subject, message } = req.body;
+      if (!email?.trim() || !subject?.trim() || !message?.trim()) {
+        return res.status(400).json({ message: "Email, objet et contenu requis." });
+      }
+      const { sendAdminEmail } = await import("./services/resend");
+      const { db: dbE } = await import("./db");
+      const { users: usersE } = await import("@shared/models/auth");
+      const { eq: eqE } = await import("drizzle-orm");
+      const [user] = await dbE.select({ email: usersE.email, firstName: usersE.firstName })
+        .from(usersE).where(eqE(usersE.email, email.trim().toLowerCase()));
+      if (!user) {
+        return res.status(404).json({ message: "Aucun utilisateur trouvé avec cet email." });
+      }
+      await sendAdminEmail(user.email, user.firstName || "Utilisateur", subject.trim(), message.trim());
+      res.json({ sent: 1, email: user.email });
+    } catch (error: any) {
+      console.error("Admin email single error:", error);
+      res.status(500).json({ message: error.message || "Erreur lors de l'envoi." });
+    }
+  });
+
   // ─── END ADMIN ROUTES ──────────────────────────────────────────────────────
 
   // ── Background job: recheck pending transactions every 3 minutes ─────────────
