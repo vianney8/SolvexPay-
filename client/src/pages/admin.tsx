@@ -592,6 +592,7 @@ export default function AdminPage() {
   const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue", linkUrl: "", linkLabel: "" });
   const [editNotifDialog, setEditNotifDialog] = useState<{ id: string; title: string; message: string; color: string; linkUrl: string; linkLabel: string } | null>(null);
   const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
+  const [withdrawConfirm, setWithdrawConfirm] = useState<{ txId: string; status: "completed" | "failed"; tx: any } | null>(null);
   // Prefetch admin data immediately on mount
   useEffect(() => {
     ["/api/admin/users", "/api/admin/merchants", "/api/admin/payment-links", "/api/admin/api-keys"].forEach(key => {
@@ -3599,12 +3600,12 @@ export default function AdminPage() {
                           <p className="text-xs text-muted-foreground">{tx.userDisplayName || "—"} · {tx.phoneNumber} · {tx.provider || "—"} · {fmtDate(tx.createdAt)}</p>
                         </div>
                         <div className="flex gap-1.5">
-                          <button onClick={() => txStatusM.mutate({ txId: tx.id, status: "completed" })} disabled={txStatusM.isPending}
+                          <button onClick={() => setWithdrawConfirm({ txId: tx.id, status: "completed", tx })} disabled={txStatusM.isPending}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-colors"
                             data-testid={`btn-validate-withdrawal-${tx.id}`}>
                             <CheckCircle2 className="h-3.5 w-3.5" />Valider
                           </button>
-                          <button onClick={() => txStatusM.mutate({ txId: tx.id, status: "failed" })} disabled={txStatusM.isPending}
+                          <button onClick={() => setWithdrawConfirm({ txId: tx.id, status: "failed", tx })} disabled={txStatusM.isPending}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-500/15 text-red-600 text-xs font-bold hover:bg-red-500/25 transition-colors"
                             data-testid={`btn-reject-withdrawal-${tx.id}`}>
                             <XCircle className="h-3.5 w-3.5" />Rejeter
@@ -5018,6 +5019,53 @@ export default function AdminPage() {
               {updateNotifM.isPending ? "En cours..." : "Enregistrer"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirmation Valider / Rejeter retrait ── */}
+      <Dialog open={!!withdrawConfirm} onOpenChange={o => { if (!o) setWithdrawConfirm(null); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <div className={`h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ${withdrawConfirm?.status === "completed" ? "bg-gradient-to-br from-emerald-500 to-emerald-600" : "bg-gradient-to-br from-red-500 to-red-600"}`}>
+              {withdrawConfirm?.status === "completed" ? <CheckCircle2 className="h-8 w-8 text-white" /> : <XCircle className="h-8 w-8 text-white" />}
+            </div>
+            <DialogTitle className="text-center text-lg">
+              {withdrawConfirm?.status === "completed" ? "Valider ce retrait ?" : "Rejeter ce retrait ?"}
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm space-y-1">
+              {withdrawConfirm && (
+                <>
+                  <span className="block font-bold text-foreground">{fmt(parseFloat(withdrawConfirm.tx.amount))} {withdrawConfirm.tx.currency || "XOF"}</span>
+                  <span className="block">{withdrawConfirm.tx.userDisplayName || "—"} · {withdrawConfirm.tx.phoneNumber} · {withdrawConfirm.tx.provider}</span>
+                  {withdrawConfirm.status === "completed"
+                    ? "Le retrait sera marqué comme complété. Assurez-vous d'avoir envoyé les fonds."
+                    : "Le retrait sera rejeté et le solde remboursé à l'utilisateur."}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setWithdrawConfirm(null)}
+              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              data-testid="btn-withdraw-confirm-cancel"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={() => {
+                if (withdrawConfirm) {
+                  txStatusM.mutate({ txId: withdrawConfirm.txId, status: withdrawConfirm.status });
+                  setWithdrawConfirm(null);
+                }
+              }}
+              disabled={txStatusM.isPending}
+              data-testid="btn-withdraw-confirm-ok"
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-50 ${withdrawConfirm?.status === "completed" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
+            >
+              {txStatusM.isPending ? "..." : withdrawConfirm?.status === "completed" ? "Valider" : "Rejeter"}
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
 
