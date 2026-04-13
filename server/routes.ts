@@ -743,7 +743,7 @@ export async function registerRoutes(
 
       const omnipayOn = await getOmnipayEnabled();
       if (!omnipayOn) {
-        return res.status(503).json({ message: "Le service OmniPay est temporairement désactivé. Veuillez réessayer plus tard." });
+        return res.status(503).json({ message: "Le service de dépôt est temporairement désactivé. Veuillez réessayer plus tard." });
       }
 
       let wallet = await storage.getWallet(userId);
@@ -916,7 +916,7 @@ export async function registerRoutes(
 
       const omnipayOnW = await getOmnipayEnabled();
       if (!omnipayOnW) {
-        return res.status(503).json({ message: "Le service OmniPay est temporairement désactivé. Veuillez réessayer plus tard." });
+        return res.status(503).json({ message: "Le service de retrait est temporairement désactivé. Veuillez réessayer plus tard." });
       }
 
       const fullName = req.user?.name || req.user?.firstName || "Client";
