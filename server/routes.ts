@@ -1245,6 +1245,10 @@ export async function registerRoutes(
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configuré" });
       }
+      const omnipayOnPApi = await getOmnipayEnabled();
+      if (!omnipayOnPApi) {
+        return res.status(503).json({ message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard." });
+      }
       const amount = parseFloat(transaction.amount);
       const fullName = (customerName || "Client SolvexPay").trim();
       const nameParts = fullName.split(" ");
@@ -1766,6 +1770,10 @@ export async function registerRoutes(
         : (await getOperatorFeeRate(operator, "feePLink", globalPLinkFee, country)) / 100;
       const feesAmount = Math.round(linkAmount * feeRate);
 
+      const omnipayOnLink = await getOmnipayEnabled();
+      if (!omnipayOnLink) {
+        return res.status(503).json({ message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard." });
+      }
       console.log(`Initiating payment for link ${slug} with reference: ${reference}`);
       const depositResponse = await omniPayService.deposit({
         msisdn: phoneNumber,
@@ -2055,6 +2063,10 @@ export async function registerRoutes(
 
         if (!isApiKeyConfigured()) {
           return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
+        }
+        const omnipayOnSrApi = await getOmnipayEnabled();
+        if (!omnipayOnSrApi) {
+          return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard.", status: 503 } });
         }
 
         const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
@@ -2350,6 +2362,10 @@ export async function registerRoutes(
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
+      }
+      const omnipayOnApi = await getOmnipayEnabled();
+      if (!omnipayOnApi) {
+        return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard.", status: 503 } });
       }
 
       // ── Calcul des frais (priorité : user custom > opérateur > global) ──
