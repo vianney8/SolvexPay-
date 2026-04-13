@@ -376,6 +376,126 @@ function GlobalMaintenanceCard() {
   );
 }
 
+function OmniPayCard() {
+  const { toast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingValue, setPendingValue] = useState<boolean>(true);
+
+  const { data, isLoading } = useQuery<{ withdrawalMode: string; globalMaintenance: boolean; omnipayEnabled: boolean }>({
+    queryKey: ["/api/admin/system-settings"],
+    staleTime: 30_000,
+  });
+
+  const mutation = useMutation({
+    mutationFn: (val: boolean) =>
+      apiRequest("PATCH", "/api/admin/system-settings", { omnipayEnabled: val }).then(r => r.json()),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/system-settings"] });
+      toast({
+        title: data.omnipayEnabled ? "✓ API OmniPay activée" : "⚠ API OmniPay désactivée",
+        description: data.omnipayEnabled
+          ? "Les dépôts et retraits via OmniPay sont de nouveau opérationnels."
+          : "Toutes les transactions OmniPay sont suspendues jusqu'à la réactivation.",
+      });
+      setConfirmOpen(false);
+    },
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const isEnabled = data?.omnipayEnabled ?? true;
+
+  function handleToggleRequest() {
+    setPendingValue(!isEnabled);
+    setConfirmOpen(true);
+  }
+
+  return (
+    <>
+      <Card className={`border-2 ${!isEnabled ? "border-amber-500/60 bg-amber-500/5" : "border-border/50"} transition-colors`}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <Zap className="h-4 w-4 text-amber-500" />
+            API OmniPay
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Lorsque l'API OmniPay est désactivée, tous les dépôts et retraits automatiques sont bloqués. Les retraits en mode manuel restent traités normalement.
+          </p>
+          {!isEnabled && (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-center gap-3">
+              <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
+              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">API OmniPay actuellement DÉSACTIVÉE</p>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 p-4">
+            <div className="space-y-1">
+              <p className="font-bold text-sm">{isLoading ? "Chargement..." : isEnabled ? "API activée" : "API désactivée"}</p>
+              <p className="text-xs text-muted-foreground">{isEnabled ? "Les transactions passent normalement via OmniPay." : "Les transactions OmniPay sont suspendues."}</p>
+            </div>
+            <button
+              onClick={handleToggleRequest}
+              disabled={isLoading || mutation.isPending}
+              data-testid="btn-toggle-omnipay"
+              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isEnabled ? "bg-emerald-500" : "bg-muted-foreground/30"} ${isLoading || mutation.isPending ? "opacity-50 pointer-events-none" : ""}`}
+            >
+              <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+          <button
+            onClick={handleToggleRequest}
+            disabled={isLoading || mutation.isPending}
+            data-testid="btn-omnipay-action"
+            className={`w-full py-3 rounded-2xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
+              isEnabled
+                ? "bg-amber-600 hover:bg-amber-700 text-white"
+                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+            } disabled:opacity-50`}
+          >
+            <Zap className="h-4 w-4" />
+            {isEnabled ? "Désactiver l'API OmniPay" : "Activer l'API OmniPay"}
+          </button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={confirmOpen} onOpenChange={o => { if (!o) setConfirmOpen(false); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <div className={`h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ${!pendingValue ? "bg-gradient-to-br from-amber-500 to-amber-600" : "bg-gradient-to-br from-emerald-500 to-emerald-600"}`}>
+              <Zap className="h-8 w-8 text-white" />
+            </div>
+            <DialogTitle className="text-center text-lg">
+              {pendingValue ? "Activer l'API OmniPay ?" : "Désactiver l'API OmniPay ?"}
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm">
+              {pendingValue
+                ? "Les dépôts et retraits automatiques via OmniPay seront de nouveau opérationnels."
+                : "Tous les dépôts et retraits automatiques seront bloqués jusqu'à la réactivation. Les retraits manuels restent actifs."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setConfirmOpen(false)}
+              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              data-testid="btn-omnipay-cancel"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={() => mutation.mutate(pendingValue)}
+              disabled={mutation.isPending}
+              data-testid="btn-omnipay-confirm"
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-50 ${pendingValue ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"}`}
+            >
+              {mutation.isPending ? "..." : "Confirmer"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function CountdownLoader({ label, icon }: { label: string; icon: string }) {
   const [count, setCount] = useState(5);
   useEffect(() => {
@@ -3846,6 +3966,7 @@ export default function AdminPage() {
           <TabsContent value="settings" className="space-y-5 mt-5">
             <GlobalMaintenanceCard />
             <WithdrawalModeCard />
+            <OmniPayCard />
             {/* ── OTP CONFIG ── */}
             {(() => {
               const OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {

@@ -376,6 +376,23 @@ function setGlobalMaintenanceCache(val: boolean) {
   _globalMaintenance = val;
   _globalMaintenanceFetchedAt = Date.now();
 }
+
+// ── OmniPay enabled/disabled cache ───────────────────────────────────────────
+let _omnipayEnabled: boolean = true;
+let _omnipayEnabledFetchedAt: number = 0;
+async function getOmnipayEnabled(): Promise<boolean> {
+  if (Date.now() - _omnipayEnabledFetchedAt < 30_000) return _omnipayEnabled;
+  try {
+    const val = await storage.getSystemSetting("omnipayEnabled");
+    _omnipayEnabled = val !== "false";
+    _omnipayEnabledFetchedAt = Date.now();
+  } catch { /* keep last known value */ }
+  return _omnipayEnabled;
+}
+function setOmnipayEnabledCache(val: boolean) {
+  _omnipayEnabled = val;
+  _omnipayEnabledFetchedAt = Date.now();
+}
 async function requireNotMaintenance(req: any, res: any, next: any) {
   const maintenance = await getGlobalMaintenance();
   if (maintenance && !req.user?.isAdmin) {
@@ -724,6 +741,11 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Service de paiement non configure" });
       }
 
+      const omnipayOn = await getOmnipayEnabled();
+      if (!omnipayOn) {
+        return res.status(503).json({ message: "Le service OmniPay est temporairement désactivé. Veuillez réessayer plus tard." });
+      }
+
       let wallet = await storage.getWallet(userId);
       if (!wallet) {
         wallet = await storage.createWallet(userId);
@@ -890,6 +912,11 @@ export async function registerRoutes(
         // Deduct amount + fees from wallet (user receives exact amount, fees taken on top)
         await storage.updateWalletBalance(userId, localCurrency, -(amount + feesLocal));
         return res.json({ ...transaction, mode: "manual" });
+      }
+
+      const omnipayOnW = await getOmnipayEnabled();
+      if (!omnipayOnW) {
+        return res.status(503).json({ message: "Le service OmniPay est temporairement désactivé. Veuillez réessayer plus tard." });
       }
 
       const fullName = req.user?.name || req.user?.firstName || "Client";
@@ -4224,11 +4251,16 @@ export async function registerRoutes(
 
   app.get("/api/admin/system-settings", isAdmin, async (_req, res) => {
     try {
-      const [withdrawalMode, maintenanceVal] = await Promise.all([
+      const [withdrawalMode, maintenanceVal, omnipayEnabledVal] = await Promise.all([
         storage.getSystemSetting("withdrawalMode"),
         storage.getSystemSetting("globalMaintenance"),
+        storage.getSystemSetting("omnipayEnabled"),
       ]);
-      res.json({ withdrawalMode: withdrawalMode || "auto", globalMaintenance: maintenanceVal === "true" });
+      res.json({
+        withdrawalMode: withdrawalMode || "auto",
+        globalMaintenance: maintenanceVal === "true",
+        omnipayEnabled: omnipayEnabledVal !== "false",
+      });
     } catch (error) {
       res.status(500).json({ message: "Erreur" });
     }
@@ -4236,7 +4268,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/system-settings", isAdmin, async (req, res) => {
     try {
-      const { withdrawalMode, globalMaintenance } = req.body;
+      const { withdrawalMode, globalMaintenance, omnipayEnabled } = req.body;
       if (withdrawalMode && ["auto", "manual"].includes(withdrawalMode)) {
         await storage.setSystemSetting("withdrawalMode", withdrawalMode);
       }
@@ -4244,11 +4276,20 @@ export async function registerRoutes(
         await storage.setSystemSetting("globalMaintenance", globalMaintenance ? "true" : "false");
         setGlobalMaintenanceCache(globalMaintenance);
       }
-      const [wMode, mVal] = await Promise.all([
+      if (typeof omnipayEnabled === "boolean") {
+        await storage.setSystemSetting("omnipayEnabled", omnipayEnabled ? "true" : "false");
+        setOmnipayEnabledCache(omnipayEnabled);
+      }
+      const [wMode, mVal, omniVal] = await Promise.all([
         storage.getSystemSetting("withdrawalMode"),
         storage.getSystemSetting("globalMaintenance"),
+        storage.getSystemSetting("omnipayEnabled"),
       ]);
-      res.json({ withdrawalMode: wMode || "auto", globalMaintenance: mVal === "true" });
+      res.json({
+        withdrawalMode: wMode || "auto",
+        globalMaintenance: mVal === "true",
+        omnipayEnabled: omniVal !== "false",
+      });
     } catch (error) {
       res.status(500).json({ message: "Erreur" });
     }
