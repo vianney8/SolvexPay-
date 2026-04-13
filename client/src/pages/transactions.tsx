@@ -197,7 +197,7 @@ function TransactionModal({ tx, onClose }: { tx: Transaction; onClose: () => voi
             {tx.description && (
               <div className="py-2">
                 <p className="text-muted-foreground mb-1">Description</p>
-                <p className="text-sm text-foreground leading-relaxed">{tx.description}</p>
+                <p className={`text-sm leading-relaxed ${tx.description.startsWith("Retrait rejeté — Motif :") ? "text-red-500 font-semibold" : "text-foreground"}`}>{tx.description}</p>
               </div>
             )}
           </div>
