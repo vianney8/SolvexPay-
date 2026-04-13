@@ -2926,6 +2926,16 @@ export async function registerRoutes(
       }
 
       if (status === "completed" && transaction.type === "withdrawal" && transaction.status === "pending") {
+        const omnipayOnValidate = await getOmnipayEnabled();
+
+        if (!omnipayOnValidate) {
+          // OmniPay désactivé : l'admin a traité le retrait manuellement, on valide directement
+          const tx = await storage.updateTransactionStatus(id, "completed");
+          adminTxCache.clear();
+          if (tx) notifyWithdrawal(tx, "success").catch(() => {});
+          return res.json({ ...tx, manuallyValidated: true });
+        }
+
         if (!isApiKeyConfigured()) {
           return res.status(503).json({ message: "Service de paiement OmniPay non configuré" });
         }
