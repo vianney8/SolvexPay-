@@ -895,8 +895,9 @@ export async function registerRoutes(
 
       const reference = generateReference();
       const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
+      const omnipayOnWithdraw = await getOmnipayEnabled();
 
-      if (withdrawalMode === "manual") {
+      if (withdrawalMode === "manual" || !omnipayOnWithdraw) {
         const transaction = await storage.createTransaction({
           userId,
           type: "withdrawal",
