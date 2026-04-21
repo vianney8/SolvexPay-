@@ -2,7 +2,7 @@
  * Dispatcher central de fournisseurs de paiement.
  *
  * Détecte automatiquement le fournisseur actif (en BDD), instancie le service
- * adéquat (OmniPay, GeniusPay, ...) et expose une API unique compatible avec
+ * adéquat (OmniPay, ...) et expose une API unique compatible avec
  * l'ancien `omniPayService`. Toutes les routes métier passent par ce service —
  * aucune modification n'est nécessaire pour ajouter un nouveau fournisseur.
  */
@@ -18,7 +18,6 @@ import {
   type OmniPayStatusResponse,
   type OmniPayBalanceResponse,
 } from "./omnipay";
-import { GeniusPayService } from "./genius";
 
 const CACHE_TTL_MS = 30_000;
 
@@ -68,14 +67,6 @@ interface ProviderInstance {
 }
 
 function buildInstance(provider: PaymentProvider): ProviderInstance {
-  if (provider.code === "genius" || provider.code === "geniuspay") {
-    const svc = new GeniusPayService({
-      apiKey: provider.apiKey || "",
-      webhookSecret: provider.secretKey || "",
-      baseUrl: provider.baseUrl || undefined,
-    });
-    return Object.assign(svc, { code: provider.code });
-  }
   // Default: OmniPay
   const svc = new OmniPayService({
     apiKey: provider.apiKey || process.env.OMNIPAY_API_KEY || "",
@@ -255,18 +246,9 @@ export async function seedPaymentProviders(): Promise<void> {
         baseUrl: "https://omnipay.webtechci.com/interface/api2",
         config: {},
       },
-      {
-        code: "genius",
-        displayName: "GeniusPay",
-        isActive: false,
-        apiKey: "",
-        secretKey: "",
-        baseUrl: "https://pay.genius.ci/api/v1",
-        config: {},
-      },
     ]);
 
-    console.log("[init] Fournisseurs de paiement par défaut créés (omnipay actif, genius inactif).");
+    console.log("[init] Fournisseur de paiement par défaut créé (omnipay actif).");
   } catch (err) {
     console.error("[init] Erreur seed paymentProviders:", err);
   }

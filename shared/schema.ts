@@ -159,7 +159,7 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
-// ── Payment Providers (multi-fournisseurs : OmniPay, GeniusPay, ...) ──
+// ── Payment Providers (multi-fournisseurs : OmniPay, ...) ──
 export const paymentProviders = pgTable("payment_providers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   code: text("code").notNull().unique(),

@@ -60,11 +60,10 @@ L'application supporte **plusieurs fournisseurs de paiement** gérés dynamiquem
 - **Dispatcher** : `server/services/paymentService.ts` — détecte le fournisseur actif (cache 30s), instancie le bon service et délègue. Routes inchangées.
 - **Implémentations** :
   - `server/services/omnipay.ts` — `OmniPayService` (signature HMAC-SHA3-512)
-  - `server/services/genius.ts` — `GeniusPayService` (Bearer token, webhook HMAC-SHA256)
 - **Activation** : POST `/api/admin/payment-providers/:id/activate` — désactive automatiquement les autres (transaction DB).
-- **Fournisseurs par défaut** seedés au démarrage : `omnipay` (actif, hérite des env vars `OMNIPAY_API_KEY`/`OMNIPAY_CALLBACK_KEY`) et `genius` (inactif, à configurer).
+- **Fournisseur par défaut** seedé au démarrage : `omnipay` (actif, hérite des env vars `OMNIPAY_API_KEY`/`OMNIPAY_CALLBACK_KEY`).
 - **UI admin** : `/admin/payment-providers` — liste, toggle d'activation, configuration des clés, journal des appels.
-- **Webhooks** : `/api/webhooks/omnipay` (existant) et `/api/webhooks/genius` (nouveau, vérifie X-Webhook-Signature/X-Webhook-Timestamp).
+- **Webhooks** : `/api/webhooks/omnipay`.
 
 ### Supported Countries & Operators
 | Country | Code | Currency | Operators |
