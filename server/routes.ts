@@ -3716,6 +3716,21 @@ export async function registerRoutes(
     }
   });
 
+  // Récupère un fournisseur avec ses valeurs en clair (pour la modification)
+  app.get("/api/admin/payment-providers/:id", isAdmin, async (req, res) => {
+    try {
+      const { paymentProviders: pp } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [row] = await db.select().from(pp).where(eq(pp.id, req.params.id));
+      if (!row) return res.status(404).json({ message: "Fournisseur introuvable" });
+      res.json(row);
+    } catch (e: any) {
+      console.error("[admin/payment-providers] get error", e);
+      res.status(500).json({ message: e.message || "Erreur serveur" });
+    }
+  });
+
   app.post("/api/admin/payment-providers", isAdmin, async (req, res) => {
     try {
       const { insertPaymentProviderSchema, paymentProviders: pp } = await import("@shared/schema");

@@ -245,23 +245,35 @@ function ProviderEditor({
   const [webhookSecret, setWebhookSecret] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
 
+  // Récupère les valeurs en clair quand on ouvre le dialogue d'édition
+  const { data: fullProvider } = useQuery<any>({
+    queryKey: ["/api/admin/payment-providers", provider?.id],
+    enabled: !!provider && open && !createMode,
+  });
+
   useEffect(() => {
-    if (provider) {
-      setDisplayName(provider.displayName);
-      setBaseUrl(provider.baseUrl || "");
-      setCode(provider.code);
-      setApiKey("");
-      setSecretKey("");
-      setWebhookSecret("");
-    } else if (createMode) {
+    if (createMode) {
       setDisplayName("");
       setBaseUrl("");
       setCode("");
       setApiKey("");
       setSecretKey("");
       setWebhookSecret("");
+      return;
     }
-  }, [provider, createMode, open]);
+    if (provider) {
+      setDisplayName(provider.displayName);
+      setBaseUrl(provider.baseUrl || "");
+      setCode(provider.code);
+    }
+    if (fullProvider) {
+      setApiKey(fullProvider.apiKey || "");
+      setSecretKey(fullProvider.secretKey || "");
+      setWebhookSecret(fullProvider.config?.webhookSecret || "");
+      setBaseUrl(fullProvider.baseUrl || "");
+      setDisplayName(fullProvider.displayName || "");
+    }
+  }, [provider, createMode, open, fullProvider]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
