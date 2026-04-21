@@ -238,8 +238,8 @@ function WithdrawalModeCard() {
         <div className="rounded-xl border border-border/60 p-4 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
-              <p className="font-bold text-sm">{isLoading ? "Chargement..." : isAuto ? "Automatique (OmniPay)" : "Manuel (admin)"}</p>
-              <p className="text-xs text-muted-foreground">{isAuto ? "Les retraits sont envoyés directement via OmniPay." : "Les retraits restent en attente, l'admin les traite manuellement."}</p>
+              <p className="font-bold text-sm">{isLoading ? "Chargement..." : isAuto ? `Automatique (${providerName})` : "Manuel (admin)"}</p>
+              <p className="text-xs text-muted-foreground">{isAuto ? `Les retraits sont envoyés directement via ${providerName}.` : "Les retraits restent en attente, l'admin les traite manuellement."}</p>
             </div>
             <div className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isAuto ? "bg-emerald-500" : "bg-muted-foreground/30"} ${mutation.isPending ? "opacity-50 pointer-events-none" : ""}`}
               role="switch" aria-checked={isAuto} onClick={() => mutation.mutate(isAuto ? "manual" : "auto")} data-testid="toggle-withdrawal-mode">
@@ -376,10 +376,20 @@ function GlobalMaintenanceCard() {
   );
 }
 
+function useActiveProviderName(): string {
+  const { data } = useQuery<any[]>({
+    queryKey: ["/api/admin/payment-providers"],
+    staleTime: 30_000,
+  });
+  const active = Array.isArray(data) ? data.find((p: any) => p.isActive) : null;
+  return active?.displayName || `${providerName}`;
+}
+
 function OmniPayCard() {
   const { toast } = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingValue, setPendingValue] = useState<boolean>(true);
+  const providerName = useActiveProviderName();
 
   const { data, isLoading } = useQuery<{ withdrawalMode: string; globalMaintenance: boolean; omnipayEnabled: boolean }>({
     queryKey: ["/api/admin/system-settings"],
@@ -392,10 +402,10 @@ function OmniPayCard() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/system-settings"] });
       toast({
-        title: data.omnipayEnabled ? "✓ API OmniPay activée" : "⚠ API OmniPay désactivée",
+        title: data.omnipayEnabled ? `✓ API ${providerName} activée` : `⚠ API ${providerName} désactivée`,
         description: data.omnipayEnabled
-          ? "Les dépôts et retraits via OmniPay sont de nouveau opérationnels."
-          : "Toutes les transactions OmniPay sont suspendues jusqu'à la réactivation.",
+          ? `Les dépôts et retraits via ${providerName} sont de nouveau opérationnels.`
+          : `Toutes les transactions ${providerName} sont suspendues jusqu'à la réactivation.`,
       });
       setConfirmOpen(false);
     },
@@ -415,23 +425,23 @@ function OmniPayCard() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-bold flex items-center gap-2">
             <Zap className="h-4 w-4 text-amber-500" />
-            API OmniPay
+            API {providerName}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Lorsque l'API OmniPay est désactivée, tous les dépôts et retraits automatiques sont bloqués. Les retraits en mode manuel restent traités normalement.
+            Lorsque l'API {providerName} est désactivée, tous les dépôts et retraits automatiques sont bloqués. Les retraits en mode manuel restent traités normalement.
           </p>
           {!isEnabled && (
             <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-center gap-3">
               <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
-              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">API OmniPay actuellement DÉSACTIVÉE</p>
+              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">API {providerName} actuellement DÉSACTIVÉE</p>
             </div>
           )}
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 p-4">
             <div className="space-y-1">
               <p className="font-bold text-sm">{isLoading ? "Chargement..." : isEnabled ? "API activée" : "API désactivée"}</p>
-              <p className="text-xs text-muted-foreground">{isEnabled ? "Les transactions passent normalement via OmniPay." : "Les transactions OmniPay sont suspendues."}</p>
+              <p className="text-xs text-muted-foreground">{isEnabled ? `Les transactions passent normalement via ${providerName}.` : `Les transactions ${providerName} sont suspendues.`}</p>
             </div>
             <button
               onClick={handleToggleRequest}
@@ -453,7 +463,7 @@ function OmniPayCard() {
             } disabled:opacity-50`}
           >
             <Zap className="h-4 w-4" />
-            {isEnabled ? "Désactiver l'API OmniPay" : "Activer l'API OmniPay"}
+            {isEnabled ? `Désactiver l'API ${providerName}` : `Activer l'API ${providerName}`}
           </button>
         </CardContent>
       </Card>
@@ -465,11 +475,11 @@ function OmniPayCard() {
               <Zap className="h-8 w-8 text-white" />
             </div>
             <DialogTitle className="text-center text-lg">
-              {pendingValue ? "Activer l'API OmniPay ?" : "Désactiver l'API OmniPay ?"}
+              {pendingValue ? `Activer l'API ${providerName} ?` : `Désactiver l'API ${providerName} ?`}
             </DialogTitle>
             <DialogDescription className="text-center text-sm">
               {pendingValue
-                ? "Les dépôts et retraits automatiques via OmniPay seront de nouveau opérationnels."
+                ? `Les dépôts et retraits automatiques via ${providerName} seront de nouveau opérationnels.`
                 : "Tous les dépôts et retraits automatiques seront bloqués jusqu'à la réactivation. Les retraits manuels restent actifs."}
             </DialogDescription>
           </DialogHeader>
@@ -732,6 +742,7 @@ export default function AdminPage() {
   const [txPage, setTxPage] = useState(1);
   const [statsPeriod, setStatsPeriod] = useState("month");
   const [activeTab, setActiveTab] = useState("overview");
+  const providerName = useActiveProviderName();
   // Dialogs
   const [kycDialog, setKycDialog] = useState<{ userId: string; name: string; status: string } | null>(null);
   const [kycAction, setKycAction] = useState<"verified" | "rejected" | "not_started" | null>(null);
@@ -1090,9 +1101,9 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
-      toast({ title: "Dépôt effectué via OmniPay" }); setDepositDialog(null); setDepositData({ amount: "", phone: "", operator: "", motif: "" });
+      toast({ title: `Dépôt effectué via ${providerName}` }); setDepositDialog(null); setDepositData({ amount: "", phone: "", operator: "", motif: "" });
     },
-    onError: (e: any) => toast({ title: "Erreur OmniPay", description: e?.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: `Erreur ${providerName}`, description: e?.message, variant: "destructive" }),
   });
 
   const migrateM = useMutation({
@@ -1113,7 +1124,7 @@ export default function AdminPage() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
       if (data?.omnipayTriggered) {
-        toast({ title: "Paiement envoyé via OmniPay", description: "Le transfert a été initié avec succès." });
+        toast({ title: `Paiement envoyé via ${providerName}`, description: "Le transfert a été initié avec succès." });
       } else if (data?.refunded) {
         toast({ title: "Transaction rejetée", description: "Le solde a été remboursé à l'utilisateur." });
       } else {
@@ -1126,7 +1137,7 @@ export default function AdminPage() {
         const parsed = JSON.parse(description.replace(/^\d+:\s*/, ""));
         description = parsed.message || description;
       } catch {}
-      toast({ title: "Erreur OmniPay", description, variant: "destructive" });
+      toast({ title: `Erreur ${providerName}`, description, variant: "destructive" });
     },
   });
 
@@ -1178,7 +1189,7 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay-rates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
-      toast({ title: "Taux OmniPay mis à jour !" });
+      toast({ title: `Taux ${providerName} mis à jour !` });
       setOmnipayRateEdit(null);
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
@@ -1236,7 +1247,7 @@ export default function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
-      toast({ title: "Retrait initié", description: `Statut OmniPay : ${res.omnipayStatus}` });
+      toast({ title: "Retrait initié", description: `Statut ${providerName} : ${res.omnipayStatus}` });
       setWdDialog(false);
       setWdForm({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
     },
@@ -1399,7 +1410,7 @@ export default function AdminPage() {
             <TabsList className="inline-flex w-max min-w-full gap-1 p-1.5 bg-muted/60 rounded-2xl h-auto">
               {[
                 { v: "overview", label: "Vue d'ensemble", Icon: BarChart3, badge: 0 },
-                { v: "liquidity", label: "Liquidité OmniPay", Icon: Activity, badge: liquidityCriticalCount },
+                { v: "liquidity", label: `Liquidité ${providerName}`, Icon: Activity, badge: liquidityCriticalCount },
                 { v: "benefices", label: "Bénéfices", Icon: Coins, badge: 0 },
                 { v: "marchands", label: "Marchands", Icon: Link2, badge: 0 },
                 { v: "kyc", label: "KYC", Icon: BadgeCheck, badge: pendingKyc.length },
@@ -1453,7 +1464,7 @@ export default function AdminPage() {
               </div>
               <div className="flex-1">
                 <p className="text-base font-black text-foreground">Fournisseurs de paiement</p>
-                <p className="text-xs text-muted-foreground">Activez OmniPay, GeniusPay et configurez les clés API. Une seule passerelle active à la fois.</p>
+                <p className="text-xs text-muted-foreground">Activez {providerName}, GeniusPay et configurez les clés API. Une seule passerelle active à la fois.</p>
               </div>
               <Link href="/admin/payment-providers">
                 <button className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 transition-colors text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm" data-testid="btn-overview-payment-providers">
@@ -1470,8 +1481,8 @@ export default function AdminPage() {
                   <Activity className="h-4.5 w-4.5 text-red-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-bold text-red-400">{liquidityCriticalCount} situation{liquidityCriticalCount !== 1 ? "s" : ""} critique{liquidityCriticalCount !== 1 ? "s" : ""} de liquidité OmniPay</p>
-                  <p className="text-xs text-muted-foreground">Cliquez pour voir l'analyse complète dans l'onglet Liquidité OmniPay</p>
+                  <p className="text-sm font-bold text-red-400">{liquidityCriticalCount} situation{liquidityCriticalCount !== 1 ? "s" : ""} critique{liquidityCriticalCount !== 1 ? "s" : ""} de liquidité {providerName}</p>
+                  <p className="text-xs text-muted-foreground">Cliquez pour voir l'analyse complète dans l'onglet Liquidité {providerName}</p>
                 </div>
               </div>
             )}
@@ -1491,7 +1502,7 @@ export default function AdminPage() {
                     data-testid="btn-admin-wd-open"
                   >
                     <TrendingDown className="h-3.5 w-3.5" />
-                    Retrait OmniPay
+                    Retrait {providerName}
                   </button>
                   <button
                     onClick={() => { queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] }); }}
@@ -1505,7 +1516,7 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y divide-border/40 bg-card">
                 {[
                   {
-                    label: "Reçu via OmniPay",
+                    label: `Reçu via ${providerName}`,
                     value: finLoading ? null : fmt(financialSummary?.omnipayDeposits || 0),
                     sub: `Frais collectés : ${finLoading ? "…" : fmt(financialSummary?.omnipayDepositFees || 0)} XOF`,
                     icon: TrendingUp,
@@ -1565,7 +1576,7 @@ export default function AdminPage() {
               <div className="bg-slate-900 dark:bg-slate-950 px-5 py-3 flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <p className="text-xs text-slate-300 font-semibold">Solde OmniPay en temps réel :</p>
+                  <p className="text-xs text-slate-300 font-semibold">Solde {providerName} en temps réel :</p>
                 </div>
                 {omniLoading ? (
                   <Skeleton className="h-4 w-40 rounded bg-slate-700" />
@@ -1588,7 +1599,7 @@ export default function AdminPage() {
               <div className="bg-slate-800 dark:bg-slate-900 px-5 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-slate-300" />
-                  <p className="text-slate-200 font-bold text-sm">Historique des retraits OmniPay</p>
+                  <p className="text-slate-200 font-bold text-sm">Historique des retraits {providerName}</p>
                   {(adminWdHistory || []).length > 0 && (
                     <span className="text-[10px] font-bold bg-slate-600 text-slate-200 rounded-full px-2 py-0.5">{(adminWdHistory || []).length}</span>
                   )}
@@ -1727,7 +1738,7 @@ export default function AdminPage() {
                 <CardContent className="space-y-0">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Frais collectés des utilisateurs</p>
                   {[
-                    { label: `Dépôts (OmniPay)`, val: fmt(commissions?.totalDepositFees || 0), color: "text-emerald-600" },
+                    { label: `Dépôts (${providerName})`, val: fmt(commissions?.totalDepositFees || 0), color: "text-emerald-600" },
                     { label: `Retraits`, val: fmt(commissions?.totalWithdrawalFees || 0), color: "text-cyan-600" },
                     { label: "Total frais perçus", val: fmt(commissions?.totalFees || 0), color: "text-indigo-600", bold: true },
                   ].map(item => (
@@ -1736,7 +1747,7 @@ export default function AdminPage() {
                       <span className={`text-sm font-${(item as any).bold ? "black" : "semibold"} ${item.color}`}>{comLoading ? "—" : item.val}</span>
                     </div>
                   ))}
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-3 mb-2">Coût OmniPay déduit</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-3 mb-2">Coût {providerName} déduit</p>
                   {[
                     { label: `Dépôts (@${commissions?.omnipayDepositRate ?? omnipayRates?.deposit ?? 3}%)`, val: fmt(commissions?.omnipayCostDeposit || 0), color: "text-rose-500" },
                     { label: `Retraits (@${commissions?.omnipayWithdrawalRate ?? omnipayRates?.withdrawal ?? 3}%)`, val: fmt(commissions?.omnipayCostWithdrawal || 0), color: "text-rose-500" },
@@ -1925,7 +1936,7 @@ export default function AdminPage() {
                   <div className="bg-gradient-to-r from-rose-600 via-orange-600 to-amber-600 px-5 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">🏦</span>
-                      <p className="text-white font-bold text-sm">Analyse de Liquidité OmniPay</p>
+                      <p className="text-white font-bold text-sm">Analyse de Liquidité {providerName}</p>
                       <span className="text-xs text-white/60 hidden sm:block">— Mis à jour toutes les 10s</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1968,7 +1979,7 @@ export default function AdminPage() {
                             <div className="text-right shrink-0">
                               {row.shortfall > 0 ? (
                                 <div>
-                                  <p className="text-[10px] text-muted-foreground font-medium">À ajouter dans OmniPay</p>
+                                  <p className="text-[10px] text-muted-foreground font-medium">À ajouter dans {providerName}</p>
                                   <p className="text-base font-black text-red-400" data-testid={`shortfall-${row.code}`}>+{fmt(Math.ceil(row.shortfall))} XOF</p>
                                 </div>
                               ) : (
@@ -1982,7 +1993,7 @@ export default function AdminPage() {
 
                           <div className="grid grid-cols-3 gap-2 mb-3 text-center">
                             <div className="bg-background/40 rounded-lg p-2">
-                              <p className="text-[10px] text-muted-foreground">Solde OmniPay</p>
+                              <p className="text-[10px] text-muted-foreground">Solde {providerName}</p>
                               <p className="text-xs font-bold text-foreground">{fmt(row.omniBalance)} XOF</p>
                             </div>
                             <div className="bg-background/40 rounded-lg p-2">
@@ -2000,7 +2011,7 @@ export default function AdminPage() {
 
                           <div>
                             <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-                              <span>Couverture OmniPay</span>
+                              <span>Couverture {providerName}</span>
                               <span className={`font-bold ${row.coverage < 50 ? "text-red-400" : row.coverage < 100 ? "text-amber-400" : "text-emerald-400"}`}>
                                 {row.coverage}%
                               </span>
@@ -2013,7 +2024,7 @@ export default function AdminPage() {
                             </div>
                             {row.shortfall > 0 && (
                               <p className="text-[10px] text-red-400 mt-1.5 font-medium">
-                                ⚠ Rechargez le wallet {row.meta.name} de <strong>+{fmt(Math.ceil(row.shortfall))} XOF</strong> dans OmniPay pour couvrir tous les retraits
+                                ⚠ Rechargez le wallet {row.meta.name} de <strong>+{fmt(Math.ceil(row.shortfall))} XOF</strong> dans {providerName} pour couvrir tous les retraits
                               </p>
                             )}
                           </div>
@@ -2082,7 +2093,7 @@ export default function AdminPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 { label: "Frais collectés (total)", val: commissions?.totalFees || 0, icon: Coins, grad: "from-indigo-500 to-violet-600", desc: "Toutes transactions" },
-                { label: "Coût OmniPay déduit", val: -(commissions?.totalOmniPayCost || 0), icon: TrendingDown, grad: "from-rose-500 to-orange-500", desc: "Frais prestataire" },
+                { label: `Coût ${providerName} déduit`, val: -(commissions?.totalOmniPayCost || 0), icon: TrendingDown, grad: "from-rose-500 to-orange-500", desc: "Frais prestataire" },
                 { label: "Bénéfice net total", val: commissions?.adminNetProfit || 0, icon: TrendingUp, grad: "from-emerald-500 to-teal-600", desc: "Depuis le début" },
                 { label: "Déjà retiré", val: -(commissions?.totalWithdrawn || 0), icon: Send, grad: "from-amber-500 to-yellow-600", desc: "Retraits confirmés" },
               ].map((item, i) => (
@@ -2494,7 +2505,7 @@ export default function AdminPage() {
                         <Building2 className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Solde OmniPay</p>
+                        <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Solde {providerName}</p>
                         <p className="text-white font-black text-sm">Compte marchand global</p>
                       </div>
                     </div>
@@ -2664,7 +2675,7 @@ export default function AdminPage() {
                                   {result && (
                                     <div className={`mt-1 text-xs font-semibold ${result.action === "completed" ? "text-emerald-600" : "text-blue-600"}`}>
                                       {result.action === "completed"
-                                        ? "✓ Déjà traité par OmniPay — statut mis à jour"
+                                        ? `✓ Déjà traité par ${providerName} — statut mis à jour`
                                         : `✓ Rejeté · ${fmtAmt(result.refundedAmount || 0, result.currency || tx.currency)} remboursés`}
                                     </div>
                                   )}
@@ -2726,7 +2737,7 @@ export default function AdminPage() {
                       <div>
                         <CardTitle className="text-sm font-bold flex items-center gap-2">
                           <Activity className="h-4 w-4 text-indigo-500" />
-                          Mouvements OmniPay en temps réel
+                          Mouvements {providerName} en temps réel
                         </CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">50 derniers mouvements · actualisation auto toutes les 60s</p>
                       </div>
@@ -3214,7 +3225,7 @@ export default function AdminPage() {
                     <TrendingDown className="h-4 w-4 text-rose-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold">Taux de coût OmniPay</p>
+                    <p className="text-sm font-bold">Taux de coût {providerName}</p>
                     <p className="text-xs text-muted-foreground">Utilisé pour calculer votre bénéfice net réel</p>
                   </div>
                 </div>
@@ -3238,7 +3249,7 @@ export default function AdminPage() {
               ) : omnipayRateEdit ? (
                 <div className="p-5 space-y-4">
                   <div className="p-3 rounded-xl bg-amber-500/8 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
-                    Entrez les taux que OmniPay vous facture (voir votre contrat OmniPay). Par défaut : 3% collecte, 3% décaissement.
+                    Entrez les taux que {providerName} vous facture (voir votre contrat {providerName}). Par défaut : 3% collecte, 3% décaissement.
                   </div>
                   {[
                     { key: "deposit" as const, label: "Collecte (PAY-IN) — Dépôts", icon: <TrendingUp className="h-4 w-4 text-rose-600" /> },
@@ -4194,7 +4205,7 @@ export default function AdminPage() {
                   </div>
                   <p className="text-xs text-muted-foreground -mt-1">
                     Activez l'OTP par opérateur et par pays pour les dépôts, paiements par lien ou API.
-                    Si un code est renseigné, il est envoyé en arrière-plan à OmniPay sans interaction de l'utilisateur.
+                    Si un code est renseigné, il est envoyé en arrière-plan à {providerName} sans interaction de l'utilisateur.
                     Les pays suspendus sont exclus.
                   </p>
                   <div className="grid gap-3">
@@ -4440,7 +4451,7 @@ export default function AdminPage() {
                 <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
                   <CheckCircle2 className="h-10 w-10 text-green-500" />
                   <p className="font-semibold text-base">Aucune erreur récente</p>
-                  <p className="text-xs text-muted-foreground max-w-xs">Les erreurs de paiement OmniPay apparaissent ici dès qu'elles surviennent.</p>
+                  <p className="text-xs text-muted-foreground max-w-xs">Les erreurs de paiement {providerName} apparaissent ici dès qu'elles surviennent.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -4739,7 +4750,7 @@ export default function AdminPage() {
       <Dialog open={!!depositDialog} onOpenChange={(o) => { if (!o) setDepositDialog(null); }}>
         <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-emerald-500" />Dépôt via OmniPay</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-emerald-500" />Dépôt via {providerName}</DialogTitle>
             <DialogDescription>
               {depositDialog?.name ? `Wallet de ${depositDialog.name}` : "Sélectionner un wallet"}
             </DialogDescription>
@@ -4889,10 +4900,10 @@ export default function AdminPage() {
               <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center">
                 <TrendingDown className="h-4 w-4 text-white" />
               </div>
-              Retrait depuis OmniPay
+              Retrait depuis {providerName}
             </DialogTitle>
             <DialogDescription>
-              Transférez des fonds depuis le solde OmniPay vers un numéro Mobile Money.
+              Transférez des fonds depuis le solde {providerName} vers un numéro Mobile Money.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
