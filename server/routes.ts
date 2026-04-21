@@ -3802,15 +3802,17 @@ export async function registerRoutes(
       if (!provider) {
         return res.status(404).json({ error: "GeniusPay non configuré" });
       }
+      const cfg = (provider.config as any) || {};
       const svc = new GeniusPayService({
-        apiKey: provider.apiKey || "",
-        webhookSecret: provider.secretKey || "",
+        publicKey: provider.apiKey || "",
+        secretKey: provider.secretKey || "",
+        webhookSecret: cfg.webhookSecret || "",
         baseUrl: provider.baseUrl || undefined,
       });
       const signature = String(req.header("x-webhook-signature") || req.header("X-Webhook-Signature") || "");
       const timestamp = String(req.header("x-webhook-timestamp") || req.header("X-Webhook-Timestamp") || "");
       const rawBody = JSON.stringify(req.body);
-      if (provider.secretKey && !svc.verifyWebhookSignature(rawBody, signature, timestamp)) {
+      if (cfg.webhookSecret && !svc.verifyWebhookSignature(rawBody, signature, timestamp)) {
         console.error("[Genius] Webhook: invalid signature");
         return res.status(401).json({ error: "Invalid signature" });
       }
