@@ -69,11 +69,9 @@ interface ProviderInstance {
 
 function buildInstance(provider: PaymentProvider): ProviderInstance {
   if (provider.code === "genius" || provider.code === "geniuspay") {
-    const cfg = (provider.config as any) || {};
     const svc = new GeniusPayService({
-      publicKey: provider.apiKey || "",
-      secretKey: provider.secretKey || "",
-      webhookSecret: cfg.webhookSecret || "",
+      apiKey: provider.apiKey || "",
+      webhookSecret: provider.secretKey || "",
       baseUrl: provider.baseUrl || undefined,
     });
     return Object.assign(svc, { code: provider.code });

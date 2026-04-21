@@ -3716,21 +3716,6 @@ export async function registerRoutes(
     }
   });
 
-  // Récupère un fournisseur avec ses valeurs en clair (pour la modification)
-  app.get("/api/admin/payment-providers/:id", isAdmin, async (req, res) => {
-    try {
-      const { paymentProviders: pp } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const { eq } = await import("drizzle-orm");
-      const [row] = await db.select().from(pp).where(eq(pp.id, req.params.id));
-      if (!row) return res.status(404).json({ message: "Fournisseur introuvable" });
-      res.json(row);
-    } catch (e: any) {
-      console.error("[admin/payment-providers] get error", e);
-      res.status(500).json({ message: e.message || "Erreur serveur" });
-    }
-  });
-
   app.post("/api/admin/payment-providers", isAdmin, async (req, res) => {
     try {
       const { insertPaymentProviderSchema, paymentProviders: pp } = await import("@shared/schema");
@@ -3817,17 +3802,15 @@ export async function registerRoutes(
       if (!provider) {
         return res.status(404).json({ error: "GeniusPay non configuré" });
       }
-      const cfg = (provider.config as any) || {};
       const svc = new GeniusPayService({
-        publicKey: provider.apiKey || "",
-        secretKey: provider.secretKey || "",
-        webhookSecret: cfg.webhookSecret || "",
+        apiKey: provider.apiKey || "",
+        webhookSecret: provider.secretKey || "",
         baseUrl: provider.baseUrl || undefined,
       });
       const signature = String(req.header("x-webhook-signature") || req.header("X-Webhook-Signature") || "");
       const timestamp = String(req.header("x-webhook-timestamp") || req.header("X-Webhook-Timestamp") || "");
       const rawBody = JSON.stringify(req.body);
-      if (cfg.webhookSecret && !svc.verifyWebhookSignature(rawBody, signature, timestamp)) {
+      if (provider.secretKey && !svc.verifyWebhookSignature(rawBody, signature, timestamp)) {
         console.error("[Genius] Webhook: invalid signature");
         return res.status(401).json({ error: "Invalid signature" });
       }

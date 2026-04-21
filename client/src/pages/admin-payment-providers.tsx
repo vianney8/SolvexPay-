@@ -242,38 +242,21 @@ function ProviderEditor({
   const [displayName, setDisplayName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
-  const [webhookSecret, setWebhookSecret] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
 
-  // Récupère les valeurs en clair quand on ouvre le dialogue d'édition
-  const { data: fullProvider } = useQuery<any>({
-    queryKey: ["/api/admin/payment-providers", provider?.id],
-    enabled: !!provider && open && !createMode,
-  });
-
   useEffect(() => {
-    if (createMode) {
+    if (provider) {
+      setDisplayName(provider.displayName);
+      setBaseUrl(provider.baseUrl || "");
+      setCode(provider.code);
+    } else if (createMode) {
       setDisplayName("");
       setBaseUrl("");
       setCode("");
       setApiKey("");
       setSecretKey("");
-      setWebhookSecret("");
-      return;
     }
-    if (provider) {
-      setDisplayName(provider.displayName);
-      setBaseUrl(provider.baseUrl || "");
-      setCode(provider.code);
-    }
-    if (fullProvider) {
-      setApiKey(fullProvider.apiKey || "");
-      setSecretKey(fullProvider.secretKey || "");
-      setWebhookSecret(fullProvider.config?.webhookSecret || "");
-      setBaseUrl(fullProvider.baseUrl || "");
-      setDisplayName(fullProvider.displayName || "");
-    }
-  }, [provider, createMode, open, fullProvider]);
+  }, [provider, createMode, open]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -293,7 +276,6 @@ function ProviderEditor({
         if (apiKey) body.apiKey = apiKey;
         if (secretKey) body.secretKey = secretKey;
         if (baseUrl !== (provider.baseUrl || "")) body.baseUrl = baseUrl || null;
-        if (webhookSecret) body.config = { webhookSecret };
         const res = await apiRequest("PATCH", `/api/admin/payment-providers/${provider.id}`, body);
         return res.json();
       }
@@ -301,7 +283,7 @@ function ProviderEditor({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-providers"] });
       toast({ title: createMode ? "Fournisseur créé" : "Configuration mise à jour" });
-      setApiKey(""); setSecretKey(""); setWebhookSecret("");
+      setApiKey(""); setSecretKey("");
       onClose();
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -337,19 +319,12 @@ function ProviderEditor({
             <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." data-testid="input-base-url" />
           </div>
           <div>
-            <Label>Clé publique / API {!createMode && <span className="text-xs text-muted-foreground">(vide = inchangée)</span>}</Label>
-            <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="pk_live_... ou clé API" data-testid="input-api-key" />
-            <p className="text-xs text-muted-foreground mt-1">GeniusPay : clé pk_live_… — OmniPay : clé API marchand.</p>
+            <Label>Clé API {!createMode && <span className="text-xs text-muted-foreground">(laisser vide pour ne pas changer)</span>}</Label>
+            <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="••••••••" data-testid="input-api-key" />
           </div>
           <div>
-            <Label>Clé secrète {!createMode && <span className="text-xs text-muted-foreground">(vide = inchangée)</span>}</Label>
-            <Input type="password" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="sk_live_... ou secret callback" data-testid="input-secret-key" />
-            <p className="text-xs text-muted-foreground mt-1">GeniusPay : clé sk_live_… — OmniPay : clé de callback (signature webhook).</p>
-          </div>
-          <div>
-            <Label>Secret webhook (whsec_) {!createMode && <span className="text-xs text-muted-foreground">(vide = inchangé)</span>}</Label>
-            <Input type="password" value={webhookSecret} onChange={(e) => setWebhookSecret(e.target.value)} placeholder="whsec_live_..." data-testid="input-webhook-secret" />
-            <p className="text-xs text-muted-foreground mt-1">Spécifique GeniusPay. Fourni par GeniusPay lorsque vous enregistrez l'URL du webhook dans leur tableau de bord.</p>
+            <Label>Secret webhook {!createMode && <span className="text-xs text-muted-foreground">(laisser vide pour ne pas changer)</span>}</Label>
+            <Input type="password" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="••••••••" data-testid="input-secret-key" />
           </div>
         </div>
         <DialogFooter>
