@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, boolean, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, boolean, index, jsonb, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -158,6 +158,42 @@ export const notifications = pgTable("notifications", {
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// ── Payment Providers (multi-fournisseurs : OmniPay, GeniusPay, ...) ──
+export const paymentProviders = pgTable("payment_providers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  isActive: boolean("is_active").notNull().default(false),
+  apiKey: text("api_key"),
+  secretKey: text("secret_key"),
+  baseUrl: text("base_url"),
+  config: jsonb("config").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPaymentProviderSchema = createInsertSchema(paymentProviders).omit({ id: true, createdAt: true, updatedAt: true });
+export type PaymentProvider = typeof paymentProviders.$inferSelect;
+export type InsertPaymentProvider = z.infer<typeof insertPaymentProviderSchema>;
+
+export const paymentProviderLogs = pgTable("payment_provider_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerCode: text("provider_code").notNull(),
+  action: text("action").notNull(),
+  reference: text("reference"),
+  request: jsonb("request"),
+  response: jsonb("response"),
+  status: text("status").notNull(),
+  errorMessage: text("error_message"),
+  durationMs: integer("duration_ms"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_provider_logs_created").on(table.createdAt),
+  index("idx_provider_logs_provider").on(table.providerCode),
+]);
+
+export type PaymentProviderLog = typeof paymentProviderLogs.$inferSelect;
 
 // Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({

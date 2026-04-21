@@ -5,7 +5,8 @@ import { execSync } from "child_process";
 import rateLimit from "express-rate-limit";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
-import { omniPayService, isApiKeyConfigured, verifyCallbackSignature, omnipayStatusToString, omnipayStatusFromRaw, type OmniPayCallbackPayload } from "./services/omnipay";
+import { verifyCallbackSignature, omnipayStatusToString, omnipayStatusFromRaw, type OmniPayCallbackPayload } from "./services/omnipay";
+import { paymentService, isApiKeyConfigured, getOmniPayCallbackKey, getProviderByCode, activateProvider, invalidateActiveProviderCache, seedPaymentProviders } from "./services/paymentService";
 import { testResendConnection } from "./services/resend";
 import { notifyTransactionCompleted, notifyWithdrawal, handleTelegramCallback } from "./services/telegram";
 import { sendKycStatusEmail } from "./services/resend";
@@ -761,7 +762,7 @@ export async function registerRoutes(
       const returnUrl = isWave ? `https://solvexpay.com/api/payment/callback?reference=${reference}` : undefined;
       const omniDepositOperator = getOmniPayOperatorCode(operator, country);
 
-      const depositResponse = await omniPayService.deposit({
+      const depositResponse = await paymentService.deposit({
         msisdn: phoneNumber,
         amount,
         reference,
@@ -928,7 +929,7 @@ export async function registerRoutes(
       let isTimeout = false;
 
       try {
-        transferResponse = await omniPayService.transfer({
+        transferResponse = await paymentService.transfer({
           msisdn: phoneNumber,
           amount: amount,
           reference,
@@ -1026,7 +1027,7 @@ export async function registerRoutes(
       const isWave = operator.toLowerCase() === "wave";
 
       console.log(`Initiating OmniPay transfer for reference: ${reference} (Country: ${country}, Operator: ${operator})`);
-      const transferResponse = await omniPayService.transfer({
+      const transferResponse = await paymentService.transfer({
         msisdn: phoneNumber,
         amount,
         reference,
@@ -1069,7 +1070,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Reference requise" });
       }
 
-      const result = await omniPayService.getStatus(reference);
+      const result = await paymentService.getStatus(reference);
       const statusStr = omnipayStatusToString(result.status ?? 0);
 
       const transaction = await storage.getTransactionByReference(reference);
@@ -1139,7 +1140,7 @@ export async function registerRoutes(
       }
 
       // ── Transaction encore pending → interroger OmniPay ──────────────────
-      const result = await omniPayService.getStatus(reference);
+      const result = await paymentService.getStatus(reference);
       const statusStr = omnipayStatusToString(result.status ?? 0);
 
       if (transaction) {
@@ -1260,7 +1261,7 @@ export async function registerRoutes(
         ? `https://solvexpay.com/pay-api/${id}?status=callback&reference=${transaction.reference}`
         : undefined;
       const omniOperator = getOmniPayOperatorCode(operator, country);
-      const depositResponse = await omniPayService.deposit({
+      const depositResponse = await paymentService.deposit({
         msisdn: phoneNumber,
         amount,
         reference: transaction.reference,
@@ -1329,7 +1330,7 @@ export async function registerRoutes(
         const publicStatus = transaction.status === "completed" ? "SUCCESS" : transaction.status === "failed" ? "FAILED" : "PENDING";
         return res.json({ success: true, status: publicStatus });
       }
-      const result = await omniPayService.getStatus(transaction.reference);
+      const result = await paymentService.getStatus(transaction.reference);
       const statusStr = omnipayStatusToString(result.status ?? 0);
       if (statusStr === "completed") {
         const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
@@ -1776,7 +1777,7 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard." });
       }
       console.log(`Initiating payment for link ${slug} with reference: ${reference}`);
-      const depositResponse = await omniPayService.deposit({
+      const depositResponse = await paymentService.deposit({
         msisdn: phoneNumber,
         amount: linkAmount,
         reference,
@@ -2108,7 +2109,7 @@ export async function registerRoutes(
 
         let omnipayResponse: any;
         try {
-          omnipayResponse = await omniPayService.deposit({
+          omnipayResponse = await paymentService.deposit({
             msisdn: phone,
             amount,
             reference,
@@ -2245,7 +2246,7 @@ export async function registerRoutes(
           message: "Transaction déjà traitée",
         });
       }
-      const result = await omniPayService.getStatus(transaction.reference);
+      const result = await paymentService.getStatus(transaction.reference);
       const statusStr = omnipayStatusToString(result.status ?? 0);
 
       if (statusStr === "completed") {
@@ -2418,7 +2419,7 @@ export async function registerRoutes(
       // ── Appel OmniPay ──
       let omnipayResponse: any;
       try {
-        omnipayResponse = await omniPayService.deposit({
+        omnipayResponse = await paymentService.deposit({
           msisdn: phone,
           amount,
           reference,
@@ -2481,7 +2482,7 @@ export async function registerRoutes(
 
     if (transactionId && reference) {
       try {
-        const result = await omniPayService.getStatus(reference);
+        const result = await paymentService.getStatus(reference);
         const statusStr = omnipayStatusToString(result.status ?? 0);
         const transaction = await storage.getTransactionById(transactionId);
 
@@ -2548,7 +2549,7 @@ export async function registerRoutes(
     console.log("[OmniPay] Callback received:", JSON.stringify(payload));
 
     // Signature verification — reject invalid requests immediately
-    const callbackKey = omniPayService.getCallbackKey();
+    const callbackKey = await getOmniPayCallbackKey();
     if (callbackKey) {
       if (!payload.signature) {
         console.error("[OmniPay] Callback: missing signature");
@@ -2644,7 +2645,7 @@ export async function registerRoutes(
 
     if (reference) {
       try {
-        const result = await omniPayService.getStatus(reference);
+        const result = await paymentService.getStatus(reference);
         const statusStr = omnipayStatusToString(result.status ?? 0);
         const transaction = await storage.getTransactionByReference(reference);
         if (transaction && transaction.status === "pending") {
@@ -2965,7 +2966,7 @@ export async function registerRoutes(
 
         console.log(`Admin: initiating OmniPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${omnipayOperator}, amount: ${amount}, fees: ${txFees}, net: ${netAmountLocal})`);
         try {
-          const transferResponse = await omniPayService.transfer({
+          const transferResponse = await paymentService.transfer({
             msisdn: phoneNumber,
             amount: netAmountLocal,
             reference: transaction.reference,
@@ -3687,11 +3688,184 @@ export async function registerRoutes(
 
   app.get("/api/admin/omnipay/balance", isAdmin, async (req, res) => {
     try {
-      const balances = await omniPayService.getBalance();
+      const balances = await paymentService.getBalance();
       res.json(balances);
     } catch (error) {
       console.error("Admin OmniPay balance error:", error);
       res.status(500).json({ message: "Impossible de récupérer le solde OmniPay" });
+    }
+  });
+
+  // ── Gestion des fournisseurs de paiement (admin) ──
+  app.get("/api/admin/payment-providers", isAdmin, async (_req, res) => {
+    try {
+      const { paymentProviders: pp } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const rows = await db.select().from(pp);
+      const safe = rows.map((r) => ({
+        ...r,
+        apiKey: r.apiKey ? `${r.apiKey.slice(0, 6)}…${r.apiKey.slice(-4)}` : "",
+        secretKey: r.secretKey ? `${r.secretKey.slice(0, 4)}…${r.secretKey.slice(-4)}` : "",
+        hasApiKey: !!r.apiKey,
+        hasSecretKey: !!r.secretKey,
+      }));
+      res.json(safe);
+    } catch (e: any) {
+      console.error("[admin/payment-providers] list error", e);
+      res.status(500).json({ message: e.message || "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/admin/payment-providers", isAdmin, async (req, res) => {
+    try {
+      const { insertPaymentProviderSchema, paymentProviders: pp } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const parsed = insertPaymentProviderSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const [created] = await db.insert(pp).values(parsed.data as any).returning();
+      invalidateActiveProviderCache();
+      res.json(created);
+    } catch (e: any) {
+      console.error("[admin/payment-providers] create error", e);
+      res.status(500).json({ message: e.message || "Erreur serveur" });
+    }
+  });
+
+  app.patch("/api/admin/payment-providers/:id", isAdmin, async (req, res) => {
+    try {
+      const { paymentProviders: pp } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const allowed: any = {};
+      const fields = ["displayName", "apiKey", "secretKey", "baseUrl", "config"] as const;
+      for (const f of fields) {
+        if (req.body[f] !== undefined && req.body[f] !== "") allowed[f] = req.body[f];
+      }
+      allowed.updatedAt = new Date();
+      const [updated] = await db.update(pp).set(allowed).where(eq(pp.id, req.params.id)).returning();
+      if (!updated) return res.status(404).json({ message: "Fournisseur introuvable" });
+      invalidateActiveProviderCache();
+      res.json({ ...updated, apiKey: undefined, secretKey: undefined });
+    } catch (e: any) {
+      console.error("[admin/payment-providers] update error", e);
+      res.status(500).json({ message: e.message || "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/admin/payment-providers/:id/activate", isAdmin, async (req, res) => {
+    try {
+      const updated = await activateProvider(req.params.id);
+      if (!updated) return res.status(404).json({ message: "Fournisseur introuvable" });
+      res.json({ ...updated, apiKey: undefined, secretKey: undefined });
+    } catch (e: any) {
+      console.error("[admin/payment-providers] activate error", e);
+      res.status(500).json({ message: e.message || "Erreur serveur" });
+    }
+  });
+
+  app.delete("/api/admin/payment-providers/:id", isAdmin, async (req, res) => {
+    try {
+      const { paymentProviders: pp } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const [row] = await db.select().from(pp).where(eq(pp.id, req.params.id));
+      if (!row) return res.status(404).json({ message: "Fournisseur introuvable" });
+      if (row.isActive) return res.status(400).json({ message: "Désactivez le fournisseur avant de le supprimer" });
+      await db.delete(pp).where(eq(pp.id, req.params.id));
+      invalidateActiveProviderCache();
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error("[admin/payment-providers] delete error", e);
+      res.status(500).json({ message: e.message || "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/admin/payment-provider-logs", isAdmin, async (req, res) => {
+    try {
+      const { paymentProviderLogs: ppl } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { desc } = await import("drizzle-orm");
+      const limit = Math.min(Number(req.query.limit) || 100, 500);
+      const rows = await db.select().from(ppl).orderBy(desc(ppl.createdAt)).limit(limit);
+      res.json(rows);
+    } catch (e: any) {
+      console.error("[admin/payment-provider-logs] error", e);
+      res.status(500).json({ message: e.message || "Erreur serveur" });
+    }
+  });
+
+  // ── Webhook GeniusPay ──
+  app.post("/api/webhooks/genius", async (req, res) => {
+    try {
+      const { GeniusPayService, geniusStatusFromPayload } = await import("./services/genius");
+      const provider = await getProviderByCode("genius");
+      if (!provider) {
+        return res.status(404).json({ error: "GeniusPay non configuré" });
+      }
+      const svc = new GeniusPayService({
+        apiKey: provider.apiKey || "",
+        webhookSecret: provider.secretKey || "",
+        baseUrl: provider.baseUrl || undefined,
+      });
+      const signature = String(req.header("x-webhook-signature") || req.header("X-Webhook-Signature") || "");
+      const timestamp = String(req.header("x-webhook-timestamp") || req.header("X-Webhook-Timestamp") || "");
+      const rawBody = JSON.stringify(req.body);
+      if (provider.secretKey && !svc.verifyWebhookSignature(rawBody, signature, timestamp)) {
+        console.error("[Genius] Webhook: invalid signature");
+        return res.status(401).json({ error: "Invalid signature" });
+      }
+
+      res.json({ received: true });
+
+      ;(async () => {
+        try {
+          const payload = req.body as any;
+          const reference = payload?.reference;
+          if (!reference) return;
+          const statusStr = geniusStatusFromPayload(payload);
+          if (statusStr !== "completed" && statusStr !== "failed") return;
+          const transaction = await storage.getTransactionByReference(reference);
+          if (!transaction || transaction.status !== "pending") return;
+
+          if (statusStr === "completed") {
+            const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
+            if (!updated) return;
+            if (transaction.type === "deposit") {
+              const gross = parseFloat(transaction.amount);
+              const txFees = parseFloat((transaction as any).fees || "0") || 0;
+              const net = gross - txFees;
+              await storage.updateWalletBalance(transaction.userId, transaction.currency, net > 0 ? net : gross);
+              const completedTx = await storage.getTransactionByReference(reference);
+              if (completedTx) {
+                forwardToMerchantWebhooks(completedTx);
+                notifyTransactionCompleted(completedTx).catch(() => {});
+              }
+            }
+            if (transaction.type === "withdrawal") {
+              const completedWd = await storage.getTransactionByReference(reference);
+              if (completedWd) notifyWithdrawal(completedWd, "success").catch(() => {});
+            }
+          } else if (statusStr === "failed") {
+            const updated = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+            if (!updated) return;
+            if (transaction.type === "withdrawal") {
+              const refundAmt = parseFloat(transaction.amount);
+              const refundFeesXOF = parseFloat((transaction as any).fees || "0");
+              const refundFeesLocal = transaction.currency === "CDF" ? Math.round(refundFeesXOF / 0.22) : refundFeesXOF;
+              await storage.updateWalletBalance(transaction.userId, transaction.currency, refundAmt + refundFeesLocal);
+              const failedWd = await storage.getTransactionByReference(reference);
+              if (failedWd) notifyWithdrawal(failedWd, "failed").catch(() => {});
+            }
+            const failedTx = await storage.getTransactionByReference(reference);
+            if (failedTx) forwardToMerchantWebhooks(failedTx);
+          }
+        } catch (err) {
+          console.error("[Genius] Webhook async processing error:", err);
+        }
+      })();
+    } catch (e: any) {
+      console.error("[Genius] Webhook error:", e);
+      res.status(500).json({ error: e.message || "Erreur serveur" });
     }
   });
 
@@ -3737,7 +3911,7 @@ export async function registerRoutes(
       // Vérifier le statut OmniPay d'abord
       let omnipayStatus = "pending";
       try {
-        const result = await omniPayService.getStatus(tx.reference);
+        const result = await paymentService.getStatus(tx.reference);
         omnipayStatus = omnipayStatusToString(result.status ?? 0);
       } catch {}
 
@@ -3799,7 +3973,7 @@ export async function registerRoutes(
 
       let omnipayBalances: any[] = [];
       try {
-        const balResp = await omniPayService.getBalance();
+        const balResp = await paymentService.getBalance();
         omnipayBalances = balResp.balance || [];
       } catch {}
 
@@ -3839,7 +4013,7 @@ export async function registerRoutes(
       const nameParts = (recipientName || "Admin SolvexPay").trim().split(" ");
       const firstName = nameParts[0] || "Admin";
       const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
-      const transferResult = await omniPayService.transfer({
+      const transferResult = await paymentService.transfer({
         msisdn: phoneNumber,
         amount: parsedAmount,
         reference,
@@ -3885,7 +4059,7 @@ export async function registerRoutes(
       const { eq } = await import("drizzle-orm");
       const [wd] = await db.select().from(adminWithdrawals).where(eq(adminWithdrawals.id, req.params.id as string));
       if (!wd) return res.status(404).json({ message: "Retrait introuvable" });
-      const result = await omniPayService.getStatus(wd.reference);
+      const result = await paymentService.getStatus(wd.reference);
       const statusStr = omnipayStatusToString(result.status ?? 0);
       await db.update(adminWithdrawals).set({ status: statusStr, updatedAt: new Date() }).where(eq(adminWithdrawals.id, wd.id));
       res.json({ status: statusStr, omnipayStatus: result.status });
@@ -3929,7 +4103,7 @@ export async function registerRoutes(
       const { amount, phoneNumber, operator, motif, firstName, lastName } = req.body;
       if (!amount || !phoneNumber) return res.status(400).json({ message: "Montant et téléphone requis" });
       const reference = generateReference();
-      const depositResult = await omniPayService.deposit({
+      const depositResult = await paymentService.deposit({
         msisdn: phoneNumber.replace(/^\+/, "").replace(/^00/, ""),
         amount: parseFloat(amount),
         reference,
@@ -4452,7 +4626,7 @@ export async function registerRoutes(
 
         for (const tx of pendingTxs) {
           try {
-            const result = await omniPayService.getStatus(tx.reference);
+            const result = await paymentService.getStatus(tx.reference);
             const statusStr = omnipayStatusFromRaw(result.status);
 
             if (statusStr === "completed") {

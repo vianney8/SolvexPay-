@@ -51,9 +51,20 @@ SolvexPay is a pan-African payment aggregation platform enabling businesses to a
   - `paymentMethods` — Operator maintenance/availability config (admin-managed)
   - `systemSettings` — Key-value settings (fees, support links)
 
-## Payment Provider
+## Payment Providers (architecture multi-fournisseurs)
 
-**OmniPay only** — Keys: `OMNIPAY_API_KEY`, `OMNIPAY_CALLBACK_KEY`
+L'application supporte **plusieurs fournisseurs de paiement** gérés dynamiquement via la table `paymentProviders`. Un seul fournisseur peut être actif à la fois ; toutes les opérations (dépôt, retrait, transfert) utilisent automatiquement le fournisseur actif via le dispatcher central `paymentService`.
+
+- **Table** `payment_providers` : `code` (unique), `displayName`, `isActive`, `apiKey`, `secretKey` (webhook secret), `baseUrl`, `config` (jsonb).
+- **Table** `payment_provider_logs` : journal de tous les appels API (action, request/response, durée, erreur).
+- **Dispatcher** : `server/services/paymentService.ts` — détecte le fournisseur actif (cache 30s), instancie le bon service et délègue. Routes inchangées.
+- **Implémentations** :
+  - `server/services/omnipay.ts` — `OmniPayService` (signature HMAC-SHA3-512)
+  - `server/services/genius.ts` — `GeniusPayService` (Bearer token, webhook HMAC-SHA256)
+- **Activation** : POST `/api/admin/payment-providers/:id/activate` — désactive automatiquement les autres (transaction DB).
+- **Fournisseurs par défaut** seedés au démarrage : `omnipay` (actif, hérite des env vars `OMNIPAY_API_KEY`/`OMNIPAY_CALLBACK_KEY`) et `genius` (inactif, à configurer).
+- **UI admin** : `/admin/payment-providers` — liste, toggle d'activation, configuration des clés, journal des appels.
+- **Webhooks** : `/api/webhooks/omnipay` (existant) et `/api/webhooks/genius` (nouveau, vérifie X-Webhook-Signature/X-Webhook-Timestamp).
 
 ### Supported Countries & Operators
 | Country | Code | Currency | Operators |

@@ -23,6 +23,7 @@ import PayApiPage from "@/pages/pay-api";
 import AdminPage from "@/pages/admin";
 import AdminUsersPage from "@/pages/admin-users";
 import AdminMerchantsPage from "@/pages/admin-merchants";
+import AdminPaymentProvidersPage from "@/pages/admin-payment-providers";
 import SupportPage from "@/pages/support";
 import DocumentationPage from "@/pages/documentation";
 import SrApiPage from "@/pages/sr-api";
@@ -154,6 +155,7 @@ function AuthenticatedRoutes() {
       <Route path="/admin" component={AdminPageWrapped} />
       <Route path="/admin/users" component={AdminUsersPage} />
       <Route path="/admin/merchants" component={AdminMerchantsPage} />
+      <Route path="/admin/payment-providers" component={AdminPaymentProvidersPage} />
       <Route path="/support" component={SupportPage} />
       <Route path="/documentation" component={DocumentationPage} />
       <Route path="/sr-api" component={SrApiPage} />

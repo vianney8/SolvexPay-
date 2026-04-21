@@ -2244,6 +2244,12 @@ export default function AdminPage() {
                 <p className="text-2xl font-black text-violet-600">{merchantsLoading ? "—" : (merchants || []).length}</p>
                 <p className="text-xs text-muted-foreground">marchands</p>
               </div>
+              <Link href="/admin/payment-providers">
+                <button className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 transition-colors text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm flex-shrink-0" data-testid="btn-go-admin-payment-providers">
+                  <Link2 className="h-3.5 w-3.5" />
+                  Fournisseurs
+                </button>
+              </Link>
               <Link href="/admin/merchants">
                 <button className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 transition-colors text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm flex-shrink-0" data-testid="btn-go-admin-merchants">
                   <Link2 className="h-3.5 w-3.5" />

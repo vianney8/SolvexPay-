@@ -104,6 +104,8 @@ app.use((req, res, next) => {
 (async () => {
   const { seedDefaults, promoteAdminEmail } = await import("./seed");
   await seedDefaults();
+  const { seedPaymentProviders } = await import("./services/paymentService");
+  await seedPaymentProviders();
   await promoteAdminEmail();
 
   await registerRoutes(httpServer, app);

@@ -1,9 +1,13 @@
 import axios from "axios";
 import crypto from "crypto";
 
-const OMNIPAY_BASE_URL = "https://omnipay.webtechci.com/interface/api2";
-const OMNIPAY_API_KEY = process.env.OMNIPAY_API_KEY || "";
-const OMNIPAY_CALLBACK_KEY = process.env.OMNIPAY_CALLBACK_KEY || "";
+const DEFAULT_OMNIPAY_BASE_URL = "https://omnipay.webtechci.com/interface/api2";
+
+export interface OmniPayConfig {
+  apiKey: string;
+  callbackKey: string;
+  baseUrl?: string;
+}
 
 export interface OmniPayDepositParams {
   msisdn: string;
@@ -30,7 +34,7 @@ export interface OmniPayDepositResponse {
   success: number;
   code?: number;
   message?: string;
-  id?: number;
+  id?: number | string;
   reference?: string;
   payment_url?: string;
   first_name?: string;
@@ -45,7 +49,7 @@ export interface OmniPayTransferResponse {
   success: number;
   code?: number;
   message?: string;
-  id?: number;
+  id?: number | string;
   reference?: string;
   first_name?: string;
   last_name?: string;
@@ -59,7 +63,7 @@ export interface OmniPayTransferResponse {
 export interface OmniPayStatusResponse {
   success: number;
   code?: number;
-  id?: number;
+  id?: number | string;
   status?: number;
   message?: string;
   reference?: string;
@@ -131,11 +135,29 @@ function normalizeMsisdn(msisdn: string): string {
   return msisdn.replace(/^\+/, "").replace(/^00/, "");
 }
 
-class OmniPayService {
+export class OmniPayService {
+  private apiKey: string;
+  private callbackKey: string;
+  private baseUrl: string;
+
+  constructor(config: OmniPayConfig) {
+    this.apiKey = config.apiKey || "";
+    this.callbackKey = config.callbackKey || "";
+    this.baseUrl = config.baseUrl || DEFAULT_OMNIPAY_BASE_URL;
+  }
+
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
+
+  getCallbackKey(): string {
+    return this.callbackKey;
+  }
+
   async deposit(params: OmniPayDepositParams): Promise<OmniPayDepositResponse> {
     const body: any = {
       action: "paymentrequest",
-      apikey: OMNIPAY_API_KEY,
+      apikey: this.apiKey,
       msisdn: normalizeMsisdn(params.msisdn),
       amount: String(params.amount),
       reference: params.reference,
@@ -154,7 +176,7 @@ class OmniPayService {
       msisdn: params.msisdn.substring(0, 6) + "***",
     });
 
-    const response = await axios.post<OmniPayDepositResponse>(OMNIPAY_BASE_URL, body, {
+    const response = await axios.post<OmniPayDepositResponse>(this.baseUrl, body, {
       headers: { "Content-Type": "application/json" },
     });
 
@@ -170,7 +192,7 @@ class OmniPayService {
   async transfer(params: OmniPayTransferParams): Promise<OmniPayTransferResponse> {
     const body: any = {
       action: "transfer",
-      apikey: OMNIPAY_API_KEY,
+      apikey: this.apiKey,
       msisdn: normalizeMsisdn(params.msisdn),
       amount: String(params.amount),
       reference: params.reference,
@@ -186,7 +208,7 @@ class OmniPayService {
       msisdn: params.msisdn.substring(0, 6) + "***",
     });
 
-    const response = await axios.post<OmniPayTransferResponse>(OMNIPAY_BASE_URL, body, {
+    const response = await axios.post<OmniPayTransferResponse>(this.baseUrl, body, {
       headers: { "Content-Type": "application/json" },
       timeout: 90000,
     });
@@ -203,11 +225,11 @@ class OmniPayService {
   async getStatus(reference: string): Promise<OmniPayStatusResponse> {
     const body = {
       action: "getstatus",
-      apikey: OMNIPAY_API_KEY,
+      apikey: this.apiKey,
       reference,
     };
 
-    const response = await axios.post<OmniPayStatusResponse>(OMNIPAY_BASE_URL, body, {
+    const response = await axios.post<OmniPayStatusResponse>(this.baseUrl, body, {
       headers: { "Content-Type": "application/json" },
     });
 
@@ -231,10 +253,10 @@ class OmniPayService {
   async getBalance(): Promise<OmniPayBalanceResponse> {
     const body = {
       action: "getbalance",
-      apikey: OMNIPAY_API_KEY,
+      apikey: this.apiKey,
     };
 
-    const response = await axios.post<OmniPayBalanceResponse>(OMNIPAY_BASE_URL, body, {
+    const response = await axios.post<OmniPayBalanceResponse>(this.baseUrl, body, {
       headers: { "Content-Type": "application/json" },
     });
 
@@ -244,14 +266,4 @@ class OmniPayService {
 
     return response.data;
   }
-
-  getCallbackKey(): string {
-    return OMNIPAY_CALLBACK_KEY;
-  }
 }
-
-export function isApiKeyConfigured(): boolean {
-  return !!OMNIPAY_API_KEY;
-}
-
-export const omniPayService = new OmniPayService();
