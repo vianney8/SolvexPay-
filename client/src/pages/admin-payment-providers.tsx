@@ -11,7 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Settings, CheckCircle2, XCircle, Activity } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Plus, Settings, CheckCircle2, XCircle, Activity, BookOpen, ExternalLink } from "lucide-react";
 
 interface Provider {
   id: string;
@@ -21,6 +22,8 @@ interface Provider {
   apiKey: string;
   secretKey: string;
   baseUrl: string | null;
+  docsUrl: string | null;
+  docs: string | null;
   hasApiKey: boolean;
   hasSecretKey: boolean;
 }
@@ -151,6 +154,34 @@ export default function AdminPaymentProvidersPage() {
                         {p.hasSecretKey ? p.secretKey : <span className="text-amber-600">Non configuré</span>}
                       </div>
                     </div>
+                    {(p.docsUrl || p.docs) && (
+                      <div className="md:col-span-2">
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
+                          <BookOpen className="h-3 w-3" /> Documentation
+                        </div>
+                        {p.docsUrl && (
+                          <a
+                            href={p.docsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline break-all"
+                            data-testid={`link-docs-${p.code}`}
+                          >
+                            <ExternalLink className="h-3 w-3" /> {p.docsUrl}
+                          </a>
+                        )}
+                        {p.docs && (
+                          <details className="mt-1">
+                            <summary className="text-xs cursor-pointer text-muted-foreground hover:text-foreground">
+                              Notes ({p.docs.length} caractères)
+                            </summary>
+                            <pre className="mt-2 text-xs whitespace-pre-wrap bg-muted p-2 rounded max-h-64 overflow-auto" data-testid={`text-docs-${p.code}`}>
+                              {p.docs}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    )}
                     <div className="md:col-span-2 flex items-center justify-end gap-2 pt-2">
                       {!p.isActive && (
                         <Button
@@ -243,18 +274,24 @@ function ProviderEditor({
   const [apiKey, setApiKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [docsUrl, setDocsUrl] = useState("");
+  const [docs, setDocs] = useState("");
 
   useEffect(() => {
     if (provider) {
       setDisplayName(provider.displayName);
       setBaseUrl(provider.baseUrl || "");
       setCode(provider.code);
+      setDocsUrl(provider.docsUrl || "");
+      setDocs(provider.docs || "");
     } else if (createMode) {
       setDisplayName("");
       setBaseUrl("");
       setCode("");
       setApiKey("");
       setSecretKey("");
+      setDocsUrl("");
+      setDocs("");
     }
   }, [provider, createMode, open]);
 
@@ -268,6 +305,8 @@ function ProviderEditor({
           apiKey,
           secretKey,
           baseUrl: baseUrl.trim() || null,
+          docsUrl: docsUrl.trim() || null,
+          docs: docs.trim() || null,
         });
         return res.json();
       } else if (provider) {
@@ -276,6 +315,8 @@ function ProviderEditor({
         if (apiKey) body.apiKey = apiKey;
         if (secretKey) body.secretKey = secretKey;
         if (baseUrl !== (provider.baseUrl || "")) body.baseUrl = baseUrl || null;
+        if (docsUrl !== (provider.docsUrl || "")) body.docsUrl = docsUrl || null;
+        if (docs !== (provider.docs || "")) body.docs = docs || null;
         const res = await apiRequest("PATCH", `/api/admin/payment-providers/${provider.id}`, body);
         return res.json();
       }

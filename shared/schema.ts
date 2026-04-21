@@ -168,6 +168,8 @@ export const paymentProviders = pgTable("payment_providers", {
   apiKey: text("api_key"),
   secretKey: text("secret_key"),
   baseUrl: text("base_url"),
+  docsUrl: text("docs_url"),
+  docs: text("docs"),
   config: jsonb("config").$type<Record<string, any>>().default({}),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

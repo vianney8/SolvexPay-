@@ -3737,7 +3737,7 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { eq } = await import("drizzle-orm");
       const allowed: any = {};
-      const fields = ["displayName", "apiKey", "secretKey", "baseUrl", "config"] as const;
+      const fields = ["displayName", "apiKey", "secretKey", "baseUrl", "docsUrl", "docs", "config"] as const;
       for (const f of fields) {
         if (req.body[f] !== undefined && req.body[f] !== "") allowed[f] = req.body[f];
       }
