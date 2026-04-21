@@ -1446,6 +1446,23 @@ export default function AdminPage() {
               </Link>
             </div>
 
+            {/* Payment providers banner */}
+            <div className="rounded-2xl bg-gradient-to-r from-emerald-600/10 to-teal-600/10 border border-emerald-500/20 p-4 flex items-center gap-4">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
+                <CreditCard className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-black text-foreground">Fournisseurs de paiement</p>
+                <p className="text-xs text-muted-foreground">Activez OmniPay, GeniusPay et configurez les clés API. Une seule passerelle active à la fois.</p>
+              </div>
+              <Link href="/admin/payment-providers">
+                <button className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 transition-colors text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm" data-testid="btn-overview-payment-providers">
+                  <CreditCard className="h-3.5 w-3.5" />
+                  Fournisseurs
+                </button>
+              </Link>
+            </div>
+
             {/* ── RÉSUMÉ RAPIDE LIQUIDITÉ ── */}
             {liquidityCriticalCount > 0 && (
               <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 flex items-center gap-3 cursor-pointer" onClick={() => { const el = document.querySelector('[data-testid="tab-liquidity"]') as HTMLButtonElement; el?.click(); }}>
