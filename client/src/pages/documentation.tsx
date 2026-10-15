@@ -372,21 +372,21 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
                   <ArrowDownToLine className="h-5 w-5 text-primary" /> Initier un paiement
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Toutes les intégrations SolvexPay utilisent un <strong>flux de redirection obligatoire</strong> vers la page de paiement hébergée SolvexPay. C'est sur cette page que le client saisit son numéro de téléphone et choisit son opérateur — le prompt USSD lui est ensuite envoyé directement.
+                  L'API JSON permet d'initier le paiement depuis votre propre formulaire. Vous gardez la main sur l'expérience client : aucune redirection externe n'est requise pour les opérateurs compatibles avec le paiement direct.
                 </p>
               </div>
 
               {/* Flux visuel obligatoire */}
               <Card className="border-primary/20 bg-primary/5">
                 <CardContent className="p-5">
-                  <p className="text-xs font-bold uppercase tracking-wider text-primary mb-4">Flux de paiement — Étapes obligatoires</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-primary mb-4">Flux de paiement direct depuis votre formulaire</p>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                     {[
-                      { num: "1", title: "Votre serveur", desc: "Appelle l'API SolvexPay avec le montant" },
-                      { num: "2", title: "Redirection obligatoire", desc: "Redirigez le client vers payment_url" },
-                      { num: "3", title: "Page SolvexPay", desc: "Le client saisit son téléphone et opérateur" },
-                      { num: "4", title: "Prompt USSD", desc: "Le client confirme sur son téléphone" },
-                      { num: "5", title: "Webhook", desc: "Votre serveur reçoit la confirmation" },
+                      { num: "1", title: "Votre formulaire", desc: "Le client saisit ses informations chez vous" },
+                      { num: "2", title: "Votre serveur", desc: "Appelle l'API avec téléphone et opérateur" },
+                      { num: "3", title: "Paiement direct", desc: "L'opérateur traite la demande" },
+                      { num: "4", title: "Vérification", desc: "Consultez le statut avec la référence" },
+                      { num: "5", title: "Webhook", desc: "Recevez la confirmation côté serveur" },
                     ].map((step, i, arr) => (
                       <div key={step.num} className="flex sm:flex-col items-center gap-2 sm:gap-1 flex-1">
                         <div className="flex sm:flex-col items-center gap-1 w-full">
@@ -409,12 +409,12 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
                 </CardContent>
               </Card>
 
-              <Card className="border-red-500/20 bg-red-500/5">
+              <Card className="border-amber-500/20 bg-amber-500/5">
                 <CardContent className="p-4 flex items-start gap-3">
-                  <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-bold text-red-700">Redirection OBLIGATOIRE vers payment_url</p>
-                    <p className="text-xs text-red-600 mt-0.5">Après chaque appel API, vous devez impérativement rediriger votre client vers l'URL <code className="bg-red-100 px-1 rounded font-mono">payment_url</code> retournée. C'est sur la page SolvexPay que le client saisit son numéro Mobile Money et reçoit son prompt USSD. Aucun USSD n'est envoyé par votre serveur.</p>
+                    <p className="text-sm font-bold text-amber-800">Réponse de l'API et compatibilité opérateur</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Le paiement direct retourne une référence à vérifier. Si une réponse indique <code className="bg-amber-100 px-1 rounded font-mono">requiresRedirect: true</code> ou fournit une URL externe, ne redirigez pas automatiquement le client : cette méthode opérateur n'est pas disponible dans un parcours sans redirection.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -423,8 +423,8 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
                 <CardContent className="p-4 flex items-start gap-3">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-bold text-emerald-700">Méthode simple — Redirection directe (sans JavaScript)</p>
-                    <p className="text-xs text-emerald-600 mt-0.5">Construisez une URL avec votre clé API et redirigez directement. Aucun appel API séparé nécessaire — idéal pour les intégrations rapides.</p>
+                    <p className="text-sm font-bold text-emerald-700">Page de paiement hébergée — optionnelle</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">L'endpoint checkout reste une expérience hébergée facultative. Pour conserver votre formulaire, utilisez plutôt l'API JSON décrite ci-dessous.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -444,7 +444,7 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
                     <ParamRow name="customer_email" type="string" required={false} desc="Email du client" />
                     <ParamRow name="country" type="string" required={false} desc="Code pays ISO pour pré-sélectionner le pays (BJ, CI, SN...)" />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-3">→ Réponse : redirection HTTP 302 vers la page de paiement SolvexPay. L'utilisateur voit directement le formulaire de paiement.</p>
+                  <p className="text-xs text-muted-foreground mt-3">→ Cet endpoint affiche le formulaire hébergé. Il est facultatif et distinct de l'intégration API JSON sans redirection.</p>
                 </div>
               </div>
 
@@ -475,7 +475,7 @@ app.get('/payer', (req, res) => {
 
               <div className="border-t border-border/60 pt-5">
                 <p className="text-sm font-bold mb-1">Méthode API JSON (POST) — Intégration serveur</p>
-                <p className="text-xs text-muted-foreground mb-4">Créez le paiement depuis votre serveur, obtenez le <code className="bg-muted px-1 rounded font-mono">payment_url</code> et redirigez obligatoirement votre client vers cette URL. Les paramètres optionnels pré-remplissent le formulaire sur la page SolvexPay.</p>
+                <p className="text-xs text-muted-foreground mb-4">Créez le paiement depuis votre serveur avec les données saisies sur votre propre formulaire. La réponse JSON contient une référence et un statut à vérifier ; aucune redirection n'est nécessaire pour les opérateurs compatibles.</p>
 
                 <div className="border border-border/60 rounded-xl overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
@@ -486,16 +486,17 @@ app.get('/payer', (req, res) => {
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Paramètres (body JSON)</p>
                     <div className="border border-border/60 rounded-xl overflow-hidden">
                       <ParamRow name="amount" type="number" required desc="Montant — minimum 100 XOF" />
-                      <ParamRow name="description" type="string" required={false} desc="Description de la transaction (affichée sur la page de paiement)" />
-                      <ParamRow name="customer_name" type="string" required={false} desc="Nom du client — pré-rempli sur la page SolvexPay" />
+                      <ParamRow name="description" type="string" required={false} desc="Libellé de la transaction" />
+                      <ParamRow name="customer_name" type="string" required={false} desc="Nom du payeur associé à la transaction" />
                       <ParamRow name="customer_email" type="string" required={false} desc="Email du client" />
-                      <ParamRow name="country" type="string" required={false} desc="Code pays ISO (BJ, CI, SN…) — pré-sélectionne le pays sur la page" />
-                      <ParamRow name="phone" type="string" required={false} desc="Numéro de téléphone — pré-rempli sur la page (le client peut modifier)" />
-                      <ParamRow name="operator" type="string" required={false} desc="Opérateur (MTN, Orange, Wave…) — pré-sélectionné sur la page" />
+                      <ParamRow name="country" type="string" required={false} desc="Code pays ISO pour acheminer le paiement (BJ, CI, SN…)" />
+                      <ParamRow name="phone" type="string" required={false} desc="Numéro Mobile Money du payeur" />
+                      <ParamRow name="operator" type="string" required={false} desc="Opérateur Mobile Money choisi par le payeur (MTN, Orange, Wave…)" />
+                      <ParamRow name="otp" type="string" required={false} desc="Code de paiement opérateur fourni par le client si requis (Orange CI/BF)" />
                       <ParamRow name="metadata" type="object" required={false} desc="Données libres retournées dans le webhook (order_id, user_id…)" />
                     </div>
                     <div className="mt-3 p-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
-                      <p className="text-xs text-amber-700 font-semibold">⚠ Après cet appel, redirigez impérativement votre client vers <code className="bg-amber-100 px-1 rounded font-mono">data.payment_url</code>. Aucun USSD n'est envoyé par votre serveur — c'est la page SolvexPay qui gère la confirmation Mobile Money.</p>
+                      <p className="text-xs text-amber-700 font-semibold">Si <code className="bg-amber-100 px-1 rounded font-mono">requiresRedirect</code> est vrai ou une URL externe est retournée, ne la naviguez pas automatiquement : conservez la référence et indiquez que cet opérateur requiert une page externe.</p>
                     </div>
                   </div>
                 </div>
@@ -526,7 +527,9 @@ app.get('/payer', (req, res) => {
     description: 'Commande #1234',
     customer_name: 'Jean Dupont',
     customer_email: 'jean@example.com',
-    country: 'CI',              // facultatif — pré-sélectionne le pays
+    country: 'CI',
+    phone: '2250701234567',
+    operator: 'Orange',
     metadata: { order_id: '1234' },
   }),
 });
@@ -536,8 +539,9 @@ const data = await response.json();
 if (!response.ok) {
   console.error('Erreur:', data.error.code, data.error.message);
 } else {
-  // OBLIGATOIRE : rediriger l'utilisateur vers la page de paiement SolvexPay
-  res.redirect(data.payment_url);
+  // Gardez le client sur votre page et affichez le statut / les instructions.
+  // Vérifiez la transaction avec la référence retournée.
+  return { reference: data.reference, status: data.status, instructions: data.instructions };
 }`} />
 
               <CodeBlock lang="python" code={`import requests, os
@@ -553,7 +557,9 @@ response = requests.post(
         'description': 'Commande #1234',
         'customer_name': 'Jean Dupont',
         'customer_email': 'jean@example.com',
-        'country': 'CI',        # facultatif
+        'country': 'CI',
+        'phone': '2250701234567',
+        'operator': 'Orange',
         'metadata': {'order_id': '1234'},
     }
 )
@@ -562,8 +568,8 @@ data = response.json()
 if not response.ok:
     print('Erreur:', data['error']['code'], data['error']['message'])
 else:
-    # OBLIGATOIRE : rediriger l'utilisateur vers la page de paiement SolvexPay
-    return redirect(data['payment_url'])  # Flask/Django`} />
+    # Conservez le client sur votre page et affichez le statut de la transaction.
+    print("Référence à vérifier :", data.get('reference'))}`} />
             </section>
 
             {/* STATUT */}
@@ -908,8 +914,8 @@ if (!response.ok) {
       console.error(\`Erreur \${code}: \${message}\`);
   }
 } else {
-  // Toujours rediriger vers payment_url — jamais de paiement direct
-  res.redirect(data.payment_url);
+  // Conservez votre formulaire : affichez les instructions et vérifiez la référence.
+  return { reference: data.reference, status: data.status, instructions: data.instructions };
 }`} />
 
               <Card className="border-border/60 bg-muted/20">

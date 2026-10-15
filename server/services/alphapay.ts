@@ -47,6 +47,7 @@ export interface PaymentParams {
   returnUrl?: string;
   callbackUrl?: string;
   checkout?: boolean;
+  directOnly?: boolean;
 }
 
 export interface PaymentResponse {
@@ -57,6 +58,20 @@ export interface PaymentResponse {
   message?: string;
   payment_url?: string;
   kind?: "payment" | "payout" | "checkout";
+  requires_redirect?: boolean;
+  instructions?: string;
+}
+
+export const DIRECT_PAYMENT_UNAVAILABLE = "Cet opérateur exige une page externe pour cette tentative. Le paiement n’est pas disponible sans redirection. Aucune page externe ne sera ouverte ; conservez la référence pour vérifier son statut.";
+
+/** Preserve the provider receipt for reconciliation, but never offer external navigation. */
+export function directPaymentResponse(receipt: PaymentResponse): PaymentResponse {
+  const requiresRedirect = !!receipt.payment_url || receipt.requires_redirect === true || receipt.kind === "checkout";
+  const { payment_url: _externalUrl, ...safe } = receipt;
+  return {
+    ...safe, requires_redirect: requiresRedirect,
+    ...(requiresRedirect ? { message: DIRECT_PAYMENT_UNAVAILABLE, instructions: undefined } : {}),
+  };
 }
 
 export class AlphaPayService {
@@ -95,7 +110,8 @@ export class AlphaPayService {
       return_url: params.returnUrl,
     };
     let result: any;
-    if (params.checkout) {
+    const checkout = params.checkout === true && params.directOnly !== true;
+    if (checkout) {
       if (!params.email) throw new Error("L’adresse email du payeur est requise pour le checkout AlphaPay.");
       result = await this.request("post", "/checkout-sessions/", {
         ...common, customer_email: params.email,
@@ -113,7 +129,12 @@ export class AlphaPayService {
       const target = new URL(url);
       if (target.protocol !== "https:") throw new Error("URL de paiement AlphaPay invalide.");
     }
-    return { success: 1, id: result.id, status: result.status, reference: params.reference, payment_url: url, kind: params.checkout ? "checkout" : "payment" };
+    const response: PaymentResponse = {
+      success: 1, id: result.id, status: result.status, reference: params.reference,
+      payment_url: url, kind: checkout ? "checkout" : "payment",
+      instructions: typeof result.instructions === "string" ? result.instructions.slice(0, 2000) : undefined,
+    };
+    return params.directOnly ? directPaymentResponse(response) : response;
   }
 
   async transfer(params: PaymentParams): Promise<PaymentResponse> {

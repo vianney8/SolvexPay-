@@ -68,8 +68,8 @@ function KeyConfigSection({ apiKey }: { apiKey: any }) {
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-xs font-semibold">URL de redirection (après paiement)</Label>
-          <p className="text-[11px] text-muted-foreground">L'utilisateur est redirigé ici après un paiement réussi.</p>
+          <Label className="text-xs font-semibold">URL de retour marchand</Label>
+          <p className="text-[11px] text-muted-foreground">Lien de retour disponible après paiement ; le formulaire ne redirige pas automatiquement.</p>
           <Input value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} placeholder="https://monsite.com/paiement-success" className="h-8 text-xs" data-testid={`input-redirect-url-${apiKey.id}`} />
         </div>
         <div className="space-y-1.5">
@@ -101,14 +101,14 @@ function KeyConfigSection({ apiKey }: { apiKey: any }) {
 }
 
 const SR_OPERATORS = [
-  { code: "MTN", label: "MTN Mobile Money", countries: ["BJ", "CI", "CM"], otp: false, note: "Confirmation USSD automatique" },
-  { code: "MOOV", label: "Moov Money", countries: ["BJ", "TG", "BF", "ML", "CI"], otp: false, note: "Confirmation USSD automatique" },
-  { code: "ORANGE", label: "Orange Money", countries: ["CI", "SN", "BF", "ML", "CM"], otp: true, note: "OTP requis sur Côte d'Ivoire et Sénégal" },
-  { code: "WAVE", label: "Wave", countries: ["CI", "SN"], otp: false, note: "Lien de paiement Wave généré" },
-  { code: "TMONEY", label: "T-Money", countries: ["TG"], otp: false, note: "Confirmation USSD automatique" },
+  { code: "MTN", label: "MTN Mobile Money", countries: ["BJ", "CI", "CM"], otp: false, note: "Suivre les instructions et le statut retournés" },
+  { code: "MOOV", label: "Moov Money", countries: ["BJ", "TG", "BF", "ML", "CI"], otp: false, note: "Suivre les instructions et le statut retournés" },
+  { code: "ORANGE", label: "Orange Money", countries: ["CI", "SN", "BF", "ML", "CM"], otp: true, note: "Code opérateur fourni par le client si requis (CI, BF)" },
+  { code: "WAVE", label: "Wave", countries: ["CI", "SN"], otp: false, note: "Disponibilité précisée dans la réponse API" },
+  { code: "TMONEY", label: "T-Money", countries: ["TG"], otp: false, note: "Suivre les instructions et le statut retournés" },
   { code: "FREE", label: "Free Money", countries: ["SN"], otp: false, note: "Alias: MIXX" },
-  { code: "AIRTEL", label: "Airtel Money", countries: ["COD"], otp: false, note: "Confirmation USSD automatique" },
-  { code: "VODACOM", label: "Vodacom M-Pesa", countries: ["COD"], otp: false, note: "Confirmation USSD automatique" },
+  { code: "AIRTEL", label: "Airtel Money", countries: ["COD"], otp: false, note: "Suivre les instructions et le statut retournés" },
+  { code: "VODACOM", label: "Vodacom M-Pesa", countries: ["COD"], otp: false, note: "Suivre les instructions et le statut retournés" },
 ];
 
 const SR_COUNTRIES = [
@@ -144,7 +144,7 @@ function SrWebhookConfig({ srKey }: { srKey: any }) {
       </div>
       <div className="space-y-2">
         <Label className="text-[11px] text-green-300/80 font-semibold">URL de redirection (optionnel)</Label>
-        <p className="text-[10px] text-green-300/50">Redirigez l'utilisateur ici après un paiement Wave réussi.</p>
+        <p className="text-[10px] text-green-300/50">URL de retour conservée pour les intégrations historiques. Les nouveaux paiements directs n'ouvrent pas automatiquement cette URL.</p>
         <Input value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} placeholder="https://monsite.com/paiement-success" className="h-8 text-xs bg-black/40 border-green-500/20 text-green-200 placeholder:text-green-300/30" data-testid="input-sr-redirect-url" />
       </div>
       <Button size="sm" className="h-8 text-xs font-bold gap-1.5 bg-green-700 hover:bg-green-600 text-white border-0" onClick={() => updateM.mutate({ webhookUrl, redirectUrl })} disabled={updateM.isPending} data-testid="button-save-sr-webhook">
@@ -311,7 +311,7 @@ Content-Type: application/json`}</pre>
   "phone": "22901234567",   // Requis — Numéro complet avec indicatif
   "operator": "mtn",        // Requis — Code opérateur (voir liste)
   "country": "BJ",          // Requis — Code pays ISO (voir liste)
-  "otp": "123456",          // Optionnel — OTP si requis par l'opérateur
+  "otp": "CODE_FOURNI",     // Optionnel — code fourni par le client si requis
   "description": "...",     // Optionnel — Libellé transaction
   "customer_name": "...",   // Optionnel — Nom du client
   "customer_email": "..."   // Optionnel — Email du client
@@ -324,7 +324,8 @@ Content-Type: application/json`}</pre>
                     <pre className="text-green-400/80 text-[11px] whitespace-pre-wrap">{`{
   "success": true,
   "id": "txn_abc123",       // ID de la transaction SolvexPay
-  "status": "pending",      // En attente de validation client
+  "status": "pending",      // Statut en cours
+  "requires_redirect": false,
   "reference": "REF...",    // Référence de transaction
   "amount": 5000,
   "fees": 350,              // Frais SolvexPay (% configuré)
@@ -332,7 +333,8 @@ Content-Type: application/json`}</pre>
   "currency": "XOF",
   "operator": "MTN",
   "phone": "22901234567",
-  "message": "Paiement initié. Le client doit valider sur son téléphone.",
+  "instructions": "Instructions opérateur si disponibles.",
+  "message": "Paiement initié. Vérifiez le statut avec la référence.",
   "created_at": "2025-01-01T00:00:00.000Z"
 }`}</pre>
                   </div>
@@ -340,7 +342,7 @@ Content-Type: application/json`}</pre>
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                   <Info className="h-3.5 w-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
                   <p className="text-blue-300/80 text-[11px] leading-relaxed">
-                    Le statut initial est toujours <strong className="text-blue-300">pending</strong>. Un USSD est envoyé au client pour qu'il valide le paiement. SolvexPay reçoit la confirmation en temps réel et crédite automatiquement votre solde. Votre webhook est notifié à chaque changement de statut.
+                    Le statut initial est <strong className="text-blue-300">pending</strong>. Affichez le message et les instructions retournés, puis vérifiez le statut ou attendez le webhook. Les modalités dépendent de l'opérateur ; ne supposez pas qu'un prompt téléphone est toujours envoyé.
                   </p>
                 </div>
               </div>
@@ -398,7 +400,7 @@ Content-Type: application/json`}</pre>
                           <span className="font-bold text-green-200 text-[11px]">{op.label}</span>
                           <code className="bg-green-500/10 px-1.5 py-0.5 rounded text-green-400 text-[10px]">{op.code.toLowerCase()}</code>
                           {op.otp ? (
-                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/20 text-amber-400 text-[9px] font-bold"><AlertCircle className="h-2.5 w-2.5" />OTP REQUIS</span>
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/20 text-amber-400 text-[9px] font-bold"><AlertCircle className="h-2.5 w-2.5" />OTP selon pays</span>
                           ) : (
                             <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 text-[9px] font-bold"><CheckCircle2 className="h-2.5 w-2.5" />OTP optionnel</span>
                           )}
@@ -415,7 +417,7 @@ Content-Type: application/json`}</pre>
                   <AlertCircle className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="text-[11px] text-amber-300/80 space-y-1">
                     <p className="font-bold text-amber-300">Opérateurs nécessitant un OTP</p>
-                    <p><strong>ORANGE (CI, SN) :</strong> Demandez l'OTP à votre client avant d'appeler l'API. L'OTP est obtenu en composant le <code className="bg-black/40 px-1 rounded">#144#</code> sur son téléphone (CI) ou <code className="bg-black/40 px-1 rounded">#144*82#</code> (SN). L'OTP expire en 5 minutes.</p>
+                    <p><strong>ORANGE (CI, BF) :</strong> Transmettez le code opérateur dans le champ <code className="bg-black/40 px-1 rounded">otp</code> s'il est requis. Ne pré-remplissez pas de code et ne supposez pas de parcours USSD particulier.</p>
                   </div>
                 </div>
               </div>
@@ -504,7 +506,7 @@ app.post('/webhook/solvexpay', (req, res) => {
                   <p className="font-bold text-green-300 mb-2">Statuts possibles</p>
                   <div className="space-y-2">
                     {[
-                      { s: "pending", icon: <AlertCircle className="h-3 w-3 text-amber-400" />, desc: "En attente de validation par le client (USSD en cours)" },
+                      { s: "pending", icon: <AlertCircle className="h-3 w-3 text-amber-400" />, desc: "Transaction en cours — consultez les instructions retournées" },
                       { s: "completed", icon: <CheckCircle2 className="h-3 w-3 text-green-400" />, desc: "Paiement validé — votre solde SolvexPay est crédité" },
                       { s: "failed", icon: <XCircle className="h-3 w-3 text-red-400" />, desc: "Paiement refusé ou expiré — aucun débit effectué" },
                     ].map(({ s, icon, desc }) => (
@@ -577,7 +579,7 @@ async function initierPaiementSR(montant, telephone, client) {
 
   const { id, reference, status, message } = response.data;
   console.log('Transaction créée:', { id, reference, status });
-  // → Afficher message au client : il va recevoir un USSD
+  // → Afficher les instructions retournées, puis vérifier le statut
   return response.data;
 }
 
@@ -639,7 +641,7 @@ if ($response['success']) {
                     <p className="font-bold text-green-300">Flux recommandé</p>
                     <p>1. Votre client remplit son numéro (+ OTP si Orange) sur votre page</p>
                     <p>2. Vous appelez <code className="bg-black/40 px-1 rounded">POST /api/v1/sr/pay</code> depuis votre backend</p>
-                    <p>3. Le client reçoit un USSD sur son téléphone et valide le paiement</p>
+    <p>3. Affichez les instructions retournées si présentes et vérifiez le statut</p>
                     <p>4. SolvexPay reçoit la confirmation et crédite votre solde</p>
                     <p>5. Votre webhook reçoit <code className="bg-black/40 px-1 rounded">transaction.completed</code></p>
                   </div>

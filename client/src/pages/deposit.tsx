@@ -13,7 +13,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { OperatorLogo } from "@/components/operator-logo";
 import {
   ArrowDownLeft, Info, CheckCircle2, Loader2, XCircle, ChevronDown, ArrowLeft, Zap,
-  Smartphone, RefreshCw, Clock, Wifi, ShieldCheck,
+  Smartphone, RefreshCw, Clock, Wifi,
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
@@ -38,7 +38,6 @@ export default function DepositPage() {
   const { user } = useAuth();
   const isBlocked = !!(user as any)?.isBlocked;
   const { toast } = useToast();
-  const [step, setStep] = useState<1 | 2>(1);
   const [amount, setAmount] = useState("");
   const [country, setCountry] = useState("BJ");
   const [operator, setOperator] = useState("");
@@ -50,9 +49,10 @@ export default function DepositPage() {
 
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"], staleTime: 60_000 });
 
-  const needsOtp = false;
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
+  const [redirectBlocked, setRedirectBlocked] = useState(false);
+  const [paymentInstructions, setPaymentInstructions] = useState("");
   const [verifyCount, setVerifyCount] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
@@ -67,9 +67,10 @@ export default function DepositPage() {
   const selectedCountry = COUNTRIES.find(c => c.code === country) || availableCountries[0] || COUNTRIES[0];
   const currency = selectedCountry.currency;
   const parsedAmount = parseFloat(amount) || 0;
+  const otpSupported = country === "CI" && operator === "Orange" || country === "BF" && operator === "Orange";
 
-  useEffect(() => { setOperator(""); setOtp(""); setStep(1); }, [country]);
-  useEffect(() => { setOtp(""); setStep(1); }, [operator]);
+  useEffect(() => { setOperator(""); setOtp(""); }, [country]);
+  useEffect(() => { setOtp(""); }, [operator]);
   useEffect(() => {
     if (suspendedCodes.length > 0 && suspendedCodes.includes(country)) {
       const first = availableCountries[0];
@@ -135,13 +136,21 @@ export default function DepositPage() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      setPendingReference(data.sendavaReference || data.reference);
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-        return;
+      setPendingReference(data.reference || data.sendavaReference || data.id || null);
+      setPaymentInstructions(typeof data.instructions === "string" && data.instructions ? data.instructions : typeof data.message === "string" ? data.message : "");
+      const paymentUrl = data.paymentUrl || data.payment_url;
+      let hasExternalPaymentUrl = false;
+      if (paymentUrl) {
+        try { hasExternalPaymentUrl = new URL(paymentUrl, window.location.origin).origin !== window.location.origin; }
+        catch { hasExternalPaymentUrl = true; }
       }
+      const cannotPayInPlace = data.requiresRedirect === true || data.requires_redirect === true || hasExternalPaymentUrl;
+      setRedirectBlocked(cannotPayInPlace);
       setPaymentStatus("processing");
-        toast({ title: "Paiement initié", description: "Suivez les instructions de paiement pour terminer l’opération." });
+      toast({
+        title: cannotPayInPlace ? "Paiement indisponible sans redirection" : "Paiement initié",
+        description: cannotPayInPlace ? "La référence est conservée pour vérification." : "Suivez les instructions affichées pour terminer l’opération.",
+      });
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Impossible d'initier le dépôt.", variant: "destructive" });
@@ -157,6 +166,18 @@ export default function DepositPage() {
     },
     onSuccess: (data: any) => {
       setVerifyCount(c => c + 1);
+      const terminal = ["SUCCESS", "FAILED", "CANCELLED"].includes(String(data.status || "").toUpperCase());
+      if (typeof data.instructions === "string" || typeof data.message === "string") {
+        setPaymentInstructions(data.instructions || data.message || "");
+      }
+      const paymentUrl = data.paymentUrl || data.payment_url;
+      let hasExternalPaymentUrl = false;
+      if (paymentUrl) {
+        try { hasExternalPaymentUrl = new URL(paymentUrl, window.location.origin).origin !== window.location.origin; }
+        catch { hasExternalPaymentUrl = true; }
+      }
+      if (terminal) setRedirectBlocked(false);
+      else if (data.requiresRedirect === true || data.requires_redirect === true || hasExternalPaymentUrl) setRedirectBlocked(true);
       if (data.status === "SUCCESS") {
         setVerifyStatus("SUCCESS");
         setPaymentStatus("success");
@@ -173,10 +194,10 @@ export default function DepositPage() {
   });
 
   useEffect(() => {
-    if (!pendingReference || paymentStatus !== "processing") return;
+    if (!pendingReference || paymentStatus !== "processing" || redirectBlocked) return;
     const interval = setInterval(() => { verifyMutation.mutate(pendingReference); }, 5000);
     return () => clearInterval(interval);
-  }, [pendingReference, paymentStatus]);
+  }, [pendingReference, paymentStatus, redirectBlocked]);
 
   useEffect(() => {
     if (paymentStatus !== "processing") return;
@@ -188,18 +209,12 @@ export default function DepositPage() {
     e.preventDefault();
     if (!parsedAmount || !phone || !operator || !country) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
-    depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, customerName: customerName || undefined, description: description || undefined });
-  };
-
-  const handleStep2Submit = () => {
-    if (!otp.trim()) return;
-    const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
-    depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, otp: otp.trim(), customerName: customerName || undefined, description: description || undefined });
+    depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, otp: otpSupported && otp.trim() ? otp.trim() : undefined, customerName: customerName || undefined, description: description || undefined });
   };
 
   const resetForm = () => {
     setPaymentStatus("idle"); setAmount(""); setPhone(""); setOtp(""); setCustomerName(""); setDescription(""); setPendingReference(null);
-    setVerifyCount(0); setElapsed(0); setVerifyStatus("PENDING"); setStep(1);
+    setVerifyCount(0); setElapsed(0); setVerifyStatus("PENDING"); setRedirectBlocked(false); setPaymentInstructions("");
     window.history.replaceState({}, "", "/deposit");
   };
 
@@ -248,7 +263,8 @@ export default function DepositPage() {
                 <p className="text-sm text-white/75 mt-0.5 leading-snug">
                   {isSuccess ? "Votre solde a été crédité avec succès."
                   : isFailed ? "Le paiement n'a pas abouti."
-                   : "Suivez les instructions de paiement affichées pour terminer l’opération."}
+                   : redirectBlocked ? "Le paiement nécessite une page externe, qui n'a pas été ouverte."
+                   : "Le statut est en cours de vérification."}
                 </p>
               </div>
             </div>
@@ -303,7 +319,7 @@ export default function DepositPage() {
             )}
           </div>
 
-          {isPending && (
+          {isPending && !redirectBlocked && (
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
               <Smartphone className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -314,16 +330,33 @@ export default function DepositPage() {
               </div>
             </div>
           )}
+          {redirectBlocked && (
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 space-y-2">
+              <p className="text-sm font-bold text-orange-900">Cet opérateur exige une page externe. Ce paiement n’est pas disponible sans redirection.</p>
+              <p className="text-xs text-orange-800">Aucune page externe n’a été ouverte. La référence reste disponible pour vérification.</p>
+            </div>
+          )}
+          {paymentInstructions && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+              <p className="text-xs font-bold text-emerald-900 mb-1">Instructions de paiement</p>
+              <p className="text-sm text-emerald-800 whitespace-pre-wrap">{paymentInstructions}</p>
+            </div>
+          )}
 
           {pendingReference && (
             <p className="text-center text-[10px] text-gray-400 font-mono" data-testid="text-deposit-ref">Réf : {pendingReference}</p>
           )}
 
-          {isPending && (
+          {isPending && !redirectBlocked && (
             <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
               <Wifi className="h-3.5 w-3.5 text-emerald-500 animate-pulse" />
               <span>Vérification automatique active...</span>
             </div>
+          )}
+          {redirectBlocked && pendingReference && (
+            <Button type="button" variant="outline" className="w-full h-11 font-bold" onClick={() => verifyMutation.mutate(pendingReference)} disabled={verifyMutation.isPending}>
+              {verifyMutation.isPending ? "Vérification..." : "Vérifier cette référence"}
+            </Button>
           )}
 
           <div className="flex gap-3">
@@ -384,166 +417,7 @@ export default function DepositPage() {
           </div>
         </div>
 
-        {/* ÉTAPE 2 : OTP */}
-        {step === 2 && needsOtp && (
-          <div className="space-y-4">
-            {/* Indicateur d'étape */}
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="h-8 w-8 rounded-full border border-border/60 flex items-center justify-center hover:bg-muted/40 transition-colors flex-shrink-0"
-                data-testid="button-back-step1"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Étape 2 sur 2</p>
-                <p className="text-sm font-bold">Vérification OTP</p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <ShieldCheck className="h-4 w-4 text-primary" />
-              </div>
-            </div>
-
-            {/* Récap */}
-            <Card className="border-border/60">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Opérateur</span>
-                  <span className="font-semibold">{operator} · {selectedCountry.name}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Numéro</span>
-                  <span className="font-semibold font-mono">{selectedCountry.prefix} {phone}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Montant crédité</span>
-                  <span className="font-black text-emerald-600">{formatCurrency(netAmount)} {currency}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Instructions OTP */}
-            <Card className="border-border/60">
-              <CardContent className="p-5 space-y-4">
-                <div className="space-y-3">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Code OTP {operator} Money
-                  </Label>
-
-                  {/* Orange Burkina Faso : code USSD avec montant */}
-                  {country === "BF" && operator === "Orange" ? (
-                    <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
-                      <div className="flex items-center gap-2 bg-orange-100/60 dark:bg-orange-900/20 rounded-lg px-3 py-2 my-1">
-                        <span className="text-xs text-muted-foreground">Composez ce code :</span>
-                        <code className="text-sm font-black text-orange-600 dark:text-orange-400 tracking-widest">
-                          *144*4*6*{parsedAmount > 0 ? parsedAmount : "MONTANT"}#
-                        </code>
-                      </div>
-                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>*144*4*6*{parsedAmount > 0 ? parsedAmount : "MONTANT"}#</strong> sur votre téléphone Orange</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Vous recevrez immédiatement votre code OTP</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez le code OTP reçu ci-dessous</li>
-                      </ol>
-                    </div>
-
-                  /* Orange Côte d'Ivoire : #144*82# option 2 */
-                  ) : country === "CI" && operator === "Orange" ? (
-                    <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144*82#</strong> sur votre téléphone Orange</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Sélectionnez l'<strong>option 2</strong> pour obtenir votre code de paiement</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
-                      </ol>
-                    </div>
-
-                  /* Moov Côte d'Ivoire : *155# → Paiement en ligne → Générer OTP */
-                  ) : country === "CI" && operator === "Moov" ? (
-                    <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">1.</span> Composez <strong>*155#</strong> sur votre téléphone Moov</li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">2.</span> Choisissez <strong>Moov Money / Paiement en ligne</strong></li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">3.</span> Sélectionnez <strong>Générer OTP</strong></li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">4.</span> Entrez votre code secret Moov Money</li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">5.</span> Entrez le code OTP reçu ci-dessous</li>
-                      </ol>
-                    </div>
-
-                  /* Orange Sénégal : #144#391# → code d'autorisation */
-                  ) : country === "SN" && operator === "Orange" ? (
-                    <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144#391#</strong> sur votre téléphone Orange</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Vous recevrez un code d'autorisation par SMS</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez le code reçu ci-dessous</li>
-                      </ol>
-                    </div>
-
-                  /* Orange Cameroun : #144# */
-                  ) : operator === "Orange" ? (
-                    <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">1.</span> Composez <strong>#144#</strong> sur votre téléphone Orange</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">2.</span> Sélectionnez <strong>"Générer un OTP"</strong> pour paiement en ligne</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 dark:text-orange-400 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
-                      </ol>
-                    </div>
-
-                  /* MTN Cameroun : *126# */
-                  ) : (
-                    <div className="rounded-xl bg-yellow-500/5 border border-yellow-500/20 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-muted-foreground space-y-1.5 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">1.</span> Composez <strong>*126#</strong> sur votre téléphone MTN</li>
-                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">2.</span> Sélectionnez l'option <strong>paiement en ligne / OTP</strong></li>
-                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">3.</span> Entrez votre code PIN MoMo</li>
-                        <li className="flex gap-2"><span className="font-bold text-yellow-600 dark:text-yellow-400 flex-shrink-0">4.</span> Entrez le code OTP reçu par SMS ci-dessous</li>
-                      </ol>
-                    </div>
-                  )}
-
-                  <Input
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="Entrez votre code OTP"
-                    className="h-14 border-border/70 text-center tracking-widest text-xl font-bold"
-                    data-testid="input-deposit-otp"
-                    autoFocus
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Button
-              type="button"
-              onClick={handleStep2Submit}
-              className="w-full h-13 text-base font-bold gap-2 shadow-xl"
-              style={{ background: "linear-gradient(135deg, hsl(160 84% 34%) 0%, hsl(160 84% 44%) 100%)" }}
-              disabled={depositMutation.isPending || !otp.trim()}
-              data-testid="button-confirm-deposit"
-            >
-              {depositMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
-              ) : (
-                <><Zap className="h-4 w-4" /> Déposer {formatCurrency(parsedAmount)} {currency}</>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {/* ÉTAPE 1 : Formulaire principal */}
-        {step === 1 && (
-          <form onSubmit={handleStep1Submit} className="space-y-4">
+        <form onSubmit={handleStep1Submit} className="space-y-4">
             <Card className="border-border/60">
               <CardContent className="p-5 space-y-5">
                 <div className="space-y-2">
@@ -670,6 +544,12 @@ export default function DepositPage() {
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom du payeur (optionnel)</Label>
                   <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Jean Dupont" className="h-11 border-border/70" data-testid="input-deposit-name" />
                 </div>
+                {otpSupported && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Code de paiement opérateur (si requis)</Label>
+                    <Input value={otp} onChange={(e) => setOtp(e.target.value)} type="text" inputMode="numeric" placeholder="Facultatif" className="h-11 border-border/70" data-testid="input-deposit-otp" />
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -696,10 +576,7 @@ export default function DepositPage() {
             <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
               <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                {needsOtp
-                  ? <>Un code OTP vous sera demandé à l'étape suivante. Les frais de service (<strong>{Math.round(feeRate * 100)}%</strong>) sont déduits du montant déposé.</>
-                  : <>Un prompt <strong>USSD</strong> sera envoyé sur votre téléphone. Les frais de service (<strong>{Math.round(feeRate * 100)}%</strong>) sont déduits du montant déposé.</>
-                }
+                Un code opérateur peut être requis pour certaines méthodes. Les frais de service (<strong>{Math.round(feeRate * 100)}%</strong>) sont déduits du montant déposé.
               </p>
             </div>
 
@@ -712,14 +589,11 @@ export default function DepositPage() {
             >
               {depositMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
-              ) : needsOtp ? (
-                <>Continuer <ChevronDown className="h-4 w-4 rotate-[-90deg]" /></>
               ) : (
                 <><Zap className="h-4 w-4" /> Déposer {parsedAmount > 0 ? `${formatCurrency(parsedAmount)} ${currency}` : ""}</>
               )}
             </Button>
-          </form>
-        )}
+        </form>
       </div>
     </DashboardLayout>
   );

@@ -756,7 +756,7 @@ export async function registerRoutes(
         lastName: resolvedLastName,
         otp,
         operator: alphaDepositOperator,
-        country, currency, email: req.user.email, checkout: true,
+        country, currency, email: req.user.email,
         returnUrl,
         callbackUrl: `${req.protocol}://${req.get("host")}/api/webhooks/alphapay`,
       });
@@ -770,6 +770,9 @@ export async function registerRoutes(
         ...transaction,
         providerId: depositResponse.id,
         paymentUrl: depositResponse.payment_url,
+        requiresRedirect: depositResponse.requires_redirect === true,
+        instructions: depositResponse.instructions,
+        message: depositResponse.message,
       });
     } catch (error: any) {
       console.error("Error creating deposit:", error);
@@ -993,7 +996,7 @@ export async function registerRoutes(
       }
 
       const frontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: frontendStatus, alphapayStatus: result.status });
+      res.json({ success: result.success, status: frontendStatus, alphapayStatus: result.status, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
     } catch (error: any) {
       console.error("Verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -1046,7 +1049,7 @@ export async function registerRoutes(
       }
 
       const publicFrontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: publicFrontendStatus });
+      res.json({ success: result.success, status: publicFrontendStatus, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
     } catch (error: any) {
       console.error("Public verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -1110,7 +1113,7 @@ export async function registerRoutes(
       }
       if (await isAlphaPayment(transaction.reference)) {
         const receipt = await paymentService.getReceipt(transaction.reference);
-        return res.json({ ...transaction, paymentUrl: receipt?.payment_url, reference: transaction.reference, message: "Cette intention de paiement existe déjà ; vérifiez son statut." });
+        return res.json({ ...transaction, requiresRedirect: receipt?.requires_redirect === true, instructions: receipt?.instructions, reference: transaction.reference, message: receipt?.message || "Cette intention de paiement existe déjà ; vérifiez son statut." });
       }
       const validation = publicPaySchema.safeParse(req.body);
       if (!validation.success) {
@@ -1182,6 +1185,9 @@ export async function registerRoutes(
       res.json({
         reference: transaction.reference,
         paymentUrl: depositResponse.payment_url || null,
+        requiresRedirect: depositResponse.requires_redirect === true,
+        instructions: depositResponse.instructions,
+        message: depositResponse.message,
         status: "pending",
       });
     } catch (err: any) {
@@ -1232,7 +1238,7 @@ export async function registerRoutes(
         }
       }
       const publicStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: publicStatus });
+      res.json({ success: result.success, status: publicStatus, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
     } catch (err: any) {
       console.error("payment-api/public/:id/verify error:", err);
       res.status(500).json({ message: err.message || "Erreur de vérification" });
@@ -1696,6 +1702,9 @@ export async function registerRoutes(
         ...transaction,
         providerId: depositResponse.id,
         paymentUrl: depositResponse.payment_url,
+        requiresRedirect: depositResponse.requires_redirect === true,
+        instructions: depositResponse.instructions,
+        message: depositResponse.message,
       });
     } catch (error: any) {
       console.error("Error processing payment:", error);
@@ -2009,9 +2018,7 @@ export async function registerRoutes(
 
         await storage.updateApiKey(req.merchantApiKey.id, { lastUsedAt: new Date() } as any);
 
-        const defaultMessage = isWave
-          ? "Paiement Wave initié. Redirigez le client vers payment_url pour qu'il valide le paiement."
-          : "Paiement initié. Le client doit valider sur son téléphone (USSD).";
+        const defaultMessage = "Paiement direct initié. Suivez les instructions de votre opérateur sur votre téléphone.";
 
         return res.status(201).json({
           success: true,
@@ -2025,7 +2032,8 @@ export async function registerRoutes(
           operator: operatorUpper,
           phone,
           message: alphapayResponse.message || defaultMessage,
-          ...(alphapayResponse.payment_url ? { payment_url: alphapayResponse.payment_url } : {}),
+          requires_redirect: alphapayResponse.requires_redirect === true,
+          instructions: alphapayResponse.instructions,
           created_at: transaction.createdAt,
         });
       }
@@ -2319,9 +2327,7 @@ export async function registerRoutes(
 
       await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
 
-      const defaultMessage = isWave
-        ? "Paiement Wave initié. Redirigez le client vers payment_url pour qu'il valide le paiement."
-        : "Paiement initié. Le client doit valider sur son téléphone (USSD).";
+      const defaultMessage = "Paiement direct initié. Suivez les instructions de votre opérateur sur votre téléphone.";
 
       res.status(201).json({
         success: true,
@@ -2335,7 +2341,8 @@ export async function registerRoutes(
         operator: operatorUpper,
         phone,
         message: alphapayResponse.message || defaultMessage,
-        ...(alphapayResponse.payment_url ? { payment_url: alphapayResponse.payment_url } : {}),
+        requires_redirect: alphapayResponse.requires_redirect === true,
+        instructions: alphapayResponse.instructions,
         created_at: transaction.createdAt,
       });
     } catch (error: any) {
@@ -2392,18 +2399,7 @@ export async function registerRoutes(
           // avec des codes numériques fiables.
         }
 
-        // Si le marchand a configuré une redirectUrl sur sa clé API, on l'inclut
-        // dans la page de confirmation pour que la page y redirige après succès.
-        if (transaction) {
-          const apiKeyRows = await storage.getApiKeys(transaction.userId);
-          const matchingKey = (transaction as any).apiKeyId
-            ? apiKeyRows.find((k: any) => k.id === (transaction as any).apiKeyId)
-            : null;
-          const merchantRedirect = (matchingKey as any)?.redirectUrl;
-          if (merchantRedirect && typeof merchantRedirect === "string" && merchantRedirect.startsWith("http")) {
-            redirectTarget = merchantRedirect;
-          }
-        }
+        // Historical callbacks return only to our own status page, never to an external site.
       } catch (err) {
         console.error("[SR Wave Callback] Error verifying status:", err);
         // En cas d'erreur AlphaPay, on redirige quand même vers la page de confirmation
@@ -2498,9 +2494,6 @@ export async function registerRoutes(
 
     // Si le marchand a fourni une URL de redirection (cas SR API Wave), on y redirige.
     // Sinon, on redirige vers la page de dépôt interne (cas dashboard).
-    if (merchant_redirect && typeof merchant_redirect === "string" && merchant_redirect.startsWith("http")) {
-      return res.redirect(merchant_redirect);
-    }
     res.redirect(`/deposit?status=callback&reference=${encodeURIComponent(String(reference || ""))}`);
   });
 

@@ -26,7 +26,7 @@ const FAQS = [
   { q: "Comment fonctionne SolvexPay ?", a: "SolvexPay est une passerelle de paiement Mobile Money pan-africaine. Après inscription, vous créez des liens de paiement ou utilisez notre API pour encaisser via MTN, Orange, Wave, Moov et plus. Tout le flux de paiement est hébergé sur notre plateforme sécurisée." },
   { q: "Quels sont les frais ?", a: "Les frais sont simples et transparents. Consultez la section Tarifs pour les taux exacts en vigueur. Aucun abonnement mensuel, aucun frais caché." },
   { q: "Le KYC est-il obligatoire ?", a: "Le KYC est requis pour débloquer tous les plafonds. Sans KYC vous pouvez tester la plateforme avec des limites réduites. La vérification prend généralement moins de 24h." },
-  { q: "Comment intégrer l'API ?", a: "Créez votre compte, accédez à 'Clés API' dans votre tableau de bord. Deux méthodes : redirection directe GET /api/v1/checkout (zéro code JavaScript) ou API JSON POST /api/v1/deposit pour les intégrations serveur." },
+  { q: "Comment intégrer l'API ?", a: "Créez votre compte, accédez à 'Clés API' dans votre tableau de bord. Utilisez l'API JSON POST /api/v1/deposit depuis votre serveur pour garder le client sur votre propre formulaire. La page checkout hébergée reste facultative." },
   { q: "Quels pays sont couverts ?", a: "9 pays : Bénin, Côte d'Ivoire, Burkina Faso, Togo, Sénégal, Mali, Cameroun, RD Congo, Congo-Brazzaville. Couverture en constante expansion." },
   { q: "Comment recevoir les notifications de paiement ?", a: "Configurez votre URL webhook dans les paramètres de votre clé API. SolvexPay envoie automatiquement une requête POST signée HMAC-SHA256 à chaque changement de statut de transaction." },
 ];
@@ -505,12 +505,12 @@ export default function LandingPage() {
                 <p className="pl-8"><span className="text-gray-500">{"}),"}</span></p>
                 <p className="pl-4"><span className="text-gray-400">{"}"}</span></p>
                 <p><span className="text-gray-400">{")"}</span><span className="text-gray-500">;</span></p>
-                <p className="mt-2 text-gray-500">{"// ✅ Redirigez votre client"}</p>
-                <p><span className="text-white">res</span><span className="text-gray-500">.</span><span className="text-yellow-300">redirect</span><span className="text-gray-500">(</span><span className="text-white">data</span><span className="text-gray-500">.</span><span className="text-blue-300">payment_url</span><span className="text-gray-500">);</span></p>
+                <p className="mt-2 text-gray-500">{"// Affichez les instructions et vérifiez la référence"}</p>
+                <p><span className="text-blue-300">const</span> <span className="text-white">data</span> <span className="text-gray-500">=</span> <span className="text-yellow-300">await</span> <span className="text-white">response</span><span className="text-gray-500">.</span><span className="text-yellow-300">json</span><span className="text-gray-400">()</span><span className="text-gray-500">;</span></p>
               </div>
               <div className="px-6 py-3 border-t border-white/10 flex items-center gap-2 bg-emerald-900/30">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs text-emerald-400/80 font-mono">{"{ payment_url: 'https://solvexpay.com/pay-api/...' }"}</span>
+                <span className="text-xs text-emerald-400/80 font-mono">{"{ reference: '...', status: 'pending' }"}</span>
               </div>
             </div>
           </div>

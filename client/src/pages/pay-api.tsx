@@ -92,6 +92,9 @@ export default function PayApiPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [redirectBlocked, setRedirectBlocked] = useState(false);
+  const [paymentInstructions, setPaymentInstructions] = useState("");
   const [country, setCountry] = useState("BJ");
   const [operator, setOperator] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -110,7 +113,8 @@ export default function PayApiPage() {
 
   const selectedCountry = COUNTRIES.find((c) => c.code === country) || COUNTRIES[0];
 
-  useEffect(() => { setOperator(""); }, [country]);
+  useEffect(() => { setOperator(""); setOtp(""); }, [country]);
+  const otpSupported = operator === "Orange" && (country === "CI" || country === "BF");
 
   const { data: suspendedData } = useQuery<{ codes: string[] }>({
     queryKey: ["/api/public/suspended-countries"],
@@ -154,14 +158,6 @@ export default function PayApiPage() {
     return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint };
   }
 
-  const redirectUrl = paymentInfo?.redirectUrl as string | undefined;
-  useEffect(() => {
-    if (verifyStatus === "SUCCESS" && redirectUrl) {
-      const timer = setTimeout(() => { window.location.href = redirectUrl; }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [verifyStatus, redirectUrl]);
-
   // Vérification immédiate du statut via l'endpoint verify
   const checkStatus = async (ref: string) => {
     try {
@@ -176,6 +172,18 @@ export default function PayApiPage() {
           setVerifyStatus(data.status);
           setVerifyCount((c) => c + 1);
         }
+        const terminal = ["SUCCESS", "FAILED", "CANCELLED"].includes(String(data.status || "").toUpperCase());
+        if (typeof data.instructions === "string" || typeof data.message === "string") {
+          setPaymentInstructions(data.instructions || data.message || "");
+        }
+        const paymentUrl = data.paymentUrl || data.payment_url;
+        let hasExternalPaymentUrl = false;
+        if (paymentUrl) {
+          try { hasExternalPaymentUrl = new URL(paymentUrl, window.location.origin).origin !== window.location.origin; }
+          catch { hasExternalPaymentUrl = true; }
+        }
+        if (terminal) setRedirectBlocked(false);
+        else if (data.requiresRedirect === true || data.requires_redirect === true || hasExternalPaymentUrl) setRedirectBlocked(true);
       }
     } catch {}
   };
@@ -195,18 +203,26 @@ export default function PayApiPage() {
   }, []);
 
   const payMutation = useMutation({
-    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName: string; customerEmail: string }) => {
+    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName: string; customerEmail: string; otp?: string }) => {
       const res = await apiRequest("POST", `/api/payment-api/public/${id}/pay`, data);
       return res.json();
     },
     onSuccess: (data: any) => {
-      setPendingReference(data.reference);
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-        return;
+      setPendingReference(data.reference || data.sendavaReference || data.id || null);
+      setPaymentInstructions(typeof data.instructions === "string" && data.instructions ? data.instructions : typeof data.message === "string" ? data.message : "");
+      const paymentUrl = data.paymentUrl || data.payment_url;
+      let hasExternalPaymentUrl = false;
+      if (paymentUrl) {
+        try { hasExternalPaymentUrl = new URL(paymentUrl, window.location.origin).origin !== window.location.origin; }
+        catch { hasExternalPaymentUrl = true; }
       }
+      const cannotPayInPlace = data.requiresRedirect === true || data.requires_redirect === true || hasExternalPaymentUrl;
+      setRedirectBlocked(cannotPayInPlace);
       setPaymentStatus("processing");
-      toast({ title: "Paiement initié", description: "Confirmez le paiement sur votre téléphone." });
+      toast({
+        title: cannotPayInPlace ? "Paiement indisponible sans redirection" : "Paiement initié",
+        description: cannotPayInPlace ? "La référence est conservée pour vérification." : "Suivez les instructions affichées pour terminer l’opération.",
+      });
     },
     onError: (err: any) => {
       setPaymentStatus("error");
@@ -216,10 +232,10 @@ export default function PayApiPage() {
 
   // Polling toutes les 3 secondes (au lieu de 5) pour une confirmation plus rapide
   useEffect(() => {
-    if (!pendingReference || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
+    if (!pendingReference || redirectBlocked || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
     const interval = setInterval(() => checkStatus(pendingReference), 3000);
     return () => clearInterval(interval);
-  }, [pendingReference, verifyStatus, id]);
+  }, [pendingReference, verifyStatus, id, redirectBlocked]);
 
   useEffect(() => {
     if (paymentStatus !== "processing" || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
@@ -251,6 +267,7 @@ export default function PayApiPage() {
       country,
       customerName: fullName,
       customerEmail: email,
+      ...(otpSupported && otp.trim() ? { otp: otp.trim() } : {}),
     });
   };
 
@@ -315,7 +332,6 @@ export default function PayApiPage() {
     const isSuccess = verifyStatus === "SUCCESS";
     const isFailed = ["FAILED", "CANCELLED"].includes(verifyStatus);
     const isPending = !isSuccess && !isFailed;
-    const shouldRedirect = isSuccess && redirectUrl;
     const elapsedMin = Math.floor(elapsed / 60);
     const elapsedSec = elapsed % 60;
     const elapsedStr = elapsedMin > 0 ? `${elapsedMin}m ${elapsedSec}s` : `${elapsedSec}s`;
@@ -376,7 +392,8 @@ export default function PayApiPage() {
                 <p className="text-sm text-white/50 max-w-xs mx-auto leading-relaxed">
                   {isSuccess ? "Votre paiement a été traité avec succès. Merci !"
                   : isFailed ? "Le paiement n'a pas abouti. Vérifiez votre solde ou réessayez."
-                   : "Suivez les instructions de paiement affichées pour terminer l’opération."}
+                   : redirectBlocked ? "Le paiement nécessite une page externe, qui n'a pas été ouverte."
+                   : "Le statut est en cours de vérification."}
                 </p>
               </div>
             </div>
@@ -426,13 +443,25 @@ export default function PayApiPage() {
               </div>
             </div>
 
-            {isPending && (
+            {isPending && !redirectBlocked && (
               <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
                 <Smartphone className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-bold text-amber-300 mb-0.5">Action requise sur votre téléphone</p>
-                  <p className="text-[11px] text-amber-200/60 leading-relaxed">Suivez les instructions de paiement affichées. La vérification du statut est automatique toutes les <strong className="text-amber-300">5 secondes</strong>.</p>
+                  <p className="text-xs font-bold text-amber-300 mb-0.5">Paiement en cours</p>
+                  <p className="text-[11px] text-amber-200/60 leading-relaxed">Le statut est vérifié automatiquement toutes les <strong className="text-amber-300">3 secondes</strong>.</p>
                 </div>
+              </div>
+            )}
+            {redirectBlocked && (
+              <div className="rounded-2xl p-4 space-y-2" style={{ background: "rgba(251,146,60,0.10)", border: "1px solid rgba(251,146,60,0.30)" }}>
+                <p className="text-sm font-bold text-orange-200">Cet opérateur exige une page externe. Ce paiement n’est pas disponible sans redirection.</p>
+                <p className="text-xs text-white/60">Aucune page externe n’a été ouverte. La référence ci-dessous reste disponible pour vérifier ce paiement.</p>
+              </div>
+            )}
+            {paymentInstructions && (
+              <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <p className="text-xs font-bold text-white/80 mb-1">Instructions de paiement</p>
+                <p className="text-sm text-white/65 whitespace-pre-wrap">{paymentInstructions}</p>
               </div>
             )}
 
@@ -442,24 +471,24 @@ export default function PayApiPage() {
               </div>
             )}
 
-            {isPending && (
+            {isPending && !redirectBlocked && (
               <div className="flex items-center justify-center gap-2 text-xs text-white/40">
                 <Wifi className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
                 <span>vérification automatique active...</span>
               </div>
             )}
 
-            {shouldRedirect && (
-              <p className="text-center text-xs text-emerald-400/60 animate-pulse" data-testid="text-redirect-notice">
-                Redirection dans 3 secondes...
-              </p>
+            {redirectBlocked && pendingReference && (
+              <Button type="button" variant="outline" className="w-full border-white/20 text-white hover:bg-white/10" onClick={() => checkStatus(pendingReference)}>
+                Vérifier cette référence
+              </Button>
             )}
 
             {isFailed && (
               <Button
                 className="w-full h-13 font-black text-base rounded-2xl"
                 style={{ background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" }}
-                onClick={() => { setPaymentStatus("idle"); setPendingReference(null); setVerifyStatus("PENDING"); setVerifyCount(0); setElapsed(0); }}
+                onClick={() => { setPaymentStatus("idle"); setPendingReference(null); setVerifyStatus("PENDING"); setVerifyCount(0); setElapsed(0); setRedirectBlocked(false); setPaymentInstructions(""); }}
                 data-testid="button-retry-payment"
               >
                 <RefreshCw className="h-4 w-4 mr-2" /> Réessayer le paiement
@@ -540,7 +569,7 @@ export default function PayApiPage() {
                       <button
                         key={c.code}
                         type="button"
-                        onClick={() => { setCountry(c.code); setShowCountryPicker(false); }}
+                        onClick={() => { setCountry(c.code); setOtp(""); setShowCountryPicker(false); }}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${country === c.code ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700"}`}
                         data-testid={`option-pay-country-${c.code}`}
                       >
@@ -568,7 +597,7 @@ export default function PayApiPage() {
                     <button
                       key={op}
                       type="button"
-                      onClick={() => { if (isDisabled) return; setOperator(op); setTimeout(() => phoneInputRef.current?.focus(), 50); }}
+                      onClick={() => { if (isDisabled) return; setOperator(op); setOtp(""); setTimeout(() => phoneInputRef.current?.focus(), 50); }}
                       disabled={isDisabled}
                       className={`relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 ${
                         isDisabled
@@ -635,6 +664,13 @@ export default function PayApiPage() {
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Email requis</Label>
               <Input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} type="email" required placeholder="jean@exemple.com" className="h-11 border-gray-200 rounded-xl" data-testid="input-pay-email" />
             </div>
+
+            {otpSupported && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Code de paiement opérateur (si requis)</Label>
+                <Input value={otp} onChange={(e) => setOtp(e.target.value)} type="text" inputMode="numeric" placeholder="Facultatif" className="h-11 border-gray-200 rounded-xl" data-testid="input-pay-otp" />
+              </div>
+            )}
 
             <Button
               type="submit"

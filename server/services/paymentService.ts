@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { paymentProviders, paymentProviderLogs, transactions, wallets, adminWithdrawals, type Transaction } from "@shared/schema";
 import { eq, and, desc, sql, ne } from "drizzle-orm";
-import { AlphaPayService, alphapayStatusToString, type PaymentParams, type PaymentResponse, type PaymentState } from "./alphapay";
+import { AlphaPayService, alphapayStatusToString, directPaymentResponse, type PaymentParams, type PaymentResponse, type PaymentState } from "./alphapay";
 import { amountInXOF, paymentWalletDelta } from "./paymentAccounting";
 export { amountInXOF } from "./paymentAccounting";
 
@@ -71,7 +71,10 @@ export async function settlePayment(reference: string, state: PaymentState) {
 class PaymentService {
   async getActiveCode() { return "alphapay"; }
   async isConfigured() { return isApiKeyConfigured(); }
-  async getReceipt(reference: string) { return (await findBinding(reference))?.response as PaymentResponse | null; }
+  async getReceipt(reference: string) {
+    const receipt = (await findBinding(reference))?.response as PaymentResponse | null;
+    return receipt ? directPaymentResponse(receipt) : null;
+  }
 
   private async initiate(action: "deposit" | "transfer", params: PaymentParams): Promise<PaymentResponse> {
     requireConfigured();
@@ -112,7 +115,10 @@ class PaymentService {
     }
   }
 
-  deposit(params: PaymentParams) { return this.initiate("deposit", params); }
+  async deposit(params: PaymentParams) {
+    const receipt = await this.initiate("deposit", { ...params, checkout: false, directOnly: true });
+    return directPaymentResponse(receipt);
+  }
   transfer(params: PaymentParams) { return this.initiate("transfer", params); }
   async getBalance() { requireConfigured(); return new AlphaPayService().getBalance(); }
 
@@ -168,7 +174,12 @@ class PaymentService {
     if (adminPayout && adminPayout.status === "pending" && state !== "pending") {
       await db.update(adminWithdrawals).set({ status: state, updatedAt: new Date() }).where(and(eq(adminWithdrawals.id, adminPayout.id), eq(adminWithdrawals.status, "pending")));
     }
-    return { success: 1, reference, status: result.status, id: result.id };
+    const presentation = directPaymentResponse(receipt);
+    return {
+      success: 1, reference, status: result.status, id: result.id,
+      requires_redirect: presentation.requires_redirect,
+      instructions: presentation.instructions, message: presentation.message,
+    };
   }
 
   /** Find webhooks by the provider ID already persisted, never by caller-supplied local references. */

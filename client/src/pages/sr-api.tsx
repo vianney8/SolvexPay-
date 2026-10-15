@@ -21,14 +21,14 @@ import { Link } from "wouter";
 import type { ApiKey } from "@shared/schema";
 
 const SR_OPERATORS = [
-  { code: "MTN", label: "MTN Mobile Money", countries: ["BJ", "CI", "CM"], otp: false, note: "Confirmation USSD automatique" },
-  { code: "MOOV", label: "Moov Money", countries: ["BJ", "TG", "BF", "ML", "CI"], otp: false, note: "Confirmation USSD automatique" },
-  { code: "ORANGE", label: "Orange Money", countries: ["CI", "SN", "BF", "ML", "CM"], otp: true, note: "OTP requis sur Côte d'Ivoire et Sénégal" },
-  { code: "WAVE", label: "Wave", countries: ["CI", "SN"], otp: false, note: "Lien de paiement Wave généré" },
-  { code: "TMONEY", label: "T-Money", countries: ["TG"], otp: false, note: "Confirmation USSD automatique" },
+  { code: "MTN", label: "MTN Mobile Money", countries: ["BJ", "CI", "CM"], otp: false, note: "Suivre les instructions et le statut retournés" },
+  { code: "MOOV", label: "Moov Money", countries: ["BJ", "TG", "BF", "ML", "CI"], otp: false, note: "Suivre les instructions et le statut retournés" },
+  { code: "ORANGE", label: "Orange Money", countries: ["CI", "SN", "BF", "ML", "CM"], otp: true, note: "Code de paiement fourni par le client si requis (CI, BF)" },
+  { code: "WAVE", label: "Wave", countries: ["CI", "SN"], otp: false, note: "Disponibilité précisée dans la réponse API" },
+  { code: "TMONEY", label: "T-Money", countries: ["TG"], otp: false, note: "Suivre les instructions et le statut retournés" },
   { code: "FREE", label: "Free Money", countries: ["SN"], otp: false, note: "Alias: MIXX" },
-  { code: "AIRTEL", label: "Airtel Money", countries: ["COD"], otp: false, note: "Confirmation USSD automatique" },
-  { code: "VODACOM", label: "Vodacom M-Pesa", countries: ["COD"], otp: false, note: "Confirmation USSD automatique" },
+  { code: "AIRTEL", label: "Airtel Money", countries: ["COD"], otp: false, note: "Suivre les instructions et le statut retournés" },
+  { code: "VODACOM", label: "Vodacom M-Pesa", countries: ["COD"], otp: false, note: "Suivre les instructions et le statut retournés" },
 ];
 
 const SR_COUNTRIES = [
@@ -105,7 +105,7 @@ CORPS DE LA REQUÊTE
   "phone": "22901234567",   // Requis — Numéro complet avec indicatif
   "operator": "mtn",        // Requis — Code opérateur (voir liste)
   "country": "BJ",          // Requis — Code pays ISO (voir liste)
-  "otp": "123456",          // Optionnel — OTP si requis par l'opérateur
+  "otp": "CODE_FOURNI",     // Optionnel — code fourni par le client si requis
   "description": "...",     // Optionnel — Libellé transaction
   "customer_name": "...",   // Optionnel — Nom du client
   "customer_email": "..."   // Optionnel — Email du client
@@ -116,6 +116,7 @@ RÉPONSE SUCCÈS (201)
   "success": true,
   "id": "txn_abc123",
   "status": "pending",
+  "requires_redirect": false,
   "reference": "REF...",
   "amount": 5000,
   "fees": 350,
@@ -123,7 +124,8 @@ RÉPONSE SUCCÈS (201)
   "currency": "XOF",
   "operator": "MTN",
   "phone": "22901234567",
-  "message": "Paiement initié. Le client doit valider sur son téléphone.",
+  "instructions": "Instructions opérateur si disponibles.",
+  "message": "Paiement initié. Vérifiez le statut avec la référence.",
   "created_at": "2025-01-01T00:00:00.000Z"
 }
 
@@ -135,9 +137,9 @@ ${activeSrCountries.map(c => `${c.name} (${c.code}) — ${c.currency} — Opéra
 ============================
 DÉTAILS OPÉRATEURS ET OTP
 ============================
-${activeSrOperators.map(op => `${op.label} (${op.code.toLowerCase()}) — ${op.otp ? "OTP REQUIS" : "OTP optionnel"} — ${op.note}`).join("\n")}
+${activeSrOperators.map(op => `${op.label} (${op.code.toLowerCase()}) — ${op.otp ? "OTP selon pays" : "OTP optionnel"} — ${op.note}`).join("\n")}
 
-ORANGE (CI, SN) : OTP obtenu en composant le #144# (CI) ou #144*82# (SN) — expire en 5 minutes.
+ORANGE (CI, BF) : fournissez le code de paiement opérateur dans le champ otp si celui-ci est requis. N'inventez pas de code USSD ni de valeur par défaut.
 
 ============================
 WEBHOOKS ET NOTIFICATIONS
@@ -185,7 +187,7 @@ GET https://solvexpay.com/api/v1/transactions/:id
 curl https://solvexpay.com/api/v1/transactions/txn_abc123 \\
   -H "Authorization: Bearer sk_live_votre_cle_sr"
 
-Statuts : pending (USSD en cours) | completed (solde crédité) | failed (refusé/expiré)
+Statuts : pending (en cours de traitement) | completed (solde crédité) | failed (refusé/expiré)
 
 ============================
 CODES D'ERREUR
@@ -236,7 +238,7 @@ if ($response['success']) { echo "Paiement initié: " . $response['message']; }
 FLUX RECOMMANDÉ :
 1. Votre client remplit son numéro (+ OTP si Orange) sur votre page
 2. Vous appelez POST /api/v1/sr/pay depuis votre backend
-3. Le client reçoit un USSD sur son téléphone et valide
+3. Vous affichez les instructions retournées si présentes et vérifiez le statut
 4. SolvexPay crédite votre solde automatiquement
 5. Votre webhook reçoit transaction.completed
 
@@ -491,9 +493,9 @@ export default function SrApiPage() {
                           <div className="space-y-2">
                             <Label className="text-[11px] text-green-300/80 font-semibold flex items-center gap-1.5">
                               URL de redirection
-                              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[9px] font-bold uppercase tracking-wide">Requis pour Wave</span>
+                              <span className="px-1.5 py-0.5 rounded bg-slate-500/20 border border-slate-500/30 text-slate-400 text-[9px] font-bold uppercase tracking-wide">Paramètre historique</span>
                             </Label>
-                            <p className="text-[10px] text-green-300/50">Wave redirige le client vers cette URL après paiement. Obligatoire si vous utilisez l'opérateur <strong className="text-amber-400">wave</strong>.</p>
+                            <p className="text-[10px] text-green-300/50">URL de retour conservée pour les intégrations historiques. Les nouveaux paiements directs n'ouvrent pas automatiquement cette URL.</p>
                             <Input
                               defaultValue={currentRedirectUrl}
                               onChange={(e) => setSrRedirectUrls(v => ({ ...v, [srKey.id]: e.target.value }))}
@@ -505,7 +507,7 @@ export default function SrApiPage() {
                             {!currentRedirectUrl && (
                               <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
                                 <AlertCircle className="h-3 w-3 text-amber-400 flex-shrink-0" />
-                                <p className="text-[10px] text-amber-300/80">Non configurée — les paiements Wave échoueront avec l'erreur <code className="bg-black/40 px-1 rounded">MISSING_REDIRECT_URL</code></p>
+                                <p className="text-[10px] text-amber-300/80">Aucune URL de retour configurée. Le paiement direct ne nécessite pas de redirection navigateur.</p>
                               </div>
                             )}
                           </div>
@@ -554,22 +556,22 @@ export default function SrApiPage() {
                   <CodeBox>{`Authorization: Bearer sk_live_votre_cle_sr\nContent-Type: application/json`}</CodeBox>
                 </DocBlock>
                 <DocBlock title="Corps de la requête">
-                  <CodeBox>{`{\n  "amount": 5000,           // Requis — Montant en XOF (min: 100)\n  "phone": "22901234567",   // Requis — Numéro complet avec indicatif\n  "operator": "mtn",        // Requis — Code opérateur (voir liste)\n  "country": "BJ",          // Requis — Code pays ISO (voir liste)\n  "otp": "123456",          // Optionnel — OTP si requis par l'opérateur\n  "description": "...",     // Optionnel — Libellé transaction\n  "customer_name": "...",   // Optionnel — Nom du client\n  "customer_email": "..."   // Optionnel — Email du client\n}`}</CodeBox>
+                  <CodeBox>{`{\n  "amount": 5000,           // Requis — Montant en XOF (min: 100)\n  "phone": "22901234567",   // Requis — Numéro complet avec indicatif\n  "operator": "mtn",        // Requis — Code opérateur (voir liste)\n  "country": "BJ",          // Requis — Code pays ISO (voir liste)\n  "otp": "CODE_FOURNI",     // Optionnel — code fourni par le client si requis\n  "description": "...",     // Optionnel — Libellé transaction\n  "customer_name": "...",   // Optionnel — Nom du client\n  "customer_email": "..."   // Optionnel — Email du client\n}`}</CodeBox>
                 </DocBlock>
                 <DocBlock title="Réponse succès (201)">
-                  <CodeBox>{`{\n  "success": true,\n  "id": "txn_abc123",       // ID de la transaction SolvexPay\n  "status": "pending",      // En attente de validation client\n  "reference": "REF...",    // Référence de transaction\n  "amount": 5000,\n  "fees": 350,              // Frais SolvexPay (% configuré)\n  "net_amount": 4650,       // Montant net crédité à vous\n  "currency": "XOF",\n  "operator": "MTN",\n  "phone": "22901234567",\n  "message": "Paiement initié. Le client doit valider sur son téléphone.",\n  "created_at": "2025-01-01T00:00:00.000Z"\n}`}</CodeBox>
+                  <CodeBox>{`{\n  "success": true,\n  "id": "txn_abc123",       // ID de la transaction SolvexPay\n  "status": "pending",      // Statut en cours\n  "requires_redirect": false,\n  "reference": "REF...",    // Référence de transaction\n  "amount": 5000,\n  "fees": 350,              // Frais SolvexPay (% configuré)\n  "net_amount": 4650,       // Montant net crédité à vous\n  "currency": "XOF",\n  "operator": "MTN",\n  "phone": "22901234567",\n  "instructions": "Instructions opérateur si disponibles.",\n  "message": "Paiement initié. Vérifiez le statut avec la référence.",\n  "created_at": "2025-01-01T00:00:00.000Z"\n}`}</CodeBox>
                 </DocBlock>
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                   <Info className="h-3.5 w-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
                   <p className="text-blue-300/80 text-[11px] leading-relaxed">
-                    Le statut initial est toujours <strong className="text-blue-300">pending</strong>. Un USSD est envoyé au client pour qu'il valide le paiement. SolvexPay reçoit la confirmation en temps réel et crédite automatiquement votre solde. Votre webhook est notifié à chaque changement de statut.
+                    Le statut initial est <strong className="text-blue-300">pending</strong>. Affichez le message et les instructions retournés, puis vérifiez le statut ou attendez le webhook. Les modalités dépendent de l'opérateur ; ne supposez pas qu'un prompt téléphone est toujours envoyé.
                   </p>
                 </div>
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <AlertCircle className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="text-[11px] text-amber-300/80 space-y-1">
-                    <p className="font-bold text-amber-300">Cas particulier : Wave (CI, SN)</p>
-                    <p>Wave ne fonctionne pas via USSD. La réponse inclut un champ <code className="bg-black/40 px-1 rounded">payment_url</code> — redirigez votre client vers cette URL pour qu'il valide le paiement dans l'app Wave. L'<strong className="text-amber-300">URL de redirection</strong> doit être configurée sur votre clé SR (obligatoire).</p>
+                    <p className="font-bold text-amber-300">Si un opérateur exige une page externe</p>
+                    <p>Si la réponse indique <code className="bg-black/40 px-1 rounded">requires_redirect: true</code>, ce paiement nécessite une page externe et n'est pas disponible dans un parcours sans redirection. L'API SR ne retourne pas d'URL de paiement à ouvrir : conservez la référence et indiquez la limite à l'utilisateur.</p>
                   </div>
                 </div>
               </div>
@@ -647,7 +649,7 @@ export default function SrApiPage() {
                 <AlertCircle className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div className="text-[11px] text-amber-300/80 space-y-1">
                   <p className="font-bold text-amber-300">Opérateurs nécessitant un OTP</p>
-                  <p><strong>ORANGE (CI, SN) :</strong> L'OTP est obtenu en composant le <code className="bg-black/40 px-1 rounded">#144#</code> (CI) ou <code className="bg-black/40 px-1 rounded">#144*82#</code> (SN). Expire en 5 minutes.</p>
+                  <p><strong>ORANGE (CI, BF) :</strong> Transmettez le code opérateur dans le champ <code className="bg-black/40 px-1 rounded">otp</code> s'il est requis. Ne pré-remplissez pas de code et ne supposez pas de parcours USSD particulier.</p>
                 </div>
               </div>
             </section>
@@ -689,7 +691,7 @@ export default function SrApiPage() {
               </DocBlock>
               <div className="space-y-2">
                 {[
-                  { s: "pending", icon: <AlertCircle className="h-3 w-3 text-amber-400" />, desc: "En attente de validation par le client (USSD en cours)" },
+                  { s: "pending", icon: <AlertCircle className="h-3 w-3 text-amber-400" />, desc: "Transaction en cours — consultez les instructions retournées" },
                   { s: "completed", icon: <CheckCircle2 className="h-3 w-3 text-green-400" />, desc: "Paiement validé — votre solde SolvexPay est crédité" },
                   { s: "failed", icon: <XCircle className="h-3 w-3 text-red-400" />, desc: "Paiement refusé ou expiré — aucun débit effectué" },
                 ].map(({ s, icon, desc }) => (
@@ -716,7 +718,6 @@ export default function SrApiPage() {
                   { code: "UNAUTHORIZED", http: "401", desc: "Clé SR manquante, invalide ou désactivée" },
                   { code: "FORBIDDEN", http: "403", desc: "Compte suspendu ou API SR non activée" },
                   { code: "VALIDATION_ERROR", http: "400", desc: "Paramètre manquant ou invalide" },
-                  { code: "MISSING_REDIRECT_URL", http: "400", desc: "URL de redirection manquante sur la clé SR — obligatoire pour Wave" },
                   { code: "COUNTRY_SUSPENDED", http: "503", desc: "Paiements suspendus pour ce pays" },
                   { code: "OPERATOR_MAINTENANCE", http: "503", desc: "Opérateur en maintenance" },
                   { code: "SERVICE_UNAVAILABLE", http: "503", desc: "Service de paiement temporairement indisponible" },
@@ -750,7 +751,7 @@ export default function SrApiPage() {
                   <p className="font-bold text-green-300">Flux recommandé</p>
                   <p>1. Votre client remplit son numéro (+ OTP si Orange) sur votre page</p>
                   <p>2. Vous appelez <code className="bg-black/40 px-1 rounded">POST /api/v1/sr/pay</code> depuis votre backend</p>
-                  <p>3. Le client reçoit un USSD sur son téléphone et valide le paiement</p>
+                  <p>3. Affichez les instructions retournées si présentes et vérifiez le statut</p>
                   <p>4. SolvexPay reçoit la confirmation et crédite votre solde</p>
                   <p>5. Votre webhook reçoit <code className="bg-black/40 px-1 rounded">transaction.completed</code></p>
                 </div>

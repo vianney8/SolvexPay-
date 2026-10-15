@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { AlphaPayService, getAlphaPayNetwork, alphapayStatusToString, verifyAlphaPaySignature } from "./alphapay";
+import { AlphaPayService, getAlphaPayNetwork, alphapayStatusToString, verifyAlphaPaySignature, directPaymentResponse } from "./alphapay";
 import { paymentWalletDelta, amountInXOF } from "./paymentAccounting";
 import type { AlphaPayClient } from "alphapay-node";
 
@@ -66,6 +66,45 @@ test("server-created checkout never exposes a merchant secret in its response", 
   const result = await client.deposit({ ...params, checkout: true });
   assert.equal(result.kind, "checkout");
   assert.equal(JSON.stringify(result).includes("sk_test_example"), false);
+});
+
+test("direct-only payment uses Softpay even if a caller requests hosted checkout", async () => {
+  const client = new AlphaPayService("sk_test_example", fakeClient(async (_method, path, options) => {
+    assert.equal(path, "/payments/softpay/");
+    assert.equal(options.body.customer.email, params.email);
+    assert.equal(options.body.otp, "123456");
+    return { id: "direct-id", status: "PENDING", checkout_url: "", instructions: "Validez la demande sur votre téléphone." };
+  }));
+  const result = await client.deposit({ ...params, checkout: true, directOnly: true, otp: "123456" });
+  assert.equal(result.kind, "payment");
+  assert.equal(result.requires_redirect, false);
+  assert.equal(result.payment_url, undefined);
+  assert.equal(result.instructions, "Validez la demande sur votre téléphone.");
+});
+
+test("an operator redirect is reported as unavailable, never disguised as a phone push", async () => {
+  const client = new AlphaPayService("sk_test_example", fakeClient(async () => ({
+    id: "redirect-id", status: "PENDING",
+    checkout_url: "https://checkout.alphapay.me/operator",
+    instructions: "Do not show these instructions for an external flow",
+  })));
+  const result = await client.deposit({ ...params, directOnly: true });
+  assert.equal(result.id, "redirect-id");
+  assert.equal(result.status, "PENDING");
+  assert.equal(result.requires_redirect, true);
+  assert.equal(result.payment_url, undefined);
+  assert.equal(result.instructions, undefined);
+  assert.match(result.message!, /pas disponible sans redirection/);
+  assert.equal(directPaymentResponse(result).requires_redirect, true);
+});
+
+test("historical checkout receipts stay reconcilable without exposing their redirect URL", () => {
+  const result = directPaymentResponse({ success: 1, id: "old-session", kind: "checkout", reference: "old-reference", payment_url: "https://checkout.alphapay.me/old" });
+  assert.equal(result.id, "old-session");
+  assert.equal(result.reference, "old-reference");
+  assert.equal(result.kind, "checkout");
+  assert.equal(result.requires_redirect, true);
+  assert.equal(result.payment_url, undefined);
 });
 
 test("payout uses the dedicated endpoint and recipient, never a payin endpoint", async () => {
