@@ -1,0 +1,1 @@
+- [Installation des dépendances importées](package-installer.md) — le callback d’installation refuse une liste de paquets vide.

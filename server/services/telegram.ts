@@ -249,6 +249,11 @@ export async function notifyKycPending(data: KycNotifyData): Promise<void> {
 }
 
 export async function setupTelegramWebhook(): Promise<void> {
+  if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
+    console.log("[Telegram] Configuration explicite absente — webhook non enregistré");
+    return;
+  }
+
   try {
     const domain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
     if (!domain) {

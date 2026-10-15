@@ -1,5 +1,18 @@
 # SolvexPay - Pan-African Payment Gateway
 
+## Lancer le projet importé sur Replit
+
+- Conserver la structure existante : React/Vite côté client, Express côté serveur.
+- Installer les dépendances indiquées dans `package.json` et `package-lock.json`.
+- Démarrer avec **Run** (workflow `Start application`) ou `npm run dev`.
+- Le serveur écoute sur `0.0.0.0:5000` et sert le client et l'API sur la même origine.
+- `DATABASE_URL` et `SESSION_SECRET` sont nécessaires. La connexion PostgreSQL existante répond et les tables sont déjà présentes : ne pas recréer la base, importer les sauvegardes SQL ou lancer `db:push` pour un simple démarrage.
+- `npm run build` prépare la version de production ; `npm start` démarre cette version.
+- Express a été mis à jour dans la même version majeure pour éviter une dépendance bloquée par le registre de sécurité.
+- Le webhook Telegram n'est enregistré au démarrage que si `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` sont explicitement configurés. Un bot n'a qu'un webhook : utiliser un bot de test distinct pour éviter que l'aperçu remplace le webhook d'un site en production.
+- L'affichage du site ne valide pas les paiements réels ni l'envoi d'emails. Ces services nécessitent leurs configurations respectives.
+- Le contrôle `npm run check` signale des erreurs TypeScript héritées de l'import ; leur correction est distincte de la mise en route.
+
 ## Overview
 
 SolvexPay is a pan-African payment aggregation platform enabling businesses to accept Mobile Money payments across 9 African countries. Built with React/TypeScript frontend, Express.js backend, and PostgreSQL (Neon) with Drizzle ORM.
