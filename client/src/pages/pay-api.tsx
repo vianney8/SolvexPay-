@@ -14,7 +14,10 @@ import {
   ChevronUp, Smartphone, RefreshCw, Clock, Wifi, Store,
 } from "lucide-react";
 import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
-import { PAYMENT_COUNTRIES as COUNTRIES, paymentOperatorLabel } from "@/lib/payment-catalog-ui";
+import { PAYMENT_DEPOSIT_COUNTRIES as COUNTRIES, paymentOperatorLabel } from "@/lib/payment-catalog-ui";
+import { usePaymentQuote } from "@/hooks/use-payment-quote";
+import { usePendingPayment } from "@/hooks/use-pending-payment";
+import { PaymentQuoteSummary, ProviderContinue, securePaymentUrl } from "@/components/payment-quote";
 import { OperatorConfirmationCode } from "@/components/operator-confirmation-code";
 
 function formatAmount(amount: number | string) {
@@ -70,8 +73,12 @@ export default function PayApiPage() {
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
-  const [pendingReference, setPendingReference] = useState<string | null>(null);
+  const [pendingReference, setPendingReference, clearPending] = usePendingPayment(`pay-api:${id}`);
+  const [providerUrl, setProviderUrl] = useState<string | null>(null);
   const [verifyStatus, setVerifyStatus] = useState<string>("PENDING");
+  useEffect(() => {
+    if (["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) clearPending();
+  }, [verifyStatus]);
   const [verifyCount, setVerifyCount] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [phone, setPhone] = useState("");
@@ -101,7 +108,7 @@ export default function PayApiPage() {
   const selectedCountry = COUNTRIES.find((c) => c.code === country) || COUNTRIES[0];
 
   useEffect(() => { setOperator(""); setOtp(""); }, [country]);
-  const otpSupported = operator === "Orange" && (country === "CI" || country === "BF");
+  useEffect(() => { setOtp(""); }, [operator]);
 
   const { data: suspendedData } = useQuery<{ codes: string[] }>({
     queryKey: ["/api/public/suspended-countries"],
@@ -130,6 +137,9 @@ export default function PayApiPage() {
     enabled: !!id,
   });
   const paymentCurrency = String(paymentInfo?.currency || "").toUpperCase();
+  const quoteState = usePaymentQuote(country, operator, Number(paymentInfo?.amount), paymentCurrency);
+  const otpSupported = quoteState.quote?.otpRequired === true;
+  const canPay = quoteState.ready && (!otpSupported || !!otp.trim()) && !suspendedCodes.includes(country) && selectedCountry.operators.includes(operator) && getOperatorStatus(operator).available && !getOperatorStatus(operator).maintenance;
   const availableCountries = COUNTRIES.filter(c => c.currency === paymentCurrency && !suspendedCodes.includes(c.code));
   useEffect(() => {
     const nextCountry = availableCountries[0];
@@ -142,7 +152,7 @@ export default function PayApiPage() {
     if (!pm) return { available: true, maintenance: false };
     const globalMaint = pm.inMaintenance === true;
     const countryMaint = (pm.maintenanceCountries || []).includes(country);
-    return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint };
+    return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint || pm.depositMaintenance === true || (pm.depositMaintenanceCountries || []).includes(country) };
   }
 
   // Vérification immédiate du statut via l'endpoint verify
@@ -161,6 +171,8 @@ export default function PayApiPage() {
           setVerifyCount((c) => c + 1);
         }
         const terminal = ["SUCCESS", "FAILED", "CANCELLED"].includes(String(data.status || "").toUpperCase());
+        if (terminal) clearPending();
+        if (data.paymentUrl || data.payment_url) setProviderUrl(securePaymentUrl(data.paymentUrl || data.payment_url));
         if (typeof data.instructions === "string" || typeof data.message === "string") {
           setPaymentInstructions(data.instructions || data.message || "");
         }
@@ -178,6 +190,10 @@ export default function PayApiPage() {
 
   // Retour du prestataire : seul l'endpoint de vérification confirme le paiement.
   useEffect(() => {
+    if (pendingReference) {
+      setPaymentStatus("processing");
+      checkStatus(pendingReference);
+    }
     const params = new URLSearchParams(window.location.search);
     if (params.get("status") === "callback") {
       const ref = params.get("reference");
@@ -200,6 +216,8 @@ export default function PayApiPage() {
       setRequiresOtp(data.requiresOtp === true);
       setPaymentInstructions(typeof data.instructions === "string" && data.instructions ? data.instructions : typeof data.message === "string" ? data.message : "");
       const paymentUrl = data.paymentUrl || data.payment_url;
+      setProviderUrl(securePaymentUrl(paymentUrl));
+      setOtp("");
       let hasExternalPaymentUrl = false;
       if (paymentUrl) {
         try { hasExternalPaymentUrl = new URL(paymentUrl, window.location.origin).origin !== window.location.origin; }
@@ -209,19 +227,19 @@ export default function PayApiPage() {
       setRedirectBlocked(cannotPayInPlace);
       setPaymentStatus("processing");
       toast({
-        title: cannotPayInPlace ? "Paiement indisponible sans redirection" : "Paiement initié",
-        description: cannotPayInPlace ? "La référence est conservée pour vérification." : "Suivez les instructions affichées pour terminer l’opération.",
+        title: cannotPayInPlace ? "Validation externe requise" : "Paiement initié",
+        description: cannotPayInPlace ? "Continuez sur la page sécurisée du prestataire." : "Suivez les instructions affichées pour terminer l’opération.",
       });
     },
     onError: (err: any) => {
-      setPaymentStatus("error");
+      setPaymentStatus("idle");
       toast({ title: "Erreur", description: err.message || "Le paiement n'a pas pu être initié.", variant: "destructive" });
     },
   });
 
   // Polling toutes les 3 secondes (au lieu de 5) pour une confirmation plus rapide
   useEffect(() => {
-    if (!pendingReference || redirectBlocked || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
+    if (!pendingReference || ["SUCCESS", "FAILED", "CANCELLED"].includes(verifyStatus)) return;
     const interval = setInterval(() => checkStatus(pendingReference), 3000);
     return () => clearInterval(interval);
   }, [pendingReference, verifyStatus, id, redirectBlocked]);
@@ -234,7 +252,7 @@ export default function PayApiPage() {
 
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault();
-    if (payMutation.isPending) return;
+    if (payMutation.isPending || !canPay) return;
     if (selectedCountry.currency !== paymentCurrency) {
       toast({ title: "Pays incompatible", description: `Choisissez un pays prenant en charge la devise ${paymentCurrency}.`, variant: "destructive" });
       return;
@@ -381,7 +399,7 @@ export default function PayApiPage() {
                 <p className="text-sm text-white/50 max-w-xs mx-auto leading-relaxed">
                   {isSuccess ? "Votre paiement a été traité avec succès. Merci !"
                   : isFailed ? "Le paiement n'a pas abouti. Vérifiez votre solde ou réessayez."
-                   : redirectBlocked ? "Le paiement nécessite une page externe, qui n'a pas été ouverte."
+                   : redirectBlocked ? "Continuez sur la page sécurisée du prestataire."
                    : "Le statut est en cours de vérification."}
                 </p>
               </div>
@@ -442,10 +460,7 @@ export default function PayApiPage() {
               </div>
             )}
             {redirectBlocked && (
-              <div className="rounded-2xl p-4 space-y-2" style={{ background: "rgba(251,146,60,0.10)", border: "1px solid rgba(251,146,60,0.30)" }}>
-                <p className="text-sm font-bold text-orange-200">Cet opérateur exige une page externe. Ce paiement n’est pas disponible sans redirection.</p>
-                <p className="text-xs text-white/60">Aucune page externe n’a été ouverte. La référence ci-dessous reste disponible pour vérifier ce paiement.</p>
-              </div>
+              <ProviderContinue url={providerUrl} />
             )}
             {paymentInstructions && (
               <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
@@ -550,7 +565,7 @@ export default function PayApiPage() {
           <form onSubmit={handlePay} className="space-y-4">
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Pays Mobile Money</Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Pays du payeur</Label>
               <div className="relative">
                 <button
                   type="button"
@@ -588,7 +603,7 @@ export default function PayApiPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Opérateur Mobile Money</Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Moyen de paiement</Label>
               <div className={`grid gap-2 ${selectedCountry.operators.length <= 2 ? "grid-cols-2" : selectedCountry.operators.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
                 {selectedCountry.operators.map((op) => {
                   const opStatus = getOperatorStatus(op);
@@ -628,7 +643,7 @@ export default function PayApiPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                Numéro {operator ? paymentOperatorLabel(operator) : "Mobile Money"}
+                {operator === "Crypto" ? "Téléphone de contact requis" : `Numéro ${operator ? paymentOperatorLabel(operator) : "Mobile Money"}`}
               </Label>
               <div className="flex gap-0 rounded-xl border border-gray-200 overflow-hidden focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                 <div className="flex items-center gap-2 px-3 bg-gray-50 border-r border-gray-200 flex-shrink-0">
@@ -665,18 +680,13 @@ export default function PayApiPage() {
               <Input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} type="email" required placeholder="jean@exemple.com" className="h-11 border-gray-200 rounded-xl" data-testid="input-pay-email" />
             </div>
 
-            {otpSupported && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Code de paiement opérateur (si requis)</Label>
-                <Input value={otp} onChange={(e) => setOtp(e.target.value)} type="text" inputMode="numeric" placeholder="Facultatif" className="h-11 border-gray-200 rounded-xl" data-testid="input-pay-otp" />
-              </div>
-            )}
+            <PaymentQuoteSummary state={quoteState} otp={otp} onOtpChange={setOtp} crypto={operator === "Crypto"} />
 
             <Button
               type="submit"
               className="w-full h-14 text-base font-black rounded-2xl shadow-lg gap-2"
               style={{ background: !phone || !operator ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
-              disabled={payMutation.isPending || !phone || !operator || !country || selectedCountry.currency !== paymentCurrency || !firstName.trim() || !lastName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim()) || (operator ? getOperatorStatus(operator).maintenance || !getOperatorStatus(operator).available : false)}
+              disabled={!canPay || payMutation.isPending || !phone || !operator || !country || selectedCountry.currency !== paymentCurrency || !firstName.trim() || !lastName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim()) || (operator ? getOperatorStatus(operator).maintenance || !getOperatorStatus(operator).available : false)}
               data-testid="button-confirm-pay"
             >
               {payMutation.isPending ? (

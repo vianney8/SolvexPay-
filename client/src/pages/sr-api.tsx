@@ -102,10 +102,10 @@ CORPS DE LA REQUÊTE
   "phone": "22901234567",   // Requis — Numéro complet avec indicatif
   "operator": "mtn",        // Requis — Code opérateur (voir liste)
   "country": "BJ",          // Requis — Code pays ISO (voir liste)
-  "otp": "CODE_FOURNI",     // Optionnel — code fourni par le client si requis
+  "otp": "CODE_FOURNI",     // Requis seulement si otpRequired du devis est vrai
   "description": "...",     // Optionnel — Libellé transaction
-  "customer_name": "...",   // Optionnel — Nom du client
-  "customer_email": "..."   // Optionnel — Email du client
+  "customer_name": "...",   // Requis — Nom du client
+  "customer_email": "..."   // Requis — Email du client
 }
 
 RÉPONSE SUCCÈS (201)
@@ -137,7 +137,7 @@ DÉTAILS OPÉRATEURS ET OTP
 ============================
 ${activeSrOperators.map(op => `${op.label} (${op.code.toLowerCase()}) — ${op.note}`).join("\n")}
 
-Le champ otp de /sr/pay est distinct du code de confirmation post-initiation (Coris BJ, Wizall SN). Ne journalisez ni ne persistez les codes.
+25 couples Mobile Money et Crypto pour les encaissements uniquement. Consultez le devis /api/payments/quote (direction=payin) : le champ otp est requis uniquement si otpRequired est vrai. Une confirmation post-initiation peut aussi être demandée par le prestataire. Ne journalisez ni ne persistez les codes. Si paymentUrl est retournée, conservez la référence et proposez une continuation HTTPS volontaire. Seul le statut serveur confirme le paiement.
 
 ============================
 WEBHOOKS ET NOTIFICATIONS
@@ -411,7 +411,7 @@ export default function SrApiPage() {
                     <h1 className="font-black text-base text-green-300">API SR</h1>
                     <span className="px-2 py-0.5 rounded-full bg-green-500/20 border border-green-500/30 text-[10px] font-bold text-green-400 uppercase tracking-wider">Sans Redirection</span>
                   </div>
-                  <p className="text-xs text-green-300/60 mt-0.5">Paiements directs depuis votre backend</p>
+                  <p className="text-xs text-green-300/60 mt-0.5">Votre formulaire, validation externe uniquement si requise</p>
                 </div>
               </div>
               <Button
@@ -511,7 +511,7 @@ export default function SrApiPage() {
                             {!currentRedirectUrl && (
                               <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
                                 <AlertCircle className="h-3 w-3 text-amber-400 flex-shrink-0" />
-                                <p className="text-[10px] text-amber-300/80">Aucune URL de retour configurée. Le paiement direct ne nécessite pas de redirection navigateur.</p>
+                                <p className="text-[10px] text-amber-300/80">Aucune URL de retour configurée. Une validation externe peut être requise ; seul le statut serveur confirme le paiement.</p>
                               </div>
                             )}
                           </div>
@@ -560,10 +560,33 @@ export default function SrApiPage() {
                   <CodeBox>{`Authorization: Bearer sk_live_votre_cle_sr\nContent-Type: application/json`}</CodeBox>
                 </DocBlock>
                 <DocBlock title="Corps de la requête">
-                  <CodeBox>{`{\n  "amount": 5000,           // Requis — Montant en XOF (min: 100)\n  "phone": "22901234567",   // Requis — Numéro complet avec indicatif\n  "operator": "mtn",        // Requis — Code opérateur (voir liste)\n  "country": "BJ",          // Requis — Code pays ISO (voir liste)\n  "otp": "CODE_FOURNI",     // Optionnel — code fourni par le client si requis\n  "description": "...",     // Optionnel — Libellé transaction\n  "customer_name": "...",   // Optionnel — Nom du client\n  "customer_email": "..."   // Optionnel — Email du client\n}`}</CodeBox>
+                  <CodeBox>{`{
+  "amount": 5000,
+  "phone": "22901234567",
+  "operator": "mtn",
+  "country": "BJ",
+  "otp": "CODE_FOURNI", // Uniquement si otpRequired du devis est vrai
+  "description": "Commande 123",
+  "customer_name": "Aminata Diallo", // Requis
+  "customer_email": "aminata@example.com" // Requis
+}`}</CodeBox>
                 </DocBlock>
                 <DocBlock title="Réponse succès (201)">
-                  <CodeBox>{`{\n  "success": true,\n  "id": "txn_abc123",       // ID de la transaction SolvexPay\n  "status": "pending",      // Statut en cours\n  "requires_redirect": false,\n  "requiresOtp": true,      // Un code opérateur peut être requis après initiation\n  "reference": "REF...",    // Référence de transaction\n  "amount": 5000,\n  "fees": 350,\n  "net_amount": 4650,\n  "currency": "XOF",\n  "operator": "Coris",\n  "phone": "22901234567",\n  "instructions": "Instructions opérateur si disponibles.",\n  "message": "Paiement initié. Vérifiez le statut avec la référence.",\n  "created_at": "2025-01-01T00:00:00.000Z"\n}`}</CodeBox>
+                  <CodeBox>{`{
+  "success": true,
+  "id": "txn_abc123",
+  "status": "pending",
+  "requires_redirect": false,
+  "requiresOtp": false,
+  "reference": "REF...",
+  "amount": 5000,
+  "fees": 350,
+  "net_amount": 4650,
+  "currency": "XOF",
+  "operator": "MTN",
+  "instructions": "Instructions prestataire si disponibles.",
+  "message": "Paiement initié. Vérifiez le statut serveur."
+}`}</CodeBox>
                 </DocBlock>
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                   <Info className="h-3.5 w-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
@@ -574,8 +597,9 @@ export default function SrApiPage() {
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <AlertCircle className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="text-[11px] text-amber-300/80 space-y-1">
-                    <p className="font-bold text-amber-300">Si un opérateur exige une page externe</p>
-                    <p>Si la réponse indique <code className="bg-black/40 px-1 rounded">requires_redirect: true</code>, ce paiement nécessite une page externe et n'est pas disponible dans un parcours sans redirection. L'API SR ne retourne pas d'URL de paiement à ouvrir : conservez la référence et indiquez la limite à l'utilisateur.</p>
+                    <p className="font-bold text-amber-300">Devis et validation prestataire</p>
+                    <p>Consultez GET /api/payments/quote avec country, operator, amount, currency et direction=payin. Affichez les frais et le total prestataire en plus des frais SolvexPay. Demandez un code uniquement si otpRequired est vrai et affichez otpInstructions. Une erreur ou available=false interdit l'initiation : aucun devis de remplacement.</p>
+                    <p>Les 25 couples Mobile Money sont complétés par Crypto pour les encaissements uniquement. Si la réponse indique <code className="bg-black/40 px-1 rounded">requires_redirect: true</code> ou fournit <code>paymentUrl</code>, conservez la référence et proposez un bouton HTTPS explicite. Le client autorise cette continuation uniquement si nécessaire. Le retour navigateur n'est jamais une preuve de paiement : vérifiez le statut serveur. Crypto exige nom, email et téléphone de contact ; le choix de l'actif et du réseau reste chez le prestataire.</p>
                   </div>
                 </div>
               </div>
@@ -815,7 +839,7 @@ export default function SrApiPage() {
               <Bolt className="h-7 w-7 text-green-500" />
             </div>
             <DialogTitle className="text-center">Créer une clé API SR</DialogTitle>
-            <DialogDescription className="text-center">Paiements directs sans redirection. Gardez cette clé secrète — ne l'exposez jamais en frontend.</DialogDescription>
+            <DialogDescription className="text-center">Paiements depuis votre formulaire, avec validation externe si requise. Gardez cette clé secrète — ne l'exposez jamais en frontend.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <Input placeholder="Nom de la clé (ex: Clé SR principale)" value={srKeyName} onChange={(e) => setSrKeyName(e.target.value)} data-testid="input-sr-key-name" />

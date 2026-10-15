@@ -14,3 +14,9 @@ Les codes préalables Orange ne sont pas équivalents à une confirmation SMS ap
 **Why:** Le formulaire hébergé examiné demande un code obligatoire avant paiement pour Orange Côte d’Ivoire et Orange Burkina Faso, alors que les champs SolvexPay étaient présentés comme facultatifs. En Côte d’Ivoire, l’instruction observée est de composer #144*82#, puis l’option 2. Au Burkina Faso, l’instruction utilise *144*4*6*{amount}#, avec le total réellement débité, frais fournisseur compris.
 
 **How to apply:** Vérifier les instructions et exigences actuelles du parcours correspondant avant de modifier les formulaires ; ne pas réutiliser mécaniquement une règle de confirmation après initiation ou le montant hors frais. L’absence de code dans le formulaire initial ne prouve pas l’absence de validation ultérieure ou de redirection.
+
+La disponibilité et les consignes doivent être lues dans les tarifs propres au marchand, séparément pour les entrées et sorties.
+
+**Why:** Le catalogue des réseaux actifs comporte des réseaux absents du checkout réel. Les exigences de code peuvent changer avec la route prioritaire sans modification côté SolvexPay.
+
+**How to apply:** Consulter /pricing/my-rates/ plutôt que déduire les capacités d’un simple is_active. Les taux de change AlphaPay peuvent ne fournir qu’un sens pour une paire ; utiliser l’inverse du taux officiel lorsqu’il est fourni, jamais une constante supposée.

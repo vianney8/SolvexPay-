@@ -10,7 +10,7 @@ export async function ensurePaymentCatalog() {
       const [existing] = await tx.select().from(paymentMethods).where(sql`lower(${paymentMethods.code}) = ${operator.code.toLowerCase()}`).limit(1);
       if (!existing) {
         await tx.insert(paymentMethods).values({
-          code: operator.code, name: operator.name, category: "mobile_money",
+          code: operator.code, name: operator.code === "Crypto" ? "Crypto / Stablecoin" : operator.name, category: operator.code === "Crypto" ? "crypto" : "mobile_money",
           countries: operator.countries, feeType: "percentage", feeValue: "0",
           // Null operator rates intentionally inherit the site's global rates.
           feeDeposit: null, feeWithdrawal: null, feePLink: null, feeApi: null,

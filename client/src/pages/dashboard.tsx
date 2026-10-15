@@ -71,6 +71,13 @@ function isExpiredPending(tx: Transaction): boolean {
 }
 
 export default function DashboardPage() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("status") !== "callback") return;
+    let reference = params.get("reference");
+    try { reference ||= sessionStorage.getItem("solvexpay:pending:deposit"); } catch {}
+    if (reference) window.location.replace(`/deposit?status=callback&reference=${encodeURIComponent(reference)}`);
+  }, []);
   const { user } = useAuth();
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [dismissedNotifs, setDismissedNotifs] = useState<string[]>([]);

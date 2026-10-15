@@ -8,6 +8,7 @@ import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./repli
 import { verifyAlphaPaySignature, alphapayStatusToString, getAlphaPayNetwork } from "./services/alphapay";
 import { PAYMENT_COUNTRIES, PAYMENT_OPERATORS, solvexCountryCode } from "@shared/payment-catalog";
 import { ensurePaymentCatalog } from "./services/paymentCatalog";
+import { quotePayment } from "./services/paymentQuote";
 import { paymentService, isApiKeyConfigured, getProviderByCode, activateProvider, invalidateActiveProviderCache, seedPaymentProviders, reservePayout, onPaymentSettled, isAlphaPayment } from "./services/paymentService";
 import { testResendConnection } from "./services/resend";
 import { notifyTransactionCompleted, notifyWithdrawal, handleTelegramCallback } from "./services/telegram";
@@ -473,6 +474,13 @@ export async function registerRoutes(
     else if (transaction.type === "withdrawal") await notifyWithdrawal(transaction, transaction.status === "completed" ? "success" : "failed");
   });
   await ensurePaymentCatalog();
+  app.get("/api/payments/quote", verifyLimiter, async (req, res) => {
+    try {
+      const { country, operator, amount, currency, direction } = req.query;
+      if ([country, operator, amount, currency].some(v => typeof v !== "string")) return res.status(400).json({ message: "Pays, opérateur, montant et devise requis." });
+      res.json(await quotePayment({ country: String(country), operator: String(operator), amount: Number(amount), currency: String(currency), direction: direction ? String(direction) : "payin" }));
+    } catch (error: any) { res.status(error.status || 503).json({ message: error.status === 422 ? error.message : "Tarifs AlphaPay indisponibles. Réessayez avant de payer." }); }
+  });
   await setupAuth(app);
   registerAuthRoutes(app);
 
@@ -1000,7 +1008,7 @@ export async function registerRoutes(
       }
 
       const frontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: frontendStatus, alphapayStatus: result.status, requiresRedirect: result.requires_redirect === true, requiresOtp: result.requires_otp === true, instructions: result.instructions, message: result.message });
+      res.json({ success: result.success, status: frontendStatus, alphapayStatus: result.status, paymentUrl: result.payment_url, requiresRedirect: result.requires_redirect === true, requiresOtp: result.requires_otp === true, instructions: result.instructions, message: result.message });
     } catch (error: any) {
       console.error("Verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -1053,7 +1061,7 @@ export async function registerRoutes(
       }
 
       const publicFrontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: publicFrontendStatus, requiresRedirect: result.requires_redirect === true, requiresOtp: result.requires_otp === true, instructions: result.instructions, message: result.message });
+      res.json({ success: result.success, status: publicFrontendStatus, paymentUrl: result.payment_url, requiresRedirect: result.requires_redirect === true, requiresOtp: result.requires_otp === true, instructions: result.instructions, message: result.message });
     } catch (error: any) {
       console.error("Public verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -1117,7 +1125,7 @@ export async function registerRoutes(
       }
       if (await isAlphaPayment(transaction.reference)) {
         const receipt = await paymentService.getReceipt(transaction.reference);
-        return res.json({ ...transaction, requiresRedirect: receipt?.requires_redirect === true, requiresOtp: receipt?.requires_otp === true, instructions: receipt?.instructions, reference: transaction.reference, message: receipt?.message || "Cette intention de paiement existe déjà ; vérifiez son statut." });
+        return res.json({ ...transaction, paymentUrl: receipt?.payment_url, requiresRedirect: receipt?.requires_redirect === true, requiresOtp: receipt?.requires_otp === true, instructions: receipt?.instructions, reference: transaction.reference, message: receipt?.message || "Cette intention de paiement existe déjà ; vérifiez son statut." });
       }
       const validation = publicPaySchema.safeParse(req.body);
       if (!validation.success) {
@@ -1243,7 +1251,7 @@ export async function registerRoutes(
         }
       }
       const publicStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: publicStatus, requiresRedirect: result.requires_redirect === true, requiresOtp: result.requires_otp === true, instructions: result.instructions, message: result.message });
+      res.json({ success: result.success, status: publicStatus, paymentUrl: result.payment_url, requiresRedirect: result.requires_redirect === true, requiresOtp: result.requires_otp === true, instructions: result.instructions, message: result.message });
     } catch (err: any) {
       console.error("payment-api/public/:id/verify error:", err);
       res.status(500).json({ message: err.message || "Erreur de vérification" });
@@ -1535,7 +1543,7 @@ export async function registerRoutes(
       }
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
-      const methods = await db.select().from(pmTable);
+      const methods = (await db.select().from(pmTable)).filter(method => PAYMENT_OPERATORS.some(op => op.code.toLowerCase() === method.code.toLowerCase()));
       if (methods.length === 0) {
         await ensurePaymentCatalog();
         const inserted = await db.select().from(pmTable);
@@ -2015,7 +2023,7 @@ export async function registerRoutes(
 
         await storage.updateApiKey(req.merchantApiKey.id, { lastUsedAt: new Date() } as any);
 
-        const defaultMessage = "Paiement direct initié. Suivez les instructions de votre opérateur sur votre téléphone.";
+        const defaultMessage = alphapayResponse.payment_url ? "Continuez sur la page sécurisée pour valider le paiement." : "Suivez les instructions de votre opérateur sur votre téléphone.";
 
         return res.status(201).json({
           success: true,
@@ -2030,6 +2038,7 @@ export async function registerRoutes(
           phone,
           message: alphapayResponse.message || defaultMessage,
           requires_redirect: alphapayResponse.requires_redirect === true,
+          payment_url: alphapayResponse.payment_url || null,
           requires_otp: alphapayResponse.requires_otp === true,
           instructions: alphapayResponse.instructions,
           created_at: transaction.createdAt,
@@ -2325,7 +2334,7 @@ export async function registerRoutes(
 
       await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
 
-      const defaultMessage = "Paiement direct initié. Suivez les instructions de votre opérateur sur votre téléphone.";
+      const defaultMessage = alphapayResponse.payment_url ? "Continuez sur la page sécurisée pour valider le paiement." : "Suivez les instructions de votre opérateur sur votre téléphone.";
 
       res.status(201).json({
         success: true,
@@ -2340,6 +2349,7 @@ export async function registerRoutes(
         phone,
         message: alphapayResponse.message || defaultMessage,
         requires_redirect: alphapayResponse.requires_redirect === true,
+        payment_url: alphapayResponse.payment_url || null,
         requires_otp: alphapayResponse.requires_otp === true,
         instructions: alphapayResponse.instructions,
         created_at: transaction.createdAt,

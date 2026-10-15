@@ -17,7 +17,10 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
-import { PAYMENT_COUNTRIES as COUNTRIES, paymentOperatorLabel } from "@/lib/payment-catalog-ui";
+import { PAYMENT_DEPOSIT_COUNTRIES as COUNTRIES, paymentOperatorLabel } from "@/lib/payment-catalog-ui";
+import { usePaymentQuote } from "@/hooks/use-payment-quote";
+import { usePendingPayment } from "@/hooks/use-pending-payment";
+import { PaymentQuoteSummary, ProviderContinue, securePaymentUrl } from "@/components/payment-quote";
 import { OperatorConfirmationCode } from "@/components/operator-confirmation-code";
 
 function formatCurrency(amount: number) {
@@ -34,13 +37,15 @@ export default function DepositPage() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [description, setDescription] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"], staleTime: 60_000 });
 
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
-  const [pendingReference, setPendingReference] = useState<string | null>(null);
+  const [pendingReference, setPendingReference, clearPending] = usePendingPayment("deposit");
+  const [providerUrl, setProviderUrl] = useState<string | null>(null);
   const [redirectBlocked, setRedirectBlocked] = useState(false);
   const [paymentInstructions, setPaymentInstructions] = useState("");
   const [requiresOtp, setRequiresOtp] = useState(false);
@@ -58,7 +63,9 @@ export default function DepositPage() {
   const selectedCountry = COUNTRIES.find(c => c.code === country) || availableCountries[0] || COUNTRIES[0];
   const currency = selectedCountry.currency;
   const parsedAmount = parseFloat(amount) || 0;
-  const otpSupported = country === "CI" && operator === "Orange" || country === "BF" && operator === "Orange";
+  const quoteState = usePaymentQuote(country, operator, parsedAmount, currency);
+  const otpSupported = quoteState.quote?.otpRequired === true;
+  const canPay = quoteState.ready && (!otpSupported || !!otp.trim()) && !isBlocked && !suspendedCodes.includes(country) && selectedCountry.operators.includes(operator) && getOperatorStatus(operator).available && !getOperatorStatus(operator).maintenance;
 
   useEffect(() => { setOperator(""); setOtp(""); }, [country]);
   useEffect(() => { setOtp(""); }, [operator]);
@@ -108,10 +115,11 @@ export default function DepositPage() {
     if (!pm) return { available: true, maintenance: false };
     const globalMaint = pm.inMaintenance === true;
     const countryMaint = (pm.maintenanceCountries || []).includes(country);
-    return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint };
+    return { available: pm.isActive !== false, maintenance: globalMaint || countryMaint || pm.depositMaintenance === true || (pm.depositMaintenanceCountries || []).includes(country) };
   }
 
   useEffect(() => {
+    if (pendingReference) setPaymentStatus("processing");
     const params = new URLSearchParams(window.location.search);
     if (params.get("status") === "callback") {
       const ref = params.get("reference");
@@ -122,7 +130,7 @@ export default function DepositPage() {
   }, []);
 
   const depositMutation = useMutation({
-    mutationFn: async (data: { amount: number; currency: string; phoneNumber: string; operator: string; country: string; otp?: string; customerName?: string; description?: string }) => {
+    mutationFn: async (data: { amount: number; currency: string; phoneNumber: string; operator: string; country: string; otp?: string; customerName?: string; customerEmail: string; description?: string }) => {
       const res = await apiRequest("POST", "/api/transactions/deposit", data);
       return res.json();
     },
@@ -131,6 +139,8 @@ export default function DepositPage() {
       setRequiresOtp(data.requiresOtp === true);
       setPaymentInstructions(typeof data.instructions === "string" && data.instructions ? data.instructions : typeof data.message === "string" ? data.message : "");
       const paymentUrl = data.paymentUrl || data.payment_url;
+      setProviderUrl(securePaymentUrl(paymentUrl));
+      setOtp("");
       let hasExternalPaymentUrl = false;
       if (paymentUrl) {
         try { hasExternalPaymentUrl = new URL(paymentUrl, window.location.origin).origin !== window.location.origin; }
@@ -140,8 +150,8 @@ export default function DepositPage() {
       setRedirectBlocked(cannotPayInPlace);
       setPaymentStatus("processing");
       toast({
-        title: cannotPayInPlace ? "Paiement indisponible sans redirection" : "Paiement initié",
-        description: cannotPayInPlace ? "La référence est conservée pour vérification." : "Suivez les instructions affichées pour terminer l’opération.",
+        title: cannotPayInPlace ? "Validation externe requise" : "Paiement initié",
+        description: cannotPayInPlace ? "Continuez sur la page sécurisée du prestataire." : "Suivez les instructions affichées pour terminer l’opération.",
       });
     },
     onError: (error: any) => {
@@ -159,6 +169,8 @@ export default function DepositPage() {
     onSuccess: (data: any) => {
       setVerifyCount(c => c + 1);
       const terminal = ["SUCCESS", "FAILED", "CANCELLED"].includes(String(data.status || "").toUpperCase());
+      if (terminal) clearPending();
+      if (data.paymentUrl || data.payment_url) setProviderUrl(securePaymentUrl(data.paymentUrl || data.payment_url));
       if (typeof data.instructions === "string" || typeof data.message === "string") {
         setPaymentInstructions(data.instructions || data.message || "");
       }
@@ -187,7 +199,8 @@ export default function DepositPage() {
   });
 
   useEffect(() => {
-    if (!pendingReference || paymentStatus !== "processing" || redirectBlocked) return;
+    if (!pendingReference || paymentStatus !== "processing") return;
+    verifyMutation.mutate(pendingReference);
     const interval = setInterval(() => { verifyMutation.mutate(pendingReference); }, 5000);
     return () => clearInterval(interval);
   }, [pendingReference, paymentStatus, redirectBlocked]);
@@ -200,9 +213,9 @@ export default function DepositPage() {
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!parsedAmount || !phone || !operator || !country) return;
+    if (!canPay || depositMutation.isPending || !parsedAmount || !phone || !operator || !country || !customerName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
-    depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, otp: otpSupported && otp.trim() ? otp.trim() : undefined, customerName: customerName || undefined, description: description || undefined });
+    depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, otp: otpSupported && otp.trim() ? otp.trim() : undefined, customerName: customerName.trim(), customerEmail: customerEmail.trim(), description: description || undefined });
   };
 
   const resetForm = () => {
@@ -256,7 +269,7 @@ export default function DepositPage() {
                 <p className="text-sm text-white/75 mt-0.5 leading-snug">
                   {isSuccess ? "Votre solde a été crédité avec succès."
                   : isFailed ? "Le paiement n'a pas abouti."
-                   : redirectBlocked ? "Le paiement nécessite une page externe, qui n'a pas été ouverte."
+                   : redirectBlocked ? "Continuez sur la page sécurisée du prestataire."
                    : "Le statut est en cours de vérification."}
                 </p>
               </div>
@@ -316,7 +329,7 @@ export default function DepositPage() {
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
               <Smartphone className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-bold text-amber-800 mb-0.5">Action requise sur votre téléphone</p>
+                <p className="text-xs font-bold text-amber-800 mb-0.5">Confirmation du paiement</p>
                 <p className="text-[11px] text-amber-700 leading-relaxed">
                   Suivez les instructions affichées par le service de paiement. Le statut est vérifié automatiquement toutes les <strong>5 secondes</strong>.
                 </p>
@@ -324,10 +337,7 @@ export default function DepositPage() {
             </div>
           )}
           {redirectBlocked && (
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 space-y-2">
-              <p className="text-sm font-bold text-orange-900">Cet opérateur exige une page externe. Ce paiement n’est pas disponible sans redirection.</p>
-              <p className="text-xs text-orange-800">Aucune page externe n’a été ouverte. La référence reste disponible pour vérification.</p>
-            </div>
+            <ProviderContinue url={providerUrl} />
           )}
           {paymentInstructions && (
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
@@ -410,8 +420,8 @@ export default function DepositPage() {
                 <ArrowDownLeft className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="font-bold text-base" data-testid="text-deposit-title">Recharge Mobile Money</p>
-                <p className="text-white/70 text-xs">Dépôt instantané sécurisé</p>
+                <p className="font-bold text-base" data-testid="text-deposit-title">Dépôt Mobile Money ou Crypto</p>
+                <p className="text-white/70 text-xs">Crédit après confirmation du prestataire</p>
               </div>
             </div>
             <div className="text-right flex-shrink-0">
@@ -460,7 +470,7 @@ export default function DepositPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Opérateur Mobile Money</Label>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Moyen de dépôt</Label>
                   <div className={`grid gap-3 ${selectedCountry.operators.length <= 2 ? "grid-cols-2" : selectedCountry.operators.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
                     {selectedCountry.operators.map((op) => {
                       const opStatus = getOperatorStatus(op);
@@ -504,11 +514,11 @@ export default function DepositPage() {
 
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Numéro de téléphone Mobile Money
+                    {operator === "Crypto" ? "Téléphone de contact requis" : "Numéro de téléphone Mobile Money"}
                   </Label>
                   {operator && (
                     <p className="text-xs text-muted-foreground -mt-1">
-                      Entrez le numéro local associé à votre compte {operator}
+                      {operator === "Crypto" ? "Un numéro de contact est requis par le prestataire." : `Entrez le numéro local associé à votre compte ${operator}`}
                     </p>
                   )}
                   <div className="flex gap-0 rounded-xl border border-border/70 overflow-hidden focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
@@ -545,15 +555,11 @@ export default function DepositPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom du payeur (optionnel)</Label>
-                  <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Jean Dupont" className="h-11 border-border/70" data-testid="input-deposit-name" />
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom du payeur requis</Label>
+                  <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required placeholder="Votre nom complet" className="h-11 border-border/70" data-testid="input-deposit-name" />
                 </div>
-                {otpSupported && (
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Code de paiement opérateur (si requis)</Label>
-                    <Input value={otp} onChange={(e) => setOtp(e.target.value)} type="text" inputMode="numeric" placeholder="Facultatif" className="h-11 border-border/70" data-testid="input-deposit-otp" />
-                  </div>
-                )}
+                <div className="space-y-2"><Label>Email requis</Label><Input value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} type="email" required placeholder="vous@exemple.com" /></div>
+                <PaymentQuoteSummary state={quoteState} otp={otp} onOtpChange={setOtp} crypto={operator === "Crypto"} />
               </CardContent>
             </Card>
 
@@ -588,7 +594,7 @@ export default function DepositPage() {
               type="submit"
               className="w-full h-13 text-base font-bold gap-2 shadow-xl"
               style={{ background: "linear-gradient(135deg, hsl(160 84% 34%) 0%, hsl(160 84% 44%) 100%)" }}
-              disabled={depositMutation.isPending || !parsedAmount || !phone || !operator || !country}
+              disabled={!canPay || depositMutation.isPending || !parsedAmount || !phone || !operator || !country || !customerName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())}
               data-testid="button-confirm-deposit"
             >
               {depositMutation.isPending ? (

@@ -1,14 +1,14 @@
 // Operational countries already present in SolvexPay; network availability checked
 // against the authenticated AlphaPay catalogue on 2026-10-15.
 export const PAYMENT_COUNTRIES = [
-  { code: "BJ", iso: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov", "Celtiis", "Coris"], phonePlaceholder: "01 90 12 34 56" },
-  { code: "CI", iso: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave", "Djamo"], phonePlaceholder: "07 12 34 56 78" },
-  { code: "BF", iso: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange", "TouchCash"], phonePlaceholder: "70 12 34 56" },
-  { code: "TG", iso: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov", "Mixx"], phonePlaceholder: "90 12 34 56" },
-  { code: "SN", iso: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free", "Djamo", "Expresso", "PayDunya", "Wizall"], phonePlaceholder: "77 123 45 67" },
-  { code: "ML", iso: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov", "MobiCash", "Wave"], phonePlaceholder: "70 12 34 56" },
+  { code: "BJ", iso: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov", "Celtiis"], phonePlaceholder: "01 90 12 34 56" },
+  { code: "CI", iso: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"], phonePlaceholder: "07 12 34 56 78" },
+  { code: "BF", iso: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
+  { code: "TG", iso: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
+  { code: "SN", iso: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free", "Expresso"], phonePlaceholder: "77 123 45 67" },
+  { code: "ML", iso: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov", "Wave"], phonePlaceholder: "70 12 34 56" },
   { code: "CM", iso: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
-  { code: "COD", iso: "CD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange", "Afrimoney"], phonePlaceholder: "81 234 56 78" },
+  { code: "COD", iso: "CD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
   { code: "COG", iso: "CG", name: "Congo-Brazzaville", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["MTN", "Airtel"], phonePlaceholder: "06 123 45 67" },
 ];
 
@@ -39,6 +39,9 @@ export function solvexCountryCode(country: string) {
 
 export function getPaymentNetwork(operator: string, country: string) {
   const code = operator.toUpperCase().replace(/[\s_-]/g, "");
+  const entry = PAYMENT_COUNTRIES.find(c => c.iso === alphaCountryCode(country));
+  if (code === "CRYPTO" && entry) return "crypto";
+  if (!entry?.operators.some(o => o.toUpperCase() === code) && !(code === "TOGOCEL" && entry?.code === "TG")) throw new Error("Moyen de paiement non disponible pour ce pays.");
   const network = PAYMENT_NETWORKS[code]?.[alphaCountryCode(country)];
   if (!network) throw new Error("Ce pays ou cet opérateur n’est pas pris en charge par AlphaPay.");
   return network;
@@ -48,7 +51,8 @@ export function needsPaymentConfirmation(network: string) {
   return ["coris_bj", "wizall_sn"].includes(network);
 }
 
-export const PAYMENT_OPERATORS = Array.from(new Set(PAYMENT_COUNTRIES.flatMap(c => c.operators))).map(code => ({
-  code, name: code === "MobiCash" ? "Mobi Cash" : code === "Celtiis" ? "Celtiis Cash" : code,
-  countries: PAYMENT_COUNTRIES.filter(c => c.operators.includes(code)).map(c => c.code),
+export const PAYMENT_DEPOSIT_COUNTRIES = PAYMENT_COUNTRIES.map(c => ({ ...c, operators: [...c.operators, "Crypto"] }));
+export const PAYMENT_OPERATORS = Array.from(new Set(PAYMENT_DEPOSIT_COUNTRIES.flatMap(c => c.operators))).map(code => ({
+  code, name: code === "Crypto" ? "Crypto / Stablecoin" : code === "MobiCash" ? "Mobi Cash" : code === "Celtiis" ? "Celtiis Cash" : code,
+  countries: PAYMENT_DEPOSIT_COUNTRIES.filter(c => c.operators.includes(code)).map(c => c.code),
 }));

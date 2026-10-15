@@ -27,7 +27,7 @@ import {
   Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon, Code2, User,
   ShieldCheck, Pencil, Loader2, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { PAYMENT_COUNTRIES as COUNTRIES } from "@/lib/payment-catalog-ui";
+import { PAYMENT_COUNTRIES as COUNTRIES, PAYMENT_OPERATORS, supportedPaymentMethod } from "@/lib/payment-catalog-ui";
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
   const [broken, setBroken] = useState(false);
@@ -746,7 +746,7 @@ export default function AdminPage() {
     refetchInterval: ["overview", "liquidity"].includes(activeTab) ? 10000 : false,
     staleTime: 8000,
   });
-  const { data: paymentMethods, isLoading: pmLoading } = useQuery<any[]>({
+  const { data: paymentMethodsRaw, isLoading: pmLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/payment-methods"],
     enabled: ["fees", "payments"].includes(activeTab),
     staleTime: 120000,
@@ -756,6 +756,7 @@ export default function AdminPage() {
     enabled: activeTab === "benefices",
     staleTime: 120000,
   });
+  const paymentMethods = paymentMethodsRaw?.filter(supportedPaymentMethod);
   const { data: systemSettings } = useQuery<{ withdrawalMode: string }>({ queryKey: ["/api/admin/system-settings"], staleTime: 60000 });
   const isAutoWithdrawal = systemSettings?.withdrawalMode !== "manual";
   const { data: profitTx, isLoading: profitTxLoading } = useQuery<any[]>({
@@ -3157,11 +3158,12 @@ export default function AdminPage() {
               <div className="space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-48 rounded-2xl" />)}</div>
             ) : (
               <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">25 couples pays/opérateur Mobile Money. Crypto : encaissements uniquement, sans retrait.</p>
                 {(paymentMethods || []).map((pm: any) => {
                   const maintCountries: string[] = pm.maintenanceCountries || [];
                   const dmCountries: string[] = pm.depositMaintenanceCountries || [];
                   const wmCountries: string[] = pm.withdrawalMaintenanceCountries || [];
-                  const pmCountries: string[] = pm.countries || [];
+                  const pmCountries: string[] = (pm.countries || []).filter((code: string) => PAYMENT_OPERATORS.find(op => op.code === pm.code)?.countries.includes(code));
                   const hasMaint = pm.inMaintenance || maintCountries.length > 0;
                   const hasDepositMaint = pm.depositMaintenance || dmCountries.length > 0;
                   const hasWithdrawalMaint = pm.withdrawalMaintenance || wmCountries.length > 0;
@@ -3202,7 +3204,7 @@ export default function AdminPage() {
                                 {pm.isActive && !pm.inMaintenance && !hasMaint && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 text-xs font-semibold"><Zap className="h-2.5 w-2.5" />Actif partout</span>}
                                 {pm.isActive && !pm.inMaintenance && hasMaint && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30 text-xs font-semibold"><ZapOff className="h-2.5 w-2.5" />Maint. partielle</span>}
                               </div>
-                              <p className="text-xs text-muted-foreground mt-0.5">{pmCountries.join(" · ")}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{pmCountries.join(" · ")}{pm.code === "Crypto" ? " — Encaissements uniquement, aucun retrait" : ""}</p>
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-muted-foreground font-semibold">{pm.feeValue}%</span>
@@ -3289,7 +3291,7 @@ export default function AdminPage() {
                             </div>
 
                             {/* Withdrawal maintenance */}
-                            <div className="border border-orange-500/30 rounded-xl overflow-hidden mt-2">
+                            <div className={`border border-orange-500/30 rounded-xl overflow-hidden mt-2 ${pm.code === "Crypto" ? "hidden" : ""}`}>
                               <div className="bg-orange-500/10 px-3 py-1.5 flex items-center justify-between">
                                 <p className="text-xs font-bold text-orange-700 dark:text-orange-400 flex items-center gap-1.5">
                                   <ZapOff className="h-3 w-3" />Maintenance retraits

@@ -1,3 +1,5 @@
+import celtiisLogo from "@/assets/images/celtiis.svg";
+
 interface OperatorLogoProps {
   operator: string;
   size?: number;
@@ -83,6 +85,9 @@ function FreeMoneyLogo({ size = 48 }: { size?: number }) {
 
 export function OperatorLogo({ operator, size = 48 }: OperatorLogoProps) {
   const op = operator.toLowerCase().replace(/[\s_-]/g, "");
+  if (op === "celtiis") return <img src={celtiisLogo} alt="Celtiis Cash" width={size} height={size} className="rounded-xl" />;
+  if (op === "expresso") return <div role="img" aria-label="Expresso" style={{ width: size, height: size, fontSize: size / 6 }} className="flex items-center justify-center rounded-xl bg-slate-100 text-slate-700 border border-slate-200 font-bold tracking-tight">expresso</div>;
+  if (op === "crypto") return <svg role="img" aria-label="Crypto" width={size} height={size} viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="13" fill="#153F43" /><path d="m24 9 13 7.5v15L24 39l-13-7.5v-15L24 9Z" stroke="#B6DECA" strokeWidth="1.5" /><path d="m24 17 6 3.5v7L24 31l-6-3.5v-7l6-3.5Z" fill="#B6DECA" /><path d="M24 9v8m13-.5-7 4M37 31.5l-7-4M24 39v-8m-13 .5 7-4m-7-11 7 4" stroke="#B6DECA" strokeWidth="1.5" /></svg>;
   if (op === "mtn") return <MtnLogo size={size} />;
   if (op === "orange") return <OrangeLogo size={size} />;
   if (op === "wave") return <WaveLogo size={size} />;

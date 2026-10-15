@@ -39,7 +39,7 @@ test("AlphaPay networks use exact country-specific codes; unsupported pairs fail
 });
 
 test("every country/operator choice maps to an active AlphaPay network checked in the live catalogue", () => {
-  const active = new Set("celtiis_bj coris_bj moov_bj mtn_bj djamo_ci moov_ci mtn_ci orange_ci wave_ci moov_bf orange_bf touchcash_bf mixx_tg moov_tg togocel djamo_sn expresso_sn freemoney_sn orange_sn paydunya_sn wave_sn wizall_sn mobi_cash_ml moov_ml orange_ml wave_ml mtn_cm orange_cm afrimoney_cd airtel_cd orange_cd vodacom_cd airtel_cg mtn_cg".split(" "));
+  const active = new Set("celtiis_bj moov_bj mtn_bj moov_ci mtn_ci orange_ci wave_ci moov_bf orange_bf moov_tg togocel expresso_sn freemoney_sn orange_sn wave_sn moov_ml orange_ml wave_ml mtn_cm orange_cm airtel_cd orange_cd vodacom_cd airtel_cg mtn_cg".split(" "));
   const actual: string[] = [];
   for (const country of PAYMENT_COUNTRIES) {
     for (const operator of country.operators) {
@@ -50,8 +50,8 @@ test("every country/operator choice maps to an active AlphaPay network checked i
     }
   }
   assert.equal(PAYMENT_COUNTRIES.length, 9);
-  assert.equal(actual.length, 34);
-  assert.equal(new Set(actual).size, 34);
+  assert.equal(actual.length, 25);
+  assert.equal(new Set(actual).size, 25);
   assert.deepEqual(new Set(actual), active);
   assert.throws(() => getPaymentNetwork("Wave", "BF")); // Listed by AlphaPay, but inactive.
   assert.throws(() => getPaymentNetwork("MTN", "SLE")); // Not an existing operational country.
@@ -62,9 +62,9 @@ test("country aliases and network-specific confirmation remain distinct", () => 
   assert.equal(alphaCountryCode("COD"), "CD");
   assert.equal(solvexCountryCode("CG"), "COG");
   assert.equal(solvexCountryCode("CD"), "COD");
-  assert.equal(getPaymentNetwork("Mixx", "TG"), "mixx_tg");
+  assert.throws(() => getPaymentNetwork("Mixx", "TG"));
   assert.equal(getPaymentNetwork("TMoney", "TG"), "togocel");
-  assert.equal(getPaymentNetwork("Mobi Cash", "ML"), "mobi_cash_ml");
+  assert.throws(() => getPaymentNetwork("Mobi Cash", "ML"));
   assert.equal(needsPaymentConfirmation("coris_bj"), true);
   assert.equal(needsPaymentConfirmation("wizall_sn"), true);
   assert.equal(needsPaymentConfirmation("mtn_bj"), false);
@@ -99,6 +99,26 @@ test("operator OTP confirmation calls the dedicated endpoint without persisting 
 function fakeClient(run: (...args: any[]) => any) {
   return { http: { request: run } } as unknown as AlphaPayClient;
 }
+
+test("crypto uses a fixed USD invoice and external validation; crypto payouts fail before any request", async () => {
+  let calls = 0;
+  const client = new AlphaPayService("sk_test_example", fakeClient(async (_method, path, options) => {
+    calls++;
+    assert.equal(path, "/payments/softpay/");
+    assert.equal(options.body.network, "crypto");
+    assert.equal(options.body.currency, "USD");
+    assert.equal(options.body.country, "XX");
+    assert.equal(options.body.amount, "4.41");
+    assert.equal(options.body.return_url, "https://example.invalid/return");
+    return { id: "crypto-example", status: "PENDING", checkout_url: "https://example.invalid/secure-crypto" };
+  }));
+  const payment = { ...params, operator: "crypto", country: "XX", currency: "USD", amount: 4.41, sourceAmount: 2500, sourceCurrency: "XOF", returnUrl: "https://example.invalid/return", directOnly: false };
+  const receipt = await client.deposit(payment);
+  assert.equal(receipt.payment_url, "https://example.invalid/secure-crypto");
+  await assert.rejects(client.transfer(payment));
+  await assert.rejects(client.deposit({ ...payment, returnUrl: undefined }));
+  assert.equal(calls, 1);
+});
 
 test("collection sends the documented payload and stable idempotency key through the SDK", async () => {
   const calls: any[] = [];

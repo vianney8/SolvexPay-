@@ -213,7 +213,7 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
                   <Globe className="h-5 w-5 text-primary" /> Pays et opérateurs supportés
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Les pays et opérateurs disponibles en temps réel. Les pays suspendus sont automatiquement exclus.
+                  25 couples pays/opérateur Mobile Money. Crypto est proposé en complément pour les encaissements uniquement, sans retrait Crypto. Les pays suspendus sont automatiquement exclus.
                 </p>
               </div>
 
@@ -357,7 +357,7 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
                   <ArrowDownToLine className="h-5 w-5 text-primary" /> Initier un paiement
                 </h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  L'API JSON permet d'initier le paiement depuis votre propre formulaire. Vous gardez la main sur l'expérience client : aucune redirection externe n'est requise pour les opérateurs compatibles avec le paiement direct.
+                  L'API JSON permet d'initier le paiement depuis votre propre formulaire. Les 25 couples pays/opérateur Mobile Money sont complétés par Crypto pour les encaissements uniquement, jamais pour les retraits. Une validation externe peut être requise selon le prestataire.
                 </p>
               </div>
 
@@ -399,7 +399,7 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
                   <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-bold text-amber-800">Réponse de l'API et compatibilité opérateur</p>
-                    <p className="text-xs text-amber-700 mt-0.5">Le paiement direct retourne une référence à vérifier. Si une réponse indique <code className="bg-amber-100 px-1 rounded font-mono">requiresRedirect: true</code> ou fournit une URL externe, ne redirigez pas automatiquement le client : cette méthode opérateur n'est pas disponible dans un parcours sans redirection.</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Conservez la référence avant toute navigation. Si la réponse indique <code className="bg-amber-100 px-1 rounded font-mono">requiresRedirect: true</code> ou fournit <code>paymentUrl</code>, proposez un bouton explicite vers cette URL HTTPS après accord du client. Un retour navigateur ne confirme jamais le paiement : vérifiez le statut serveur.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -460,7 +460,7 @@ app.get('/payer', (req, res) => {
 
               <div className="border-t border-border/60 pt-5">
                 <p className="text-sm font-bold mb-1">Méthode API JSON (POST) — Intégration serveur</p>
-                <p className="text-xs text-muted-foreground mb-4">Créez le paiement depuis votre serveur avec les données saisies sur votre propre formulaire. La réponse JSON contient une référence et un statut à vérifier ; aucune redirection n'est nécessaire pour les opérateurs compatibles.</p>
+                <p className="text-xs text-muted-foreground mb-4">Créez le paiement depuis votre serveur avec les données saisies sur votre propre formulaire. Une validation externe volontaire peut être requise. Avant l'initiation, consultez GET /api/payments/quote avec country, operator, amount, currency et direction=payin : available, otpRequired et otpInstructions déterminent la disponibilité et le code requis ; providerAmount, providerFee, providerTotal et providerCurrency affichent les frais prestataire, distincts des frais SolvexPay. En cas d'erreur, bloquez le paiement et proposez de réessayer, sans devis de remplacement.</p>
 
                 <div className="border border-border/60 rounded-xl overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
@@ -472,8 +472,8 @@ app.get('/payer', (req, res) => {
                     <div className="border border-border/60 rounded-xl overflow-hidden">
                       <ParamRow name="amount" type="number" required desc="Montant — minimum 100 XOF" />
                       <ParamRow name="description" type="string" required={false} desc="Libellé de la transaction" />
-                      <ParamRow name="customer_name" type="string" required={false} desc="Nom du payeur associé à la transaction" />
-                      <ParamRow name="customer_email" type="string" required={false} desc="Email du client" />
+                      <ParamRow name="customer_name" type="string" required={true} desc="Nom du payeur requis par le prestataire, y compris pour Crypto" />
+                      <ParamRow name="customer_email" type="string" required={true} desc="Email du payeur requis, y compris pour Crypto" />
                       <ParamRow name="country" type="string" required={false} desc="Code pays ISO pour acheminer le paiement (BJ, CI, SN…)" />
                       <ParamRow name="phone" type="string" required={false} desc="Numéro Mobile Money du payeur" />
                       <ParamRow name="operator" type="string" required={false} desc="Opérateur Mobile Money choisi par le payeur (MTN, Orange, Wave…)" />
@@ -481,7 +481,7 @@ app.get('/payer', (req, res) => {
                       <ParamRow name="metadata" type="object" required={false} desc="Données libres retournées dans le webhook (order_id, user_id…)" />
                     </div>
                     <div className="mt-3 p-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
-                      <p className="text-xs text-amber-700 font-semibold">Si <code className="bg-amber-100 px-1 rounded font-mono">requiresRedirect</code> est vrai ou une URL externe est retournée, ne la naviguez pas automatiquement : conservez la référence et indiquez que cet opérateur requiert une page externe.</p>
+                      <p className="text-xs text-amber-700 font-semibold">Si <code className="bg-amber-100 px-1 rounded font-mono">requiresRedirect</code> est vrai ou <code>paymentUrl</code> est retournée, conservez la référence et proposez une continuation HTTPS volontaire, réouvrable pendant l'attente. Vérifiez ensuite le statut serveur. Pour Crypto, nom, email et téléphone de contact restent requis ; l'actif et le réseau sont choisis chez le prestataire.</p>
                     </div>
                   </div>
                 </div>

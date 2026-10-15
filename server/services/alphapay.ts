@@ -34,6 +34,8 @@ export interface PaymentParams {
   callbackUrl?: string;
   checkout?: boolean;
   directOnly?: boolean;
+  sourceAmount?: number;
+  sourceCurrency?: string;
 }
 
 export interface PaymentResponse {
@@ -126,6 +128,7 @@ export class AlphaPayService {
   }
 
   async transfer(params: PaymentParams): Promise<PaymentResponse> {
+    if (params.operator === "crypto") throw new Error("Les retraits crypto ne sont pas disponibles.");
     const { country, currency, network } = this.context(params);
     const result = await this.request("post", "/payouts/initialize/", {
       amount: String(params.amount), currency, country, method: network,
@@ -140,6 +143,10 @@ export class AlphaPayService {
 
   context(params: PaymentParams) {
     const network = params.operator || "";
+    if (network === "crypto") {
+      if (params.currency !== "USD" || params.country !== "XX" || !Number.isFinite(params.amount) || params.amount < 1 || params.amount > 50000 || Math.abs(params.amount * 100 - Math.round(params.amount * 100)) > 1e-6 || !params.email || !params.returnUrl?.startsWith("https://")) throw new Error("Paiement crypto invalide : montant USD, email et retour HTTPS requis.");
+      return { country: "XX", currency: "USD", network };
+    }
     const suffix = network === "togocel" ? "tg" : network.split("_").at(-1);
     const country = alphaCountryCode(params.country || suffix || "");
     if (!Object.values(PAYMENT_NETWORKS).some(networks => networks[country] === network)) {

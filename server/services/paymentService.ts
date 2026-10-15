@@ -4,6 +4,8 @@ import { eq, and, desc, sql, ne } from "drizzle-orm";
 import { AlphaPayService, alphapayStatusToString, directPaymentResponse, type PaymentParams, type PaymentResponse, type PaymentState } from "./alphapay";
 import { amountInXOF, paymentWalletDelta } from "./paymentAccounting";
 import { needsPaymentConfirmation } from "@shared/payment-catalog";
+import { PAYMENT_COUNTRIES, alphaCountryCode } from "@shared/payment-catalog";
+import { quotePayment, paymentInputError } from "./paymentQuote";
 export { amountInXOF } from "./paymentAccounting";
 
 type Receipt = PaymentResponse & { kind: "payment" | "payout" | "checkout" };
@@ -74,13 +76,14 @@ class PaymentService {
   async isConfigured() { return isApiKeyConfigured(); }
   async getReceipt(reference: string) {
     const receipt = (await findBinding(reference))?.response as PaymentResponse | null;
-    return receipt ? directPaymentResponse(receipt) : null;
+    return receipt ? { ...receipt, requires_redirect: !!receipt.payment_url || receipt.requires_redirect === true } : null;
   }
 
   private async initiate(action: "deposit" | "transfer", params: PaymentParams): Promise<PaymentResponse> {
     requireConfigured();
     const service = new AlphaPayService();
-    service.context(params);
+    try { service.context(params); }
+    catch (error: any) { throw paymentInputError(error.message || "Paramètres de paiement invalides."); }
     // Save the exact non-secret payload before the network request. Ambiguous
     // responses are retried with the SAME provider idempotency key and payload.
     const binding = await db.transaction(async tx => {
@@ -92,20 +95,21 @@ class PaymentService {
       if (existing) return existing;
       const [created] = await tx.insert(paymentProviderLogs).values({
         providerCode: "alphapay", action: "binding", reference: params.reference,
-        request: { params, action }, status: "pending",
+        request: { params: { ...params, otp: undefined }, action, ephemeralOtp: !!params.otp }, status: "pending",
       }).returning();
-      return created;
+      return { ...created, justCreated: true };
     });
     const receipt = binding.response as Receipt | null;
     if (receipt?.id) return receipt;
     if (binding.status === "rejected") throw Object.assign(new Error("Cette demande AlphaPay a été rejetée."), { code: "ALPHAPAY_REJECTED" });
     const saved = binding.request as BindingRequest;
+    if ((binding.request as any).ephemeralOtp && (!(binding as any).justCreated || !params.otp)) throw new Error("Paiement avec code en attente de rapprochement ; aucune nouvelle initiation automatique.");
     if (saved.action !== action) throw new Error("Référence de paiement déjà utilisée.");
     if (binding.createdAt && Date.now() - binding.createdAt.getTime() > 60 * 60 * 1000) {
       throw new Error("Demande AlphaPay non rapprochée depuis plus d’une heure : vérification manuelle requise, fonds conservés.");
     }
     try {
-      const result = action === "deposit" ? await service.deposit(saved.params) : await service.transfer(saved.params);
+      const result = action === "deposit" ? await service.deposit({ ...saved.params, otp: params.otp }) : await service.transfer(saved.params);
       await db.update(paymentProviderLogs).set({ response: result, status: "success" }).where(eq(paymentProviderLogs.id, binding.id));
       return result;
     } catch (error: any) {
@@ -117,10 +121,29 @@ class PaymentService {
   }
 
   async deposit(params: PaymentParams) {
-    const receipt = await this.initiate("deposit", { ...params, checkout: false, directOnly: true });
-    return directPaymentResponse(receipt);
+    const country = PAYMENT_COUNTRIES.find(c => c.iso === alphaCountryCode(params.country || ""));
+    const operator = params.operator === "crypto" ? "Crypto" : country?.operators.find(o => {
+      try { return new AlphaPayService().context({ ...params, operator: params.operator }).network === getNetwork(o, country.code); } catch { return false; }
+    });
+    if (!country || !operator) throw paymentInputError("Ce moyen de paiement n’est pas disponible.");
+    let quote;
+    try { quote = await quotePayment({ country: country.code, operator, amount: params.amount, currency: params.currency || country.currency }); }
+    catch (error: any) {
+      if (error.code === "ALPHAPAY_REJECTED") throw error;
+      throw Object.assign(new Error("Tarifs AlphaPay indisponibles : aucun paiement n’a été initié. Réessayez plus tard."), { status: 503, code: "ALPHAPAY_REJECTED" });
+    }
+    if (quote.otpRequired && !params.otp?.trim()) throw paymentInputError("Le code de paiement de votre opérateur est obligatoire avant de payer.");
+    const prepared = params.operator === "crypto" ? {
+      ...params, sourceAmount: params.amount, sourceCurrency: params.currency || country.currency,
+      amount: quote.providerAmount, currency: "USD", country: "XX",
+    } : params;
+    const receipt = await this.initiate("deposit", { ...prepared, checkout: false, directOnly: false });
+    return { ...receipt, requires_redirect: !!receipt.payment_url || receipt.requires_redirect === true };
   }
-  transfer(params: PaymentParams) { return this.initiate("transfer", params); }
+  async transfer(params: PaymentParams) {
+    await validatePayout(params);
+    return this.initiate("transfer", params);
+  }
   async getBalance() { requireConfigured(); return new AlphaPayService().getBalance(); }
 
   async confirmOtp(reference: string, otp: string) {
@@ -183,8 +206,9 @@ class PaymentService {
     if (!local && !admin) throw new Error("L’opération locale n’est pas encore enregistrée ; réessayez.");
     if (state === "completed" && !result.sessionOnly) {
       const [accounting] = await db.select().from(transactions).where(eq(transactions.reference, reference)).limit(1);
+      if (saved.params.sourceAmount && accounting && (Number(accounting.amount) !== saved.params.sourceAmount || accounting.currency !== saved.params.sourceCurrency)) throw new Error("Conversion crypto incohérente : rapprochement requis.");
       const minimumNet = receipt.kind === "payout" ? saved.params.amount
-        : accounting ? saved.params.amount - Number(accounting.fees || 0) : saved.params.amount;
+        : accounting ? saved.params.amount * (1 - Number(accounting.fees || 0) / Number(accounting.amount)) : saved.params.amount;
       if (!Number.isFinite(Number(result.net_amount)) || Number(result.net_amount) < minimumNet) {
         throw new Error("Montant net AlphaPay insuffisant : rapprocher les frais sans rembourser automatiquement.");
       }
@@ -194,10 +218,11 @@ class PaymentService {
     if (adminPayout && adminPayout.status === "pending" && state !== "pending") {
       await db.update(adminWithdrawals).set({ status: state, updatedAt: new Date() }).where(and(eq(adminWithdrawals.id, adminPayout.id), eq(adminWithdrawals.status, "pending")));
     }
-    const presentation = directPaymentResponse(receipt);
+    const presentation = { ...receipt, requires_redirect: !!receipt.payment_url || receipt.requires_redirect === true };
     return {
       success: 1, reference, status: result.status, id: result.id,
       requires_redirect: presentation.requires_redirect,
+      payment_url: state === "pending" ? presentation.payment_url : undefined,
       requires_otp: state === "pending" && presentation.requires_redirect !== true && receipt.kind === "payment" && needsPaymentConfirmation(saved.params.operator || ""),
       instructions: presentation.instructions, message: presentation.message,
     };
@@ -215,8 +240,17 @@ class PaymentService {
 
 export const paymentService = new PaymentService();
 
+import { getPaymentNetwork as getNetwork } from "@shared/payment-catalog";
+async function validatePayout(params: PaymentParams) {
+  const country = PAYMENT_COUNTRIES.find(c => c.iso === alphaCountryCode(params.country || ""));
+  const operator = country?.operators.find(o => getNetwork(o, country.code) === params.operator);
+  if (!country || !operator || params.operator === "crypto") throw paymentInputError("Ce moyen de retrait n’est pas disponible.");
+  await quotePayment({ country: country.code, operator, amount: params.amount, currency: params.currency || country.currency, direction: "payout" });
+}
+
 export async function reservePayout(userId: string, params: PaymentParams, feesXOF: number, type: "withdrawal" | "transfer") {
   requireConfigured();
+  await validatePayout(params);
   const context = new AlphaPayService().context(params);
   const debit = amountInXOF(params.amount, context.currency) + feesXOF;
   if (!Number.isSafeInteger(debit) || debit <= 0 || !Number.isFinite(feesXOF) || feesXOF < 0) throw new Error("Montant ou frais invalides.");
