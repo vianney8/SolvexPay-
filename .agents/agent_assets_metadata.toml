@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "EJVYLnYS31HRv_yKHtEC6"
+uri = "file://docs/alphapay-ouverture.md"
+type = "text"
+title = "Contrôle préalable à l’ouverture AlphaPay"
+description = "Blocages confirmés, restrictions conservées, points non vérifiables et conditions avant toute ouverture. Audit du 15 octobre 2026 en lecture seule."
+logical_id = "a6627582-d1b0-4d29-a738-dd7f90b18487"
+content_hash = "sha256:2ad34487689de754f1a64339a10560ef10159a5aa63e8a19be73fcb228a28bfe"
+size = 11816
+mtime_ms = 1792085950741
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:da35066b-3c11-43a5-b1f3-6063faec4a4c/a6627582-d1b0-4d29-a738-dd7f90b18487/70a6af8e-789c-48b9-94eb-5bdeda8ff9fd"
+storage_version_token = "1792086009291248"
+content_type = "text/markdown"
