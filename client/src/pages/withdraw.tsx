@@ -24,6 +24,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { Wallet as WalletType } from "@shared/schema";
+import { useAlphaCatalog, CatalogNotice, operatorMatches, normalizeAlphaCountry } from "@/hooks/use-alphapay-catalog";
 
 function formatCurrency(amount: number | string) {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -34,16 +35,6 @@ function formatDate(date: string | Date) {
   return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(date));
 }
 
-const COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"], phonePlaceholder: "01 90 12 34 56" },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"], phonePlaceholder: "07 12 34 56 78" },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
-  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], phonePlaceholder: "77 123 45 67" },
-  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
-  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
-];
 
 const PHONE_FORMATS: Record<string, { regex: RegExp; label: string }> = {
   BJ:  { regex: /^\d{10}$/, label: "10 chiffres (ex: 0190123456)" },
@@ -62,11 +53,13 @@ const OPERATOR_LABEL: Record<string, string> = {
 };
 
 export default function WithdrawPage() {
+  const catalog = useAlphaCatalog("payout");
+  const COUNTRIES = catalog.safeCountries;
   const { toast } = useToast();
   const { user } = useAuth();
   const isBlocked = !!(user as any)?.isBlocked;
   const [amount, setAmount] = useState("");
-  const [country, setCountry] = useState((user as any)?.withdrawalCountry || "BJ");
+  const [country, setCountry] = useState(normalizeAlphaCountry((user as any)?.withdrawalCountry || "BJ"));
   const [operator, setOperator] = useState((user as any)?.withdrawalOperator || "");
 
   function stripPrefix(phone: string) {
@@ -101,11 +94,11 @@ export default function WithdrawPage() {
 
   useEffect(() => { setOperator(""); }, [country]);
   useEffect(() => {
-    if (suspendedCodes.length > 0 && suspendedCodes.includes(country)) {
+    if (catalog.ready && !availableCountries.some(c => c.code === country)) {
       const first = availableCountries[0];
       if (first) setCountry(first.code);
     }
-  }, [suspendedCodes.join(",")]); // eslint-disable-line
+  }, [suspendedCodes.join(","), catalog.data?.fetchedAt]); // eslint-disable-line
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: txResponse } = useQuery<any>({ queryKey: ["/api/transactions"] });
@@ -114,7 +107,7 @@ export default function WithdrawPage() {
 
   function getOperatorStatus(op: string) {
     if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false, withdrawalMaintenance: false };
-    const pm = paymentMethods.find((m: any) => m.code === op);
+    const pm = paymentMethods.find((m: any) => operatorMatches(m.code, op));
     if (!pm) return { available: true, maintenance: false, withdrawalMaintenance: false };
     const globalMaint = pm.inMaintenance === true;
     const countryMaint = (pm.maintenanceCountries || []).includes(country);
@@ -127,7 +120,8 @@ export default function WithdrawPage() {
     };
   }
   const balanceXOF = parseFloat(String(wallet?.balanceXOF || 0));
-  const balance = currency === "CDF" ? Math.floor(balanceXOF / 0.22) : balanceXOF;
+  const walletRate = catalog.rate(currency);
+  const balance = walletRate ? Math.floor(balanceXOF / walletRate) : 0;
   const withdrawAmount = parseFloat(amount) || 0;
 
   // Calcul du taux effectif : frais personnalisés > par pays > par opérateur > global (même logique que le backend)
@@ -138,7 +132,7 @@ export default function WithdrawPage() {
     }
     const globalRate = serviceFees?.withdrawal ?? 7;
     if (!operator || !paymentMethods) return globalRate;
-    const pm = paymentMethods.find((m: any) => m.code === operator);
+    const pm = paymentMethods.find((m: any) => operatorMatches(m.code, operator));
     if (!pm) return globalRate;
     // 1. Frais par pays
     if (country && pm.countryFees) {
@@ -155,10 +149,10 @@ export default function WithdrawPage() {
   }
 
   const feeRate = getEffectiveWithdrawalFeeRate() / 100;
-  const withdrawAmountXOF = currency === "CDF" ? Math.floor(withdrawAmount * 0.22) : withdrawAmount;
+  const withdrawAmountXOF = Math.floor(withdrawAmount * walletRate);
   const feesXOF = Math.round(withdrawAmountXOF * feeRate);
   // Fees in local currency (shown to user)
-  const feesLocal = currency === "CDF" ? Math.round(feesXOF / 0.22) : feesXOF;
+  const feesLocal = walletRate ? Math.round(feesXOF / walletRate) : 0;
   // Total debited from wallet = exact amount entered + fees
   const totalDebit = withdrawAmount + feesLocal;
   const totalDebitXOF = withdrawAmountXOF + feesXOF;
@@ -193,7 +187,7 @@ export default function WithdrawPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!withdrawAmount || !cleanPhone || !operator || !country || insufficientFunds || phoneError) return;
+    if (!catalog.ready || !walletRate || !catalog.network(operator, country)?.payout || !withdrawAmount || !cleanPhone || !operator || !country || insufficientFunds || phoneError) return;
     const fullPhone = cleanPhone.startsWith("+") ? cleanPhone : `${selectedCountry.prefix}${cleanPhone}`;
     withdrawMutation.mutate({ amount: withdrawAmount, phoneNumber: fullPhone, operator, country });
   };
@@ -243,6 +237,7 @@ export default function WithdrawPage() {
 
   return (
     <DashboardLayout title="" breadcrumbs={[{ label: "Retrait" }]}>
+      <CatalogNotice loading={catalog.isLoading} error={catalog.isError} empty={!catalog.countries.length} currency={currency} rate={walletRate} />
       <div className="max-w-md mx-auto space-y-5">
         {isBlocked && (
           <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-5 text-center space-y-2">
@@ -359,7 +354,7 @@ export default function WithdrawPage() {
                           <OperatorLogo operator={op} size={52} />
                         </div>
                         <span className={`text-xs font-bold text-center leading-tight ${operator === op ? "text-primary" : isDisabled ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
-                          {OPERATOR_LABEL[op] || op}
+                          {catalog.label(op)}
                         </span>
                       </button>
                     );
@@ -451,7 +446,7 @@ export default function WithdrawPage() {
             className="w-full h-13 text-base font-bold gap-2 shadow-xl"
             style={{ background: !withdrawAmount || insufficientFunds ? undefined : "linear-gradient(135deg, hsl(200 90% 34%) 0%, hsl(220 80% 52%) 100%)" }}
             variant={insufficientFunds ? "outline" : "default"}
-            disabled={withdrawMutation.isPending || !withdrawAmount || !cleanPhone || !!phoneError || !operator || !country || insufficientFunds}
+            disabled={!catalog.ready || !walletRate || withdrawMutation.isPending || !withdrawAmount || !cleanPhone || !!phoneError || !operator || !country || insufficientFunds}
             data-testid="button-confirm-withdraw"
           >
             {withdrawMutation.isPending ? (

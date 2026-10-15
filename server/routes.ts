@@ -6,6 +6,8 @@ import rateLimit from "express-rate-limit";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
 import { verifyAlphaPaySignature, alphapayStatusToString, getAlphaPayNetwork } from "./services/alphapay";
+import { getAlphaCatalog, getWalletRate, normalizeCountry, sameOperator, operatorAlias, countryIncludes, assertAlphaAvailable } from "./services/alphapayCatalog";
+import { amountInXOF } from "./services/paymentAccounting";
 import { paymentService, isApiKeyConfigured, getProviderByCode, activateProvider, invalidateActiveProviderCache, seedPaymentProviders, reservePayout, onPaymentSettled, isAlphaPayment } from "./services/paymentService";
 import { testResendConnection } from "./services/resend";
 import { notifyTransactionCompleted, notifyWithdrawal, handleTelegramCallback } from "./services/telegram";
@@ -83,10 +85,7 @@ const upload = multer({
   },
 });
 
-const SUPPORTED_CURRENCIES = ["XOF", "XAF", "CDF"] as const;
-
-const SUPPORTED_OPERATORS = ["MTN", "Moov", "Orange", "TMoney", "Wave", "Vodacom", "Airtel"] as const;
-const SUPPORTED_COUNTRIES = ["BJ", "BF", "TG", "CM", "CI", "COD", "COG"] as const;
+const SUPPORTED_CURRENCIES = ["XOF", "XAF", "CDF", "USD", "GHS", "GNF", "KES", "MWK", "NGN", "RWF", "SLE", "TZS", "UGX", "ZMW", "ETB", "LSL", "MZN", "INR"] as const;
 
 const depositSchema = z.object({
   amount: z.number().min(100, "Montant minimum: 100"),
@@ -163,30 +162,28 @@ const publicPaySchema = z.object({
 const getAlphaPayOperatorCode = getAlphaPayNetwork;
 const getTransferOperatorCode = getAlphaPayNetwork;
 
-function getCountryCurrency(country: string): string {
-  const XAF_COUNTRIES = ["CM", "COG"];
-  const CDF_COUNTRIES = ["COD"];
-  const c = country.toUpperCase();
-  if (XAF_COUNTRIES.includes(c)) return "XAF";
-  if (CDF_COUNTRIES.includes(c)) return "CDF";
-  return "XOF";
+async function getCountryCurrency(country: string): Promise<string> {
+  const entry = (await getAlphaCatalog()).countries.find(c => c.code === normalizeCountry(country));
+  if (!entry) throw new Error("Ce pays n’a aucun moyen de paiement AlphaPay disponible.");
+  return entry.currency;
 }
 
-function toXOFEquivalent(amount: number, currency: string): number {
-  if (currency === "CDF") return Math.floor(amount * 0.22);
-  return Math.floor(amount);
+async function toXOFEquivalent(amount: number, currency: string): Promise<number> {
+  return amountInXOF(amount, currency, await getWalletRate(currency));
 }
 
 async function checkOperatorMaintenance(operator: string, country: string): Promise<string | null> {
   try {
+    const suspended = JSON.parse((await storage.getSystemSetting("suspended_countries")) || "[]");
+    if (countryIncludes(suspended, country)) return `Les opérations sont suspendues dans ce pays (${country}).`;
     const { db } = await import("./db");
     const { paymentMethods: pmTable } = await import("@shared/schema");
     const allMethods = await db.select().from(pmTable);
-    const pm = allMethods.find(m => m.code.toUpperCase() === operator.toUpperCase());
+    const pm = allMethods.find(m => sameOperator(m.code, operator));
     if (!pm) return null;
     if (pm.isActive === false) return `L'opérateur ${pm.code} n'est pas disponible`;
     if (pm.inMaintenance) return `${pm.code} est actuellement en maintenance`;
-    if ((pm.maintenanceCountries || []).includes(country.toUpperCase())) return `${pm.code} est en maintenance dans ce pays (${country})`;
+    if (countryIncludes(pm.maintenanceCountries || [], country)) return `${pm.code} est en maintenance dans ce pays (${country})`;
     return null;
   } catch {
     return `Service temporairement indisponible. Réessayez dans quelques instants.`;
@@ -198,12 +195,12 @@ async function checkDepositMaintenance(operator: string, country: string): Promi
     const { db } = await import("./db");
     const { paymentMethods: pmTable } = await import("@shared/schema");
     const allMethods = await db.select().from(pmTable);
-    const pm = allMethods.find(m => m.code.toUpperCase() === operator.toUpperCase());
+    const pm = allMethods.find(m => sameOperator(m.code, operator));
     if (!pm) return null;
     if (pm.isActive === false) return `L'opérateur ${pm.code} n'est pas disponible`;
     if ((pm as any).depositMaintenance) return `Les dépôts via ${pm.code} sont temporairement indisponibles`;
     const dmCountries: string[] = ((pm as any).depositMaintenanceCountries || []);
-    if (dmCountries.includes(country.toUpperCase())) return `Les dépôts via ${pm.code} ne sont pas disponibles pour ce pays (${country})`;
+    if (countryIncludes(dmCountries, country)) return `Les dépôts via ${pm.code} ne sont pas disponibles pour ce pays (${country})`;
     return null;
   } catch {
     return `Service temporairement indisponible. Réessayez dans quelques instants.`;
@@ -222,11 +219,13 @@ async function getOperatorFeeRate(
     const { db } = await import("./db");
     const { paymentMethods: pmTable } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
-    const [pm] = await db.select().from(pmTable).where(eq(pmTable.code, operatorCode));
+    const methods = await db.select().from(pmTable);
+    const pm = methods.find(m => sameOperator(m.code, operatorCode));
     if (pm) {
       // 1. Per-country fee (most specific)
       if (country && pm.countryFees) {
-        const cf = (pm.countryFees as Record<string, any>)[country.toUpperCase()];
+        const countryKey = Object.keys(pm.countryFees).find(code => normalizeCountry(code) === normalizeCountry(country));
+        const cf = countryKey ? (pm.countryFees as Record<string, any>)[countryKey] : undefined;
         if (cf && cf[feeColumn] !== null && cf[feeColumn] !== undefined && cf[feeColumn] !== "") {
           return parseFloat(String(cf[feeColumn]));
         }
@@ -725,8 +724,7 @@ export async function registerRoutes(
       const isWave = operator.toLowerCase() === "wave";
       const returnUrl = `${req.protocol}://${req.get("host")}/api/payment/callback?reference=${reference}`;
       const alphaDepositOperator = getAlphaPayOperatorCode(operator, country);
-
-
+      await assertAlphaAvailable(alphaDepositOperator, country, currency, "payin");
 
       const globalDepositFee = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
       const userCustomDepositFee = req.user?.customFeeRate != null ? parseFloat(req.user.customFeeRate) : null;
@@ -801,6 +799,8 @@ export async function registerRoutes(
       }
       
       const { amount, phoneNumber, operator, country } = validation.data;
+      const maintenance = await checkOperatorMaintenance(operator, country);
+      if (maintenance) return res.status(503).json({ message: maintenance });
 
       // Validation du format du numéro par pays (après normalisation E.164 sans +)
       const PHONE_PATTERNS_BY_COUNTRY: Record<string, RegExp> = {
@@ -820,8 +820,9 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Format du numéro de téléphone invalide pour ce pays" });
       }
 
-      const localCurrency = getCountryCurrency(country);
-      const amountXOF = toXOFEquivalent(amount, localCurrency);
+      const localCurrency = await getCountryCurrency(country);
+      const walletRate = await getWalletRate(localCurrency);
+      const amountXOF = amountInXOF(amount, localCurrency, walletRate);
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configuré" });
@@ -856,13 +857,13 @@ export async function registerRoutes(
         const { db } = await import("./db");
         const { paymentMethods: pmTable } = await import("@shared/schema");
         const allMethods = await db.select().from(pmTable);
-        const pm = allMethods.find(m => m.code.toUpperCase() === operator.toUpperCase());
+        const pm = allMethods.find(m => sameOperator(m.code, operator));
         if (pm) {
           if (pm.withdrawalMaintenance) {
             return res.status(503).json({ message: `Les retraits via ${pm.name} sont temporairement indisponibles.` });
           }
           const wmCountries: string[] = (pm.withdrawalMaintenanceCountries as string[]) || [];
-          if (wmCountries.includes(country.toUpperCase())) {
+          if (countryIncludes(wmCountries, country)) {
             return res.status(503).json({ message: `Les retraits via ${pm.name} ne sont pas disponibles pour ce pays.` });
           }
         }
@@ -872,7 +873,7 @@ export async function registerRoutes(
       const transaction = await reservePayout(userId, {
         msisdn: phoneNumber, amount, reference, firstName: req.user.firstName || "Client",
         lastName: req.user.lastName || "SolvexPay", operator: getAlphaPayNetwork(operator, country),
-        country, currency: localCurrency, email: req.user.email,
+        country, currency: localCurrency, email: req.user.email, walletRate,
       }, withdrawalFees, "withdrawal");
       userTxCacheDel(userId);
       _adminCache.clear();
@@ -904,8 +905,11 @@ export async function registerRoutes(
       }
 
       const { amount, phoneNumber, operator, country, firstName, lastName } = validation.data;
-      const localCurrency = getCountryCurrency(country);
-      const amountXOF = toXOFEquivalent(amount, localCurrency);
+      const maintenance = await checkOperatorMaintenance(operator, country);
+      if (maintenance) return res.status(503).json({ message: maintenance });
+      const localCurrency = await getCountryCurrency(country);
+      const walletRate = await getWalletRate(localCurrency);
+      const amountXOF = amountInXOF(amount, localCurrency, walletRate);
 
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configure" });
@@ -928,7 +932,7 @@ export async function registerRoutes(
       const reference = generateReference();
       const transaction = await reservePayout(userId, {
         msisdn: phoneNumber, amount, reference, firstName, lastName,
-        operator: getAlphaPayNetwork(operator, country), country, currency: localCurrency, email: req.user.email,
+        operator: getAlphaPayNetwork(operator, country), country, currency: localCurrency, email: req.user.email, walletRate,
       }, transferFees, "transfer");
       userTxCacheDel(userId);
       _adminCache.clear();
@@ -996,7 +1000,7 @@ export async function registerRoutes(
       }
 
       const frontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: frontendStatus, alphapayStatus: result.status, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
+      res.json({ success: result.success, status: frontendStatus, alphapayStatus: result.status, paymentUrl: result.payment_url, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
     } catch (error: any) {
       console.error("Verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -1049,7 +1053,7 @@ export async function registerRoutes(
       }
 
       const publicFrontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: publicFrontendStatus, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
+      res.json({ success: result.success, status: publicFrontendStatus, paymentUrl: result.payment_url, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
     } catch (error: any) {
       console.error("Public verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -1113,7 +1117,7 @@ export async function registerRoutes(
       }
       if (await isAlphaPayment(transaction.reference)) {
         const receipt = await paymentService.getReceipt(transaction.reference);
-        return res.json({ ...transaction, requiresRedirect: receipt?.requires_redirect === true, instructions: receipt?.instructions, reference: transaction.reference, message: receipt?.message || "Cette intention de paiement existe déjà ; vérifiez son statut." });
+        return res.json({ ...transaction, paymentUrl: receipt?.payment_url, requiresRedirect: receipt?.requires_redirect === true, instructions: receipt?.instructions, reference: transaction.reference, message: receipt?.message || "Cette intention de paiement existe déjà ; vérifiez son statut." });
       }
       const validation = publicPaySchema.safeParse(req.body);
       if (!validation.success) {
@@ -1141,6 +1145,7 @@ export async function registerRoutes(
       const isWave = operator.toLowerCase() === "wave";
       const returnUrl = `${req.protocol}://${req.get("host")}/pay-api/${id}?status=callback&reference=${transaction.reference}`;
       const alphaOperator = getAlphaPayOperatorCode(operator, country);
+      await assertAlphaAvailable(alphaOperator, country, transaction.currency, "payin");
 
       const { db } = await import("./db");
       const { eq: eqFn } = await import("drizzle-orm");
@@ -1238,7 +1243,7 @@ export async function registerRoutes(
         }
       }
       const publicStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: publicStatus, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
+      res.json({ success: result.success, status: publicStatus, paymentUrl: result.payment_url, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
     } catch (err: any) {
       console.error("payment-api/public/:id/verify error:", err);
       res.status(500).json({ message: err.message || "Erreur de vérification" });
@@ -1485,6 +1490,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/public/alphapay/catalog", async (_req, res) => {
+    try {
+      res.set("Cache-Control", "no-store");
+      res.json(await getAlphaCatalog());
+    } catch {
+      res.status(503).json({ message: "Catalogue AlphaPay temporairement indisponible. Réessayez plus tard." });
+    }
+  });
+
   // ── Pays suspendus (public) ──────────────────────────────────────────────
   app.get("/api/public/suspended-countries", async (req, res) => {
     try {
@@ -1521,6 +1535,29 @@ export async function registerRoutes(
 
   let paymentMethodsCache: { data: unknown[]; ts: number } | null = null;
   const PM_CACHE_TTL = 5 * 60_000; // 5 minutes
+  async function syncAlphaMethods() {
+    const catalog = await getAlphaCatalog();
+    const { db } = await import("./db");
+    const { paymentMethods: pmTable } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    const methods = await db.select().from(pmTable);
+    const groups = new Map<string, { name: string; countries: string[] }>();
+    for (const network of catalog.networks) {
+      const code = operatorAlias(network.code);
+      const group = groups.get(code) || { name: code === network.code ? network.name : code, countries: [] };
+      if (!group.countries.includes(network.country)) group.countries.push(network.country);
+      groups.set(code, group);
+    }
+    for (const [code, group] of groups) {
+      const existing = methods.find(m => m.code.toLowerCase() === code.toLowerCase());
+      if (!existing) {
+        await db.insert(pmTable).values({ code, name: group.name, countries: group.countries }).onConflictDoNothing();
+      } else {
+        const countries = [...new Set([...(existing.countries || []), ...group.countries])];
+        if (countries.length !== existing.countries?.length) await db.update(pmTable).set({ countries }).where(eq(pmTable.id, existing.id));
+      }
+    }
+  }
 
   app.get("/api/payment-methods/public", async (req, res) => {
     try {
@@ -1654,6 +1691,7 @@ export async function registerRoutes(
         ? userCustomPLinkFee / 100
         : (await getOperatorFeeRate(operator, "feePLink", globalPLinkFee, country)) / 100;
       const feesAmount = Math.round(linkAmount * feeRate);
+      await assertAlphaAvailable(getAlphaPayOperatorCode(operator, country), country, paymentLink.currency, "payin");
 
       const alphapayOnLink = await getAlphapayEnabled();
       if (!alphapayOnLink) {
@@ -1848,7 +1886,7 @@ export async function registerRoutes(
   // ── Checkout redirect : GET /api/v1/checkout?key=sk_live_...&amount=...&description=... ──
   app.get("/api/v1/checkout", async (req: any, res) => {
     try {
-      const { key, amount: amountStr, description, customer_name, customer_email, country, metadata } = req.query as Record<string, string>;
+      const { key, amount: amountStr, description, customer_name, customer_email, country, currency: requestedCurrency, metadata } = req.query as Record<string, string>;
 
       if (!key) return res.status(400).send("Paramètre 'key' manquant.");
       const apiKey = await storage.findApiKeyByFullKey(key.trim());
@@ -1879,11 +1917,14 @@ export async function registerRoutes(
       const feesAmount = Math.round(amount * feeRate);
       const reference = generateReference();
 
+      const currency = requestedCurrency || (country ? await getCountryCurrency(country) : "XOF");
+      if (!(await getAlphaCatalog()).currencies.includes(currency)) return res.status(400).send("Devise AlphaPay non disponible.");
+      await getWalletRate(currency);
       const transaction = await storage.createTransaction({
         userId: apiKey.userId,
         type: "deposit",
         amount: String(amount),
-        currency: "XOF",
+        currency,
         provider: null,
         phoneNumber: null,
         reference,
@@ -1906,7 +1947,7 @@ export async function registerRoutes(
 
   app.post("/api/v1/deposit", authenticateApiKey, async (req: any, res) => {
     try {
-      const { amount, phone, operator, country, description, customer_name, customer_email, otp, metadata } = req.body;
+      const { amount, phone, operator, country, currency: requestedCurrency, description, customer_name, customer_email, otp, metadata } = req.body;
       const isSrKey = !!(req.merchantApiKey as any).isSrKey;
 
       if (!amount || typeof amount !== "number" || amount < 100) {
@@ -1965,10 +2006,11 @@ export async function registerRoutes(
         const globalApiFee = parseFloat((await storage.getSystemSetting("fee_api")) || "7");
         const apiFeeRate = (await getOperatorFeeRate(operatorUpper, "feeApi", globalApiFee, countryUpper)) / 100;
         const fees = Math.round(amount * apiFeeRate);
-        const currency = getCountryCurrency(countryUpper);
+        const currency = await getCountryCurrency(countryUpper);
         if (!customer_email || !z.string().email().safeParse(customer_email).success) return res.status(400).json({error:{code:"INVALID_CUSTOMER_EMAIL",message:"Email du payeur requis par AlphaPay."}});
         const reference = generateReference();
         const alphaOperator = getAlphaPayOperatorCode(operatorUpper, countryUpper);
+        await assertAlphaAvailable(alphaOperator, countryUpper, currency, "payin");
 
         const rawName = customer_name || "Client SolvexPay";
         const nameParts = rawName.trim().split(" ");
@@ -2018,7 +2060,7 @@ export async function registerRoutes(
 
         await storage.updateApiKey(req.merchantApiKey.id, { lastUsedAt: new Date() } as any);
 
-        const defaultMessage = "Paiement direct initié. Suivez les instructions de votre opérateur sur votre téléphone.";
+        const defaultMessage = alphapayResponse.payment_url ? "Continuez sur la page de paiement sécurisée retournée." : "Paiement initié. Suivez les instructions retournées et vérifiez le statut.";
 
         return res.status(201).json({
           success: true,
@@ -2032,6 +2074,7 @@ export async function registerRoutes(
           operator: operatorUpper,
           phone,
           message: alphapayResponse.message || defaultMessage,
+          payment_url: alphapayResponse.payment_url || null,
           requires_redirect: alphapayResponse.requires_redirect === true,
           instructions: alphapayResponse.instructions,
           created_at: transaction.createdAt,
@@ -2045,12 +2088,15 @@ export async function registerRoutes(
       const feeRate = (await getOperatorFeeRate(operator ? operator.toUpperCase() : null, "feeApi", globalApiFee, country)) / 100;
       const feesAmount = Math.round(amount * feeRate);
       const reference = generateReference();
+      const currency = requestedCurrency || (country ? await getCountryCurrency(country) : "XOF");
+      if (!(await getAlphaCatalog()).currencies.includes(currency)) return res.status(400).json({ message: "Devise AlphaPay non disponible." });
+      await getWalletRate(currency);
 
       const transaction = await storage.createTransaction({
         userId: req.merchantUserId,
         type: "deposit",
         amount: String(amount),
-        currency: "XOF",
+        currency,
         provider: operator ? operator.toUpperCase() : null,
         phoneNumber: phone || null,
         reference,
@@ -2069,7 +2115,7 @@ export async function registerRoutes(
         id: transaction.id,
         status: "pending",
         amount,
-        currency: "XOF",
+        currency,
         reference,
         description: transaction.description,
         fees: feesAmount,
@@ -2267,10 +2313,11 @@ export async function registerRoutes(
         ? userCustomApiFee / 100
         : (await getOperatorFeeRate(operatorUpper, "feeApi", globalApiFee, countryUpper)) / 100;
       const fees = Math.round(amount * apiFeeRate);
-      const currency = getCountryCurrency(countryUpper);
+      const currency = await getCountryCurrency(countryUpper);
       if (!customer_email || !z.string().email().safeParse(customer_email).success) return res.status(400).json({error:{code:"INVALID_CUSTOMER_EMAIL",message:"Email du payeur requis par AlphaPay."}});
       const reference = generateReference();
       const alphaOperator = getAlphaPayOperatorCode(operatorUpper, countryUpper);
+      await assertAlphaAvailable(alphaOperator, countryUpper, currency, "payin");
 
       // ── Nom du payeur ──
       const rawName = customer_name || "Client SolvexPay";
@@ -2327,7 +2374,7 @@ export async function registerRoutes(
 
       await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
 
-      const defaultMessage = "Paiement direct initié. Suivez les instructions de votre opérateur sur votre téléphone.";
+      const defaultMessage = alphapayResponse.payment_url ? "Continuez sur la page de paiement sécurisée retournée." : "Paiement initié. Suivez les instructions retournées et vérifiez le statut.";
 
       res.status(201).json({
         success: true,
@@ -2341,6 +2388,7 @@ export async function registerRoutes(
         operator: operatorUpper,
         phone,
         message: alphapayResponse.message || defaultMessage,
+        payment_url: alphapayResponse.payment_url || null,
         requires_redirect: alphapayResponse.requires_redirect === true,
         instructions: alphapayResponse.instructions,
         created_at: transaction.createdAt,
@@ -3264,6 +3312,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/payment-methods", isAdmin, async (req, res) => {
     try {
+      await syncAlphaMethods();
       const { db } = await import("./db");
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const methods = await db.select().from(pmTable);

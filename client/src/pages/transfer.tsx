@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAlphaCatalog, CatalogNotice } from "@/hooks/use-alphapay-catalog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,16 +30,6 @@ function formatCurrency(amount: number) {
   return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 }
 
-const COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"], phonePlaceholder: "01 90 12 34 56" },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"], phonePlaceholder: "07 12 34 56 78" },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
-  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], phonePlaceholder: "77 123 45 67" },
-  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
-  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
-];
 
 const OPERATOR_LABEL: Record<string, string> = {
   MTN: "MTN Money", Orange: "Orange Money", Moov: "Moov Money", Wave: "Wave",
@@ -46,6 +37,8 @@ const OPERATOR_LABEL: Record<string, string> = {
 };
 
 export default function TransferPage() {
+  const catalog = useAlphaCatalog("payout");
+  const COUNTRIES = catalog.safeCountries;
   const { toast } = useToast();
   const { user } = useAuth();
   const isBlocked = !!(user as any)?.isBlocked;
@@ -58,20 +51,24 @@ export default function TransferPage() {
   const [success, setSuccess] = useState(false);
   const [kycGateOpen, setKycGateOpen] = useState(false);
 
-  const selectedCountry = COUNTRIES.find(c => c.code === country)!;
+  const selectedCountry = COUNTRIES.find(c => c.code === country) || COUNTRIES[0];
 
   useEffect(() => { setOperator(""); }, [country]);
+  useEffect(() => {
+    if (catalog.countries.length && !catalog.countries.some(c => c.code === country)) setCountry(catalog.countries[0].code);
+  }, [catalog.data?.fetchedAt, country]);
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
   const currency = selectedCountry.currency;
   const balanceXOF = parseFloat(String(wallet?.balanceXOF || 0));
-  const balance = currency === "CDF" ? Math.floor(balanceXOF / 0.22) : balanceXOF;
+  const walletRate = catalog.rate(currency);
+  const balance = walletRate ? Math.floor(balanceXOF / walletRate) : 0;
   const transferAmount = parseFloat(amount) || 0;
   const feeRate = (serviceFees?.transfer ?? 7) / 100;
-  const transferAmountXOF = currency === "CDF" ? Math.floor(transferAmount * 0.22) : transferAmount;
+  const transferAmountXOF = Math.floor(transferAmount * walletRate);
   const fees = Math.round(transferAmountXOF * feeRate);
-  const feesDisplay = currency === "CDF" ? Math.round(transferAmount * feeRate) : fees;
+  const feesDisplay = walletRate ? Math.round(fees / walletRate) : 0;
   const totalDeducted = transferAmount + feesDisplay;
   const insufficientFunds = (transferAmountXOF + Math.round(transferAmountXOF * feeRate)) > balanceXOF && transferAmount > 0;
 
@@ -99,7 +96,7 @@ export default function TransferPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!transferAmount || !phone || !operator || !country || insufficientFunds) return;
+    if (!catalog.ready || !walletRate || !catalog.network(operator, country)?.payout || !transferAmount || !phone || !operator || !country || insufficientFunds) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
     const nameParts = recipientName.trim().split(" ");
     const firstName = nameParts[0] || "Client";
@@ -160,6 +157,7 @@ export default function TransferPage() {
 
   return (
     <DashboardLayout title="" breadcrumbs={[{ label: "Transfert" }]}>
+      <CatalogNotice loading={catalog.isLoading} error={catalog.isError} empty={!catalog.countries.length} currency={currency} rate={walletRate} />
       <div className="max-w-md mx-auto space-y-5">
         {isBlocked && (
           <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-5 text-center space-y-2">
@@ -253,7 +251,7 @@ export default function TransferPage() {
                         <OperatorLogo operator={op} size={52} />
                       </div>
                       <span className={`text-xs font-bold text-center leading-tight ${operator === op ? "text-primary" : "text-muted-foreground"}`}>
-                        {OPERATOR_LABEL[op] || op}
+                        {catalog.label(op)}
                       </span>
                     </button>
                   ))}
@@ -343,7 +341,7 @@ export default function TransferPage() {
             type="submit"
             className="w-full h-13 text-base font-bold gap-2 shadow-xl"
             style={{ background: !transferAmount || insufficientFunds ? undefined : "linear-gradient(135deg, hsl(200 90% 34%) 0%, hsl(220 80% 52%) 100%)" }}
-            disabled={transferMutation.isPending || !transferAmount || !phone || !operator || !country || insufficientFunds}
+            disabled={!catalog.ready || !walletRate || transferMutation.isPending || !transferAmount || !phone || !operator || !country || insufficientFunds}
             data-testid="button-confirm-transfer"
           >
             {transferMutation.isPending ? (

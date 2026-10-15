@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import type { ApiKey } from "@shared/schema";
+import { useAlphaCatalog, CatalogNotice } from "@/hooks/use-alphapay-catalog";
 
 const SR_OPERATORS = [
   { code: "MTN", label: "MTN Mobile Money", countries: ["BJ", "CI", "CM"], otp: false, note: "Suivre les instructions et le statut retournés" },
@@ -253,6 +254,9 @@ Formule : net_amount = amount - fees = amount × (1 - taux)
 }
 
 export default function SrApiPage() {
+  const catalog = useAlphaCatalog("payin");
+  const SR_COUNTRIES = catalog.countries;
+  const SR_OPERATORS = catalog.operators;
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
   const [createSrOpen, setCreateSrOpen] = useState(false);
@@ -571,7 +575,7 @@ export default function SrApiPage() {
                   <AlertCircle className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="text-[11px] text-amber-300/80 space-y-1">
                     <p className="font-bold text-amber-300">Si un opérateur exige une page externe</p>
-                    <p>Si la réponse indique <code className="bg-black/40 px-1 rounded">requires_redirect: true</code>, ce paiement nécessite une page externe et n'est pas disponible dans un parcours sans redirection. L'API SR ne retourne pas d'URL de paiement à ouvrir : conservez la référence et indiquez la limite à l'utilisateur.</p>
+                    <p>Si <code>requires_redirect: true</code>, proposez la <code>payment_url</code> sécurisée retournée au client. Sinon, suivez les instructions de paiement direct. Conservez toujours la référence et vérifiez le statut côté serveur.</p>
                   </div>
                 </div>
               </div>
@@ -811,7 +815,7 @@ export default function SrApiPage() {
               <Bolt className="h-7 w-7 text-green-500" />
             </div>
             <DialogTitle className="text-center">Créer une clé API SR</DialogTitle>
-            <DialogDescription className="text-center">Paiements directs sans redirection. Gardez cette clé secrète — ne l'exposez jamais en frontend.</DialogDescription>
+            <DialogDescription className="text-center">Paiements directs ou page externe selon le réseau. Gardez cette clé secrète — ne l'exposez jamais en frontend.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <Input placeholder="Nom de la clé (ex: Clé SR principale)" value={srKeyName} onChange={(e) => setSrKeyName(e.target.value)} data-testid="input-sr-key-name" />

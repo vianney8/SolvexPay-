@@ -12,22 +12,12 @@ import { OperatorLogo } from "@/components/operator-logo";
 import { CheckCircle2, XCircle, Loader2, ChevronDown, Shield, ChevronUp, Smartphone, RefreshCw, Clock, Wifi } from "lucide-react";
 import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 import type { PaymentLink } from "@shared/schema";
+import { useAlphaCatalog, CatalogNotice, operatorMatches, safePaymentUrl, ExternalPayment } from "@/hooks/use-alphapay-catalog";
 
 function formatAmount(amount: string | number) {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
   return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
 }
-
-const COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"], phonePlaceholder: "01 90 12 34 56" },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"], phonePlaceholder: "07 12 34 56 78" },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
-  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], phonePlaceholder: "77 123 45 67" },
-  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
-  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
-];
 
 const OPERATOR_LABEL: Record<string, string> = {
   MTN: "MTN Money", Orange: "Orange Money", Moov: "Moov Money", Wave: "Wave",
@@ -73,6 +63,9 @@ function PageWrapper({ children, hideLinks = false }: { children: React.ReactNod
 }
 
 export default function PayPage() {
+  const catalog = useAlphaCatalog("payin");
+  const COUNTRIES = catalog.safeCountries;
+  const [externalUrl, setExternalUrl] = useState("");
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
   const phoneInputRef = useRef<HTMLInputElement>(null);
@@ -109,7 +102,7 @@ export default function PayPage() {
   const selectedCountry = COUNTRIES.find(c => c.code === country) || COUNTRIES[0];
 
   useEffect(() => { setOperator(""); setOtp(""); }, [country]);
-  const otpSupported = operator === "Orange" && (country === "CI" || country === "BF");
+  const otpSupported = catalog.network(operator, country)?.otpRequired === true;
 
   const { data: suspendedData } = useQuery<{ codes: string[] }>({
     queryKey: ["/api/public/suspended-countries"],
@@ -120,7 +113,7 @@ export default function PayPage() {
 
   function getOperatorStatus(op: string) {
     if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
-    const pm = paymentMethods.find((m: any) => m.code === op);
+    const pm = paymentMethods.find((m: any) => operatorMatches(m.code, op));
     if (!pm) return { available: true, maintenance: false };
     const globalMaint = pm.inMaintenance === true;
     const countryMaint = (pm.maintenanceCountries || []).includes(country);
@@ -145,7 +138,7 @@ export default function PayPage() {
   useEffect(() => {
     const nextCountry = availableCountries[0];
     if (nextCountry && !availableCountries.some(c => c.code === country)) setCountry(nextCountry.code);
-  }, [country, paymentCurrency, suspendedData?.codes]);
+  }, [country, paymentCurrency, suspendedData?.codes, catalog.data?.fetchedAt]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -165,6 +158,7 @@ export default function PayPage() {
       return res.json();
     },
     onSuccess: (data: any) => {
+      setExternalUrl(safePaymentUrl(data));
       setPendingReference(data.reference || data.sendavaReference || data.id || null);
       setPaymentInstructions(typeof data.instructions === "string" && data.instructions ? data.instructions : typeof data.message === "string" ? data.message : "");
       const paymentUrl = data.paymentUrl || data.payment_url;
@@ -177,7 +171,7 @@ export default function PayPage() {
       setRedirectBlocked(cannotPayInPlace);
       setPaymentStatus("processing");
       toast({
-        title: cannotPayInPlace ? "Paiement indisponible sans redirection" : "Paiement initié",
+        title: cannotPayInPlace ? "Page de paiement requise" : "Paiement initié",
         description: cannotPayInPlace ? "La référence est conservée pour vérification." : "Suivez les instructions affichées pour terminer l’opération.",
       });
     },
@@ -198,6 +192,7 @@ export default function PayPage() {
         });
         if (res.ok) {
           const data = await res.json();
+          if (safePaymentUrl(data)) setExternalUrl(safePaymentUrl(data));
           if (data.status) setVerifyStatus(data.status);
           const terminal = ["SUCCESS", "FAILED", "CANCELLED"].includes(String(data.status || "").toUpperCase());
           if (typeof data.instructions === "string" || typeof data.message === "string") {
@@ -226,6 +221,7 @@ export default function PayPage() {
 
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!catalog.ready || !catalog.rate(selectedCountry.currency) || !catalog.network(operator, country)?.payin) return;
     if (payMutation.isPending) return;
     if (selectedCountry.currency !== paymentCurrency) {
       toast({ title: "Pays incompatible", description: `Choisissez un pays prenant en charge la devise ${paymentCurrency}.`, variant: "destructive" });
@@ -380,7 +376,7 @@ export default function PayPage() {
                 <p className="text-sm text-white/50 max-w-xs mx-auto leading-relaxed">
                   {isSuccess ? "Votre paiement a été traité avec succès. Merci !"
                   : isFailed ? "Le paiement n'a pas abouti. Vérifiez votre solde ou réessayez."
-                   : redirectBlocked ? "Le paiement nécessite une page externe, qui n'a pas été ouverte."
+                   : redirectBlocked ? "Continuez sur la page sécurisée, puis revenez vérifier ce paiement."
                    : "Le statut est en cours de vérification."}
                 </p>
               </div>
@@ -449,10 +445,11 @@ export default function PayPage() {
                 </div>
               </div>
             )}
+            <ExternalPayment url={isPending ? externalUrl : ""} />
             {redirectBlocked && (
               <div className="rounded-2xl p-4 space-y-2" style={{ background: "rgba(251,146,60,0.10)", border: "1px solid rgba(251,146,60,0.30)" }}>
-                <p className="text-sm font-bold text-orange-200">Cet opérateur exige une page externe. Ce paiement n’est pas disponible sans redirection.</p>
-                <p className="text-xs text-white/60">Aucune page externe n’a été ouverte. La référence ci-dessous reste disponible pour vérifier ce paiement.</p>
+                <p className="text-sm font-bold text-orange-200">Une page externe sécurisée est nécessaire.</p>
+                <p className="text-xs text-white/60">Continuez avec le bouton de paiement, puis revenez vérifier le statut.</p>
               </div>
             )}
             {paymentInstructions && (
@@ -484,6 +481,7 @@ export default function PayPage() {
                   .then(async (res) => {
                     if (!res.ok) throw new Error();
                     const data = await res.json();
+                    if (safePaymentUrl(data)) setExternalUrl(safePaymentUrl(data));
                     if (data.status) setVerifyStatus(data.status);
                     const terminal = ["SUCCESS", "FAILED", "CANCELLED"].includes(String(data.status || "").toUpperCase());
                     if (typeof data.instructions === "string" || typeof data.message === "string") setPaymentInstructions(data.instructions || data.message || "");
@@ -614,6 +612,7 @@ export default function PayPage() {
           )}
 
           <form onSubmit={handlePay} className="space-y-4">
+            <CatalogNotice loading={catalog.isLoading} error={catalog.isError} empty={!availableCountries.length} currency={selectedCountry.currency} rate={catalog.rate(selectedCountry.currency)} />
 
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Pays Mobile Money</Label>
@@ -693,7 +692,7 @@ export default function PayPage() {
                         <OperatorLogo operator={op} size={52} />
                       </div>
                       <span className={`text-[11px] font-bold text-center leading-tight ${operator === op ? "text-blue-700" : isDisabled ? "text-gray-400" : "text-gray-500"}`}>
-                        {OPERATOR_LABEL[op] || op}
+                        {catalog.label(op)}
                       </span>
                     </button>
                   );
@@ -703,7 +702,7 @@ export default function PayPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                Numéro {operator ? OPERATOR_LABEL[operator] || operator : "Mobile Money"}
+                Numéro {operator ? catalog.label(operator) : "de téléphone"}
               </Label>
               <div className="flex gap-0 rounded-xl border border-gray-200 overflow-hidden focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                 <div className="flex items-center gap-2 px-3 bg-gray-50 border-r border-gray-200 flex-shrink-0">

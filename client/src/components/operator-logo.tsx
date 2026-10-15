@@ -82,7 +82,8 @@ function FreeMoneyLogo({ size = 48 }: { size?: number }) {
 }
 
 export function OperatorLogo({ operator, size = 48 }: OperatorLogoProps) {
-  const op = operator.toLowerCase();
+  const head = operator.toLowerCase().split("_")[0];
+  const op = ({ togocel: "tmoney", freemoney: "free" } as Record<string, string>)[head] || head;
   if (op === "mtn") return <MtnLogo size={size} />;
   if (op === "orange") return <OrangeLogo size={size} />;
   if (op === "wave") return <WaveLogo size={size} />;

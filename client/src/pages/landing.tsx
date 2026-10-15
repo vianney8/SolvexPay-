@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { OperatorLogo } from "@/components/operator-logo";
+import { useAlphaCatalog } from "@/hooks/use-alphapay-catalog";
 import {
   ArrowRight, Shield, Zap, Globe, Smartphone, Code2, LinkIcon,
   CheckCircle2, ChevronDown, ChevronUp, Lock, Webhook,
@@ -27,7 +28,7 @@ const FAQS = [
   { q: "Quels sont les frais ?", a: "Les frais sont simples et transparents. Consultez la section Tarifs pour les taux exacts en vigueur. Aucun abonnement mensuel, aucun frais caché." },
   { q: "Le KYC est-il obligatoire ?", a: "Le KYC est requis pour débloquer tous les plafonds. Sans KYC vous pouvez tester la plateforme avec des limites réduites. La vérification prend généralement moins de 24h." },
   { q: "Comment intégrer l'API ?", a: "Créez votre compte, accédez à 'Clés API' dans votre tableau de bord. Utilisez l'API JSON POST /api/v1/deposit depuis votre serveur pour garder le client sur votre propre formulaire. La page checkout hébergée reste facultative." },
-  { q: "Quels pays sont couverts ?", a: "9 pays : Bénin, Côte d'Ivoire, Burkina Faso, Togo, Sénégal, Mali, Cameroun, RD Congo, Congo-Brazzaville. Couverture en constante expansion." },
+  { q: "Quels pays sont couverts ?", a: "Les pays et réseaux disponibles sont synchronisés avec AlphaPay. La disponibilité dépend du moyen choisi et du sens de l’opération : encaissement ou décaissement." },
   { q: "Comment recevoir les notifications de paiement ?", a: "Configurez votre URL webhook dans les paramètres de votre clé API. SolvexPay envoie automatiquement une requête POST signée HMAC-SHA256 à chaque changement de statut de transaction." },
 ];
 
@@ -57,6 +58,8 @@ function useCountUp(target: number, duration = 2000, start = false) {
 }
 
 export default function LandingPage() {
+  const catalog = useAlphaCatalog("payin");
+  const ALL_COUNTRIES = catalog.countries.map(c => ({ ...c, iso: c.code, code: c.code, operators: c.operators.map(catalog.label) }));
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [notifIdx, setNotifIdx] = useState(0);

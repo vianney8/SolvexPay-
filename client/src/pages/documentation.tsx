@@ -4,6 +4,7 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAlphaCatalog, CatalogNotice } from "@/hooks/use-alphapay-catalog";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Key, Zap, Webhook, Globe, Lock, BookOpen, Copy, Check,
@@ -120,6 +121,8 @@ function ParamRow({ name, type, required, desc }: { name: string; type: string; 
 }
 
 function DocContent({ activeSection, setActiveSection }: { activeSection: string; setActiveSection: (s: string) => void }) {
+  const catalog = useAlphaCatalog("payin");
+  const COUNTRIES_DATA = catalog.countries;
   const { data: contactLinks } = useQuery<Record<string, string>>({ queryKey: ["/api/support-links"] });
   const { data: suspendedData } = useQuery<{ codes: string[] }>({
     queryKey: ["/api/public/suspended-countries"],
@@ -127,9 +130,8 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
     staleTime: 60_000,
   });
   const suspendedCodes = suspendedData?.codes || [];
-  const filteredOperators = OPERATORS.map(op => ({
-    ...op,
-    countries: op.countries.split(", ").filter(cc => !suspendedCodes.includes(cc)).join(", "),
+  const filteredOperators = catalog.operators.map(op => ({
+    ...op, name: op.label, countries: op.countries.filter(cc => !suspendedCodes.includes(cc)).join(", "),
   })).filter(op => op.countries.length > 0);
   const supportEmail = contactLinks?.support_link_email?.replace("mailto:", "") || "support@solvexpay.com";
   const supportWhatsApp = contactLinks?.support_link_whatsapp_direct || "https://wa.me/22891840498";
@@ -179,12 +181,12 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
                   </div>
                 </div>
                 <p className="text-white/80 text-sm leading-relaxed">
-                  Intégrez les paiements Mobile Money dans votre application en quelques lignes de code. SolvexPay agrège 8 opérateurs dans 9 pays africains.
+                  Intégrez les moyens de paiement AlphaPay disponibles pour votre compte. Le catalogue est actualisé automatiquement.
                 </p>
                 <div className="flex flex-wrap gap-2 mt-4">
                   <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">REST · JSON</span>
                   <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">HTTPS requis</span>
-                  <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">9 pays · 8 opérateurs</span>
+                  <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">{catalog.countries.length} destinations · {catalog.operators.length} réseaux</span>
                 </div>
               </div>
 
@@ -266,7 +268,7 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
                         return (
                           <span key={op} className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold border border-transparent ${s.bg} ${s.text}`}>
                             <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
-                            {op}
+                            {catalog.label(op)}
                           </span>
                         );
                       })}
@@ -276,6 +278,11 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
 
                 return (
                   <div className="space-y-6">
+                    <CatalogNotice loading={catalog.isLoading} error={catalog.isError} empty={!catalog.countries.length} />
+                    <p className="text-xs text-muted-foreground">Catalogue JSON : <code>GET /api/public/alphapay/catalog</code>. Utilisez les codes exacts de réseau et les indicateurs payin/payout. XX désigne les moyens internationaux, XC la RD Congo en USD.</p>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {activeCountries.filter(c => !["XOF", "XAF"].includes(c.currency)).map(c => <CountryCard key={c.code} c={c} />)}
+                    </div>
                     {xofCountries.length > 0 && (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
@@ -313,7 +320,7 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
                           <div>
                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Paramètre <code className="font-mono bg-muted px-1 rounded">operator</code></p>
                             <div className="flex flex-wrap gap-1">
-                              {["MTN","Orange","Moov","Wave","TMoney","Airtel","Free"].map(op => (
+                              {catalog.operators.map(o => o.code).map(op => (
                                 <code key={op} className="px-1.5 py-0.5 rounded bg-muted border border-border/60 text-[10px] font-mono font-bold">{op}</code>
                               ))}
                             </div>
@@ -414,7 +421,7 @@ const response = await fetch('${BASE_URL}/api/v1/deposit', {
                   <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-bold text-amber-800">Réponse de l'API et compatibilité opérateur</p>
-                    <p className="text-xs text-amber-700 mt-0.5">Le paiement direct retourne une référence à vérifier. Si une réponse indique <code className="bg-amber-100 px-1 rounded font-mono">requiresRedirect: true</code> ou fournit une URL externe, ne redirigez pas automatiquement le client : cette méthode opérateur n'est pas disponible dans un parcours sans redirection.</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Conservez la référence pour vérifier le statut. Si <code>requiresRedirect: true</code>, proposez au client la <code>paymentUrl</code> sécurisée retournée. Sinon, suivez les instructions du paiement direct. Une redirection ou un retour navigateur ne prouve jamais un paiement.</p>
                   </div>
                 </CardContent>
               </Card>

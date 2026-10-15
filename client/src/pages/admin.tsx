@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useAlphaCatalog } from "@/hooks/use-alphapay-catalog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Users, ArrowDownUp, TrendingUp, Wallet, Shield, KeyRound, PenLine,
@@ -588,6 +589,8 @@ function CountdownLoader({ label, icon }: { label: string; icon: string }) {
 }
 
 export default function AdminPage() {
+  const alphaCatalog = useAlphaCatalog();
+  const COUNTRIES = alphaCatalog.data?.countries || [];
   const { toast } = useToast();
 
   const [userSearch, setUserSearch] = useState("");
