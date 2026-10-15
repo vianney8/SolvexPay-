@@ -1,6 +1,5 @@
 import { AlphaPayClient } from "alphapay-node";
 import crypto from "node:crypto";
-import { normalizeCountry } from "./alphapayCatalog";
 
 export type PaymentState = "pending" | "completed" | "failed";
 export function alphapayStatusToString(status: unknown): PaymentState {
@@ -28,12 +27,10 @@ const NETWORKS: Record<string, Record<string, string>> = {
 };
 
 export function getAlphaPayNetwork(operator: string, country: string): string {
-  const iso = normalizeCountry(country);
-  const exact = operator.toLowerCase();
-  if (/^[a-z][a-z0-9_]*$/.test(exact) && (exact.includes("_") || ["togocel", "card", "crypto"].includes(exact))) return exact;
-  const mapped = NETWORKS[operator.toUpperCase()]?.[iso];
-  if (!mapped) throw new Error("Utilisez le code réseau exact retourné par le catalogue AlphaPay.");
-  return mapped;
+  const iso = country.toUpperCase() === "COD" ? "CD" : country.toUpperCase();
+  const network = NETWORKS[operator.toUpperCase()]?.[iso];
+  if (!network) throw new Error("Ce pays ou cet opérateur n’est pas pris en charge par AlphaPay.");
+  return network;
 }
 
 export interface PaymentParams {
@@ -51,8 +48,6 @@ export interface PaymentParams {
   callbackUrl?: string;
   checkout?: boolean;
   directOnly?: boolean;
-  /** Server-owned immutable quote; never read from a public request body. */
-  walletRate?: number;
 }
 
 export interface PaymentResponse {
@@ -138,7 +133,6 @@ export class AlphaPayService {
       success: 1, id: result.id, status: result.status, reference: params.reference,
       payment_url: url, kind: checkout ? "checkout" : "payment",
       instructions: typeof result.instructions === "string" ? result.instructions.slice(0, 2000) : undefined,
-      requires_redirect: !!url,
     };
     return params.directOnly ? directPaymentResponse(response) : response;
   }
@@ -159,14 +153,11 @@ export class AlphaPayService {
   context(params: PaymentParams) {
     const network = params.operator || "";
     const suffix = network === "togocel" ? "tg" : network.split("_").at(-1);
-    const country = normalizeCountry(params.country || suffix || "");
-    const special = network === "togocel" && country === "TG"
-      || ["card", "crypto"].includes(network) && country === "XX"
-      || /^(airtel|orange|vodacom)_cd_usd$/.test(network) && country === "XC";
-    if (!/^[a-z][a-z0-9_]*$/.test(network) || (!special && !network.endsWith(`_${country.toLowerCase()}`))) {
+    const country = (params.country === "COD" ? "CD" : params.country || suffix || "").toUpperCase();
+    if (!Object.values(NETWORKS).some(networks => networks[country] === network)) {
       throw new Error("Réseau AlphaPay non pris en charge pour ce pays.");
     }
-    const localCurrency = ({ CM: "XAF", CG: "XAF", GA: "XAF", CD: "CDF", GH: "GHS", GN: "GNF", KE: "KES", MW: "MWK", NG: "NGN", RW: "RWF", TZ: "TZS", UG: "UGX", ZM: "ZMW", SL: "SLE", XC: "USD", XX: "USD", ET: "ETB", LS: "LSL", MZ: "MZN", IN: "INR", US: "USD" } as Record<string, string>)[country] || "XOF";
+    const localCurrency = country === "CM" ? "XAF" : country === "CD" ? "CDF" : "XOF";
     const currency = params.currency || localCurrency;
     if (currency !== localCurrency) throw new Error("La devise du paiement doit correspondre au pays sélectionné.");
     if (!Number.isSafeInteger(params.amount) || params.amount <= 0 || params.amount > 1_000_000_000) throw new Error("Montant entier invalide ou trop élevé.");

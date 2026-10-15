@@ -3,7 +3,6 @@ import { paymentProviders, paymentProviderLogs, transactions, wallets, adminWith
 import { eq, and, desc, sql, ne } from "drizzle-orm";
 import { AlphaPayService, alphapayStatusToString, directPaymentResponse, type PaymentParams, type PaymentResponse, type PaymentState } from "./alphapay";
 import { amountInXOF, paymentWalletDelta } from "./paymentAccounting";
-import { assertAlphaAvailable, getWalletRate } from "./alphapayCatalog";
 export { amountInXOF } from "./paymentAccounting";
 
 type Receipt = PaymentResponse & { kind: "payment" | "payout" | "checkout" };
@@ -52,11 +51,7 @@ export async function settlePayment(reference: string, state: PaymentState) {
   const settled = await db.transaction(async tx => {
     const [transaction] = await tx.select().from(transactions).where(eq(transactions.reference, reference)).for("update");
     if (!transaction || transaction.status !== "pending") return;
-    const [binding] = await tx.select().from(paymentProviderLogs).where(and(
-      eq(paymentProviderLogs.reference, reference), eq(paymentProviderLogs.providerCode, "alphapay"),
-      eq(paymentProviderLogs.action, "binding"),
-    )).limit(1);
-    const delta = paymentWalletDelta(transaction, state, (binding?.request as BindingRequest | undefined)?.params.walletRate);
+    const delta = paymentWalletDelta(transaction, state);
     if (delta !== 0) {
       await tx.insert(wallets).values({ userId: transaction.userId }).onConflictDoNothing({ target: wallets.userId });
       const [wallet] = await tx.update(wallets).set({ balanceXOF: sql`${wallets.balanceXOF} + ${delta}`, updatedAt: new Date() })
@@ -77,19 +72,14 @@ class PaymentService {
   async getActiveCode() { return "alphapay"; }
   async isConfigured() { return isApiKeyConfigured(); }
   async getReceipt(reference: string) {
-    const binding = await findBinding(reference);
-    const receipt = binding?.response as PaymentResponse | null;
-    return receipt ? ((binding?.request as BindingRequest)?.params.directOnly ? directPaymentResponse(receipt) : receipt) : null;
+    const receipt = (await findBinding(reference))?.response as PaymentResponse | null;
+    return receipt ? directPaymentResponse(receipt) : null;
   }
 
   private async initiate(action: "deposit" | "transfer", params: PaymentParams): Promise<PaymentResponse> {
     requireConfigured();
     const service = new AlphaPayService();
-    const context = service.context(params);
-    if (!(await findBinding(params.reference))) {
-      await assertAlphaAvailable(context.network, context.country, context.currency, action === "deposit" ? "payin" : "payout");
-      params = { ...params, walletRate: await getWalletRate(context.currency) };
-    }
+    service.context(params);
     // Save the exact non-secret payload before the network request. Ambiguous
     // responses are retried with the SAME provider idempotency key and payload.
     const binding = await db.transaction(async tx => {
@@ -126,7 +116,8 @@ class PaymentService {
   }
 
   async deposit(params: PaymentParams) {
-    return this.initiate("deposit", { ...params, checkout: false, directOnly: false });
+    const receipt = await this.initiate("deposit", { ...params, checkout: false, directOnly: true });
+    return directPaymentResponse(receipt);
   }
   transfer(params: PaymentParams) { return this.initiate("transfer", params); }
   async getBalance() { requireConfigured(); return new AlphaPayService().getBalance(); }
@@ -183,11 +174,10 @@ class PaymentService {
     if (adminPayout && adminPayout.status === "pending" && state !== "pending") {
       await db.update(adminWithdrawals).set({ status: state, updatedAt: new Date() }).where(and(eq(adminWithdrawals.id, adminPayout.id), eq(adminWithdrawals.status, "pending")));
     }
-    const presentation = saved.params.directOnly ? directPaymentResponse(receipt) : receipt;
+    const presentation = directPaymentResponse(receipt);
     return {
       success: 1, reference, status: result.status, id: result.id,
-      payment_url: presentation.payment_url,
-      requires_redirect: presentation.requires_redirect === true || !!presentation.payment_url,
+      requires_redirect: presentation.requires_redirect,
       instructions: presentation.instructions, message: presentation.message,
     };
   }
@@ -207,9 +197,7 @@ export const paymentService = new PaymentService();
 export async function reservePayout(userId: string, params: PaymentParams, feesXOF: number, type: "withdrawal" | "transfer") {
   requireConfigured();
   const context = new AlphaPayService().context(params);
-  await assertAlphaAvailable(context.network, context.country, context.currency, "payout");
-  params = { ...params, walletRate: params.walletRate ?? await getWalletRate(context.currency) };
-  const debit = amountInXOF(params.amount, context.currency, params.walletRate) + feesXOF;
+  const debit = amountInXOF(params.amount, context.currency) + feesXOF;
   if (!Number.isSafeInteger(debit) || debit <= 0 || !Number.isFinite(feesXOF) || feesXOF < 0) throw new Error("Montant ou frais invalides.");
   const transaction = await db.transaction(async tx => {
     const [wallet] = await tx.update(wallets).set({ balanceXOF: sql`${wallets.balanceXOF} - ${debit}`, updatedAt: new Date() })
@@ -221,11 +209,6 @@ export async function reservePayout(userId: string, params: PaymentParams, feesX
       phoneNumber: params.msisdn, provider: context.network,
       description: `AlphaPay — ${type === "withdrawal" ? "retrait" : "transfert"}`,
     }).returning();
-    // Persist the exact refund conversion in the same commit as the reservation.
-    await tx.insert(paymentProviderLogs).values({
-      providerCode: "alphapay", action: "binding", reference: params.reference,
-      request: { params, action: "transfer" }, status: "pending",
-    });
     return created;
   });
   try {

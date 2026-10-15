@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import type { ApiKey } from "@shared/schema";
-import { useAlphaCatalog } from "@/hooks/use-alphapay-catalog";
 
 function formatDate(date: string | Date | null) {
   if (!date) return "Jamais";
@@ -156,9 +155,6 @@ function SrWebhookConfig({ srKey }: { srKey: any }) {
 }
 
 function SrSection({ allKeys }: { allKeys: ApiKey[] }) {
-  const catalog = useAlphaCatalog("payin");
-  const SR_COUNTRIES = catalog.countries;
-  const SR_OPERATORS = catalog.operators;
   const { toast } = useToast();
   const [createSrOpen, setCreateSrOpen] = useState(false);
   const [srKeyName, setSrKeyName] = useState("");
@@ -232,7 +228,7 @@ function SrSection({ allKeys }: { allKeys: ApiKey[] }) {
                 <h2 className="font-black text-base text-green-300">API SR</h2>
                 <span className="px-2 py-0.5 rounded-full bg-green-500/20 border border-green-500/30 text-[10px] font-bold text-green-400 uppercase tracking-wider">Sans Redirection</span>
               </div>
-              <p className="text-xs text-green-300/60 mt-0.5">Initiez les paiements depuis votre serveur. Une page externe est proposée uniquement si le réseau l’exige.</p>
+              <p className="text-xs text-green-300/60 mt-0.5">Initiez des paiements directement depuis votre backend, sans redirection côté client.</p>
             </div>
           </div>
 
@@ -698,7 +694,7 @@ if ($response['success']) {
               <Bolt className="h-7 w-7 text-green-500" />
             </div>
             <DialogTitle className="text-center">Créer une clé API SR</DialogTitle>
-            <DialogDescription className="text-center">Paiements directs ou page externe selon le réseau. Gardez cette clé secrète — ne l'exposez jamais en frontend.</DialogDescription>
+            <DialogDescription className="text-center">Paiements directs sans redirection. Gardez cette clé secrète — ne l'exposez jamais en frontend.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <Input placeholder="Nom de la clé (ex: Clé SR principale)" value={srKeyName} onChange={(e) => setSrKeyName(e.target.value)} data-testid="input-sr-key-name" />

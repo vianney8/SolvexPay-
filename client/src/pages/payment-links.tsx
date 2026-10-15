@@ -19,7 +19,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { useAlphaCatalog, CatalogNotice } from "@/hooks/use-alphapay-catalog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Plus, Link2, Copy, ExternalLink, Trash2, Search,
@@ -28,9 +27,9 @@ import {
 } from "lucide-react";
 import type { PaymentLink } from "@shared/schema";
 
-function formatCurrency(amount: string | number, currency = "XOF") {
+function formatCurrency(amount: string | number) {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num) + ` ${currency}`;
+  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num) + " XOF";
 }
 
 function formatDate(date: string | Date) {
@@ -38,8 +37,6 @@ function formatDate(date: string | Date) {
 }
 
 function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; onSuccess: () => void; editLink?: PaymentLink | null }) {
-  const catalog = useAlphaCatalog("payin");
-  const [currency, setCurrency] = useState(editLink?.currency || "XOF");
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(editLink?.name || "");
@@ -100,14 +97,13 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!catalog.ready || !catalog.rate(currency)) return;
     if (!name.trim()) return;
     if (!allowCustomAmount && !amount) return;
 
     const payload = {
       name: name.trim(),
       amount: allowCustomAmount ? (amount ? parseFloat(String(amount)) : 0) : parseFloat(String(amount)),
-      currency,
+      currency: "XOF",
       allowCustomAmount,
       description: description.trim() || undefined,
       redirectUrl: redirectUrl.trim() || undefined,
@@ -168,21 +164,13 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
-              <CatalogNotice loading={catalog.isLoading} error={catalog.isError} currency={currency} rate={catalog.rate(currency)} />
-              <div className="space-y-2">
-                <Label>Devise du paiement</Label>
-                <select value={currency} onChange={e => setCurrency(e.target.value)} disabled={!!editLink} className="w-full h-11 rounded-md border border-input bg-background px-3" data-testid="select-link-currency">
-                  {(catalog.data?.currencies || [currency]).map(code => <option key={code} value={code}>{code}</option>)}
-                </select>
-                {editLink && <p className="text-xs text-muted-foreground">La devise d’un lien existant ne peut pas être modifiée.</p>}
-              </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nom du produit ou service</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: T-shirt, Abonnement mensuel..." required className="h-11 border-border/70" data-testid="input-link-name" />
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant ({currency})</Label>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Montant (XOF)</Label>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Libre</span>
                     <Switch checked={allowCustomAmount} onCheckedChange={setAllowCustomAmount} data-testid="switch-custom-amount" />
@@ -250,16 +238,16 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aperçu des frais</p>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Montant du paiement</span>
-                  <span className="font-semibold" data-testid="text-preview-amount">{formatCurrency(previewAmount, currency)}</span>
+                  <span className="font-semibold" data-testid="text-preview-amount">{formatCurrency(previewAmount)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Frais d'encaissement ({Math.round(feeRate * 100)}%)</span>
-                  <span className="text-destructive font-medium" data-testid="text-preview-fees">- {formatCurrency(fees, currency)}</span>
+                  <span className="text-destructive font-medium" data-testid="text-preview-fees">- {formatCurrency(fees)}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sm">Montant net reçu</span>
-                  <span className="font-black text-lg text-emerald-600 dark:text-emerald-400" data-testid="text-preview-net">{formatCurrency(netAmount, currency)}</span>
+                  <span className="font-black text-lg text-emerald-600 dark:text-emerald-400" data-testid="text-preview-net">{formatCurrency(netAmount)}</span>
                 </div>
               </CardContent>
             </Card>
@@ -276,7 +264,7 @@ function PaymentLinkForm({ onBack, onSuccess, editLink }: { onBack: () => void; 
             <Button type="button" variant="outline" onClick={onBack} className="flex-1 h-12 font-semibold border-border/70" data-testid="button-cancel-create">
               Annuler
             </Button>
-            <Button type="submit" className="flex-1 h-12 font-bold shadow-lg shadow-primary/20" disabled={!catalog.ready || !catalog.rate(currency) || isPending || uploading} data-testid="button-confirm-create-link">
+            <Button type="submit" className="flex-1 h-12 font-bold shadow-lg shadow-primary/20" disabled={isPending || uploading} data-testid="button-confirm-create-link">
               {uploading ? "Upload en cours..." : isPending ? (editLink ? "Modification..." : "Création...") : (editLink ? "Enregistrer" : "Créer le lien")}
             </Button>
           </div>
@@ -518,9 +506,9 @@ export default function PaymentLinksPage() {
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       {(link as any).allowCustomAmount ? (
-                        <span className="font-black text-sm text-violet-600 dark:text-violet-400">Montant libre{parseFloat(link.amount) > 0 ? ` (min. ${formatCurrency(link.amount, link.currency)})` : ""}</span>
+                        <span className="font-black text-sm text-violet-600 dark:text-violet-400">Montant libre{parseFloat(link.amount) > 0 ? ` (min. ${formatCurrency(link.amount)})` : ""}</span>
                       ) : (
-                        <span className="font-black text-sm text-foreground">{formatCurrency(link.amount, link.currency)}</span>
+                        <span className="font-black text-sm text-foreground">{formatCurrency(link.amount)}</span>
                       )}
                       <span className="text-xs text-muted-foreground">{link.timesUsed} utilisation{parseInt(String(link.timesUsed)) !== 1 ? "s" : ""}</span>
                       {link.createdAt && <span className="text-xs text-muted-foreground hidden sm:inline">{formatDate(link.createdAt)}</span>}

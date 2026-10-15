@@ -17,16 +17,24 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
-import { useAlphaCatalog, CatalogNotice, operatorMatches, safePaymentUrl, ExternalPayment } from "@/hooks/use-alphapay-catalog";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 }
 
+const COUNTRIES = [
+  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"], phonePlaceholder: "01 90 12 34 56" },
+  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"], phonePlaceholder: "07 12 34 56 78" },
+  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
+  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
+  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], phonePlaceholder: "77 123 45 67" },
+  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
+  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
+  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
+];
+
+
 export default function DepositPage() {
-  const catalog = useAlphaCatalog("payin");
-  const COUNTRIES = catalog.safeCountries;
-  const [externalUrl, setExternalUrl] = useState("");
   const { user } = useAuth();
   const isBlocked = !!(user as any)?.isBlocked;
   const { toast } = useToast();
@@ -59,16 +67,16 @@ export default function DepositPage() {
   const selectedCountry = COUNTRIES.find(c => c.code === country) || availableCountries[0] || COUNTRIES[0];
   const currency = selectedCountry.currency;
   const parsedAmount = parseFloat(amount) || 0;
-  const otpSupported = catalog.network(operator, country)?.otpRequired === true;
+  const otpSupported = country === "CI" && operator === "Orange" || country === "BF" && operator === "Orange";
 
   useEffect(() => { setOperator(""); setOtp(""); }, [country]);
   useEffect(() => { setOtp(""); }, [operator]);
   useEffect(() => {
-    if (catalog.ready && !availableCountries.some(c => c.code === country)) {
+    if (suspendedCodes.length > 0 && suspendedCodes.includes(country)) {
       const first = availableCountries[0];
       if (first) setCountry(first.code);
     }
-  }, [suspendedCodes.join(","), catalog.data?.fetchedAt]); // eslint-disable-line
+  }, [suspendedCodes.join(",")]); // eslint-disable-line
 
   const { data: wallet } = useQuery<WalletType>({ queryKey: ["/api/wallet"] });
   const { data: serviceFees } = useQuery<{ deposit: number; withdrawal: number; transfer: number }>({ queryKey: ["/api/service-fees"] });
@@ -81,7 +89,7 @@ export default function DepositPage() {
     }
     const globalRate = serviceFees?.deposit ?? 7;
     if (!operator || !paymentMethods) return globalRate;
-    const pm = paymentMethods.find((m: any) => operatorMatches(m.code, operator));
+    const pm = paymentMethods.find((m: any) => m.code === operator);
     if (!pm) return globalRate;
     // 1. Frais par pays
     if (country && pm.countryFees) {
@@ -101,11 +109,11 @@ export default function DepositPage() {
   const feesAmount = Math.round(parsedAmount * feeRate);
   const netAmount = parsedAmount - feesAmount;
   const balanceXOF = parseFloat(String(wallet?.balanceXOF || 0));
-  const balance = catalog.rate(currency) ? Math.floor(balanceXOF / catalog.rate(currency)) : 0;
+  const balance = currency === "CDF" ? Math.floor(balanceXOF / 0.22) : balanceXOF;
 
   function getOperatorStatus(op: string) {
     if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
-    const pm = paymentMethods.find((m: any) => operatorMatches(m.code, op));
+    const pm = paymentMethods.find((m: any) => m.code === op);
     if (!pm) return { available: true, maintenance: false };
     const globalMaint = pm.inMaintenance === true;
     const countryMaint = (pm.maintenanceCountries || []).includes(country);
@@ -128,7 +136,6 @@ export default function DepositPage() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      setExternalUrl(safePaymentUrl(data));
       setPendingReference(data.reference || data.sendavaReference || data.id || null);
       setPaymentInstructions(typeof data.instructions === "string" && data.instructions ? data.instructions : typeof data.message === "string" ? data.message : "");
       const paymentUrl = data.paymentUrl || data.payment_url;
@@ -141,8 +148,8 @@ export default function DepositPage() {
       setRedirectBlocked(cannotPayInPlace);
       setPaymentStatus("processing");
       toast({
-        title: cannotPayInPlace ? "Page de paiement requise" : "Paiement initié",
-        description: cannotPayInPlace ? "Utilisez le bouton pour continuer le paiement." : "Suivez les instructions affichées pour terminer l’opération.",
+        title: cannotPayInPlace ? "Paiement indisponible sans redirection" : "Paiement initié",
+        description: cannotPayInPlace ? "La référence est conservée pour vérification." : "Suivez les instructions affichées pour terminer l’opération.",
       });
     },
     onError: (error: any) => {
@@ -158,7 +165,6 @@ export default function DepositPage() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      if (safePaymentUrl(data)) setExternalUrl(safePaymentUrl(data));
       setVerifyCount(c => c + 1);
       const terminal = ["SUCCESS", "FAILED", "CANCELLED"].includes(String(data.status || "").toUpperCase());
       if (typeof data.instructions === "string" || typeof data.message === "string") {
@@ -201,14 +207,14 @@ export default function DepositPage() {
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!catalog.ready || !catalog.rate(currency) || !catalog.network(operator, country)?.payin || !parsedAmount || !phone || !operator || !country) return;
+    if (!parsedAmount || !phone || !operator || !country) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
     depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, otp: otpSupported && otp.trim() ? otp.trim() : undefined, customerName: customerName || undefined, description: description || undefined });
   };
 
   const resetForm = () => {
     setPaymentStatus("idle"); setAmount(""); setPhone(""); setOtp(""); setCustomerName(""); setDescription(""); setPendingReference(null);
-    setVerifyCount(0); setElapsed(0); setVerifyStatus("PENDING"); setRedirectBlocked(false); setPaymentInstructions(""); setExternalUrl("");
+    setVerifyCount(0); setElapsed(0); setVerifyStatus("PENDING"); setRedirectBlocked(false); setPaymentInstructions("");
     window.history.replaceState({}, "", "/deposit");
   };
 
@@ -257,7 +263,7 @@ export default function DepositPage() {
                 <p className="text-sm text-white/75 mt-0.5 leading-snug">
                   {isSuccess ? "Votre solde a été crédité avec succès."
                   : isFailed ? "Le paiement n'a pas abouti."
-                   : redirectBlocked ? "Continuez sur la page sécurisée, puis revenez vérifier ce paiement."
+                   : redirectBlocked ? "Le paiement nécessite une page externe, qui n'a pas été ouverte."
                    : "Le statut est en cours de vérification."}
                 </p>
               </div>
@@ -324,11 +330,10 @@ export default function DepositPage() {
               </div>
             </div>
           )}
-          <ExternalPayment url={isPending ? externalUrl : ""} />
           {redirectBlocked && (
             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 space-y-2">
-              <p className="text-sm font-bold text-orange-900">Ce moyen nécessite une page externe sécurisée.</p>
-              <p className="text-xs text-orange-800">Continuez avec le bouton de paiement, puis revenez vérifier le statut. Conservez votre référence.</p>
+              <p className="text-sm font-bold text-orange-900">Cet opérateur exige une page externe. Ce paiement n’est pas disponible sans redirection.</p>
+              <p className="text-xs text-orange-800">Aucune page externe n’a été ouverte. La référence reste disponible pour vérification.</p>
             </div>
           )}
           {paymentInstructions && (
@@ -380,7 +385,6 @@ export default function DepositPage() {
 
   return (
     <DashboardLayout title="" breadcrumbs={[{ label: "Dépôt" }]}>
-      <CatalogNotice loading={catalog.isLoading} error={catalog.isError} empty={!catalog.countries.length} currency={currency} rate={catalog.rate(currency)} />
       <div className="max-w-md mx-auto space-y-5">
         {isBlocked && (
           <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-5 text-center space-y-2">
@@ -486,7 +490,7 @@ export default function DepositPage() {
                             <OperatorLogo operator={op} size={52} />
                           </div>
                           <span className={`text-xs font-bold text-center leading-tight ${operator === op ? "text-primary" : isDisabled ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
-                            {catalog.label(op)}
+                            {op === "MTN" ? "MTN Money" : op === "Orange" ? "Orange Money" : op === "Moov" ? "Moov Money" : op === "Wave" ? "Wave" : op === "TMoney" ? "T-Money" : op === "Vodacom" ? "Vodacom M-Pesa" : op === "Airtel" ? "Airtel Money" : op}
                           </span>
                         </button>
                       );
@@ -543,7 +547,6 @@ export default function DepositPage() {
                 {otpSupported && (
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Code de paiement opérateur (si requis)</Label>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{catalog.network(operator, country)?.otpInstructions}</p>
                     <Input value={otp} onChange={(e) => setOtp(e.target.value)} type="text" inputMode="numeric" placeholder="Facultatif" className="h-11 border-border/70" data-testid="input-deposit-otp" />
                   </div>
                 )}
@@ -581,7 +584,7 @@ export default function DepositPage() {
               type="submit"
               className="w-full h-13 text-base font-bold gap-2 shadow-xl"
               style={{ background: "linear-gradient(135deg, hsl(160 84% 34%) 0%, hsl(160 84% 44%) 100%)" }}
-              disabled={!catalog.ready || !catalog.rate(currency) || depositMutation.isPending || !parsedAmount || !phone || !operator || !country}
+              disabled={depositMutation.isPending || !parsedAmount || !phone || !operator || !country}
               data-testid="button-confirm-deposit"
             >
               {depositMutation.isPending ? (
