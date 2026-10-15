@@ -47,3 +47,7 @@ expertMode = true
 
 [userenv.shared]
 DATABASE_URL = "postgresql://neondb_owner:npg_AoQeNYOx3v7M@ep-muddy-butterfly-aj3wcfd2-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 300000
