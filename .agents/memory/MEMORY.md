@@ -1,3 +1,4 @@
 - [Installation des dépendances importées](package-installer.md) — le callback d’installation refuse une liste de paquets vide.
 - [Identité client AlphaPay](alphapay-customer.md) — les exemples REST simplifiés omettent des champs obligatoires pour les payins et payouts.
 - [Consultation des IP AlphaPay](alphapay-ip-whitelist.md) — utiliser la méthode de lecture du SDK ; une route supposée en 404 ne prouve pas l’absence d’IP.
+- [Parcours et codes AlphaPay](alphapay-otp-parcours.md) — vérifier le formulaire réel ; distinguer code préalable obligatoire et confirmation après initiation.
