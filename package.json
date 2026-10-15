@@ -45,6 +45,7 @@
     "@types/cors": "^2.8.19",
     "@types/memoizee": "^0.4.12",
     "@types/multer": "^2.0.0",
+    "alphapay-node": "^0.1.2",
     "axios": "^1.13.4",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",

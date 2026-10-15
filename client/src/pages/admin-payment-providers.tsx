@@ -1,380 +1,202 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Activity, ArrowLeft, BookOpen, CheckCircle2, CircleAlert, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Settings, CheckCircle2, XCircle, Activity, BookOpen, ExternalLink } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface Provider {
-  id: string;
-  code: string;
-  displayName: string;
-  isActive: boolean;
-  apiKey: string;
-  secretKey: string;
-  baseUrl: string | null;
-  docsUrl: string | null;
-  docs: string | null;
-  hasApiKey: boolean;
-  hasSecretKey: boolean;
-}
+type AlphaPayConfig = {
+  provider: "alphapay";
+  configured: boolean;
+  webhookConfigured: boolean;
+  docsUrl: string;
+  payoutRequirements: string[];
+};
 
-interface ProviderLog {
+type ProviderLog = {
   id: string;
-  providerCode: string;
+  providerCode?: string;
   action: string;
   reference: string | null;
   status: string;
   errorMessage: string | null;
   durationMs: number | null;
   createdAt: string;
-}
+};
+
+type AlphaPayBalance = {
+  success: 1;
+  balance: Array<{ countryName: string; countryCode: string; amount: number | string; pending: number | string; currency: string }>;
+};
 
 export default function AdminPaymentProvidersPage() {
-  const { toast } = useToast();
-  const [editing, setEditing] = useState<Provider | null>(null);
-  const [creating, setCreating] = useState(false);
-
-  const { data: providers = [], isLoading } = useQuery<Provider[]>({
-    queryKey: ["/api/admin/payment-providers"],
-  });
-
-  const { data: logs = [] } = useQuery<ProviderLog[]>({
-    queryKey: ["/api/admin/payment-provider-logs"],
+  const config = useQuery<AlphaPayConfig>({ queryKey: ["/api/admin/alphapay/config"], staleTime: 30_000 });
+  const logs = useQuery<ProviderLog[]>({
+    queryKey: ["/api/admin/payment-provider-logs", "alphapay"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/payment-provider-logs?provider=alphapay", { credentials: "include" });
+      if (!response.ok) throw new Error("Impossible de charger le journal.");
+      const result = await response.json();
+      return Array.isArray(result) ? result : result.logs || [];
+    },
     refetchInterval: 10_000,
   });
-
-  const activateMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiRequest("POST", `/api/admin/payment-providers/${id}/activate`);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-providers"] });
-      toast({ title: "Fournisseur activé", description: "Toutes les opérations utiliseront ce fournisseur." });
-    },
-    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  const balance = useQuery<AlphaPayBalance>({
+    queryKey: ["/api/admin/alphapay/balance"],
+    refetchInterval: 30_000,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/admin/payment-providers/${id}`);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-providers"] });
-      toast({ title: "Fournisseur supprimé" });
-    },
-    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
-  });
+  const configured = config.data?.configured === true;
+  const setupItems = [
+    { label: "Connexion AlphaPay", ready: config.data?.configured },
+    { label: "Notifications webhook", ready: config.data?.webhookConfigured },
+  ];
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          <Link href="/admin">
-            <Button variant="ghost" size="sm" data-testid="link-back-admin">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Retour
-            </Button>
+    <main className="min-h-screen bg-background p-4 sm:p-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header className="flex flex-wrap items-center gap-4">
+          <Link href="/admin" className="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-testid="link-back-admin">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Retour
           </Link>
           <div>
-            <h1 className="text-2xl font-black">Fournisseurs de paiement</h1>
-            <p className="text-sm text-muted-foreground">Un seul fournisseur peut être actif à la fois.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Infrastructure paiements</p>
+            <h1 className="text-2xl font-black tracking-tight">AlphaPay</h1>
           </div>
-          <div className="ml-auto">
-            <Button onClick={() => setCreating(true)} data-testid="button-add-provider">
-              <Plus className="h-4 w-4 mr-2" /> Ajouter
-            </Button>
-          </div>
-        </div>
+          <Badge className={`ml-auto gap-1.5 ${configured ? "bg-emerald-600" : "bg-amber-600"}`}>
+            {configured ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
+            {configured ? "Connecté" : "Configuration requise"}
+          </Badge>
+        </header>
 
-        <Tabs defaultValue="providers">
-          <TabsList>
-            <TabsTrigger value="providers" data-testid="tab-providers">Fournisseurs</TabsTrigger>
-            <TabsTrigger value="logs" data-testid="tab-logs">Journal des appels</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="providers" className="space-y-4">
-            {isLoading ? (
-              <div className="text-muted-foreground">Chargement...</div>
-            ) : providers.length === 0 ? (
-              <div className="text-muted-foreground">Aucun fournisseur.</div>
-            ) : (
-              providers.map((p) => (
-                <Card key={p.id} data-testid={`card-provider-${p.code}`}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <CardTitle data-testid={`text-provider-name-${p.code}`}>{p.displayName}</CardTitle>
-                        <Badge variant="outline" className="font-mono text-xs">{p.code}</Badge>
-                        {p.isActive ? (
-                          <Badge className="bg-emerald-500 hover:bg-emerald-600" data-testid={`badge-active-${p.code}`}>
-                            <CheckCircle2 className="h-3 w-3 mr-1" /> Actif
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" data-testid={`badge-inactive-${p.code}`}>
-                            <XCircle className="h-3 w-3 mr-1" /> Inactif
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Activer</span>
-                        <Switch
-                          checked={p.isActive}
-                          disabled={p.isActive || activateMutation.isPending}
-                          onCheckedChange={() => activateMutation.mutate(p.id)}
-                          data-testid={`switch-activate-${p.code}`}
-                        />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="grid md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="text-xs text-muted-foreground">URL de base</div>
-                      <div className="font-mono text-xs break-all" data-testid={`text-base-url-${p.code}`}>{p.baseUrl || "—"}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Clé API</div>
-                      <div className="font-mono text-xs">
-                        {p.hasApiKey ? p.apiKey : <span className="text-amber-600">Non configurée</span>}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Secret webhook</div>
-                      <div className="font-mono text-xs">
-                        {p.hasSecretKey ? p.secretKey : <span className="text-amber-600">Non configuré</span>}
-                      </div>
-                    </div>
-                    {(p.docsUrl || p.docs) && (
-                      <div className="md:col-span-2">
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
-                          <BookOpen className="h-3 w-3" /> Documentation
-                        </div>
-                        {p.docsUrl && (
-                          <a
-                            href={p.docsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline break-all"
-                            data-testid={`link-docs-${p.code}`}
-                          >
-                            <ExternalLink className="h-3 w-3" /> {p.docsUrl}
-                          </a>
-                        )}
-                        {p.docs && (
-                          <details className="mt-1">
-                            <summary className="text-xs cursor-pointer text-muted-foreground hover:text-foreground">
-                              Notes ({p.docs.length} caractères)
-                            </summary>
-                            <pre className="mt-2 text-xs whitespace-pre-wrap bg-muted p-2 rounded max-h-64 overflow-auto" data-testid={`text-docs-${p.code}`}>
-                              {p.docs}
-                            </pre>
-                          </details>
-                        )}
-                      </div>
-                    )}
-                    <div className="md:col-span-2 flex items-center justify-end gap-2 pt-2">
-                      {!p.isActive && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => { if (confirm(`Supprimer ${p.displayName} ?`)) deleteMutation.mutate(p.id); }}
-                          data-testid={`button-delete-${p.code}`}
-                        >
-                          Supprimer
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => setEditing(p)} data-testid={`button-edit-${p.code}`}>
-                        <Settings className="h-4 w-4 mr-2" /> Configurer
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </TabsContent>
-
-          <TabsContent value="logs">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-4 w-4" /> Derniers appels API
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {logs.length === 0 ? (
-                    <div className="text-muted-foreground text-sm">Aucun appel enregistré.</div>
-                  ) : (
-                    logs.map((l) => (
-                      <div
-                        key={l.id}
-                        className="flex items-center gap-3 text-xs border rounded-lg p-2"
-                        data-testid={`row-log-${l.id}`}
-                      >
-                        <Badge variant="outline" className="font-mono">{l.providerCode}</Badge>
-                        <span className="font-semibold">{l.action}</span>
-                        {l.status === "success" ? (
-                          <Badge className="bg-emerald-500 text-white">OK</Badge>
-                        ) : (
-                          <Badge variant="destructive">ERR</Badge>
-                        )}
-                        <span className="font-mono text-muted-foreground">{l.reference || "—"}</span>
-                        <span className="ml-auto text-muted-foreground">{l.durationMs ?? "?"}ms</span>
-                        <span className="text-muted-foreground">{new Date(l.createdAt).toLocaleString()}</span>
-                        {l.errorMessage && <span className="text-red-500 text-xs truncate max-w-xs" title={l.errorMessage}>{l.errorMessage}</span>}
-                      </div>
-                    ))
-                  )}
+        <section className="grid gap-4 lg:grid-cols-[1.25fr_.75fr]">
+          <Card className="overflow-hidden border-border/60">
+            <div className="h-1.5 bg-gradient-to-r from-emerald-600 via-teal-500 to-sky-500" />
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-600" /> État du service
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {config.isLoading ? (
+                <div className="space-y-3"><Skeleton className="h-5 w-48" /><Skeleton className="h-16 w-full" /></div>
+              ) : config.isError ? (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="font-semibold">État AlphaPay indisponible</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Réessayez dans quelques instants.</p>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={() => config.refetch()}>Réessayer</Button>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              ) : (
+                <>
+                  <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                    AlphaPay traite les collectes, décaissements et le suivi des paiements. Les clients sont dirigés vers le checkout hébergé; aucun SDK navigateur ni clé publique n’est requis.
+                  </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                    {setupItems.map(item => (
+                      <div key={item.label} className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 p-3">
+                        {item.ready ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <CircleAlert className="h-4 w-4 shrink-0 text-amber-600" />}
+                        <span className="text-xs font-semibold">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {config.data?.docsUrl && (
+                      <a href={config.data.docsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
+                        <BookOpen className="h-4 w-4" /> Documentation AlphaPay <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => config.refetch()} disabled={config.isFetching}>
+                      <RefreshCw className={`mr-2 h-3.5 w-3.5 ${config.isFetching ? "animate-spin" : ""}`} /> Actualiser
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
-        <ProviderEditor
-          provider={editing}
-          open={!!editing}
-          onClose={() => setEditing(null)}
-        />
-        <ProviderEditor
-          provider={null}
-          open={creating}
-          onClose={() => setCreating(false)}
-          createMode
-        />
-      </div>
-    </div>
-  );
-}
+          <Card className="border-border/60">
+            <CardHeader><CardTitle className="text-base">Conditions de décaissement</CardTitle></CardHeader>
+            <CardContent>
+              {config.isLoading ? <div className="space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /></div> : (
+                <ul className="space-y-3">
+                  {(config.data?.payoutRequirements || []).length ? config.data!.payoutRequirements.map((item, index) => (
+                    <li key={`${index}-${item}`} className="flex gap-3 text-sm leading-relaxed">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] font-bold text-emerald-700">{index + 1}</span>
+                      <span>{item}</span>
+                    </li>
+                  )) : <li className="text-sm text-muted-foreground">Aucune condition particulière communiquée.</li>}
+                </ul>
+              )}
+              <p className="mt-5 rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
+                Les clés API et secrets webhook sont gérés dans Replit Secrets. N’ajoutez aucune clé dans l’interface.
+              </p>
+            </CardContent>
+          </Card>
+        </section>
 
-function ProviderEditor({
-  provider,
-  open,
-  onClose,
-  createMode,
-}: {
-  provider: Provider | null;
-  open: boolean;
-  onClose: () => void;
-  createMode?: boolean;
-}) {
-  const { toast } = useToast();
-  const [code, setCode] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [secretKey, setSecretKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [docsUrl, setDocsUrl] = useState("");
-  const [docs, setDocs] = useState("");
-
-  useEffect(() => {
-    if (provider) {
-      setDisplayName(provider.displayName);
-      setBaseUrl(provider.baseUrl || "");
-      setCode(provider.code);
-      setDocsUrl(provider.docsUrl || "");
-      setDocs(provider.docs || "");
-    } else if (createMode) {
-      setDisplayName("");
-      setBaseUrl("");
-      setCode("");
-      setApiKey("");
-      setSecretKey("");
-      setDocsUrl("");
-      setDocs("");
-    }
-  }, [provider, createMode, open]);
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (createMode) {
-        const res = await apiRequest("POST", "/api/admin/payment-providers", {
-          code: code.trim().toLowerCase(),
-          displayName: displayName.trim(),
-          isActive: false,
-          apiKey,
-          secretKey,
-          baseUrl: baseUrl.trim() || null,
-          docsUrl: docsUrl.trim() || null,
-          docs: docs.trim() || null,
-        });
-        return res.json();
-      } else if (provider) {
-        const body: any = {};
-        if (displayName !== provider.displayName) body.displayName = displayName;
-        if (apiKey) body.apiKey = apiKey;
-        if (secretKey) body.secretKey = secretKey;
-        if (baseUrl !== (provider.baseUrl || "")) body.baseUrl = baseUrl || null;
-        if (docsUrl !== (provider.docsUrl || "")) body.docsUrl = docsUrl || null;
-        if (docs !== (provider.docs || "")) body.docs = docs || null;
-        const res = await apiRequest("PATCH", `/api/admin/payment-providers/${provider.id}`, body);
-        return res.json();
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-providers"] });
-      toast({ title: createMode ? "Fournisseur créé" : "Configuration mise à jour" });
-      setApiKey(""); setSecretKey("");
-      onClose();
-    },
-    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{createMode ? "Nouveau fournisseur" : `Configurer ${provider?.displayName}`}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          {createMode && (
-            <>
-              <div>
-                <Label>Code (unique, sans espaces)</Label>
-                <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="ex: stripe, paydunya..." data-testid="input-provider-code" />
+        <Card className="border-border/60">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-primary" /> Soldes AlphaPay</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => balance.refetch()} disabled={balance.isFetching} aria-label="Actualiser les soldes">
+              <RefreshCw className={`h-4 w-4 ${balance.isFetching ? "animate-spin" : ""}`} />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {balance.isLoading ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}</div> : balance.isError ? (
+              <div className="rounded-xl border border-border p-4 text-sm text-muted-foreground">Les soldes ne sont pas disponibles pour le moment.</div>
+            ) : !balance.data?.balance?.length ? (
+              <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Aucun solde retourné par AlphaPay.</div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {balance.data.balance.map(row => (
+                  <div key={row.countryCode} className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                    <p className="text-xs font-semibold text-muted-foreground">{row.countryName} <span className="font-mono">· {row.countryCode}</span></p>
+                    <p className="mt-2 text-lg font-black">{new Intl.NumberFormat("fr-FR").format(Number(row.amount) || 0)} <span className="text-xs font-semibold text-muted-foreground">{row.currency}</span></p>
+                    <p className="mt-1 text-xs text-muted-foreground">En attente : {new Intl.NumberFormat("fr-FR").format(Number(row.pending) || 0)} {row.currency}</p>
+                  </div>
+                ))}
               </div>
-              <div>
-                <Label>Nom affiché</Label>
-                <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Stripe" data-testid="input-provider-name" />
-              </div>
-            </>
-          )}
-          {!createMode && (
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60">
+          <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <Label>Nom affiché</Label>
-              <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} data-testid="input-provider-name" />
+              <CardTitle className="text-base">Journal des opérations</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">Événements AlphaPay uniquement · actualisation automatique</p>
             </div>
-          )}
-          <div>
-            <Label>URL de base API</Label>
-            <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." data-testid="input-base-url" />
-          </div>
-          <div>
-            <Label>Clé API {!createMode && <span className="text-xs text-muted-foreground">(laisser vide pour ne pas changer)</span>}</Label>
-            <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="••••••••" data-testid="input-api-key" />
-          </div>
-          <div>
-            <Label>Secret webhook {!createMode && <span className="text-xs text-muted-foreground">(laisser vide pour ne pas changer)</span>}</Label>
-            <Input type="password" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="••••••••" data-testid="input-secret-key" />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Annuler</Button>
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-provider">
-            {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <Button variant="ghost" size="sm" onClick={() => logs.refetch()} disabled={logs.isFetching} aria-label="Actualiser le journal">
+              <RefreshCw className={`h-4 w-4 ${logs.isFetching ? "animate-spin" : ""}`} />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {logs.isLoading ? <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12 rounded-lg" />)}</div> : logs.isError ? (
+              <div className="rounded-xl border border-destructive/30 p-4 text-sm">Impossible de charger le journal. <Button variant="outline" size="sm" className="ml-2" onClick={() => logs.refetch()}>Réessayer</Button></div>
+            ) : !logs.data?.length ? (
+              <div className="rounded-xl border border-dashed border-border p-7 text-center">
+                <Activity className="mx-auto h-6 w-6 text-muted-foreground/50" />
+                <p className="mt-2 text-sm font-semibold">Aucune opération enregistrée</p>
+                <p className="mt-1 text-xs text-muted-foreground">Les appels AlphaPay apparaîtront ici.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {logs.data.map(log => (
+                  <div key={log.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/50 p-3 text-xs">
+                    <Badge variant={log.status === "success" ? "default" : "destructive"}>{log.status === "success" ? "OK" : log.status}</Badge>
+                    <span className="font-semibold">{log.action}</span>
+                    <span className="font-mono text-muted-foreground">{log.reference || "Sans référence"}</span>
+                    <span className="ml-auto text-muted-foreground">{log.durationMs ?? "—"} ms</span>
+                    <time className="text-muted-foreground">{new Date(log.createdAt).toLocaleString("fr-FR")}</time>
+                    {log.errorMessage && <p className="w-full truncate text-destructive" title={log.errorMessage}>{log.errorMessage}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </main>
   );
 }

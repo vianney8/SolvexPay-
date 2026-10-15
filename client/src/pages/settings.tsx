@@ -41,7 +41,6 @@ const WITHDRAWAL_COUNTRIES = [
   { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", operators: ["Orange", "Moov"] },
   { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", operators: ["MTN", "Orange"] },
   { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", operators: ["Vodacom", "Airtel", "Orange"] },
-  { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", operators: ["Airtel", "MTN"] },
 ];
 
 function detectCountryCode(phone: string) {

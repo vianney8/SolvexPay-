@@ -43,7 +43,6 @@ const COUNTRIES = [
   { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
   { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
   { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
-  { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"], phonePlaceholder: "06 123 45 67" },
 ];
 
 const PHONE_FORMATS: Record<string, { regex: RegExp; label: string }> = {
@@ -55,7 +54,6 @@ const PHONE_FORMATS: Record<string, { regex: RegExp; label: string }> = {
   ML:  { regex: /^\d{8}$/,  label: "8 chiffres (ex: 70123456)" },
   CM:  { regex: /^6\d{8}$/, label: "9 chiffres commençant par 6 (ex: 612345678)" },
   COD: { regex: /^\d{9}$/,  label: "9 chiffres (ex: 812345678)" },
-  COG: { regex: /^\d{9}$/,  label: "9 chiffres (ex: 061234567)" },
 };
 
 const OPERATOR_LABEL: Record<string, string> = {
@@ -483,7 +481,7 @@ export default function WithdrawPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">
-                          {tx.provider && tx.provider.toLowerCase() !== "omnipay" ? tx.provider : "Retrait"}
+                          {tx.operator || "Retrait"}
                           {tx.phoneNumber && <span className="ml-2 text-xs font-normal text-muted-foreground">{tx.phoneNumber}</span>}
                         </p>
                         <p className="text-xs text-muted-foreground">{tx.createdAt ? formatDate(tx.createdAt) : ""}</p>

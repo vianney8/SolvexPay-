@@ -1,255 +1,213 @@
-/**
- * Dispatcher central de fournisseurs de paiement.
- *
- * Détecte automatiquement le fournisseur actif (en BDD), instancie le service
- * adéquat (OmniPay, ...) et expose une API unique compatible avec
- * l'ancien `omniPayService`. Toutes les routes métier passent par ce service —
- * aucune modification n'est nécessaire pour ajouter un nouveau fournisseur.
- */
 import { db } from "../db";
-import { paymentProviders, paymentProviderLogs, type PaymentProvider } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
-import {
-  OmniPayService,
-  type OmniPayDepositParams,
-  type OmniPayDepositResponse,
-  type OmniPayTransferParams,
-  type OmniPayTransferResponse,
-  type OmniPayStatusResponse,
-  type OmniPayBalanceResponse,
-} from "./omnipay";
+import { paymentProviders, paymentProviderLogs, transactions, wallets, adminWithdrawals, type Transaction } from "@shared/schema";
+import { eq, and, desc, sql, ne } from "drizzle-orm";
+import { AlphaPayService, alphapayStatusToString, type PaymentParams, type PaymentResponse, type PaymentState } from "./alphapay";
+import { amountInXOF, paymentWalletDelta } from "./paymentAccounting";
+export { amountInXOF } from "./paymentAccounting";
 
-const CACHE_TTL_MS = 30_000;
-
-interface ActiveProviderCache {
-  provider: PaymentProvider;
-  fetchedAt: number;
+type Receipt = PaymentResponse & { kind: "payment" | "payout" | "checkout" };
+type BindingRequest = { params: PaymentParams; action: "deposit" | "transfer" };
+let settlementListener: ((transaction: Transaction) => Promise<void>) | undefined;
+export function onPaymentSettled(listener: (transaction: Transaction) => Promise<void>) { settlementListener = listener; }
+export function isApiKeyConfigured() { return !!process.env.ALPHAPAY_SECRET_KEY; }
+export function invalidateActiveProviderCache() { /* Configuration is read from the environment, never cached. */ }
+export async function getActiveProvider() {
+  const [provider] = await db.select().from(paymentProviders).where(eq(paymentProviders.code, "alphapay")).limit(1);
+  return provider || null;
 }
-
-let cache: ActiveProviderCache | null = null;
-
-export function invalidateActiveProviderCache(): void {
-  cache = null;
-}
-
-export async function getProviderByCode(code: string): Promise<PaymentProvider | null> {
-  const [row] = await db.select().from(paymentProviders).where(eq(paymentProviders.code, code)).limit(1);
-  return row || null;
-}
-
-/** Récupère la clé de callback du fournisseur OmniPay spécifiquement (route /webhooks/omnipay). */
-export async function getOmniPayCallbackKey(): Promise<string> {
-  const p = await getProviderByCode("omnipay");
-  return p?.secretKey || process.env.OMNIPAY_CALLBACK_KEY || "";
-}
-
-export async function getActiveProvider(): Promise<PaymentProvider | null> {
-  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-    return cache.provider;
-  }
-  const [row] = await db.select().from(paymentProviders).where(eq(paymentProviders.isActive, true)).limit(1);
-  if (!row) {
-    cache = null;
-    return null;
-  }
-  cache = { provider: row, fetchedAt: Date.now() };
-  return row;
-}
-
-interface ProviderInstance {
-  code: string;
-  isConfigured(): boolean;
-  getCallbackKey(): string;
-  deposit(params: OmniPayDepositParams): Promise<OmniPayDepositResponse>;
-  transfer(params: OmniPayTransferParams): Promise<OmniPayTransferResponse>;
-  getStatus(reference: string): Promise<OmniPayStatusResponse>;
-  getBalance(): Promise<OmniPayBalanceResponse>;
-}
-
-function buildInstance(provider: PaymentProvider): ProviderInstance {
-  // Default: OmniPay
-  const svc = new OmniPayService({
-    apiKey: provider.apiKey || process.env.OMNIPAY_API_KEY || "",
-    callbackKey: provider.secretKey || process.env.OMNIPAY_CALLBACK_KEY || "",
-    baseUrl: provider.baseUrl || undefined,
-  });
-  return Object.assign(svc, { code: provider.code });
-}
-
-async function getProviderInstance(): Promise<ProviderInstance> {
+export async function getProviderByCode(code: string) { return code === "alphapay" ? getActiveProvider() : null; }
+export async function activateProvider(id: string) {
   const provider = await getActiveProvider();
-  if (!provider) {
-    // Fallback: tente OmniPay via env si aucun fournisseur n'est configuré en BDD
-    const envKey = process.env.OMNIPAY_API_KEY;
-    if (envKey) {
-      const svc = new OmniPayService({
-        apiKey: envKey,
-        callbackKey: process.env.OMNIPAY_CALLBACK_KEY || "",
-      });
-      return Object.assign(svc, { code: "omnipay" });
-    }
-    throw new Error("Aucun fournisseur de paiement actif. Configurez-en un dans l'admin.");
-  }
-  return buildInstance(provider);
+  return provider?.id === id ? provider : null;
 }
-
-async function logCall(
-  providerCode: string,
-  action: string,
-  reference: string | null,
-  request: any,
-  startedAt: number,
-  result: { ok: true; response: any } | { ok: false; error: string }
-): Promise<void> {
-  try {
-    const sanitized = { ...(request || {}) };
-    if (sanitized.apikey) sanitized.apikey = "[REDACTED]";
-    if (sanitized.apiKey) sanitized.apiKey = "[REDACTED]";
-    if (sanitized.msisdn && typeof sanitized.msisdn === "string") {
-      sanitized.msisdn = sanitized.msisdn.substring(0, 6) + "***";
-    }
-    await db.insert(paymentProviderLogs).values({
-      providerCode,
-      action,
-      reference: reference || undefined,
-      request: sanitized,
-      response: result.ok ? result.response : null,
-      status: result.ok ? "success" : "error",
-      errorMessage: result.ok ? null : result.error,
-      durationMs: Date.now() - startedAt,
-    } as any);
-  } catch (err) {
-    console.error("[paymentService] Failed to write provider log:", err);
-  }
-}
-
-class PaymentDispatcher {
-  async getActiveCode(): Promise<string | null> {
-    const p = await getActiveProvider();
-    return p?.code || null;
-  }
-
-  async isConfigured(): Promise<boolean> {
-    try {
-      const inst = await getProviderInstance();
-      return inst.isConfigured();
-    } catch {
-      return false;
-    }
-  }
-
-  async getCallbackKey(): Promise<string> {
-    try {
-      const inst = await getProviderInstance();
-      return inst.getCallbackKey();
-    } catch {
-      return "";
-    }
-  }
-
-  async deposit(params: OmniPayDepositParams): Promise<OmniPayDepositResponse> {
-    const inst = await getProviderInstance();
-    const startedAt = Date.now();
-    try {
-      const response = await inst.deposit(params);
-      await logCall(inst.code, "deposit", params.reference, params, startedAt, { ok: true, response });
-      return response;
-    } catch (err: any) {
-      await logCall(inst.code, "deposit", params.reference, params, startedAt, { ok: false, error: err?.message || String(err) });
-      throw err;
-    }
-  }
-
-  async transfer(params: OmniPayTransferParams): Promise<OmniPayTransferResponse> {
-    const inst = await getProviderInstance();
-    const startedAt = Date.now();
-    try {
-      const response = await inst.transfer(params);
-      await logCall(inst.code, "transfer", params.reference, params, startedAt, { ok: true, response });
-      return response;
-    } catch (err: any) {
-      await logCall(inst.code, "transfer", params.reference, params, startedAt, { ok: false, error: err?.message || String(err) });
-      throw err;
-    }
-  }
-
-  async getStatus(reference: string): Promise<OmniPayStatusResponse> {
-    const inst = await getProviderInstance();
-    const startedAt = Date.now();
-    try {
-      const response = await inst.getStatus(reference);
-      await logCall(inst.code, "getStatus", reference, { reference }, startedAt, { ok: true, response });
-      return response;
-    } catch (err: any) {
-      await logCall(inst.code, "getStatus", reference, { reference }, startedAt, { ok: false, error: err?.message || String(err) });
-      throw err;
-    }
-  }
-
-  async getBalance(): Promise<OmniPayBalanceResponse> {
-    const inst = await getProviderInstance();
-    const startedAt = Date.now();
-    try {
-      const response = await inst.getBalance();
-      await logCall(inst.code, "getBalance", null, {}, startedAt, { ok: true, response });
-      return response;
-    } catch (err: any) {
-      await logCall(inst.code, "getBalance", null, {}, startedAt, { ok: false, error: err?.message || String(err) });
-      throw err;
-    }
-  }
-}
-
-export const paymentService = new PaymentDispatcher();
-
-/** Compatibilité descendante : équivalent synchrone de l'ancien `isApiKeyConfigured`. */
-export function isApiKeyConfigured(): boolean {
-  // Présence du cache => au moins un provider trouvé récemment
-  if (cache?.provider?.apiKey) return true;
-  return !!process.env.OMNIPAY_API_KEY;
-}
-
-/**
- * Active un fournisseur et désactive automatiquement tous les autres.
- * Utilise une transaction pour garantir l'unicité de l'actif.
- */
-export async function activateProvider(id: string): Promise<PaymentProvider | null> {
-  const result = await db.transaction(async (tx) => {
-    await tx.update(paymentProviders).set({ isActive: false, updatedAt: new Date() });
-    const [row] = await tx
-      .update(paymentProviders)
-      .set({ isActive: true, updatedAt: new Date() })
-      .where(eq(paymentProviders.id, id))
-      .returning();
-    return row || null;
+export async function seedPaymentProviders() {
+  await db.transaction(async tx => {
+    await tx.update(paymentProviders).set({ isActive: false, apiKey: "", secretKey: "", updatedAt: new Date() }).where(ne(paymentProviders.code, "alphapay"));
+    await tx.insert(paymentProviders).values({
+      code: "alphapay", displayName: "AlphaPay", isActive: true,
+      apiKey: "", secretKey: "", baseUrl: "https://api.alphapay.me/api/v1",
+      docsUrl: "https://docs.alphapay.me/javascript-sdk", config: {},
+    }).onConflictDoUpdate({ target: paymentProviders.code, set: { isActive: true, apiKey: "", secretKey: "", updatedAt: new Date() } });
   });
-  invalidateActiveProviderCache();
-  return result;
 }
 
-/** Seed les fournisseurs par défaut au démarrage si la table est vide. */
-export async function seedPaymentProviders(): Promise<void> {
+async function findBinding(reference: string) {
+  const [binding] = await db.select().from(paymentProviderLogs).where(and(
+    eq(paymentProviderLogs.reference, reference), eq(paymentProviderLogs.providerCode, "alphapay"),
+    eq(paymentProviderLogs.action, "binding"),
+  )).orderBy(desc(paymentProviderLogs.createdAt)).limit(1);
+  return binding;
+}
+
+export async function isAlphaPayment(reference: string) { return !!(await findBinding(reference)); }
+
+function requireConfigured() {
+  if (!isApiKeyConfigured()) throw Object.assign(new Error("AlphaPay n’est pas configuré. Ajoutez ALPHAPAY_SECRET_KEY dans les Secrets du projet."), { status: 503 });
+}
+
+/** Status transition and accounting entry commit together, under the same row lock. */
+export async function settlePayment(reference: string, state: PaymentState) {
+  if (state === "pending") return;
+  const settled = await db.transaction(async tx => {
+    const [transaction] = await tx.select().from(transactions).where(eq(transactions.reference, reference)).for("update");
+    if (!transaction || transaction.status !== "pending") return;
+    const delta = paymentWalletDelta(transaction, state);
+    if (delta !== 0) {
+      await tx.insert(wallets).values({ userId: transaction.userId }).onConflictDoNothing({ target: wallets.userId });
+      const [wallet] = await tx.update(wallets).set({ balanceXOF: sql`${wallets.balanceXOF} + ${delta}`, updatedAt: new Date() })
+        .where(eq(wallets.userId, transaction.userId)).returning();
+      if (!wallet) throw new Error("Portefeuille introuvable.");
+    }
+    const [updated] = await tx.update(transactions).set({ status: state }).where(eq(transactions.id, transaction.id)).returning();
+    return updated;
+  });
+  if (settled && settlementListener) {
+    try { await settlementListener(settled); }
+    catch { console.error("[AlphaPay] Notification à réessayer après règlement comptable."); }
+  }
+  return settled;
+}
+
+class PaymentService {
+  async getActiveCode() { return "alphapay"; }
+  async isConfigured() { return isApiKeyConfigured(); }
+  async getReceipt(reference: string) { return (await findBinding(reference))?.response as PaymentResponse | null; }
+
+  private async initiate(action: "deposit" | "transfer", params: PaymentParams): Promise<PaymentResponse> {
+    requireConfigured();
+    const service = new AlphaPayService();
+    service.context(params);
+    // Save the exact non-secret payload before the network request. Ambiguous
+    // responses are retried with the SAME provider idempotency key and payload.
+    const binding = await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${params.reference}))`);
+      const [existing] = await tx.select().from(paymentProviderLogs).where(and(
+        eq(paymentProviderLogs.reference, params.reference),
+        eq(paymentProviderLogs.providerCode, "alphapay"), eq(paymentProviderLogs.action, "binding"),
+      )).limit(1);
+      if (existing) return existing;
+      const [created] = await tx.insert(paymentProviderLogs).values({
+        providerCode: "alphapay", action: "binding", reference: params.reference,
+        request: { params, action }, status: "pending",
+      }).returning();
+      return created;
+    });
+    const receipt = binding.response as Receipt | null;
+    if (receipt?.id) return receipt;
+    if (binding.status === "rejected") throw Object.assign(new Error("Cette demande AlphaPay a été rejetée."), { code: "ALPHAPAY_REJECTED" });
+    const saved = binding.request as BindingRequest;
+    if (saved.action !== action) throw new Error("Référence de paiement déjà utilisée.");
+    if (binding.createdAt && Date.now() - binding.createdAt.getTime() > 60 * 60 * 1000) {
+      throw new Error("Demande AlphaPay non rapprochée depuis plus d’une heure : vérification manuelle requise, fonds conservés.");
+    }
+    try {
+      const result = action === "deposit" ? await service.deposit(saved.params) : await service.transfer(saved.params);
+      await db.update(paymentProviderLogs).set({ response: result, status: "success" }).where(eq(paymentProviderLogs.id, binding.id));
+      return result;
+    } catch (error: any) {
+      if (error.code === "ALPHAPAY_REJECTED") {
+        await db.update(paymentProviderLogs).set({ status: "rejected", errorMessage: error.message }).where(eq(paymentProviderLogs.id, binding.id));
+      }
+      throw error;
+    }
+  }
+
+  deposit(params: PaymentParams) { return this.initiate("deposit", params); }
+  transfer(params: PaymentParams) { return this.initiate("transfer", params); }
+  async getBalance() { requireConfigured(); return new AlphaPayService().getBalance(); }
+
+  async getStatus(reference: string): Promise<PaymentResponse> {
+    requireConfigured();
+    let binding = await findBinding(reference);
+    if (!binding) throw Object.assign(new Error("Cette opération historique n’est pas gérée par AlphaPay ; rapprochement manuel requis."), { code: "LEGACY_PAYMENT" });
+    if (binding.status === "rejected") {
+      await settlePayment(reference, "failed");
+      return { success: 1, reference, status: "FAILED" };
+    }
+    let receipt = binding.response as Receipt | null;
+    if (!receipt?.id) {
+      const saved = binding.request as BindingRequest;
+      await this.initiate(saved.action, saved.params);
+      binding = await findBinding(reference);
+      receipt = binding?.response as Receipt;
+    }
+    if (!receipt?.id) throw new Error("Référence AlphaPay en attente de rapprochement.");
+    const result = await new AlphaPayService().verify(receipt.id, receipt.kind);
+    const state = alphapayStatusToString(result.status);
+    const saved = binding!.request as BindingRequest;
+    const expected = new AlphaPayService().context(saved.params);
+    if (!result.sessionOnly) {
+      if (receipt.kind !== "checkout" && result.id !== receipt.id) {
+        throw new Error("Identifiant de transaction AlphaPay incohérent.");
+      }
+      if (Number(result.requested_amount) !== saved.params.amount || result.currency !== expected.currency) {
+        throw new Error("Montant ou devise AlphaPay incohérent : rapprochement manuel requis.");
+      }
+      if (result.flow_direction !== (receipt.kind === "payout" ? "OUTBOUND" : "INBOUND")) {
+        throw new Error("Sens de transaction AlphaPay incohérent.");
+      }
+    } else if (state === "completed") {
+      throw new Error("Une session payée doit être liée à une transaction vérifiée.");
+    }
+    if (result.id && result.id !== receipt.id) {
+      await db.update(paymentProviderLogs).set({ response: { ...receipt, transactionId: result.id } }).where(eq(paymentProviderLogs.id, binding!.id));
+    }
+    const [local] = await db.select({ id: transactions.id }).from(transactions).where(eq(transactions.reference, reference)).limit(1);
+    const [admin] = await db.select({ id: adminWithdrawals.id }).from(adminWithdrawals).where(eq(adminWithdrawals.reference, reference)).limit(1);
+    if (!local && !admin) throw new Error("L’opération locale n’est pas encore enregistrée ; réessayez.");
+    if (state === "completed" && !result.sessionOnly) {
+      const [accounting] = await db.select().from(transactions).where(eq(transactions.reference, reference)).limit(1);
+      const minimumNet = receipt.kind === "payout" ? saved.params.amount
+        : accounting ? saved.params.amount - Number(accounting.fees || 0) : saved.params.amount;
+      if (!Number.isFinite(Number(result.net_amount)) || Number(result.net_amount) < minimumNet) {
+        throw new Error("Montant net AlphaPay insuffisant : rapprocher les frais sans rembourser automatiquement.");
+      }
+    }
+    await settlePayment(reference, state);
+    const [adminPayout] = await db.select().from(adminWithdrawals).where(eq(adminWithdrawals.reference, reference)).limit(1);
+    if (adminPayout && adminPayout.status === "pending" && state !== "pending") {
+      await db.update(adminWithdrawals).set({ status: state, updatedAt: new Date() }).where(and(eq(adminWithdrawals.id, adminPayout.id), eq(adminWithdrawals.status, "pending")));
+    }
+    return { success: 1, reference, status: result.status, id: result.id };
+  }
+
+  /** Find webhooks by the provider ID already persisted, never by caller-supplied local references. */
+  async referenceForWebhook(providerId: string): Promise<string | undefined> {
+    const [binding] = await db.select({ reference: paymentProviderLogs.reference }).from(paymentProviderLogs).where(and(
+      eq(paymentProviderLogs.providerCode, "alphapay"), eq(paymentProviderLogs.action, "binding"),
+      sql`(${paymentProviderLogs.response}->>'id' = ${providerId} OR ${paymentProviderLogs.response}->>'transactionId' = ${providerId})`,
+    )).limit(1);
+    return binding?.reference || undefined;
+  }
+}
+
+export const paymentService = new PaymentService();
+
+export async function reservePayout(userId: string, params: PaymentParams, feesXOF: number, type: "withdrawal" | "transfer") {
+  requireConfigured();
+  const context = new AlphaPayService().context(params);
+  const debit = amountInXOF(params.amount, context.currency) + feesXOF;
+  if (!Number.isSafeInteger(debit) || debit <= 0 || !Number.isFinite(feesXOF) || feesXOF < 0) throw new Error("Montant ou frais invalides.");
+  const transaction = await db.transaction(async tx => {
+    const [wallet] = await tx.update(wallets).set({ balanceXOF: sql`${wallets.balanceXOF} - ${debit}`, updatedAt: new Date() })
+      .where(and(eq(wallets.userId, userId), sql`${wallets.balanceXOF} >= ${debit}`)).returning();
+    if (!wallet) throw Object.assign(new Error("Solde insuffisant."), { status: 400 });
+    const [created] = await tx.insert(transactions).values({
+      userId, type, amount: String(params.amount), currency: context.currency,
+      reference: params.reference, status: "pending", fees: String(feesXOF),
+      phoneNumber: params.msisdn, provider: context.network,
+      description: `AlphaPay — ${type === "withdrawal" ? "retrait" : "transfert"}`,
+    }).returning();
+    return created;
+  });
   try {
-    const existing = await db.select().from(paymentProviders);
-    if (existing.length > 0) return;
-
-    const envOmniKey = process.env.OMNIPAY_API_KEY || "";
-    const envOmniCallback = process.env.OMNIPAY_CALLBACK_KEY || "";
-
-    await db.insert(paymentProviders).values([
-      {
-        code: "omnipay",
-        displayName: "OmniPay",
-        isActive: true,
-        apiKey: envOmniKey,
-        secretKey: envOmniCallback,
-        baseUrl: "https://omnipay.webtechci.com/interface/api2",
-        config: {},
-      },
-    ]);
-
-    console.log("[init] Fournisseur de paiement par défaut créé (omnipay actif).");
-  } catch (err) {
-    console.error("[init] Erreur seed paymentProviders:", err);
+    const receipt = await paymentService.transfer(params);
+    return { ...transaction, providerId: receipt.id };
+  } catch (error: any) {
+    if (error.code === "ALPHAPAY_REJECTED") {
+      await settlePayment(params.reference, "failed");
+      throw error;
+    }
+    return { ...transaction, providerId: null, message: "Demande en cours de rapprochement AlphaPay. Fonds réservés, ne renvoyez pas une nouvelle demande." };
   }
 }

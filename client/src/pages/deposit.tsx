@@ -31,7 +31,6 @@ const COUNTRIES = [
   { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
   { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
   { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
-  { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"], phonePlaceholder: "06 123 45 67" },
 ];
 
 
@@ -51,19 +50,7 @@ export default function DepositPage() {
 
   const { data: paymentMethods } = useQuery<any[]>({ queryKey: ["/api/payment-methods/public"], staleTime: 60_000 });
 
-  const _OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
-    Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
-    Moov: { CI: { requiresOtp: true } },
-  };
-  const _otpPm = paymentMethods?.find((m: any) => m.code === operator);
-  const _otpSaved = _otpPm?.otpConfig?.[country];
-  const _otpFallback = _OTP_DEFAULTS[operator]?.[country];
-  const otpConfig = {
-    requiresOtp: _otpSaved !== undefined ? _otpSaved.requiresOtp : (_otpFallback?.requiresOtp ?? false),
-    defaultOtp: _otpSaved !== undefined ? (_otpSaved.defaultOtp ?? null) : (_otpFallback?.defaultOtp ?? null),
-  };
-  const needsOtp = otpConfig.requiresOtp;
-  const silentOtp = otpConfig.defaultOtp;
+  const needsOtp = false;
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [verifyCount, setVerifyCount] = useState(0);
@@ -138,7 +125,7 @@ export default function DepositPage() {
       const ref = params.get("reference");
       if (ref) setPendingReference(ref);
       setPaymentStatus("processing");
-      toast({ title: "Vérification en cours", description: "Nous vérifions votre paiement Wave..." });
+      toast({ title: "Vérification en cours", description: "Nous confirmons le statut de votre paiement." });
     }
   }, []);
 
@@ -154,7 +141,7 @@ export default function DepositPage() {
         return;
       }
       setPaymentStatus("processing");
-      toast({ title: "Paiement initié", description: "Un prompt USSD a été envoyé sur votre téléphone." });
+        toast({ title: "Paiement initié", description: "Suivez les instructions de paiement pour terminer l’opération." });
     },
     onError: (error: any) => {
       toast({ title: "Erreur", description: error.message || "Impossible d'initier le dépôt.", variant: "destructive" });
@@ -201,13 +188,7 @@ export default function DepositPage() {
     e.preventDefault();
     if (!parsedAmount || !phone || !operator || !country) return;
     const fullPhone = phone.startsWith("+") ? phone : `${selectedCountry.prefix}${phone}`;
-    if (needsOtp && silentOtp) {
-      depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, otp: silentOtp, customerName: customerName || undefined, description: description || undefined });
-    } else if (needsOtp) {
-      setStep(2);
-    } else {
-      depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, customerName: customerName || undefined, description: description || undefined });
-    }
+    depositMutation.mutate({ amount: parsedAmount, currency, phoneNumber: fullPhone, operator, country, customerName: customerName || undefined, description: description || undefined });
   };
 
   const handleStep2Submit = () => {
@@ -267,7 +248,7 @@ export default function DepositPage() {
                 <p className="text-sm text-white/75 mt-0.5 leading-snug">
                   {isSuccess ? "Votre solde a été crédité avec succès."
                   : isFailed ? "Le paiement n'a pas abouti."
-                  : "Confirmez le prompt USSD sur votre téléphone."}
+                   : "Suivez les instructions de paiement affichées pour terminer l’opération."}
                 </p>
               </div>
             </div>
@@ -328,7 +309,7 @@ export default function DepositPage() {
               <div>
                 <p className="text-xs font-bold text-amber-800 mb-0.5">Action requise sur votre téléphone</p>
                 <p className="text-[11px] text-amber-700 leading-relaxed">
-                  Vous avez reçu un <strong>prompt USSD</strong>. Entrez votre code PIN pour valider. Vérification automatique toutes les <strong>5 secondes</strong>.
+                  Suivez les instructions affichées par le service de paiement. Le statut est vérifié automatiquement toutes les <strong>5 secondes</strong>.
                 </p>
               </div>
             </div>

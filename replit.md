@@ -64,93 +64,23 @@ SolvexPay is a pan-African payment aggregation platform enabling businesses to a
   - `paymentMethods` — Operator maintenance/availability config (admin-managed)
   - `systemSettings` — Key-value settings (fees, support links)
 
-## Payment Providers (architecture multi-fournisseurs)
+## AlphaPay — unique fournisseur des nouvelles opérations
 
-L'application supporte **plusieurs fournisseurs de paiement** gérés dynamiquement via la table `paymentProviders`. Un seul fournisseur peut être actif à la fois ; toutes les opérations (dépôt, retrait, transfert) utilisent automatiquement le fournisseur actif via le dispatcher central `paymentService`.
-
-- **Table** `payment_providers` : `code` (unique), `displayName`, `isActive`, `apiKey`, `secretKey` (webhook secret), `baseUrl`, `config` (jsonb).
-- **Table** `payment_provider_logs` : journal de tous les appels API (action, request/response, durée, erreur).
-- **Dispatcher** : `server/services/paymentService.ts` — détecte le fournisseur actif (cache 30s), instancie le bon service et délègue. Routes inchangées.
-- **Implémentations** :
-  - `server/services/omnipay.ts` — `OmniPayService` (signature HMAC-SHA3-512)
-- **Activation** : POST `/api/admin/payment-providers/:id/activate` — désactive automatiquement les autres (transaction DB).
-- **Fournisseur par défaut** seedé au démarrage : `omnipay` (actif, hérite des env vars `OMNIPAY_API_KEY`/`OMNIPAY_CALLBACK_KEY`).
-- **UI admin** : `/admin/payment-providers` — liste, toggle d'activation, configuration des clés, journal des appels.
-- **Webhooks** : `/api/webhooks/omnipay`.
-
-### Supported Countries & Operators
-| Country | Code | Currency | Operators |
-|---------|------|----------|-----------|
-| Bénin | BJ | XOF | MTN, Moov |
-| Côte d'Ivoire | CI | XOF | Orange, MTN, Moov, Wave |
-| Burkina Faso | BF | XOF | Moov, Orange |
-| Togo | TG | XOF | TMoney, Moov |
-| Sénégal | SN | XOF | Orange, Wave, Free |
-| Mali | ML | XOF | Orange, Moov |
-| Cameroun | CM | XAF | MTN, Orange |
-| RD Congo | COD | CDF | Vodacom, Airtel, Orange |
-| Congo-Brazza. | COG | XAF | Airtel, MTN |
-
-### Currency Conversion (all stored in XOF)
-- **XAF → XOF**: 1:1 (same CFA zone)
-- **CDF → XOF**: `Math.floor(amount × 0.22)` (no decimals)
-- Logic in `server/storage.ts` → `updateWalletBalance()`
-
-### OmniPay Quirks
-- `getStatus()` returns `{ success: 0, message: "Transaction successful" }` for completed payments → mapped to `status: 3`
-- `getOmniPayOperatorCode(operator, country)` function maps operator names to OmniPay-specific codes (e.g., Moov BJ → `moov_benin`, Moov TG → `moov_togo`)
-
-## API Payment Flow (Mandatory Redirect)
-
-All API integrations use a **mandatory redirect flow** to SolvexPay's hosted payment page. No USSD is triggered by the merchant's server.
-
-### Step-by-step:
-1. **Merchant server** calls `POST /api/v1/deposit` or redirects to `GET /api/v1/checkout`
-2. SolvexPay creates a pending transaction and returns `payment_url`
-3. **Merchant MUST redirect** the customer to `payment_url` (= `https://solvexpay.com/pay-api/:id`)
-4. Customer fills in their phone number and selects their operator on the SolvexPay hosted page
-5. OmniPay sends the USSD prompt to the customer's phone
-6. Customer confirms on their phone
-7. SolvexPay credits the merchant wallet and fires the webhook
-
-### API Endpoints (merchant, requires `sk_live_` key)
-- `GET /api/v1/checkout?key=&amount=&description=&customer_name=&customer_email=&country=` — Direct redirect to hosted page (no JS needed)
-- `POST /api/v1/deposit` — JSON API: returns `{ id, payment_url, status, amount, fees, reference, ... }`
-- `GET /api/v1/transactions/:id` — Check transaction status (read-only, no real-time operator call)
-- `POST /api/v1/transactions/:id/verify` — Force real-time status check from operator; if completed, credits wallet and fires webhook immediately
-- `GET /api/v1/balance` — Get merchant wallet balance
-
-### Hosted Payment Page (`/pay-api/:id`)
-- Pre-fills country, phone, and operator from transaction data if provided
-- Customer selects operator, enters phone → USSD sent → auto-verification every 5s
-- Wave payments: redirects to Wave checkout URL, returns via `?status=callback&reference=`
-- Maintenance check enforced server-side (cannot pay via maintenance operator)
-
-## Wave Payment Flow
-- OmniPay returns a `payment_url` (Wave checkout link)
-- All 3 pages (`deposit.tsx`, `pay-api.tsx`, `pay.tsx`) redirect via `window.location.href`
-- After Wave confirmation, OmniPay redirects to `returnUrl` with reference
-- Frontend detects `?status=callback&reference=` and starts polling verify endpoint
-
-## Verify Endpoint (`/api/transactions/verify`)
-- Polls OmniPay `getStatus()` every 5s from frontend
-- OmniPay "Transaction successful" (`success: 0`) → correctly mapped to `status: 3` (completed)
-- Credits wallet (net of fees) when status becomes "completed"
-- **Atomic**: uses `updateTransactionStatusIfPending()` (conditional SQL WHERE status='pending') to prevent double-crediting in concurrent requests
-
-## Webhook System
-- Outbound webhooks: fired on `completed`/`failed` status change
-- Signed with HMAC-SHA256 using per-key `webhookSecret` → `x-solvexpay-signature: sha256=...`
-- OmniPay inbound: `POST /api/webhooks/omnipay` with `OMNIPAY_CALLBACK_KEY` verification
-- 3 retries: immediate → 8s delay → 30s delay
-- `callbackUrl: "https://solvexpay.com/api/webhooks/omnipay"` sent on every OmniPay deposit call
-
-## Auto-Recovery (PendingChecker)
-- Background job in `server/routes.ts` → `startPendingChecker()`
-- Starts 30s after server boot, runs every 3 minutes
-- Checks pending deposits between 90s and 1h old (max 15 per batch)
-- Calls OmniPay `getStatus()` → if completed: credits wallet + fires merchant webhook
-- Prevents double-crediting via `updateTransactionStatusIfPending()` (atomic SQL WHERE status='pending')
+- Choix produit confirmé par l’utilisateur : supprimer entièrement les anciens modules et options de paiement, utiliser AlphaPay directement via SDK/API et conserver l’historique. Ne pas réintroduire de sélection ou de secours vers les anciens fournisseurs.
+- Les anciens modules, formulaires de clés, sélecteurs de fournisseur, modals et webhooks ont été retirés du code actif. Les écritures historiques restent inchangées.
+- SDK officiel Node.js : alphapay-node. Documentation : https://docs.alphapay.me/javascript-sdk et https://docs.alphapay.me/node-sdk.
+- Encaissements : checkout hébergé créé côté serveur pour les dépôts ; softpay pour les APIs marchandes et pages publiques. Toute URL de paiement renvoyée doit être suivie, quel que soit le réseau.
+- Décaissements : API payouts/initialize, fonds réservés atomiquement avant envoi. Autorisation payin/payout, KYC, solde AlphaPay et IP autorisée sont requis. Replit ne garantit pas d’IP sortante fixe ; prévoir une sortie fixe avant l’activation durable.
+- Secrets : ALPHAPAY_SECRET_KEY et ALPHAPAY_WEBHOOK_SECRET. Aucune clé secrète ni clé publique n’est envoyée au navigateur : le checkout est créé par le serveur.
+- Webhook : POST /api/webhooks/alphapay. Signature X-Webhook-Signature : HMAC-SHA256 du timestamp suivi d’un point puis du corps brut ; X-Webhook-Timestamp doit dater de moins de cinq minutes. Les exemples du SDK JavaScript mentionnent un autre header, mais la référence webhook actuelle et le SDK serveur sont la source de vérité.
+- La confirmation navigateur et la redirection ne prouvent pas un paiement. Les montants, devises et sens sont rapprochés via les endpoints verify authentifiés avant règlement.
+- Les références locales et IDs AlphaPay sont conservés dans les journaux de liaison persistants. Les retries réutilisent exactement la même intention et clé d’idempotence ; une réponse incertaine garde les fonds réservés.
+- Statut final et mouvement du portefeuille sont validés dans une même transaction SQL verrouillée. Pas de double crédit, de remboursement sur timeout ou de validation manuelle d’un paiement AlphaPay en attente.
+- Les paiements historiques sans liaison AlphaPay nécessitent un rapprochement manuel ; ne pas les envoyer au nouveau fournisseur, les échouer ou les rembourser automatiquement.
+- Pays existants pris en charge : BJ, CI, BF, TG, SN, ML, CM, COD (normalisé CD). Congo-Brazzaville est retiré des nouvelles opérations, car absent du catalogue AlphaPay. Les montants et réseaux sont validés côté serveur ; pas de conversion implicite de devise.
+- Les frais de SolvexPay sont conservés. Le bénéfice net après frais fournisseur n’est pas présenté comme connu tant que ces coûts réels ne sont pas rapprochés.
+- Vérification locale : npm run check, npm run build, node --import tsx --test server/services/alphapay.test.ts. Aucun test local ne doit appeler un service de paiement réel ou écrire dans la base métier.
+- Administration : /admin/payment-providers affiche uniquement le statut AlphaPay et ses exigences, /api/admin/alphapay/config ne renvoie que des indicateurs sans secret. Les anciens endpoints de gestion de fournisseurs ne sont plus disponibles.
 
 ## Telegram Notifications
 - Bot sends alerts for completed deposits and withdrawals to admin
@@ -196,7 +126,7 @@ All API integrations use a **mandatory redirect flow** to SolvexPay's hosted pay
 
 ## Key Files
 - `server/routes.ts` — All API routes
-- `server/services/omnipay.ts` — OmniPay integration + status mapping
+- `server/services/alphapay.ts` — AlphaPay integration + status mapping
 - `server/storage.ts` — DB operations + currency conversion
 - `client/src/pages/deposit.tsx` — Dashboard deposit page
 - `client/src/pages/pay-api.tsx` — Hosted API payment page
@@ -220,8 +150,8 @@ Si vous déplacez ou remixez ce projet, voici **tout ce qu'il faut reconfigurer*
 | Secret | Description |
 |--------|-------------|
 | `SESSION_SECRET` | Clé aléatoire longue pour sécuriser les sessions Express |
-| `OMNIPAY_API_KEY` | Clé API OmniPay (tableau de bord OmniPay) |
-| `OMNIPAY_CALLBACK_KEY` | Clé de signature des callbacks OmniPay |
+| `ALPHAPAY_SECRET_KEY` | Clé API AlphaPay (tableau de bord AlphaPay) |
+| `ALPHAPAY_WEBHOOK_SECRET` | Clé de signature des callbacks AlphaPay |
 | `RESEND_API_KEY` | Clé API Resend (envoi d'emails) |
 | `RESEND_FROM_EMAIL` | Adresse email d'envoi (ex: noreply@solvexpay.com) |
 | `DATABASE_URL` | Même URL Neon que ci-dessus (aussi en secret) |

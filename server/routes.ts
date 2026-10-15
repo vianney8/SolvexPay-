@@ -5,8 +5,8 @@ import { execSync } from "child_process";
 import rateLimit from "express-rate-limit";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
-import { verifyCallbackSignature, omnipayStatusToString, omnipayStatusFromRaw, type OmniPayCallbackPayload } from "./services/omnipay";
-import { paymentService, isApiKeyConfigured, getOmniPayCallbackKey, getProviderByCode, activateProvider, invalidateActiveProviderCache, seedPaymentProviders } from "./services/paymentService";
+import { verifyAlphaPaySignature, alphapayStatusToString, getAlphaPayNetwork } from "./services/alphapay";
+import { paymentService, isApiKeyConfigured, getProviderByCode, activateProvider, invalidateActiveProviderCache, seedPaymentProviders, reservePayout, onPaymentSettled, isAlphaPayment } from "./services/paymentService";
 import { testResendConnection } from "./services/resend";
 import { notifyTransactionCompleted, notifyWithdrawal, handleTelegramCallback } from "./services/telegram";
 import { sendKycStatusEmail } from "./services/resend";
@@ -155,44 +155,13 @@ const publicPaySchema = z.object({
   operator: z.string().min(1, "Operateur requis"),
   country: z.string().min(2, "Pays requis"),
   customerName: z.string().optional(),
-  customerEmail: z.string().email().optional().or(z.literal("")),
+  customerEmail: z.string().email("L’adresse email du payeur est requise par AlphaPay."),
   customAmount: z.number().min(100).optional(),
   otp: z.string().optional(),
 });
 
-function getOmniPayOperatorCode(operator: string, country: string): string {
-  const op = operator.toUpperCase();
-  const co = country.toUpperCase();
-  const mapping: Record<string, Record<string, string>> = {
-    WAVE:     { CI: "wave", SN: "wave" },
-    FREE:     { SN: "mixx" },
-    MIXX:     { SN: "mixx" },
-    MTN:      { BJ: "mtn", CI: "mtn", CM: "mtn_cm", COG: "mtn" },
-    MOOV:     { BJ: "moov_benin", CI: "moov", TG: "moov_togo", BF: "moov_bf", ML: "moov_ml" },
-    ORANGE:   { CI: "orange", SN: "orange_sn", CM: "orange_cm", BF: "orange_bf", ML: "orange_ml", COD: "orange_cong" },
-    TMONEY:   { TG: "tmoney" },
-    VODACOM:  { COD: "mpesa" },
-    AIRTEL:   { COD: "airtel_money", COG: "airtel" },
-  };
-  return mapping[op]?.[co] ?? op.toLowerCase();
-}
-
-function getTransferOperatorCode(operator: string, country: string): string {
-  const op = operator.toUpperCase();
-  const co = country.toUpperCase();
-  const mapping: Record<string, Record<string, string>> = {
-    MOOV:     { BJ: "moov_benin", CI: "moov", TG: "moov_togo", BF: "moov_bf", ML: "moov_ml" },
-    ORANGE:   { CI: "orange", SN: "orange_sn", CM: "orange_cm", BF: "orange_bf", ML: "orange_ml", COD: "orange_cong" },
-    MTN:      { BJ: "mtn", CI: "mtn", CM: "mtn_cm", COG: "mtn" },
-    TMONEY:   { TG: "tmoney" },
-    WAVE:     { CI: "wave", SN: "wave" },
-    FREE:     { SN: "free_sn" },
-    MIXX:     { SN: "free_sn" },
-    VODACOM:  { COD: "mpesa" },
-    AIRTEL:   { COD: "airtel_money", COG: "airtel" },
-  };
-  return mapping[op]?.[co] ?? op.toLowerCase();
-}
+const getAlphaPayOperatorCode = getAlphaPayNetwork;
+const getTransferOperatorCode = getAlphaPayNetwork;
 
 function getCountryCurrency(country: string): string {
   const XAF_COUNTRIES = ["CM", "COG"];
@@ -378,22 +347,10 @@ function setGlobalMaintenanceCache(val: boolean) {
   _globalMaintenanceFetchedAt = Date.now();
 }
 
-// ── OmniPay enabled/disabled cache ───────────────────────────────────────────
-let _omnipayEnabled: boolean = true;
-let _omnipayEnabledFetchedAt: number = 0;
-async function getOmnipayEnabled(): Promise<boolean> {
-  if (Date.now() - _omnipayEnabledFetchedAt < 30_000) return _omnipayEnabled;
-  try {
-    const val = await storage.getSystemSetting("omnipayEnabled");
-    _omnipayEnabled = val !== "false";
-    _omnipayEnabledFetchedAt = Date.now();
-  } catch { /* keep last known value */ }
-  return _omnipayEnabled;
-}
-function setOmnipayEnabledCache(val: boolean) {
-  _omnipayEnabled = val;
-  _omnipayEnabledFetchedAt = Date.now();
-}
+// ── AlphaPay enabled/disabled cache ───────────────────────────────────────────
+async function getAlphapayEnabled(): Promise<boolean> { return isApiKeyConfigured(); }
+
+
 async function requireNotMaintenance(req: any, res: any, next: any) {
   const maintenance = await getGlobalMaintenance();
   if (maintenance && !req.user?.isAdmin) {
@@ -506,6 +463,13 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  onPaymentSettled(async transaction => {
+    userTxCacheDel(transaction.userId);
+    _adminCache.clear();
+    forwardToMerchantWebhooks(transaction);
+    if (transaction.type === "deposit" && transaction.status === "completed") await notifyTransactionCompleted(transaction);
+    else if (transaction.type === "withdrawal") await notifyWithdrawal(transaction, transaction.status === "completed" ? "success" : "failed");
+  });
   await setupAuth(app);
   registerAuthRoutes(app);
 
@@ -742,8 +706,8 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Service de paiement non configure" });
       }
 
-      const omnipayOn = await getOmnipayEnabled();
-      if (!omnipayOn) {
+      const alphapayOn = await getAlphapayEnabled();
+      if (!alphapayOn) {
         return res.status(503).json({ message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard." });
       }
 
@@ -759,20 +723,10 @@ export async function registerRoutes(
 
       const reference = generateReference();
       const isWave = operator.toLowerCase() === "wave";
-      const returnUrl = isWave ? `https://solvexpay.com/api/payment/callback?reference=${reference}` : undefined;
-      const omniDepositOperator = getOmniPayOperatorCode(operator, country);
+      const returnUrl = `${req.protocol}://${req.get("host")}/api/payment/callback?reference=${reference}`;
+      const alphaDepositOperator = getAlphaPayOperatorCode(operator, country);
 
-      const depositResponse = await paymentService.deposit({
-        msisdn: phoneNumber,
-        amount,
-        reference,
-        firstName: resolvedFirstName,
-        lastName: resolvedLastName,
-        otp,
-        operator: omniDepositOperator,
-        returnUrl,
-        callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
-      });
+
 
       const globalDepositFee = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
       const userCustomDepositFee = req.user?.customFeeRate != null ? parseFloat(req.user.customFeeRate) : null;
@@ -793,11 +747,28 @@ export async function registerRoutes(
         description: description || "Depot SolvexPay",
         fees: String(depositFees),
       } as any);
+      let depositResponse: any;
+      try { depositResponse = await paymentService.deposit({
+        msisdn: phoneNumber,
+        amount,
+        reference,
+        firstName: resolvedFirstName,
+        lastName: resolvedLastName,
+        otp,
+        operator: alphaDepositOperator,
+        country, currency, email: req.user.email, checkout: true,
+        returnUrl,
+        callbackUrl: `${req.protocol}://${req.get("host")}/api/webhooks/alphapay`,
+      });
+      } catch (providerError: any) {
+        if (providerError.code === "ALPHAPAY_REJECTED") { await storage.updateTransactionStatusIfPending(transaction.id, "failed"); throw providerError; }
+        depositResponse = { message: "Confirmation AlphaPay en attente. Ne relancez pas le paiement." };
+      }
       userTxCacheDel(userId);
 
       res.json({
         ...transaction,
-        omnipayId: depositResponse.id,
+        providerId: depositResponse.id,
         paymentUrl: depositResponse.payment_url,
       });
     } catch (error: any) {
@@ -895,86 +866,14 @@ export async function registerRoutes(
       }
 
       const reference = generateReference();
-      const withdrawalMode = (await storage.getSystemSetting("withdrawalMode")) || "auto";
-      const omnipayOnWithdraw = await getOmnipayEnabled();
-
-      if (withdrawalMode === "manual" || !omnipayOnWithdraw) {
-        const transaction = await storage.createTransaction({
-          userId,
-          type: "withdrawal",
-          amount: amount.toString(),
-          currency: localCurrency,
-          provider: operator,
-          phoneNumber,
-          reference,
-          status: "pending",
-          description: `Retrait vers ${phoneNumber} via ${operator}`,
-          fees: String(withdrawalFees),
-        } as any);
-        // Deduct amount + fees from wallet (user receives exact amount, fees taken on top)
-        await storage.updateWalletBalance(userId, localCurrency, -(amount + feesLocal));
-        return res.json({ ...transaction, mode: "manual" });
-      }
-
-      const fullName = req.user?.name || req.user?.firstName || "Client";
-      const nameParts = fullName.trim().split(" ");
-      const resolvedFirstName = nameParts[0] || "Client";
-      const resolvedLastName = nameParts.slice(1).join(" ") || "SolvexPay";
-
-      const isWave = operator.toLowerCase() === "wave";
-
-      console.log(`Initiating OmniPay withdrawal for reference: ${reference} (Country: ${country}, Operator: ${operator}), amount: ${amount}, fees: ${withdrawalFees}, total_debit: ${amount + feesLocal}`);
-
-      let transferResponse: any = null;
-      let isTimeout = false;
-
-      try {
-        transferResponse = await paymentService.transfer({
-          msisdn: phoneNumber,
-          amount: amount,
-          reference,
-          firstName: resolvedFirstName,
-          lastName: resolvedLastName,
-          operator: getOmniPayOperatorCode(operator, country),
-        });
-        console.log(`OmniPay withdrawal response for ${reference}:`, transferResponse);
-      } catch (transferErr: any) {
-        const isTimeoutError = transferErr?.code === "ECONNABORTED" || transferErr?.message?.includes("timeout");
-        if (!isTimeoutError) throw transferErr; // propagate non-timeout errors normally
-        isTimeout = true;
-        console.warn(`[Withdrawal] Timeout on transfer ${reference} (${country}/${operator}) — creating pending tx and letting PendingChecker verify`);
-      }
-
-      const transaction = await storage.createTransaction({
-        userId,
-        type: "withdrawal",
-        amount: amount.toString(),
-        currency: localCurrency,
-        provider: operator,
-        phoneNumber,
-        reference,
-        status: "pending",
-        description: `Retrait vers ${phoneNumber} via ${operator}`,
-        fees: String(withdrawalFees),
-      } as any);
+      const transaction = await reservePayout(userId, {
+        msisdn: phoneNumber, amount, reference, firstName: req.user.firstName || "Client",
+        lastName: req.user.lastName || "SolvexPay", operator: getAlphaPayNetwork(operator, country),
+        country, currency: localCurrency, email: req.user.email,
+      }, withdrawalFees, "withdrawal");
       userTxCacheDel(userId);
-
-      // Deduct amount + fees from wallet (user receives exact amount, fees taken on top)
-      await storage.updateWalletBalance(userId, localCurrency, -(amount + feesLocal));
-
-      if (isTimeout) {
-        return res.json({
-          ...transaction,
-          omnipayId: null,
-          _timedOut: true,
-          message: "Retrait en cours de traitement. Votre solde a été réservé et sera confirmé sous quelques minutes.",
-        });
-      }
-
-      res.json({
-        ...transaction,
-        omnipayId: transferResponse?.id,
-      });
+      _adminCache.clear();
+      res.json(transaction);
     } catch (error: any) {
       console.error("Error creating withdrawal:", error);
       logPaymentError({
@@ -1024,39 +923,13 @@ export async function registerRoutes(
       }
 
       const reference = generateReference();
-      const isWave = operator.toLowerCase() === "wave";
-
-      console.log(`Initiating OmniPay transfer for reference: ${reference} (Country: ${country}, Operator: ${operator})`);
-      const transferResponse = await paymentService.transfer({
-        msisdn: phoneNumber,
-        amount,
-        reference,
-        firstName,
-        lastName,
-        operator: getOmniPayOperatorCode(operator, country),
-      });
-      console.log(`OmniPay transfer response for ${reference}:`, transferResponse);
-
-      const transaction = await storage.createTransaction({
-        userId,
-        type: "transfer",
-        amount: amount.toString(),
-        currency: localCurrency,
-        provider: "omnipay",
-        phoneNumber,
-        reference,
-        status: "pending",
-        description: `Transfert vers ${firstName} ${lastName} (${phoneNumber})`,
-        fees: String(transferFees),
-      } as any);
+      const transaction = await reservePayout(userId, {
+        msisdn: phoneNumber, amount, reference, firstName, lastName,
+        operator: getAlphaPayNetwork(operator, country), country, currency: localCurrency, email: req.user.email,
+      }, transferFees, "transfer");
       userTxCacheDel(userId);
-
-      await storage.updateWalletBalance(userId, "XOF", -totalDeductedXOF);
-
-      res.json({
-        ...transaction,
-        omnipayId: transferResponse.id,
-      });
+      _adminCache.clear();
+      res.json(transaction);
     } catch (error: any) {
       console.error("Error creating transfer:", error);
       res.status(500).json({ message: error.message || "Echec du transfert" });
@@ -1070,8 +943,10 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Reference requise" });
       }
 
+      const ownedTransaction = await storage.getTransactionByReference(reference);
+      if (!ownedTransaction || ownedTransaction.userId !== req.user.id) return res.status(404).json({ message: "Transaction introuvable." });
       const result = await paymentService.getStatus(reference);
-      const statusStr = omnipayStatusToString(result.status ?? 0);
+      const statusStr = alphapayStatusToString(result.status);
 
       const transaction = await storage.getTransactionByReference(reference);
       if (transaction) {
@@ -1118,7 +993,7 @@ export async function registerRoutes(
       }
 
       const frontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: frontendStatus, omnipayStatus: result.status });
+      res.json({ success: result.success, status: frontendStatus, alphapayStatus: result.status });
     } catch (error: any) {
       console.error("Verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -1132,16 +1007,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Reference requise" });
       }
 
-      // ── Vérification BDD en premier — évite d'appeler OmniPay inutilement ──
+      // ── Vérification BDD en premier — évite d'appeler AlphaPay inutilement ──
       const transaction = await storage.getTransactionByReference(reference);
       if (transaction && transaction.status !== "pending") {
         const publicFrontendStatus = transaction.status === "completed" ? "SUCCESS" : transaction.status === "failed" ? "FAILED" : "PENDING";
         return res.json({ success: true, status: publicFrontendStatus });
       }
 
-      // ── Transaction encore pending → interroger OmniPay ──────────────────
+      // ── Transaction encore pending → interroger AlphaPay ──────────────────
       const result = await paymentService.getStatus(reference);
-      const statusStr = omnipayStatusToString(result.status ?? 0);
+      const statusStr = alphapayStatusToString(result.status);
 
       if (transaction) {
         if (statusStr === "completed") {
@@ -1233,6 +1108,10 @@ export async function registerRoutes(
       if (!transaction || transaction.status !== "pending") {
         return res.status(404).json({ message: "Paiement introuvable ou déjà traité" });
       }
+      if (await isAlphaPayment(transaction.reference)) {
+        const receipt = await paymentService.getReceipt(transaction.reference);
+        return res.json({ ...transaction, paymentUrl: receipt?.payment_url, reference: transaction.reference, message: "Cette intention de paiement existe déjà ; vérifiez son statut." });
+      }
       const validation = publicPaySchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ message: validation.error.errors[0].message });
@@ -1247,8 +1126,8 @@ export async function registerRoutes(
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ message: "Service de paiement non configuré" });
       }
-      const omnipayOnPApi = await getOmnipayEnabled();
-      if (!omnipayOnPApi) {
+      const alphapayOnPApi = await getAlphapayEnabled();
+      if (!alphapayOnPApi) {
         return res.status(503).json({ message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard." });
       }
       const amount = parseFloat(transaction.amount);
@@ -1257,21 +1136,9 @@ export async function registerRoutes(
       const firstName = nameParts[0] || "Client";
       const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
       const isWave = operator.toLowerCase() === "wave";
-      const returnUrl = isWave
-        ? `https://solvexpay.com/pay-api/${id}?status=callback&reference=${transaction.reference}`
-        : undefined;
-      const omniOperator = getOmniPayOperatorCode(operator, country);
-      const depositResponse = await paymentService.deposit({
-        msisdn: phoneNumber,
-        amount,
-        reference: transaction.reference,
-        firstName,
-        lastName,
-        otp,
-        operator: omniOperator,
-        returnUrl,
-        callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
-      });
+      const returnUrl = `${req.protocol}://${req.get("host")}/pay-api/${id}?status=callback&reference=${transaction.reference}`;
+      const alphaOperator = getAlphaPayOperatorCode(operator, country);
+
       const { db } = await import("./db");
       const { eq: eqFn } = await import("drizzle-orm");
       const { transactions: txTable } = await import("@shared/schema");
@@ -1300,6 +1167,18 @@ export async function registerRoutes(
         payerOperator: operator.toUpperCase(),
         fees: String(recalcFees),
       } as any).where(eqFn(txTable.id, id));
+      const depositResponse = await paymentService.deposit({
+        msisdn: phoneNumber,
+        amount,
+        reference: transaction.reference,
+        firstName,
+        lastName,
+        otp,
+        operator: alphaOperator,
+        country, currency: transaction.currency, email: req.body.customerEmail || transaction.payerEmail || undefined,
+        returnUrl,
+        callbackUrl: `${req.protocol}://${req.get("host")}/api/webhooks/alphapay`,
+      });
       res.json({
         reference: transaction.reference,
         paymentUrl: depositResponse.payment_url || null,
@@ -1331,7 +1210,7 @@ export async function registerRoutes(
         return res.json({ success: true, status: publicStatus });
       }
       const result = await paymentService.getStatus(transaction.reference);
-      const statusStr = omnipayStatusToString(result.status ?? 0);
+      const statusStr = alphapayStatusToString(result.status);
       if (statusStr === "completed") {
         const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
         if (updated) {
@@ -1743,9 +1622,7 @@ export async function registerRoutes(
       const resolvedFirstName = nameParts[0] || "Client";
       const resolvedLastName = nameParts.slice(1).join(" ") || "SolvexPay";
       const isWave = operator.toLowerCase() === "wave";
-      const returnUrl = isWave
-        ? `https://solvexpay.com/pay/${slug}?status=callback&reference=${reference}`
-        : undefined;
+      const returnUrl = `${req.protocol}://${req.get("host")}/pay/${slug}?status=callback&reference=${reference}`;
 
       const fixedAmount = parseFloat(paymentLink.amount);
       let linkAmount: number;
@@ -1772,23 +1649,11 @@ export async function registerRoutes(
         : (await getOperatorFeeRate(operator, "feePLink", globalPLinkFee, country)) / 100;
       const feesAmount = Math.round(linkAmount * feeRate);
 
-      const omnipayOnLink = await getOmnipayEnabled();
-      if (!omnipayOnLink) {
+      const alphapayOnLink = await getAlphapayEnabled();
+      if (!alphapayOnLink) {
         return res.status(503).json({ message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard." });
       }
       console.log(`Initiating payment for link ${slug} with reference: ${reference}`);
-      const depositResponse = await paymentService.deposit({
-        msisdn: phoneNumber,
-        amount: linkAmount,
-        reference,
-        firstName: resolvedFirstName,
-        lastName: resolvedLastName,
-        otp,
-        operator: getOmniPayOperatorCode(operator, country),
-        returnUrl,
-        callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
-      });
-      console.log(`Payment response for ${reference}:`, depositResponse);
 
       const transaction = await storage.createTransaction({
         userId: paymentLink.userId,
@@ -1807,12 +1672,29 @@ export async function registerRoutes(
         payerOperator: operator,
         paymentLinkId: paymentLink.id,
       } as any);
+      let depositResponse: any;
+      try { depositResponse = await paymentService.deposit({
+        msisdn: phoneNumber,
+        amount: linkAmount,
+        reference,
+        firstName: resolvedFirstName,
+        lastName: resolvedLastName,
+        otp,
+        operator: getAlphaPayOperatorCode(operator, country),
+        country, currency: paymentLink.currency, email: customerEmail || undefined,
+        returnUrl,
+        callbackUrl: `${req.protocol}://${req.get("host")}/api/webhooks/alphapay`,
+      });
+      } catch (providerError: any) {
+        if (providerError.code === "ALPHAPAY_REJECTED") { await storage.updateTransactionStatusIfPending(transaction.id, "failed"); throw providerError; }
+        depositResponse = { message: "Confirmation AlphaPay en attente. Ne relancez pas le paiement." };
+      }
 
       await storage.incrementPaymentLinkUsage(paymentLink.id);
 
       res.json({
         ...transaction,
-        omnipayId: depositResponse.id,
+        providerId: depositResponse.id,
         paymentUrl: depositResponse.payment_url,
       });
     } catch (error: any) {
@@ -2033,7 +1915,7 @@ export async function registerRoutes(
         return res.status(403).json({ error: { code: "KYC_REQUIRED", message: "Vérification KYC requise pour utiliser l'API.", status: 403 } });
       }
 
-      // ── Clé SR : paiement direct via OmniPay (sans redirection) ──
+      // ── Clé SR : paiement direct via AlphaPay (sans redirection) ──
       if (isSrKey) {
         if (!merchantUser.apiSrEnabled) {
           return res.status(403).json({ error: { code: "FORBIDDEN", message: "API SR non activée sur ce compte.", status: 403 } });
@@ -2066,8 +1948,8 @@ export async function registerRoutes(
         if (!isApiKeyConfigured()) {
           return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
         }
-        const omnipayOnSrApi = await getOmnipayEnabled();
-        if (!omnipayOnSrApi) {
+        const alphapayOnSrApi = await getAlphapayEnabled();
+        if (!alphapayOnSrApi) {
           return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard.", status: 503 } });
         }
 
@@ -2075,8 +1957,9 @@ export async function registerRoutes(
         const apiFeeRate = (await getOperatorFeeRate(operatorUpper, "feeApi", globalApiFee, countryUpper)) / 100;
         const fees = Math.round(amount * apiFeeRate);
         const currency = getCountryCurrency(countryUpper);
+        if (!customer_email || !z.string().email().safeParse(customer_email).success) return res.status(400).json({error:{code:"INVALID_CUSTOMER_EMAIL",message:"Email du payeur requis par AlphaPay."}});
         const reference = generateReference();
-        const omniOperator = getOmniPayOperatorCode(operatorUpper, countryUpper);
+        const alphaOperator = getAlphaPayOperatorCode(operatorUpper, countryUpper);
 
         const rawName = customer_name || "Client SolvexPay";
         const nameParts = rawName.trim().split(" ");
@@ -2103,26 +1986,25 @@ export async function registerRoutes(
           apiKeyId: req.merchantApiKey.id,
         } as any);
 
-        const returnUrl = isWave
-          ? `https://solvexpay.com/api/v1/sr/wave-callback?id=${transaction.id}&reference=${reference}`
-          : undefined;
+        const returnUrl = `${req.protocol}://${req.get("host")}/api/v1/sr/wave-callback?id=${transaction.id}&reference=${reference}`;
 
-        let omnipayResponse: any;
+        let alphapayResponse: any;
         try {
-          omnipayResponse = await paymentService.deposit({
+          alphapayResponse = await paymentService.deposit({
             msisdn: phone,
             amount,
             reference,
             firstName,
             lastName,
             otp,
-            operator: omniOperator,
+            operator: alphaOperator,
+            country: countryUpper, currency, email: customer_email || undefined,
             returnUrl,
-            callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
+            callbackUrl: `${req.protocol}://${req.get("host")}/api/webhooks/alphapay`,
           });
-        } catch (omniErr: any) {
-          await storage.updateTransactionStatus(transaction.id, "failed");
-          throw omniErr;
+        } catch (providerErr: any) {
+          if (providerErr.code === "ALPHAPAY_REJECTED") await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+          throw providerErr;
         }
 
         await storage.updateApiKey(req.merchantApiKey.id, { lastUsedAt: new Date() } as any);
@@ -2142,8 +2024,8 @@ export async function registerRoutes(
           currency,
           operator: operatorUpper,
           phone,
-          message: omnipayResponse.message || defaultMessage,
-          ...(isWave && omnipayResponse.payment_url ? { payment_url: omnipayResponse.payment_url } : {}),
+          message: alphapayResponse.message || defaultMessage,
+          ...(alphapayResponse.payment_url ? { payment_url: alphapayResponse.payment_url } : {}),
           created_at: transaction.createdAt,
         });
       }
@@ -2174,7 +2056,7 @@ export async function registerRoutes(
         apiKeyId: apiKeyId || null,
       } as any);
 
-      const hostedUrl = `https://solvexpay.com/pay-api/${transaction.id}`;
+      const hostedUrl = `${req.protocol}://${req.get("host")}/pay-api/${transaction.id}`;
       res.status(201).json({
         id: transaction.id,
         status: "pending",
@@ -2191,7 +2073,7 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("API v1 deposit error:", error);
-      if (error.message?.includes("OmniPay") || error.message?.includes("omnipay")) {
+      if (error.message?.includes("AlphaPay") || error.message?.includes("alphapay")) {
         return res.status(503).json({ error: { code: "PROVIDER_UNAVAILABLE", message: error.message, status: 503 } });
       }
       res.status(500).json({ error: { code: "SERVER_ERROR", message: error.message || "Erreur interne.", status: 500 } });
@@ -2230,7 +2112,7 @@ export async function registerRoutes(
     }
   });
 
-  // ── Merchant: manually check/sync a transaction status from OmniPay ─────────
+  // ── Merchant: manually check/sync a transaction status from AlphaPay ─────────
   app.post("/api/v1/transactions/:id/verify", authenticateApiKey, async (req: any, res) => {
     try {
       const { id } = req.params as Record<string, string>;
@@ -2247,7 +2129,7 @@ export async function registerRoutes(
         });
       }
       const result = await paymentService.getStatus(transaction.reference);
-      const statusStr = omnipayStatusToString(result.status ?? 0);
+      const statusStr = alphapayStatusToString(result.status);
 
       if (statusStr === "completed") {
         const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
@@ -2365,8 +2247,8 @@ export async function registerRoutes(
       if (!isApiKeyConfigured()) {
         return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Service de paiement non configuré.", status: 503 } });
       }
-      const omnipayOnApi = await getOmnipayEnabled();
-      if (!omnipayOnApi) {
+      const alphapayOnApi = await getAlphapayEnabled();
+      if (!alphapayOnApi) {
         return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: "Le service de paiement est temporairement désactivé. Veuillez réessayer plus tard.", status: 503 } });
       }
 
@@ -2378,8 +2260,9 @@ export async function registerRoutes(
         : (await getOperatorFeeRate(operatorUpper, "feeApi", globalApiFee, countryUpper)) / 100;
       const fees = Math.round(amount * apiFeeRate);
       const currency = getCountryCurrency(countryUpper);
+      if (!customer_email || !z.string().email().safeParse(customer_email).success) return res.status(400).json({error:{code:"INVALID_CUSTOMER_EMAIL",message:"Email du payeur requis par AlphaPay."}});
       const reference = generateReference();
-      const omniOperator = getOmniPayOperatorCode(operatorUpper, countryUpper);
+      const alphaOperator = getAlphaPayOperatorCode(operatorUpper, countryUpper);
 
       // ── Nom du payeur ──
       const rawName = customer_name || "Client SolvexPay";
@@ -2410,29 +2293,28 @@ export async function registerRoutes(
 
       // ── Wave returnUrl : callback backend SR dédié ──
       // Étape 1 : Wave redirige le client vers /api/v1/sr/wave-callback
-      // Étape 2 : on vérifie immédiatement le statut OmniPay et on crédite si confirmé
+      // Étape 2 : on vérifie immédiatement le statut AlphaPay et on crédite si confirmé
       // Étape 3 : on redirige le client vers /pay-api/:id (page publique de confirmation)
-      const returnUrl = isWave
-        ? `https://solvexpay.com/api/v1/sr/wave-callback?id=${transaction.id}&reference=${reference}`
-        : undefined;
+      const returnUrl = `${req.protocol}://${req.get("host")}/api/v1/sr/wave-callback?id=${transaction.id}&reference=${reference}`;
 
-      // ── Appel OmniPay ──
-      let omnipayResponse: any;
+      // ── Appel AlphaPay ──
+      let alphapayResponse: any;
       try {
-        omnipayResponse = await paymentService.deposit({
+        alphapayResponse = await paymentService.deposit({
           msisdn: phone,
           amount,
           reference,
           firstName,
           lastName,
           otp,
-          operator: omniOperator,
+          operator: alphaOperator,
+            country: countryUpper, currency, email: customer_email || undefined,
           returnUrl,
-          callbackUrl: "https://solvexpay.com/api/webhooks/omnipay",
+          callbackUrl: `${req.protocol}://${req.get("host")}/api/webhooks/alphapay`,
         });
-      } catch (omniErr: any) {
-        await storage.updateTransactionStatus(transaction.id, "failed");
-        throw omniErr;
+      } catch (providerErr: any) {
+        if (providerErr.code === "ALPHAPAY_REJECTED") await storage.updateTransactionStatusIfPending(transaction.id, "failed");
+        throw providerErr;
       }
 
       await storage.updateApiKey(apiKey.id, { lastUsedAt: new Date() } as any);
@@ -2452,8 +2334,8 @@ export async function registerRoutes(
         currency,
         operator: operatorUpper,
         phone,
-        message: omnipayResponse.message || defaultMessage,
-        ...(isWave && omnipayResponse.payment_url ? { payment_url: omnipayResponse.payment_url } : {}),
+        message: alphapayResponse.message || defaultMessage,
+        ...(alphapayResponse.payment_url ? { payment_url: alphapayResponse.payment_url } : {}),
         created_at: transaction.createdAt,
       });
     } catch (error: any) {
@@ -2472,18 +2354,18 @@ export async function registerRoutes(
 
   // ─── SR API — CALLBACK WAVE (retour depuis l'app Wave) ───────────────────────
   // Wave redirige ici après que le client ait payé (ou annulé).
-  // On vérifie le statut OmniPay immédiatement, on crédite si confirmé,
+  // On vérifie le statut AlphaPay immédiatement, on crédite si confirmé,
   // puis on redirige vers la page de confirmation publique /pay-api/:id.
   app.get("/api/v1/sr/wave-callback", async (req, res) => {
     const { id: transactionId, reference } = req.query as Record<string, string>;
     console.log(`[SR Wave Callback] transactionId=${transactionId} reference=${reference}`);
 
-    let redirectTarget = `https://solvexpay.com/pay-api/${transactionId}?status=callback&reference=${encodeURIComponent(reference || "")}`;
+    let redirectTarget = `${req.protocol}://${req.get("host")}/pay-api/${transactionId}?status=callback&reference=${encodeURIComponent(reference || "")}`;
 
     if (transactionId && reference) {
       try {
         const result = await paymentService.getStatus(reference);
-        const statusStr = omnipayStatusToString(result.status ?? 0);
+        const statusStr = alphapayStatusToString(result.status);
         const transaction = await storage.getTransactionById(transactionId);
 
         if (transaction && transaction.status === "pending") {
@@ -2506,7 +2388,7 @@ export async function registerRoutes(
               console.log(`[SR Wave Callback] ✓ Transaction ${reference} completed and credited`);
             }
           }
-          // Ne jamais marquer "failed" ici : le webhook OmniPay s'en charge
+          // Ne jamais marquer "failed" ici : le webhook AlphaPay s'en charge
           // avec des codes numériques fiables.
         }
 
@@ -2524,7 +2406,7 @@ export async function registerRoutes(
         }
       } catch (err) {
         console.error("[SR Wave Callback] Error verifying status:", err);
-        // En cas d'erreur OmniPay, on redirige quand même vers la page de confirmation
+        // En cas d'erreur AlphaPay, on redirige quand même vers la page de confirmation
         // qui fera le polling et récupèrera le statut au prochain cycle.
       }
     }
@@ -2544,109 +2426,48 @@ export async function registerRoutes(
     res.json({ imageUrl });
   });
 
-  app.post("/api/webhooks/omnipay", async (req, res) => {
-    const payload = req.body as OmniPayCallbackPayload;
-    console.log("[OmniPay] Callback received:", JSON.stringify(payload));
-
-    // Signature verification — reject invalid requests immediately
-    const callbackKey = await getOmniPayCallbackKey();
-    if (callbackKey) {
-      if (!payload.signature) {
-        console.error("[OmniPay] Callback: missing signature");
-        return res.status(401).json({ error: "Missing signature" });
-      }
-      if (!verifyCallbackSignature(payload, callbackKey)) {
-        console.error("[OmniPay] Callback: invalid signature");
-        return res.status(401).json({ error: "Invalid signature" });
-      }
+  app.post("/api/webhooks/alphapay", async (req, res) => {
+    const secret = process.env.ALPHAPAY_WEBHOOK_SECRET || "";
+    if (!secret) return res.status(503).json({ message: "Webhook AlphaPay non configuré." });
+    const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.alloc(0);
+    if (!verifyAlphaPaySignature(rawBody, req.get("X-Webhook-Signature") || "", req.get("X-Webhook-Timestamp") || "", secret)) {
+      return res.status(401).json({ message: "Signature AlphaPay invalide ou expirée." });
     }
-
-    // Always acknowledge immediately — prevents OmniPay from retrying on our internal errors
-    res.json({ received: true });
-
-    // Process asynchronously after response is sent
-    ;(async () => {
-      try {
-        const { reference, status: statusCode } = payload;
-        if (!reference) {
-          console.warn("[OmniPay] Callback: missing reference in payload", JSON.stringify(payload));
-          return;
+    if (req.body?.event === "webhook.test") return res.json({ received: true });
+    if (!String(req.body?.event || "").startsWith("transaction.")) return res.json({ received: true, ignored: true });
+    const providerId = req.body?.data?.id;
+    if (typeof providerId !== "string") return res.status(400).json({ message: "Identifiant AlphaPay requis." });
+    try {
+      let reference = await paymentService.referenceForWebhook(providerId);
+      // Checkout webhooks contain the payment ID, not necessarily the session ID.
+      // Only consider our own persisted checkout bindings, and verify them through AlphaPay.
+      if (!reference) {
+        const { db } = await import("./db");
+        const { paymentProviderLogs: logs } = await import("@shared/schema");
+        const { and, eq, sql, desc } = await import("drizzle-orm");
+        const sessions = await db.select({ reference: logs.reference }).from(logs).where(and(eq(logs.providerCode, "alphapay"),eq(logs.action, "binding"),sql`${logs.response}->>'kind' = 'checkout'`)).orderBy(desc(logs.createdAt)).limit(30);
+        for (const session of sessions) {
+          if (!session.reference) continue;
+          const verified = await paymentService.getStatus(session.reference);
+          if (verified.id === providerId) { reference = session.reference; break; }
         }
-
-        const statusStr = omnipayStatusFromRaw(statusCode);
-        console.log(`[OmniPay] Callback processing: reference=${reference} rawStatus=${statusCode} → ${statusStr}`);
-        if (statusStr !== "completed" && statusStr !== "failed") {
-          console.log(`[OmniPay] Callback: status "${statusCode}" is still pending — skipping`);
-          return;
-        }
-
-        const transaction = await storage.getTransactionByReference(reference);
-        if (!transaction) {
-          console.warn(`[OmniPay] Callback: transaction not found for reference ${reference}`);
-          return;
-        }
-        if (transaction.status !== "pending") {
-          console.log(`[OmniPay] Callback: transaction ${reference} already in status "${transaction.status}" — skipping`);
-          return;
-        }
-
-        if (statusStr === "completed") {
-          const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
-          if (!updated) return; // Already processed by another callback — skip to avoid double credit
-          if (transaction.type === "deposit") {
-            const grossAmtWh = parseFloat(transaction.amount);
-            const txFeesWh = parseFloat((transaction as any).fees || "0") || 0;
-            const netAmtWh = grossAmtWh - txFeesWh;
-            await storage.updateWalletBalance(
-              transaction.userId,
-              transaction.currency,
-              netAmtWh > 0 ? netAmtWh : grossAmtWh
-            );
-            console.log(`[OmniPay] Deposit ${reference} completed, wallet credited`);
-          } else if (transaction.type === "withdrawal") {
-            console.log(`[OmniPay] Withdrawal ${reference} completed`);
-          }
-        } else {
-          const failedUpdate = await storage.updateTransactionStatusIfPending(transaction.id, "failed");
-          if (!failedUpdate) return;
-          if (transaction.type === "withdrawal") {
-            const refundAmt = parseFloat(transaction.amount);
-            const refundFeesXOF = parseFloat((transaction as any).fees || "0");
-            const refundFeesLocal = transaction.currency === "CDF" ? Math.round(refundFeesXOF / 0.22) : refundFeesXOF;
-            await storage.updateWalletBalance(
-              transaction.userId,
-              transaction.currency,
-              refundAmt + refundFeesLocal // Refund exact amount + fees
-            );
-            console.log(`[OmniPay] Withdrawal ${reference} failed, balance refunded (amount + fees)`);
-          } else {
-            console.log(`[OmniPay] Payment ${reference} failed`);
-          }
-        }
-
-        const finalTx = await storage.getTransactionByReference(reference);
-        if (finalTx) {
-          forwardToMerchantWebhooks(finalTx);
-          if (statusStr === "completed" && finalTx.type === "deposit") {
-            notifyTransactionCompleted(finalTx).catch(() => {});
-          } else if (finalTx.type === "withdrawal") {
-            notifyWithdrawal(finalTx, statusStr === "completed" ? "success" : "failed").catch(() => {});
-          }
-        }
-      } catch (error: any) {
-        console.error("[OmniPay] Callback async processing error:", error.message || error);
       }
-    })();
+      if (!reference) return res.status(409).json({ message: "Opération non rapprochée ; nouvelle livraison nécessaire." });
+      await paymentService.getStatus(reference);
+      res.json({ received: true });
+    } catch {
+      res.status(503).json({ message: "Vérification AlphaPay à réessayer." });
+    }
   });
 
   app.get("/api/payment/callback", async (req, res) => {
     const { reference, merchant_redirect } = req.query as Record<string, string>;
-    console.log(`OmniPay payment redirect callback: reference=${reference} merchant_redirect=${merchant_redirect}`);
+    console.log(`AlphaPay payment redirect callback: reference=${reference} merchant_redirect=${merchant_redirect}`);
 
     if (reference) {
       try {
         const result = await paymentService.getStatus(reference);
-        const statusStr = omnipayStatusToString(result.status ?? 0);
+        const statusStr = alphapayStatusToString(result.status);
         const transaction = await storage.getTransactionByReference(reference);
         if (transaction && transaction.status === "pending") {
           if (statusStr === "completed") {
@@ -2667,7 +2488,7 @@ export async function registerRoutes(
               }
             }
           }
-          // Ne jamais marquer comme "failed" ici : le webhook OmniPay ou le polling
+          // Ne jamais marquer comme "failed" ici : le webhook AlphaPay ou le polling
           // du marchand s'en chargera avec des codes numériques fiables.
         }
       } catch (error) {
@@ -2684,21 +2505,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/settings/webhook-urls", isAuthenticated, async (req, res) => {
-    const baseUrl = "https://solvexpay.com";
-
-    res.json({
-      callbackUrl: `${baseUrl}/api/webhooks/omnipay`,
-      returnUrl: `${baseUrl}/api/payment/callback`,
-      domain: "solvexpay.com",
-      instructions: "Configurez ces URLs dans votre tableau de bord OmniPay dans Mon Compte > URL de Callback.",
-      steps: [
-        "1. Connectez-vous a votre compte OmniPay sur omnipay.webtechci.com",
-        "2. Allez dans Mon Compte > URL de Callback",
-        "3. Configurez l'URL de callback: https://solvexpay.com/api/webhooks/omnipay",
-        "4. Copiez la cle de callback et configurez-la comme OMNIPAY_CALLBACK_KEY",
-        "5. Configurez votre cle API comme OMNIPAY_API_KEY"
-      ]
-    });
+    const baseUrl = req.protocol + "://" + req.get("host");
+    res.json({ callbackUrl: baseUrl + "/api/webhooks/alphapay", returnUrl: baseUrl + "/api/payment/callback", domain: req.get("host"), instructions: "Dans AlphaPay, créez un webhook pour transaction.success, transaction.failed et transaction.cancelled. Configurez son secret dans ALPHAPAY_WEBHOOK_SECRET.", steps: ["Configurer ALPHAPAY_SECRET_KEY dans les Secrets du projet.", "Activer les droits payin et payout et autoriser l’IP sortante du serveur dans AlphaPay.", "Configurer le webhook depuis le tableau de bord AlphaPay."] });
   });
 
   // ─── ADMIN ROUTES ─────────────────────────────────────────────────────────
@@ -2794,7 +2602,7 @@ export async function registerRoutes(
       const { sum, eq, and, ne } = await import("drizzle-orm");
       const { transactions: txTable, wallets: walletsTable } = await import("@shared/schema");
 
-      const [omnipayDeposits] = await db.select({ total: sum(txTable.amount), fees: sum(txTable.fees) })
+      const [alphapayDeposits] = await db.select({ total: sum(txTable.amount), fees: sum(txTable.fees) })
         .from(txTable).where(and(eq(txTable.type, "deposit"), eq(txTable.status, "completed"), ne(txTable.provider, "admin")));
 
       const [adminDeposits] = await db.select({ total: sum(txTable.amount) })
@@ -2812,8 +2620,8 @@ export async function registerRoutes(
         .from(txTable).where(eq(txTable.status, "completed"));
 
       res.json({
-        omnipayDeposits: parseFloat(omnipayDeposits.total || "0"),
-        omnipayDepositFees: parseFloat(omnipayDeposits.fees || "0"),
+        depositCollections: parseFloat(alphapayDeposits.total || "0"),
+        depositFees: parseFloat(alphapayDeposits.fees || "0"),
         adminDeposits: parseFloat(adminDeposits.total || "0"),
         withdrawals: parseFloat(withdrawals.total || "0"),
         withdrawalFees: parseFloat(withdrawals.fees || "0"),
@@ -2926,11 +2734,13 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction introuvable" });
       }
 
-      if (status === "completed" && transaction.type === "withdrawal" && transaction.status === "pending") {
-        const omnipayOnValidate = await getOmnipayEnabled();
+      if (await isAlphaPayment(transaction.reference)) return res.status(409).json({ message: "Le statut AlphaPay est confirmé uniquement par vérification serveur. Utilisez la vérification du paiement." });
 
-        if (!omnipayOnValidate) {
-          // OmniPay désactivé : l'admin a traité le retrait manuellement, on valide directement
+      if (status === "completed" && transaction.type === "withdrawal" && transaction.status === "pending") {
+        const alphapayOnValidate = await getAlphapayEnabled();
+
+        if (!alphapayOnValidate) {
+          // AlphaPay désactivé : l'admin a traité le retrait manuellement, on valide directement
           const tx = await storage.updateTransactionStatus(id, "completed");
           adminTxCache.clear();
           if (tx) notifyWithdrawal(tx, "success").catch(() => {});
@@ -2938,7 +2748,7 @@ export async function registerRoutes(
         }
 
         if (!isApiKeyConfigured()) {
-          return res.status(503).json({ message: "Service de paiement OmniPay non configuré" });
+          return res.status(503).json({ message: "Service de paiement AlphaPay non configuré" });
         }
 
         const amount = parseFloat(transaction.amount);
@@ -2962,9 +2772,9 @@ export async function registerRoutes(
         const resolvedLastName = txUser?.lastName || "SolvexPay";
 
         const txCountry = (transaction as any).payerCountry || "BJ";
-        const omnipayOperator = getOmniPayOperatorCode(operator, txCountry);
+        const alphapayOperator = getAlphaPayOperatorCode(operator, txCountry);
 
-        console.log(`Admin: initiating OmniPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${omnipayOperator}, amount: ${amount}, fees: ${txFees}, net: ${netAmountLocal})`);
+        console.log(`Admin: initiating AlphaPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${alphapayOperator}, amount: ${amount}, fees: ${txFees}, net: ${netAmountLocal})`);
         try {
           const transferResponse = await paymentService.transfer({
             msisdn: phoneNumber,
@@ -2972,18 +2782,18 @@ export async function registerRoutes(
             reference: transaction.reference,
             firstName: resolvedFirstName,
             lastName: resolvedLastName,
-            operator: omnipayOperator,
+            operator: alphapayOperator,
           });
-          console.log(`Admin: OmniPay transfer response for tx ${id}:`, transferResponse);
+          console.log(`Admin: AlphaPay transfer response for tx ${id}:`, transferResponse);
 
           const tx = await storage.updateTransactionStatus(id, "completed");
           if (tx) notifyWithdrawal(tx, "success").catch(() => {});
-          return res.json({ ...tx, omnipayId: transferResponse.id, omnipayTriggered: true });
-        } catch (omnipayError: any) {
-          console.error(`Admin: OmniPay transfer failed for tx ${id}:`, omnipayError);
+          return res.json({ ...tx, providerId: transferResponse.id, alphapayTriggered: true });
+        } catch (alphapayError: any) {
+          console.error(`Admin: AlphaPay transfer failed for tx ${id}:`, alphapayError);
           return res.status(502).json({
-            message: `Échec du paiement OmniPay: ${omnipayError.message || "Erreur inconnue"}`,
-            omnipayError: true,
+            message: `Échec du paiement AlphaPay: ${alphapayError.message || "Erreur inconnue"}`,
+            alphapayError: true,
           });
         }
       }
@@ -3024,7 +2834,7 @@ export async function registerRoutes(
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
       const { eq } = await import("drizzle-orm");
-      await db.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, id));
+      await db.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, String(id)));
       adminCacheDel("admin-users");
       res.json({ success: true });
     } catch (error) {
@@ -3075,7 +2885,7 @@ export async function registerRoutes(
       const [updated] = await db
         .update(usersTable)
         .set({ isAdmin: !!adminVal, updatedAt: new Date() })
-        .where(eq(usersTable.id, id))
+        .where(eq(usersTable.id, String(id)))
         .returning();
       adminCacheDel("admin-users");
       const { passwordHash: _, ...safeUser } = updated;
@@ -3099,7 +2909,7 @@ export async function registerRoutes(
       const updateData: any = { kycStatus, updatedAt: new Date() };
       if (kycStatus === "rejected" && rejectionReason) updateData.kycRejectionReason = rejectionReason;
       if (kycStatus === "verified") updateData.kycRejectionReason = null;
-      const [updated] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
+      const [updated] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, String(id))).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
       if ((kycStatus === "verified" || kycStatus === "rejected") && updated.email) {
         sendKycStatusEmail(
@@ -3127,7 +2937,7 @@ export async function registerRoutes(
       const [user] = await db
         .select({ kycDocumentFront: usersTable.kycDocumentFront, kycDocumentBack: usersTable.kycDocumentBack, kycSelfie: usersTable.kycSelfie })
         .from(usersTable)
-        .where(eq(usersTable.id, id));
+        .where(eq(usersTable.id, String(id)));
       if (!user) return res.status(404).json({ message: "Utilisateur introuvable" });
       res.json(user);
     } catch (error) {
@@ -3142,7 +2952,7 @@ export async function registerRoutes(
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
       const { eq } = await import("drizzle-orm");
-      const [updated] = await db.update(usersTable).set({ isBlocked: !!isBlocked, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
+      const [updated] = await db.update(usersTable).set({ isBlocked: !!isBlocked, updatedAt: new Date() }).where(eq(usersTable.id, String(id))).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
       adminCacheDel("admin-users", "admin-wallets", "admin-merchants");
       const { passwordHash: _, ...safeUser } = updated;
@@ -3165,7 +2975,7 @@ export async function registerRoutes(
       if ("customWithdrawalFeeRate" in req.body) updateData.customWithdrawalFeeRate = customWithdrawalFeeRate != null ? String(customWithdrawalFeeRate) : null;
       if ("customFeeApi" in req.body) updateData.customFeeApi = customFeeApi != null ? String(customFeeApi) : null;
       if ("customFeePLink" in req.body) updateData.customFeePLink = customFeePLink != null ? String(customFeePLink) : null;
-      const [updated] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
+      const [updated] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, String(id))).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
       adminCacheDel("admin-users", "admin-wallets", "admin-merchants");
       const { passwordHash: _, ...safeUser } = updated;
@@ -3199,7 +3009,7 @@ export async function registerRoutes(
       const { users: usersTable } = await import("@shared/models/auth");
       const { db } = await import("./db");
       const { eq } = await import("drizzle-orm");
-      const [updated] = await db.update(usersTable).set({ apiSrEnabled, updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
+      const [updated] = await db.update(usersTable).set({ apiSrEnabled, updatedAt: new Date() }).where(eq(usersTable.id, String(id))).returning();
       if (!updated) return res.status(404).json({ message: "Utilisateur introuvable" });
       adminCacheDel("admin-users");
       res.json({ success: true, apiSrEnabled: updated.apiSrEnabled });
@@ -3290,38 +3100,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/omnipay-rates", isAdmin, async (req, res) => {
-    try {
-      const deposit = parseFloat((await storage.getSystemSetting("omnipay_rate_deposit")) || "3");
-      const withdrawal = parseFloat((await storage.getSystemSetting("omnipay_rate_withdrawal")) || "3");
-      res.json({ deposit, withdrawal });
-    } catch (error) {
-      res.status(500).json({ message: "Erreur serveur" });
-    }
-  });
-
-  app.patch("/api/admin/omnipay-rates", isAdmin, async (req, res) => {
-    try {
-      const { deposit, withdrawal } = req.body;
-      if (deposit !== undefined) {
-        const v = parseFloat(deposit);
-        if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide (0-100)" });
-        await storage.setSystemSetting("omnipay_rate_deposit", String(v));
-      }
-      if (withdrawal !== undefined) {
-        const v = parseFloat(withdrawal);
-        if (isNaN(v) || v < 0 || v > 100) return res.status(400).json({ message: "Valeur invalide (0-100)" });
-        await storage.setSystemSetting("omnipay_rate_withdrawal", String(v));
-      }
-      const updated = {
-        deposit: parseFloat((await storage.getSystemSetting("omnipay_rate_deposit")) || "3"),
-        withdrawal: parseFloat((await storage.getSystemSetting("omnipay_rate_withdrawal")) || "3"),
-      };
-      res.json(updated);
-    } catch (error) {
-      res.status(500).json({ message: "Erreur serveur" });
-    }
-  });
+  // AlphaPay tariffs belong to the provider dashboard. No legacy percentage configuration.
 
   app.get("/api/admin/commissions", isAdmin, async (req, res) => {
     try {
@@ -3333,8 +3112,8 @@ export async function registerRoutes(
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      const omnipayDepositRate = parseFloat((await storage.getSystemSetting("omnipay_rate_deposit")) || "3") / 100;
-      const omnipayWithdrawalRate = parseFloat((await storage.getSystemSetting("omnipay_rate_withdrawal")) || "3") / 100;
+      const alphapayDepositRate = 0;
+      const alphapayWithdrawalRate = 0;
 
       const [totalFees] = await db.select({ total: sum(txTable.fees) }).from(txTable).where(eq(txTable.status, "completed"));
       const [monthFees] = await db.select({ total: sum(txTable.fees) }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, startOfMonth)));
@@ -3343,11 +3122,11 @@ export async function registerRoutes(
       const [monthVolume] = await db.select({ total: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), gte(txTable.createdAt, startOfMonth)));
       const [txCountCompleted] = await db.select({ count: count() }).from(txTable).where(eq(txTable.status, "completed"));
 
-      const [depositFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit"), eq(txTable.provider, "omnipay")));
+      const [depositFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit"), eq(txTable.provider, "alphapay")));
       const [withdrawalFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "withdrawal")));
       const [transferFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "transfer")));
       const [apiFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit")));
-      const [monthDepositFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit"), eq(txTable.provider, "omnipay"), gte(txTable.createdAt, startOfMonth)));
+      const [monthDepositFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "deposit"), eq(txTable.provider, "alphapay"), gte(txTable.createdAt, startOfMonth)));
       const [monthWithdrawalFees] = await db.select({ fees: sum(txTable.fees), volume: sum(txTable.amount) }).from(txTable).where(and(eq(txTable.status, "completed"), eq(txTable.type, "withdrawal"), gte(txTable.createdAt, startOfMonth)));
 
       // Total admin profit withdrawals (completed only deducted, pending reserved)
@@ -3364,16 +3143,16 @@ export async function registerRoutes(
       const monthDepositVolumeVal = parseFloat(monthDepositFees.volume || "0");
       const monthWithdrawalVolumeVal = parseFloat(monthWithdrawalFees.volume || "0");
 
-      const omnipayCostDeposit = Math.round(totalDepositVolume * omnipayDepositRate);
-      const omnipayCostWithdrawal = Math.round(totalWithdrawalVolume * omnipayWithdrawalRate);
-      const omnipayCostDepositMonth = Math.round(monthDepositVolumeVal * omnipayDepositRate);
-      const omnipayCostWithdrawalMonth = Math.round(monthWithdrawalVolumeVal * omnipayWithdrawalRate);
-      const totalOmniPayCost = omnipayCostDeposit + omnipayCostWithdrawal;
+      const alphapayCostDeposit = Math.round(totalDepositVolume * alphapayDepositRate);
+      const alphapayCostWithdrawal = Math.round(totalWithdrawalVolume * alphapayWithdrawalRate);
+      const alphapayCostDepositMonth = Math.round(monthDepositVolumeVal * alphapayDepositRate);
+      const alphapayCostWithdrawalMonth = Math.round(monthWithdrawalVolumeVal * alphapayWithdrawalRate);
+      const totalAlphaPayCost = alphapayCostDeposit + alphapayCostWithdrawal;
       const totalAdminFees = parseFloat(totalFees.total || "0");
-      const adminNetProfit = totalAdminFees - totalOmniPayCost;
+      const adminNetProfit = totalAdminFees - totalAlphaPayCost;
       const monthAdminFees = parseFloat(monthFees.total || "0");
-      const monthOmniPayCost = omnipayCostDepositMonth + omnipayCostWithdrawalMonth;
-      const monthNetProfit = monthAdminFees - monthOmniPayCost;
+      const monthAlphaPayCost = alphapayCostDepositMonth + alphapayCostWithdrawalMonth;
+      const monthNetProfit = monthAdminFees - monthAlphaPayCost;
 
       const totalWithdrawn = parseFloat(withdrawnCompleted.total || "0");
       const pendingWithdrawn = parseFloat(withdrawnPending.total || "0");
@@ -3391,18 +3170,19 @@ export async function registerRoutes(
         totalTransferFees,
         totalDepositVolume,
         totalWithdrawalVolume,
-        omnipayCostDeposit,
-        omnipayCostWithdrawal,
-        totalOmniPayCost,
-        adminNetProfit,
+        alphapayCostDeposit,
+        alphapayCostWithdrawal,
+        totalAlphaPayCost,
+        adminNetProfit: null,
+        providerCostKnown: false,
         monthDepositFees: monthDepositFeesVal,
         monthWithdrawalFees: monthWithdrawalFeesVal,
-        monthOmniPayCost,
-        monthNetProfit,
-        omnipayDepositRate: omnipayDepositRate * 100,
-        omnipayWithdrawalRate: omnipayWithdrawalRate * 100,
-        estimatedOmniPayCut: totalOmniPayCost,
-        estimatedNetRevenue: adminNetProfit,
+        monthAlphaPayCost,
+        monthNetProfit: null,
+        alphapayDepositRate: alphapayDepositRate * 100,
+        alphapayWithdrawalRate: alphapayWithdrawalRate * 100,
+        estimatedAlphaPayCut: totalAlphaPayCost,
+        estimatedNetRevenue: null,
         totalWithdrawn,
         pendingWithdrawn,
         availableBalance,
@@ -3670,7 +3450,7 @@ export async function registerRoutes(
     }
   });
 
-  // OmniPay balance
+  // AlphaPay balance
   app.post("/api/admin/payment-methods/global-maintenance", isAdmin, async (req, res) => {
     try {
       const { inMaintenance } = req.body;
@@ -3686,98 +3466,19 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/omnipay/balance", isAdmin, async (req, res) => {
+  app.get("/api/admin/alphapay/balance", isAdmin, async (req, res) => {
     try {
       const balances = await paymentService.getBalance();
       res.json(balances);
     } catch (error) {
-      console.error("Admin OmniPay balance error:", error);
-      res.status(500).json({ message: "Impossible de récupérer le solde OmniPay" });
+      console.error("Admin AlphaPay balance error:", error);
+      res.status(500).json({ message: "Impossible de récupérer le solde AlphaPay" });
     }
   });
 
   // ── Gestion des fournisseurs de paiement (admin) ──
-  app.get("/api/admin/payment-providers", isAdmin, async (_req, res) => {
-    try {
-      const { paymentProviders: pp } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const rows = await db.select().from(pp);
-      const safe = rows.map((r) => ({
-        ...r,
-        apiKey: r.apiKey ? `${r.apiKey.slice(0, 6)}…${r.apiKey.slice(-4)}` : "",
-        secretKey: r.secretKey ? `${r.secretKey.slice(0, 4)}…${r.secretKey.slice(-4)}` : "",
-        hasApiKey: !!r.apiKey,
-        hasSecretKey: !!r.secretKey,
-      }));
-      res.json(safe);
-    } catch (e: any) {
-      console.error("[admin/payment-providers] list error", e);
-      res.status(500).json({ message: e.message || "Erreur serveur" });
-    }
-  });
-
-  app.post("/api/admin/payment-providers", isAdmin, async (req, res) => {
-    try {
-      const { insertPaymentProviderSchema, paymentProviders: pp } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const parsed = insertPaymentProviderSchema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
-      const [created] = await db.insert(pp).values(parsed.data as any).returning();
-      invalidateActiveProviderCache();
-      res.json(created);
-    } catch (e: any) {
-      console.error("[admin/payment-providers] create error", e);
-      res.status(500).json({ message: e.message || "Erreur serveur" });
-    }
-  });
-
-  app.patch("/api/admin/payment-providers/:id", isAdmin, async (req, res) => {
-    try {
-      const { paymentProviders: pp } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const { eq } = await import("drizzle-orm");
-      const allowed: any = {};
-      const fields = ["displayName", "apiKey", "secretKey", "baseUrl", "docsUrl", "docs", "config"] as const;
-      for (const f of fields) {
-        if (req.body[f] !== undefined && req.body[f] !== "") allowed[f] = req.body[f];
-      }
-      allowed.updatedAt = new Date();
-      const [updated] = await db.update(pp).set(allowed).where(eq(pp.id, req.params.id)).returning();
-      if (!updated) return res.status(404).json({ message: "Fournisseur introuvable" });
-      invalidateActiveProviderCache();
-      res.json({ ...updated, apiKey: undefined, secretKey: undefined });
-    } catch (e: any) {
-      console.error("[admin/payment-providers] update error", e);
-      res.status(500).json({ message: e.message || "Erreur serveur" });
-    }
-  });
-
-  app.post("/api/admin/payment-providers/:id/activate", isAdmin, async (req, res) => {
-    try {
-      const updated = await activateProvider(req.params.id);
-      if (!updated) return res.status(404).json({ message: "Fournisseur introuvable" });
-      res.json({ ...updated, apiKey: undefined, secretKey: undefined });
-    } catch (e: any) {
-      console.error("[admin/payment-providers] activate error", e);
-      res.status(500).json({ message: e.message || "Erreur serveur" });
-    }
-  });
-
-  app.delete("/api/admin/payment-providers/:id", isAdmin, async (req, res) => {
-    try {
-      const { paymentProviders: pp } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const { eq } = await import("drizzle-orm");
-      const [row] = await db.select().from(pp).where(eq(pp.id, req.params.id));
-      if (!row) return res.status(404).json({ message: "Fournisseur introuvable" });
-      if (row.isActive) return res.status(400).json({ message: "Désactivez le fournisseur avant de le supprimer" });
-      await db.delete(pp).where(eq(pp.id, req.params.id));
-      invalidateActiveProviderCache();
-      res.json({ ok: true });
-    } catch (e: any) {
-      console.error("[admin/payment-providers] delete error", e);
-      res.status(500).json({ message: e.message || "Erreur serveur" });
-    }
+  app.get("/api/admin/alphapay/config", isAdmin, async (_req, res) => {
+    res.json({provider: "alphapay", configured: isApiKeyConfigured(), webhookConfigured: !!process.env.ALPHAPAY_WEBHOOK_SECRET, sdkConfigured: !!process.env.ALPHAPAY_PUBLIC_KEY, docsUrl: "https://docs.alphapay.me/javascript-sdk", payoutRequirements: ["Clé secrète autorisée pour les encaissements et décaissements", "KYC marchand AlphaPay validé", "IP sortante du serveur autorisée", "Solde marchand suffisant", "Mode de frais ADD_ON autorisé pour recevoir le montant attendu"]});
   });
 
   app.get("/api/admin/payment-provider-logs", isAdmin, async (req, res) => {
@@ -3786,7 +3487,8 @@ export async function registerRoutes(
       const { db } = await import("./db");
       const { desc } = await import("drizzle-orm");
       const limit = Math.min(Number(req.query.limit) || 100, 500);
-      const rows = await db.select().from(ppl).orderBy(desc(ppl.createdAt)).limit(limit);
+      const { eq } = await import("drizzle-orm");
+      const rows = await db.select({id: ppl.id, providerCode:ppl.providerCode, action:ppl.action, reference:ppl.reference, status:ppl.status, errorMessage:ppl.errorMessage, durationMs:ppl.durationMs, createdAt:ppl.createdAt}).from(ppl).where(eq(ppl.providerCode,"alphapay")).orderBy(desc(ppl.createdAt)).limit(limit);
       res.json(rows);
     } catch (e: any) {
       console.error("[admin/payment-provider-logs] error", e);
@@ -3808,7 +3510,7 @@ export async function registerRoutes(
         status: txTable.status, provider: txTable.provider,
         phoneNumber: txTable.phoneNumber, reference: txTable.reference,
         createdAt: txTable.createdAt,
-        userName: usersTable.name, userEmail: usersTable.email,
+        userName: usersTable.firstName, userEmail: usersTable.email,
         userFirstName: usersTable.firstName, userLastName: usersTable.lastName,
       }).from(txTable)
         .leftJoin(usersTable, eq(txTable.userId, usersTable.id))
@@ -3821,47 +3523,20 @@ export async function registerRoutes(
     }
   });
 
-  // Vérifier le statut OmniPay puis rejeter/rembourser un retrait
+  // Vérifier le statut AlphaPay puis rejeter/rembourser un retrait
   app.post("/api/admin/transactions/:id/force-reject", isAdmin, async (req, res) => {
     try {
-      const { id } = req.params as Record<string, string>;
-      const { transactions: txTable } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const { eq } = await import("drizzle-orm");
-      const [tx] = await db.select().from(txTable).where(eq(txTable.id, id));
-      if (!tx) return res.status(404).json({ message: "Transaction introuvable" });
-      if (tx.type !== "withdrawal") return res.status(400).json({ message: "Seuls les retraits peuvent être rejetés" });
-      if (tx.status !== "pending") return res.status(400).json({ message: "Transaction déjà traitée" });
-
-      // Vérifier le statut OmniPay d'abord
-      let omnipayStatus = "pending";
-      try {
-        const result = await paymentService.getStatus(tx.reference);
-        omnipayStatus = omnipayStatusToString(result.status ?? 0);
-      } catch {}
-
-      if (omnipayStatus === "completed") {
-        await storage.updateTransactionStatus(id, "completed");
-        userTxCacheDel(tx.userId);
-        return res.json({ action: "completed", message: "Le retrait a déjà été traité avec succès par OmniPay. Statut mis à jour." });
-      }
-
-      // Rejeter et rembourser le wallet utilisateur
-      await storage.updateTransactionStatus(id, "failed");
-      const refundAmt = parseFloat(tx.amount);
-      const refundFeesXOF = parseFloat((tx as any).fees || "0");
-      const refundFeesLocal = tx.currency === "CDF" ? Math.round(refundFeesXOF / 0.22) : refundFeesXOF;
-      await storage.updateWalletBalance(tx.userId, tx.currency, refundAmt + refundFeesLocal);
-      userTxCacheDel(tx.userId);
-      adminCacheDel("admin-wallets");
-      res.json({ action: "rejected", omnipayStatus, refunded: true, refundedAmount: refundAmt + refundFeesLocal, currency: tx.currency });
-    } catch (error: any) {
-      console.error("Force-reject error:", error);
-      res.status(500).json({ message: error.message || "Erreur serveur" });
-    }
+      const transaction = await storage.getTransactionById(String(req.params.id));
+      if (!transaction) return res.status(404).json({message:"Transaction introuvable."});
+      if (!(await isAlphaPayment(transaction.reference))) return res.status(409).json({message:"Opération historique : rapprochement manuel nécessaire avant tout remboursement."});
+      const verified = await paymentService.getStatus(transaction.reference);
+      const status = alphapayStatusToString(verified.status);
+      if (status === "pending") return res.status(409).json({message:"AlphaPay n’a pas encore confirmé l’issue. Aucun remboursement autorisé.",status});
+      res.json({action:status === "completed" ? "completed" : "rejected",status,refunded:status === "failed"});
+    } catch { res.status(503).json({message:"Vérification AlphaPay indisponible. Fonds conservés."}); }
   });
 
-  app.get("/api/admin/omnipay-movements", isAdmin, async (req, res) => {
+  app.get("/api/admin/alphapay-movements", isAdmin, async (req, res) => {
     try {
       const { transactions: txTable } = await import("@shared/schema");
       const { db } = await import("./db");
@@ -3896,10 +3571,10 @@ export async function registerRoutes(
           .where(and(eq(txTable.type, "withdrawal"), eq(txTable.status, "pending"))),
       ]);
 
-      let omnipayBalances: any[] = [];
+      let alphapayBalances: any[] = [];
       try {
         const balResp = await paymentService.getBalance();
-        omnipayBalances = balResp.balance || [];
+        alphapayBalances = balResp.balance || [];
       } catch {}
 
       const movements = recentTxs.map(tx => ({
@@ -3915,56 +3590,16 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ movements, omnipayBalances, pendingByCountry });
+      res.json({ movements, alphapayBalances, pendingByCountry });
     } catch (error) {
-      console.error("OmniPay movements error:", error);
+      console.error("AlphaPay movements error:", error);
       res.status(500).json({ message: "Erreur serveur" });
     }
   });
 
-  app.post("/api/admin/omnipay/withdraw", isAdmin, async (req: any, res) => {
-    try {
-      const { amount, phoneNumber, operator, recipientName, note } = req.body;
-      if (!amount || !phoneNumber || !operator) {
-        return res.status(400).json({ message: "Montant, numéro et opérateur requis" });
-      }
-      const parsedAmount = parseFloat(String(amount));
-      if (isNaN(parsedAmount) || parsedAmount <= 0) {
-        return res.status(400).json({ message: "Montant invalide" });
-      }
-      const { db } = await import("./db");
-      const { adminWithdrawals } = await import("@shared/schema");
-      const reference = `ADMIN-WD-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-      const nameParts = (recipientName || "Admin SolvexPay").trim().split(" ");
-      const firstName = nameParts[0] || "Admin";
-      const lastName = nameParts.slice(1).join(" ") || "SolvexPay";
-      const transferResult = await paymentService.transfer({
-        msisdn: phoneNumber,
-        amount: parsedAmount,
-        reference,
-        firstName,
-        lastName,
-        operator,
-      });
-      const statusStr = omnipayStatusToString((transferResult as any).status ?? 0);
-      const [inserted] = await db.insert(adminWithdrawals).values({
-        amount: String(parsedAmount),
-        phoneNumber,
-        operator,
-        recipientName: recipientName || null,
-        reference,
-        omnipayId: transferResult.id ? String(transferResult.id) : null,
-        status: statusStr,
-        note: note || null,
-      }).returning();
-      res.json({ success: true, withdrawal: inserted, omnipayStatus: statusStr });
-    } catch (error: any) {
-      console.error("Admin OmniPay withdraw error:", error);
-      res.status(500).json({ message: error.message || "Erreur lors du retrait OmniPay" });
-    }
-  });
+  // Standalone legacy administrator cashout modal removed. Merchant payouts use the reserved-wallet flow.
 
-  app.get("/api/admin/omnipay/withdrawals", isAdmin, async (req, res) => {
+  app.get("/api/admin/alphapay/withdrawals", isAdmin, async (req, res) => {
     try {
       const { db } = await import("./db");
       const { adminWithdrawals } = await import("@shared/schema");
@@ -3977,7 +3612,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/omnipay/withdrawals/:id/check", isAdmin, async (req, res) => {
+  app.post("/api/admin/alphapay/withdrawals/:id/check", isAdmin, async (req, res) => {
     try {
       const { db } = await import("./db");
       const { adminWithdrawals } = await import("@shared/schema");
@@ -3985,9 +3620,9 @@ export async function registerRoutes(
       const [wd] = await db.select().from(adminWithdrawals).where(eq(adminWithdrawals.id, req.params.id as string));
       if (!wd) return res.status(404).json({ message: "Retrait introuvable" });
       const result = await paymentService.getStatus(wd.reference);
-      const statusStr = omnipayStatusToString(result.status ?? 0);
+      const statusStr = alphapayStatusToString(result.status);
       await db.update(adminWithdrawals).set({ status: statusStr, updatedAt: new Date() }).where(eq(adminWithdrawals.id, wd.id));
-      res.json({ status: statusStr, omnipayStatus: result.status });
+      res.json({ status: statusStr, alphapayStatus: result.status });
     } catch (error: any) {
       console.error("Admin withdrawal check error:", error);
       res.status(500).json({ message: error.message || "Erreur vérification statut" });
@@ -4021,7 +3656,7 @@ export async function registerRoutes(
     }
   });
 
-  // Admin deposit into a user wallet via OmniPay
+  // Admin deposit into a user wallet via AlphaPay
   app.post("/api/admin/wallets/:userId/deposit", isAdmin, async (req, res) => {
     try {
       const { userId } = req.params as Record<string, string>;
@@ -4037,7 +3672,7 @@ export async function registerRoutes(
         operator: operator || undefined,
       });
       if (depositResult.success !== 1) {
-        return res.status(400).json({ message: depositResult.message || "Erreur OmniPay" });
+        return res.status(400).json({ message: depositResult.message || "Erreur AlphaPay" });
       }
       let wallet = await storage.getWallet(userId);
       if (!wallet) wallet = await storage.createWallet(userId);
@@ -4047,14 +3682,14 @@ export async function registerRoutes(
         type: "deposit",
         amount: String(amount),
         currency: "XOF",
-        provider: operator || "omnipay",
+        provider: operator || "alphapay",
         phoneNumber,
         reference,
         status: "completed",
-        description: `Dépôt admin via OmniPay: ${motif || "Alimentation wallet"}`,
+        description: `Dépôt admin via AlphaPay: ${motif || "Alimentation wallet"}`,
       });
       adminCacheDel("admin-users", "admin-wallets");
-      res.json({ success: true, transaction: tx, omnipayRef: depositResult.reference });
+      res.json({ success: true, transaction: tx, alphapayRef: depositResult.reference });
     } catch (error) {
       console.error("Admin wallet deposit error:", error);
       res.status(500).json({ message: "Erreur lors du dépôt" });
@@ -4375,15 +4010,15 @@ export async function registerRoutes(
 
   app.get("/api/admin/system-settings", isAdmin, async (_req, res) => {
     try {
-      const [withdrawalMode, maintenanceVal, omnipayEnabledVal] = await Promise.all([
+      const [withdrawalMode, maintenanceVal, alphapayEnabledVal] = await Promise.all([
         storage.getSystemSetting("withdrawalMode"),
         storage.getSystemSetting("globalMaintenance"),
-        storage.getSystemSetting("omnipayEnabled"),
+        storage.getSystemSetting("alphapayEnabled"),
       ]);
       res.json({
         withdrawalMode: withdrawalMode || "auto",
         globalMaintenance: maintenanceVal === "true",
-        omnipayEnabled: omnipayEnabledVal !== "false",
+        alphapayEnabled: isApiKeyConfigured(),
       });
     } catch (error) {
       res.status(500).json({ message: "Erreur" });
@@ -4392,7 +4027,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/system-settings", isAdmin, async (req, res) => {
     try {
-      const { withdrawalMode, globalMaintenance, omnipayEnabled } = req.body;
+      const { withdrawalMode, globalMaintenance, alphapayEnabled } = req.body;
       if (withdrawalMode && ["auto", "manual"].includes(withdrawalMode)) {
         await storage.setSystemSetting("withdrawalMode", withdrawalMode);
       }
@@ -4400,19 +4035,16 @@ export async function registerRoutes(
         await storage.setSystemSetting("globalMaintenance", globalMaintenance ? "true" : "false");
         setGlobalMaintenanceCache(globalMaintenance);
       }
-      if (typeof omnipayEnabled === "boolean") {
-        await storage.setSystemSetting("omnipayEnabled", omnipayEnabled ? "true" : "false");
-        setOmnipayEnabledCache(omnipayEnabled);
-      }
-      const [wMode, mVal, omniVal] = await Promise.all([
+
+      const [wMode, mVal, providerVal] = await Promise.all([
         storage.getSystemSetting("withdrawalMode"),
         storage.getSystemSetting("globalMaintenance"),
-        storage.getSystemSetting("omnipayEnabled"),
+        storage.getSystemSetting("alphapayEnabled"),
       ]);
       res.json({
         withdrawalMode: wMode || "auto",
         globalMaintenance: mVal === "true",
-        omnipayEnabled: omniVal !== "false",
+        alphapayEnabled: isApiKeyConfigured(),
       });
     } catch (error) {
       res.status(500).json({ message: "Erreur" });
@@ -4496,7 +4128,7 @@ export async function registerRoutes(
       const { eq: eqE } = await import("drizzle-orm");
       const [user] = await dbE.select({ email: usersE.email, firstName: usersE.firstName })
         .from(usersE).where(eqE(usersE.email, email.trim().toLowerCase()));
-      if (!user) {
+      if (!user?.email) {
         return res.status(404).json({ message: "Aucun utilisateur trouvé avec cet email." });
       }
       await sendAdminEmail(user.email, user.firstName || "Utilisateur", subject.trim(), message.trim());
@@ -4511,18 +4143,18 @@ export async function registerRoutes(
 
   // ── Background job: recheck pending transactions every 3 minutes ─────────────
   // This catches payments where the user closed the browser before confirmation
-  // and where OmniPay webhook may not have arrived yet.
+  // and where AlphaPay webhook may not have arrived yet.
   ;(async function startPendingChecker() {
     const CHECK_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
     const MIN_AGE_MS = 90 * 1000;            // only check transactions older than 90s
     const MAX_AGE_MS = 60 * 60 * 1000;       // ignore transactions older than 1 hour
-    const MAX_BATCH = 15;                    // max per run to avoid OmniPay flood
+    const MAX_BATCH = 15;                    // max per run to avoid AlphaPay flood
 
     const runCheck = async () => {
       try {
         const { db } = await import("./db");
         const { transactions: txTable } = await import("@shared/schema");
-        const { and, eq: eqD, lt, gt } = await import("drizzle-orm");
+        const { and, eq: eqD, lt, gt, sql: sqlD } = await import("drizzle-orm");
 
         const now = new Date();
         const minAge = new Date(now.getTime() - MIN_AGE_MS);
@@ -4536,7 +4168,8 @@ export async function registerRoutes(
           .where(
             and(
               eqD(txTable.status, "pending"),
-              or(eqD(txTable.type, "deposit"), eqD(txTable.type, "withdrawal")),
+              or(eqD(txTable.type, "deposit"), eqD(txTable.type, "withdrawal"), eqD(txTable.type, "transfer")),
+              sqlD`exists (select 1 from payment_provider_logs p where p.provider_code = 'alphapay' and p.action = 'binding' and p.reference = ${txTable.reference})`,
               lt(txTable.createdAt, minAge),
               gt(txTable.createdAt, maxAge)
             )
@@ -4552,7 +4185,7 @@ export async function registerRoutes(
         for (const tx of pendingTxs) {
           try {
             const result = await paymentService.getStatus(tx.reference);
-            const statusStr = omnipayStatusFromRaw(result.status);
+            const statusStr = alphapayStatusToString(result.status);
 
             if (statusStr === "completed") {
               const updated = await storage.updateTransactionStatusIfPending(tx.id, "completed");
@@ -4597,7 +4230,7 @@ export async function registerRoutes(
               }
             }
 
-            // Small delay between OmniPay calls to avoid rate limiting
+            // Small delay between AlphaPay calls to avoid rate limiting
             await new Promise((r) => setTimeout(r, 300));
           } catch (err: any) {
             console.warn(`[PendingChecker] ⚠ Error checking ${tx.reference}: ${err?.message || err}`);
@@ -4615,5 +4248,6 @@ export async function registerRoutes(
     }, 30000);
   })();
 
+  app.use("/api", (_req, res) => res.status(404).json({ message: "Route API introuvable." }));
   return httpServer;
 }

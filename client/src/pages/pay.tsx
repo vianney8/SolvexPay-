@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { OperatorLogo } from "@/components/operator-logo";
-import { CheckCircle2, XCircle, Loader2, ChevronDown, Shield, ChevronUp, Smartphone, RefreshCw, Clock, Wifi, ShieldCheck, ArrowLeft } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, ChevronDown, Shield, ChevronUp, Smartphone, RefreshCw, Clock, Wifi } from "lucide-react";
 import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
 import type { PaymentLink } from "@shared/schema";
 
@@ -24,9 +24,9 @@ const COUNTRIES = [
   { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
   { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
   { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], phonePlaceholder: "77 123 45 67" },
+  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
   { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
   { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
-  { code: "COG", name: "Congo-Brazza.", flag: "🇨🇬", prefix: "+242", currency: "XAF", operators: ["Airtel", "MTN"], phonePlaceholder: "06 123 45 67" },
 ];
 
 const OPERATOR_LABEL: Record<string, string> = {
@@ -91,8 +91,6 @@ export default function PayPage() {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
   const [customAmount, setCustomAmount] = useState("");
-  const [step, setStep] = useState(1);
-  const [otp, setOtp] = useState("");
 
   const { data: paymentMethods } = useQuery<any[]>({
     queryKey: ["/api/payment-methods/public"],
@@ -105,24 +103,9 @@ export default function PayPage() {
     refetchInterval: 10_000,
   });
 
-  const selectedCountry = COUNTRIES.find(c => c.code === country)!;
-  const _OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
-    Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
-    Moov: { CI: { requiresOtp: true } },
-  };
-  const _otpPm = paymentMethods?.find((m: any) => m.code === operator);
-  const _otpSaved = _otpPm?.otpConfig?.[country];
-  const _otpFallback = _OTP_DEFAULTS[operator]?.[country];
-  const otpConfig = {
-    requiresOtp: _otpSaved !== undefined ? _otpSaved.requiresOtp : (_otpFallback?.requiresOtp ?? false),
-    defaultOtp: _otpSaved !== undefined ? (_otpSaved.defaultOtp ?? null) : (_otpFallback?.defaultOtp ?? null),
-  };
-  const needsOtp = otpConfig.requiresOtp;
-  const silentOtp = otpConfig.defaultOtp;
-  const isOrangeCM = !!(silentOtp);
+  const selectedCountry = COUNTRIES.find(c => c.code === country) || COUNTRIES[0];
 
-  useEffect(() => { setOperator(""); setOtp(""); setStep(1); }, [country]);
-  useEffect(() => { setOtp(""); setStep(1); }, [operator]);
+  useEffect(() => { setOperator(""); }, [country]);
 
   const { data: suspendedData } = useQuery<{ codes: string[] }>({
     queryKey: ["/api/public/suspended-countries"],
@@ -130,7 +113,6 @@ export default function PayPage() {
     staleTime: 60_000,
   });
   const suspendedCodes = suspendedData?.codes || [];
-  const availableCountries = COUNTRIES.filter(c => !suspendedCodes.includes(c.code));
 
   function getOperatorStatus(op: string) {
     if (!paymentMethods || paymentMethods.length === 0) return { available: true, maintenance: false };
@@ -154,6 +136,12 @@ export default function PayPage() {
     gcTime: 5 * 60_000,
     retry: 1,
   });
+  const paymentCurrency = String(paymentLink?.currency || "").toUpperCase();
+  const availableCountries = COUNTRIES.filter(c => c.currency === paymentCurrency && !suspendedCodes.includes(c.code));
+  useEffect(() => {
+    const nextCountry = availableCountries[0];
+    if (nextCountry && !availableCountries.some(c => c.code === country)) setCountry(nextCountry.code);
+  }, [country, paymentCurrency, suspendedData?.codes]);
 
   const redirectUrl = (paymentLink as any)?.redirectUrl as string | undefined;
   useEffect(() => {
@@ -170,13 +158,13 @@ export default function PayPage() {
       if (ref) {
         setPendingReference(ref);
         setPaymentStatus("processing");
-        toast({ title: "Vérification en cours", description: "Nous vérifions votre paiement Wave..." });
+        toast({ title: "Vérification en cours", description: "Nous confirmons le statut de votre paiement." });
       }
     }
   }, []);
 
   const payMutation = useMutation({
-    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; otp?: string; customerName?: string; customerEmail?: string; customAmount?: number }) => {
+    mutationFn: async (data: { phoneNumber: string; operator: string; country: string; customerName: string; customerEmail: string; customAmount?: number }) => {
       const res = await apiRequest("POST", `/api/payment-links/public/${slug}/pay`, data);
       return res.json();
     },
@@ -223,15 +211,19 @@ export default function PayPage() {
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault();
     if (payMutation.isPending) return;
-    if (!phone || !operator || !country) {
+    if (selectedCountry.currency !== paymentCurrency) {
+      toast({ title: "Pays incompatible", description: `Choisissez un pays prenant en charge la devise ${paymentCurrency}.`, variant: "destructive" });
+      return;
+    }
+    if (!phone || !operator || !country || !firstName.trim() || !lastName.trim()) {
       toast({ title: "Champs requis", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
       return;
     }
-    if (needsOtp && !isOrangeCM && step === 1) {
-      setStep(2);
+    const email = customerEmail.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({ title: "Email requis", description: "Saisissez une adresse e-mail valide pour continuer le paiement.", variant: "destructive" });
       return;
     }
-    if (needsOtp && !isOrangeCM && !otp.trim()) return;
     const isCustom = (paymentLink as any)?.allowCustomAmount;
     const parsedCustom = parseFloat(customAmount);
     const minAmount = parseFloat((paymentLink as any)?.amount ?? "0");
@@ -251,9 +243,8 @@ export default function PayPage() {
       phoneNumber: fullPhone,
       operator,
       country,
-      customerName: fullName || undefined,
-      customerEmail: customerEmail || undefined,
-      ...(needsOtp ? { otp: silentOtp || otp.trim() } : {}),
+      customerName: fullName,
+      customerEmail: email,
       ...(isCustom ? { customAmount: parsedCustom } : {}),
     } as any);
   };
@@ -373,7 +364,7 @@ export default function PayPage() {
                 <p className="text-sm text-white/50 max-w-xs mx-auto leading-relaxed">
                   {isSuccess ? "Votre paiement a été traité avec succès. Merci !"
                   : isFailed ? "Le paiement n'a pas abouti. Vérifiez votre solde ou réessayez."
-                  : "Ouvrez votre téléphone et confirmez le prompt USSD envoyé par votre opérateur."}
+                   : "Suivez les instructions de paiement affichées pour terminer l’opération."}
                 </p>
               </div>
             </div>
@@ -437,7 +428,7 @@ export default function PayPage() {
                 <Smartphone className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs font-bold text-amber-300 mb-0.5">Action requise sur votre téléphone</p>
-                  <p className="text-[11px] text-amber-200/60 leading-relaxed">Vous avez reçu un <strong className="text-amber-300">prompt USSD</strong>. Entrez votre code PIN pour valider le paiement. La vérification est automatique toutes les <strong className="text-amber-300">5 secondes</strong>.</p>
+                  <p className="text-[11px] text-amber-200/60 leading-relaxed">Suivez les instructions de paiement affichées. La vérification du statut est automatique toutes les <strong className="text-amber-300">5 secondes</strong>.</p>
                 </div>
               </div>
             )}
@@ -578,129 +569,6 @@ export default function PayPage() {
 
           <form onSubmit={handlePay} className="space-y-4">
 
-            {/* ── ÉTAPE 2 : OTP ── */}
-            {step === 2 && needsOtp && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 pb-1">
-                  <button type="button" onClick={() => setStep(1)} className="h-8 w-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors flex-shrink-0" data-testid="button-back-step1">
-                    <ArrowLeft className="h-4 w-4 text-gray-500" />
-                  </button>
-                  <div className="flex-1">
-                    <p className="text-xs text-gray-400">Étape 2 sur 2</p>
-                    <p className="text-sm font-bold text-gray-800">Vérification OTP</p>
-                  </div>
-                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <ShieldCheck className="h-4 w-4 text-blue-600" />
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-1 text-sm">
-                  <div className="flex justify-between"><span className="text-gray-500">Opérateur</span><span className="font-semibold">{operator} · {selectedCountry.name}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500">Numéro</span><span className="font-semibold font-mono">{selectedCountry.prefix} {phone}</span></div>
-                </div>
-
-                <div className="rounded-xl border border-gray-200 p-4 space-y-3">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Code OTP {operator}</Label>
-
-                  {country === "BF" && operator === "Orange" ? (
-                    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-orange-700">Comment obtenir votre code OTP :</p>
-                      <div className="flex items-center gap-2 bg-orange-100 rounded-lg px-3 py-2">
-                        <span className="text-xs text-gray-500">Composez :</span>
-                        <code className="text-sm font-black text-orange-600 tracking-widest">*144*4*6*{"{MONTANT}"}#</code>
-                      </div>
-                      <ol className="text-xs text-gray-500 space-y-1 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">1.</span> Composez <strong>*144*4*6*{"{MONTANT}"}#</strong> sur votre téléphone Orange</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">2.</span> Vous recevrez immédiatement votre code OTP</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">3.</span> Entrez le code OTP reçu ci-dessous</li>
-                      </ol>
-                    </div>
-                  ) : country === "CI" && operator === "Orange" ? (
-                    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-orange-700">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-gray-500 space-y-1 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">1.</span> Composez <strong>#144*82#</strong> sur votre téléphone Orange</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">2.</span> Sélectionnez l'<strong>option 2</strong> pour obtenir votre code</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
-                      </ol>
-                    </div>
-                  ) : country === "CI" && operator === "Moov" ? (
-                    <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-blue-700">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-gray-500 space-y-1 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">1.</span> Composez <strong>*155#</strong> sur votre téléphone Moov</li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">2.</span> Choisissez <strong>Moov Money / Paiement en ligne</strong></li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">3.</span> Sélectionnez <strong>Générer OTP</strong></li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">4.</span> Entrez votre code secret Moov Money</li>
-                        <li className="flex gap-2"><span className="font-bold text-blue-600 flex-shrink-0">5.</span> Entrez le code OTP reçu ci-dessous</li>
-                      </ol>
-                    </div>
-                  ) : country === "SN" && operator === "Orange" ? (
-                    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-orange-700">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-gray-500 space-y-1 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">1.</span> Composez <strong>#144#391#</strong> sur votre téléphone Orange</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">2.</span> Vous recevrez un code d'autorisation par SMS</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">3.</span> Entrez le code reçu ci-dessous</li>
-                      </ol>
-                    </div>
-                  ) : operator === "Orange" ? (
-                    <div className="rounded-xl bg-orange-50 border border-orange-200 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-orange-700">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-gray-500 space-y-1 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">1.</span> Composez <strong>#144#</strong> sur votre téléphone Orange</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">2.</span> Sélectionnez <strong>"Générer un OTP"</strong> pour paiement en ligne</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">3.</span> Entrez votre code secret Orange Money</li>
-                        <li className="flex gap-2"><span className="font-bold text-orange-600 flex-shrink-0">4.</span> Entrez le code OTP reçu ci-dessous</li>
-                      </ol>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl bg-yellow-50 border border-yellow-200 p-3 space-y-1.5">
-                      <p className="text-xs font-semibold text-yellow-700">Comment obtenir votre code OTP :</p>
-                      <ol className="text-xs text-gray-500 space-y-1 list-none">
-                        <li className="flex gap-2"><span className="font-bold text-yellow-600 flex-shrink-0">1.</span> Composez <strong>*126#</strong> sur votre téléphone MTN</li>
-                        <li className="flex gap-2"><span className="font-bold text-yellow-600 flex-shrink-0">2.</span> Sélectionnez l'option <strong>paiement en ligne / OTP</strong></li>
-                        <li className="flex gap-2"><span className="font-bold text-yellow-600 flex-shrink-0">3.</span> Entrez votre code PIN MoMo</li>
-                        <li className="flex gap-2"><span className="font-bold text-yellow-600 flex-shrink-0">4.</span> Entrez le code OTP reçu par SMS ci-dessous</li>
-                      </ol>
-                    </div>
-                  )}
-
-                  <Input
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="Entrez votre code OTP"
-                    className="h-14 border-gray-200 text-center tracking-widest text-xl font-bold rounded-xl placeholder:text-sm placeholder:tracking-normal placeholder:font-normal"
-                    data-testid="input-pay-otp"
-                    autoFocus
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full h-14 text-base font-black rounded-2xl shadow-lg gap-2"
-                  style={{ background: !otp.trim() ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
-                  disabled={payMutation.isPending || !otp.trim()}
-                  data-testid="button-confirm-pay-otp"
-                >
-                  {payMutation.isPending ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
-                  ) : (paymentLink as any).allowCustomAmount && customAmount ? (
-                    `Payer ${formatAmount(parseFloat(customAmount))} ${paymentLink.currency}`
-                  ) : (paymentLink as any).allowCustomAmount ? (
-                    "Payer"
-                  ) : (
-                    `Payer ${formatAmount(paymentLink.amount)} ${paymentLink.currency}`
-                  )}
-                </Button>
-              </div>
-            )}
-
-            {/* ── ÉTAPE 1 : FORMULAIRE ── */}
-            {step === 1 && (<>
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Pays Mobile Money</Label>
               <div className="relative">
@@ -734,6 +602,9 @@ export default function PayPage() {
                   </div>
                 )}
               </div>
+              {availableCountries.length === 0 && (
+                <p className="text-xs text-red-600">Aucun pays de paiement n’est disponible pour la devise {paymentCurrency || "de ce lien"}.</p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -813,6 +684,7 @@ export default function PayPage() {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Jean"
+                  required
                   className="h-11 border-gray-200 rounded-xl"
                   data-testid="input-pay-firstname"
                 />
@@ -823,6 +695,7 @@ export default function PayPage() {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Dupont"
+                  required
                   className="h-11 border-gray-200 rounded-xl"
                   data-testid="input-pay-lastname"
                 />
@@ -830,11 +703,12 @@ export default function PayPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Email (optionnel)</Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Email requis</Label>
               <Input
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
                 type="email"
+                required
                 placeholder="jean@exemple.com"
                 className="h-11 border-gray-200 rounded-xl"
                 data-testid="input-pay-email"
@@ -847,14 +721,13 @@ export default function PayPage() {
               style={{ background: !phone || !operator ? undefined : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
               disabled={
                 payMutation.isPending || !phone || !operator || !country || !firstName.trim() || !lastName.trim() ||
+                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim()) || selectedCountry.currency !== paymentCurrency ||
                 ((paymentLink as any).allowCustomAmount && (!customAmount || parseFloat(customAmount) < 100))
               }
               data-testid="button-confirm-pay"
             >
               {payMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Traitement...</>
-              ) : needsOtp && !isOrangeCM && step === 1 ? (
-                "Continuer →"
               ) : (paymentLink as any).allowCustomAmount && customAmount ? (
                 `Payer ${formatAmount(parseFloat(customAmount))} ${paymentLink.currency}`
               ) : (paymentLink as any).allowCustomAmount ? (
@@ -863,8 +736,6 @@ export default function PayPage() {
                 `Payer ${formatAmount(paymentLink.amount)} ${paymentLink.currency}`
               )}
             </Button>
-
-            </>)}
 
           </form>
         </div>

@@ -59,7 +59,7 @@ function getTypeLabel(tx: Transaction) {
 
 function getDisplayProvider(tx: Transaction) {
   if (!tx.provider) return null;
-  if (tx.provider.toLowerCase() === "omnipay") return "Fournisseur";
+  if (tx.provider) return "Paiement Mobile Money";
   if (tx.provider.toLowerCase() === "admin") return "Admin";
   return tx.provider;
 }

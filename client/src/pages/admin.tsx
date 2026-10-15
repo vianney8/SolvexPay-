@@ -85,7 +85,6 @@ const COUNTRIES = [
   { code: "ML", name: "Mali", flag: "🇲🇱" },
   { code: "CM", name: "Cameroun", flag: "🇨🇲" },
   { code: "COD", name: "RD Congo", flag: "🇨🇩" },
-  { code: "COG", name: "Congo", flag: "🇨🇬" },
 ];
 
 const TX_TYPE_LABELS: Record<string, string> = { deposit: "Dépôt", withdrawal: "Retrait", transfer: "Transfert" };
@@ -238,8 +237,8 @@ function WithdrawalModeCard() {
         <div className="rounded-xl border border-border/60 p-4 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
-              <p className="font-bold text-sm">{isLoading ? "Chargement..." : isAuto ? "Automatique (OmniPay)" : "Manuel (admin)"}</p>
-              <p className="text-xs text-muted-foreground">{isAuto ? "Les retraits sont envoyés directement via OmniPay." : "Les retraits restent en attente, l'admin les traite manuellement."}</p>
+              <p className="font-bold text-sm">{isLoading ? "Chargement..." : isAuto ? "Automatique (AlphaPay)" : "Manuel (admin)"}</p>
+              <p className="text-xs text-muted-foreground">{isAuto ? "Les retraits sont envoyés via AlphaPay." : "Les retraits restent en attente, l'admin les traite manuellement."}</p>
             </div>
             <div className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isAuto ? "bg-emerald-500" : "bg-muted-foreground/30"} ${mutation.isPending ? "opacity-50 pointer-events-none" : ""}`}
               role="switch" aria-checked={isAuto} onClick={() => mutation.mutate(isAuto ? "manual" : "auto")} data-testid="toggle-withdrawal-mode">
@@ -366,126 +365,6 @@ function GlobalMaintenanceCard() {
               disabled={mutation.isPending}
               data-testid="btn-maintenance-confirm"
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-50 ${pendingValue ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
-            >
-              {mutation.isPending ? "..." : "Confirmer"}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-function OmniPayCard() {
-  const { toast } = useToast();
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingValue, setPendingValue] = useState<boolean>(true);
-
-  const { data, isLoading } = useQuery<{ withdrawalMode: string; globalMaintenance: boolean; omnipayEnabled: boolean }>({
-    queryKey: ["/api/admin/system-settings"],
-    staleTime: 30_000,
-  });
-
-  const mutation = useMutation({
-    mutationFn: (val: boolean) =>
-      apiRequest("PATCH", "/api/admin/system-settings", { omnipayEnabled: val }).then(r => r.json()),
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/system-settings"] });
-      toast({
-        title: data.omnipayEnabled ? "✓ API OmniPay activée" : "⚠ API OmniPay désactivée",
-        description: data.omnipayEnabled
-          ? "Les dépôts et retraits via OmniPay sont de nouveau opérationnels."
-          : "Toutes les transactions OmniPay sont suspendues jusqu'à la réactivation.",
-      });
-      setConfirmOpen(false);
-    },
-    onError: () => toast({ title: "Erreur", variant: "destructive" }),
-  });
-
-  const isEnabled = data?.omnipayEnabled ?? true;
-
-  function handleToggleRequest() {
-    setPendingValue(!isEnabled);
-    setConfirmOpen(true);
-  }
-
-  return (
-    <>
-      <Card className={`border-2 ${!isEnabled ? "border-amber-500/60 bg-amber-500/5" : "border-border/50"} transition-colors`}>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-bold flex items-center gap-2">
-            <Zap className="h-4 w-4 text-amber-500" />
-            API OmniPay
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Lorsque l'API OmniPay est désactivée, tous les dépôts et retraits automatiques sont bloqués. Les retraits en mode manuel restent traités normalement.
-          </p>
-          {!isEnabled && (
-            <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-center gap-3">
-              <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
-              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">API OmniPay actuellement DÉSACTIVÉE</p>
-            </div>
-          )}
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 p-4">
-            <div className="space-y-1">
-              <p className="font-bold text-sm">{isLoading ? "Chargement..." : isEnabled ? "API activée" : "API désactivée"}</p>
-              <p className="text-xs text-muted-foreground">{isEnabled ? "Les transactions passent normalement via OmniPay." : "Les transactions OmniPay sont suspendues."}</p>
-            </div>
-            <button
-              onClick={handleToggleRequest}
-              disabled={isLoading || mutation.isPending}
-              data-testid="btn-toggle-omnipay"
-              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isEnabled ? "bg-emerald-500" : "bg-muted-foreground/30"} ${isLoading || mutation.isPending ? "opacity-50 pointer-events-none" : ""}`}
-            >
-              <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
-            </button>
-          </div>
-          <button
-            onClick={handleToggleRequest}
-            disabled={isLoading || mutation.isPending}
-            data-testid="btn-omnipay-action"
-            className={`w-full py-3 rounded-2xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
-              isEnabled
-                ? "bg-amber-600 hover:bg-amber-700 text-white"
-                : "bg-emerald-600 hover:bg-emerald-700 text-white"
-            } disabled:opacity-50`}
-          >
-            <Zap className="h-4 w-4" />
-            {isEnabled ? "Désactiver l'API OmniPay" : "Activer l'API OmniPay"}
-          </button>
-        </CardContent>
-      </Card>
-
-      <Dialog open={confirmOpen} onOpenChange={o => { if (!o) setConfirmOpen(false); }}>
-        <DialogContent className="max-w-sm rounded-3xl">
-          <DialogHeader>
-            <div className={`h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ${!pendingValue ? "bg-gradient-to-br from-amber-500 to-amber-600" : "bg-gradient-to-br from-emerald-500 to-emerald-600"}`}>
-              <Zap className="h-8 w-8 text-white" />
-            </div>
-            <DialogTitle className="text-center text-lg">
-              {pendingValue ? "Activer l'API OmniPay ?" : "Désactiver l'API OmniPay ?"}
-            </DialogTitle>
-            <DialogDescription className="text-center text-sm">
-              {pendingValue
-                ? "Les dépôts et retraits automatiques via OmniPay seront de nouveau opérationnels."
-                : "Tous les dépôts et retraits automatiques seront bloqués jusqu'à la réactivation. Les retraits manuels restent actifs."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={() => setConfirmOpen(false)}
-              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-              data-testid="btn-omnipay-cancel"
-            >
-              Annuler
-            </button>
-            <button
-              onClick={() => mutation.mutate(pendingValue)}
-              disabled={mutation.isPending}
-              data-testid="btn-omnipay-confirm"
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-50 ${pendingValue ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"}`}
             >
               {mutation.isPending ? "..." : "Confirmer"}
             </button>
@@ -751,7 +630,7 @@ export default function AdminPage() {
   const [expandedCountryFees, setExpandedCountryFees] = useState<Set<string>>(new Set());
   const [otpCodeEdit, setOtpCodeEdit] = useState<Record<string, string>>({});
   const [otpConfirmDialog, setOtpConfirmDialog] = useState<{ pmCode: string; country: string; flag: string; countryName: string; requiresOtp: boolean; defaultOtp: string } | null>(null);
-  const [omnipayRateEdit, setOmnipayRateEdit] = useState<{ deposit: string; withdrawal: string } | null>(null);
+  const [providerRateEdit, setProviderRateEdit] = useState<{ deposit: string; withdrawal: string } | null>(null);
   const [resetStatsDialog, setResetStatsDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [srAllDialog, setSrAllDialog] = useState(false);
@@ -759,8 +638,6 @@ export default function AdminPage() {
   const [linksSearchDebounced, setLinksSearchDebounced] = useState("");
   const [linksPage, setLinksPage] = useState(1);
   const [apiKeysSearch, setApiKeysSearch] = useState("");
-  const [wdDialog, setWdDialog] = useState(false);
-  const [wdForm, setWdForm] = useState({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
   const [notifForm, setNotifForm] = useState({ title: "", message: "", color: "blue", linkUrl: "", linkLabel: "" });
   const [editNotifDialog, setEditNotifDialog] = useState<{ id: string; title: string; message: string; color: string; linkUrl: string; linkLabel: string } | null>(null);
   const [supportLinksForm, setSupportLinksForm] = useState<Record<string, string> | null>(null);
@@ -834,15 +711,15 @@ export default function AdminPage() {
     gcTime: Infinity,
     refetchOnWindowFocus: false,
   });
-  const { data: omnipayBalance, isLoading: omniLoading, refetch: refetchOmni } = useQuery<any>({
-    queryKey: ["/api/admin/omnipay/balance"],
+  const { data: alphapayBalance, isLoading: alphaLoading, refetch: refetchAlpha } = useQuery<any>({
+    queryKey: ["/api/admin/alphapay/balance"],
     retry: 1,
     staleTime: 10000,
     refetchInterval: activeTab === "overview" ? 10000 : false,
   });
-  const { data: omnipayMovements, isLoading: movementsLoading, refetch: refetchMovements } = useQuery<any>({
-    queryKey: ["/api/admin/omnipay-movements"],
-    enabled: activeTab === "wallets",
+  const { data: alphapayMovements, isLoading: movementsLoading, refetch: refetchMovements } = useQuery<any>({
+    queryKey: ["/api/admin/alphapay/movements"],
+    enabled: false,
     refetchInterval: activeTab === "wallets" ? 60_000 : false,
     staleTime: 30_000,
   });
@@ -863,7 +740,7 @@ export default function AdminPage() {
       setRejectingId(null);
       setRejectResultMap(prev => ({ ...prev, [id]: data }));
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-withdrawals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/alphapay/movements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
       const msg = data.action === "completed"
         ? "Retrait déjà complété — statut mis à jour"
@@ -902,7 +779,7 @@ export default function AdminPage() {
     staleTime: 120000,
   });
   const { data: adminWdHistory, isLoading: wdHistoryLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/omnipay/withdrawals"],
+    queryKey: ["/api/admin/alphapay/withdrawals"],
     enabled: ["overview", "benefices"].includes(activeTab),
     staleTime: 120000,
   });
@@ -1090,9 +967,9 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
-      toast({ title: "Dépôt effectué via OmniPay" }); setDepositDialog(null); setDepositData({ amount: "", phone: "", operator: "", motif: "" });
+      toast({ title: "Dépôt administrateur effectué" }); setDepositDialog(null); setDepositData({ amount: "", phone: "", operator: "", motif: "" });
     },
-    onError: (e: any) => toast({ title: "Erreur OmniPay", description: e?.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
   const migrateM = useMutation({
@@ -1112,8 +989,8 @@ export default function AdminPage() {
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
-      if (data?.omnipayTriggered) {
-        toast({ title: "Paiement envoyé via OmniPay", description: "Le transfert a été initié avec succès." });
+      if (data?.alphapayTriggered) {
+        toast({ title: "Paiement envoyé via AlphaPay", description: "Le transfert a été initié avec succès." });
       } else if (data?.refunded) {
         toast({ title: "Transaction rejetée", description: "Le solde a été remboursé à l'utilisateur." });
       } else {
@@ -1126,7 +1003,7 @@ export default function AdminPage() {
         const parsed = JSON.parse(description.replace(/^\d+:\s*/, ""));
         description = parsed.message || description;
       } catch {}
-      toast({ title: "Erreur OmniPay", description, variant: "destructive" });
+      toast({ title: "Erreur", description, variant: "destructive" });
     },
   });
 
@@ -1169,17 +1046,18 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
 
-  const { data: omnipayRates, isLoading: omnipayRatesLoading } = useQuery<{ deposit: number; withdrawal: number }>({
-    queryKey: ["/api/admin/omnipay-rates"],
+  const { data: alphapayRates, isLoading: alphapayRatesLoading } = useQuery<{ deposit: number; withdrawal: number }>({
+    queryKey: ["/api/admin/alphapay/rates"],
+    enabled: false,
   });
 
-  const omnipayRatesM = useMutation({
-    mutationFn: (d: { deposit?: number; withdrawal?: number }) => apiRequest("PATCH", "/api/admin/omnipay-rates", d),
+  const alphapayRatesM = useMutation({
+    mutationFn: (d: { deposit?: number; withdrawal?: number }) => apiRequest("PATCH", "/api/admin/alphapay/rates", d),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay-rates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/alphapay/rates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
-      toast({ title: "Taux OmniPay mis à jour !" });
-      setOmnipayRateEdit(null);
+      toast({ title: "Taux AlphaPay mis à jour !" });
+      setProviderRateEdit(null);
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
@@ -1225,30 +1103,6 @@ export default function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
       toast({ title: "Statistiques réinitialisées", description: "Toutes les transactions ont été supprimées" });
       setResetStatsDialog(false); setResetConfirmText("");
-    },
-    onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
-  });
-
-  const wdM = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/admin/omnipay/withdraw", data).then(r => r.json()),
-    onSuccess: (res: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
-      toast({ title: "Retrait initié", description: `Statut OmniPay : ${res.omnipayStatus}` });
-      setWdDialog(false);
-      setWdForm({ amount: "", phone: "", operator: "", recipientName: "", note: "" });
-    },
-    onError: (e: any) => toast({ title: "Erreur retrait", description: e?.message, variant: "destructive" }),
-  });
-
-  const wdCheckM = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/admin/omnipay/withdrawals/${id}/check`, {}).then(r => r.json()),
-    onSuccess: (res: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/commissions"] });
-      toast({ title: "Statut mis à jour", description: `Statut : ${res.status}` });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e?.message, variant: "destructive" }),
   });
@@ -1345,7 +1199,7 @@ export default function AdminPage() {
       GN: "GIN", ML: "MLI", BF: "BFA", NE: "NER", COD: "COD", COG: "COG",
     };
     const omniBalances: Record<string, number> = {};
-    ((omnipayBalance?.balance) ?? []).forEach((b: any) => { omniBalances[b.countryCode] = b.amount ?? 0; });
+    ((alphapayBalance?.balance) ?? []).forEach((b: any) => { omniBalances[b.countryCode] = b.amount ?? 0; });
     const pendingMap: Record<string, number> = {};
     (liquidityData.pendingByCountry ?? []).forEach((p: any) => { pendingMap[p.country] = p.pendingAmount ?? 0; });
     return liquidityData.walletsByCountry.filter((w: any) => {
@@ -1399,7 +1253,6 @@ export default function AdminPage() {
             <TabsList className="inline-flex w-max min-w-full gap-1 p-1.5 bg-muted/60 rounded-2xl h-auto">
               {[
                 { v: "overview", label: "Vue d'ensemble", Icon: BarChart3, badge: 0 },
-                { v: "liquidity", label: "Liquidité OmniPay", Icon: Activity, badge: liquidityCriticalCount },
                 { v: "benefices", label: "Bénéfices", Icon: Coins, badge: 0 },
                 { v: "marchands", label: "Marchands", Icon: Link2, badge: 0 },
                 { v: "kyc", label: "KYC", Icon: BadgeCheck, badge: pendingKyc.length },
@@ -1448,13 +1301,13 @@ export default function AdminPage() {
 
             {/* ── RÉSUMÉ RAPIDE LIQUIDITÉ ── */}
             {liquidityCriticalCount > 0 && (
-              <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 flex items-center gap-3 cursor-pointer" onClick={() => { const el = document.querySelector('[data-testid="tab-liquidity"]') as HTMLButtonElement; el?.click(); }}>
+              <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab("wallets")}>
                 <div className="h-9 w-9 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
                   <Activity className="h-4.5 w-4.5 text-red-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-bold text-red-400">{liquidityCriticalCount} situation{liquidityCriticalCount !== 1 ? "s" : ""} critique{liquidityCriticalCount !== 1 ? "s" : ""} de liquidité OmniPay</p>
-                  <p className="text-xs text-muted-foreground">Cliquez pour voir l'analyse complète dans l'onglet Liquidité OmniPay</p>
+                  <p className="text-sm font-bold text-red-400">{liquidityCriticalCount} situation{liquidityCriticalCount !== 1 ? "s" : ""} critique{liquidityCriticalCount !== 1 ? "s" : ""} de couverture</p>
+                  <p className="text-xs text-muted-foreground">Vérifiez les soldes AlphaPay et les retraits en attente.</p>
                 </div>
               </div>
             )}
@@ -1469,15 +1322,7 @@ export default function AdminPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setWdDialog(true)}
-                    className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 transition-colors rounded-lg px-3 py-1.5 text-xs font-bold text-white"
-                    data-testid="btn-admin-wd-open"
-                  >
-                    <TrendingDown className="h-3.5 w-3.5" />
-                    Retrait OmniPay
-                  </button>
-                  <button
-                    onClick={() => { queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/balance"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] }); }}
+                    onClick={() => { queryClient.invalidateQueries({ queryKey: ["/api/admin/financial-summary"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/alphapay/balance"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/alphapay/withdrawals"] }); }}
                     className="text-white/70 hover:text-white transition-colors"
                     data-testid="btn-refresh-financial"
                   >
@@ -1488,14 +1333,14 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y divide-border/40 bg-card">
                 {[
                   {
-                    label: "Reçu via OmniPay",
-                    value: finLoading ? null : fmt(financialSummary?.omnipayDeposits || 0),
-                    sub: `Frais collectés : ${finLoading ? "…" : fmt(financialSummary?.omnipayDepositFees || 0)} XOF`,
+                    label: "Collectes de paiement",
+                    value: finLoading ? null : fmt(financialSummary?.depositCollections || 0),
+                    sub: `Frais collectés : ${finLoading ? "…" : fmt(financialSummary?.depositFees || 0)} XOF`,
                     icon: TrendingUp,
                     grad: "from-emerald-500 to-teal-500",
                     bg: "bg-emerald-500/8",
                     text: "text-emerald-600 dark:text-emerald-400",
-                    testid: "fin-omnipay-received",
+                    testid: "fin-payment-collections",
                   },
                   {
                     label: "Soldes en Wallets",
@@ -1544,17 +1389,17 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-              {/* OmniPay live balance bar */}
+              {/* AlphaPay live balance bar */}
               <div className="bg-slate-900 dark:bg-slate-950 px-5 py-3 flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <p className="text-xs text-slate-300 font-semibold">Solde OmniPay en temps réel :</p>
+                  <p className="text-xs text-slate-300 font-semibold">Solde AlphaPay :</p>
                 </div>
-                {omniLoading ? (
+                {alphaLoading ? (
                   <Skeleton className="h-4 w-40 rounded bg-slate-700" />
-                ) : omnipayBalance?.balance ? (
+                ) : alphapayBalance?.balance ? (
                   <div className="flex gap-3 flex-wrap">
-                    {omnipayBalance.balance.map((b: any, i: number) => (
+                    {alphapayBalance.balance.map((b: any, i: number) => (
                       <span key={i} className="text-xs font-bold text-emerald-400">
                         {b.countryName}: <span className="text-white">{b.amount.toLocaleString()} {b.currency}</span>
                       </span>
@@ -1566,24 +1411,16 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* ── HISTORIQUE RETRAITS ADMIN OMNIPAY ── */}
+            {/* ── Historique des décaissements ── */}
             <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
               <div className="bg-slate-800 dark:bg-slate-900 px-5 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-slate-300" />
-                  <p className="text-slate-200 font-bold text-sm">Historique des retraits OmniPay</p>
+                  <p className="text-slate-200 font-bold text-sm">Historique des décaissements AlphaPay</p>
                   {(adminWdHistory || []).length > 0 && (
                     <span className="text-[10px] font-bold bg-slate-600 text-slate-200 rounded-full px-2 py-0.5">{(adminWdHistory || []).length}</span>
                   )}
                 </div>
-                <button
-                  onClick={() => setWdDialog(true)}
-                  className="flex items-center gap-1.5 bg-rose-600/80 hover:bg-rose-600 transition-colors rounded-lg px-3 py-1.5 text-xs font-bold text-white"
-                  data-testid="btn-admin-wd-open-2"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Nouveau retrait
-                </button>
               </div>
               {wdHistoryLoading ? (
                 <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
@@ -1618,17 +1455,6 @@ export default function AdminPage() {
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <p className="text-[10px] text-muted-foreground">{new Date(wd.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-                        {wd.status === "pending" && (
-                          <button
-                            onClick={() => wdCheckM.mutate(wd.id)}
-                            disabled={wdCheckM.isPending}
-                            className="text-[10px] font-bold text-indigo-500 hover:text-indigo-400 flex items-center gap-0.5"
-                            data-testid={`btn-check-wd-${wd.id}`}
-                          >
-                            <RefreshCw className="h-2.5 w-2.5" />
-                            Vérifier
-                          </button>
-                        )}
                       </div>
                     </div>
                   ))}
@@ -1710,7 +1536,7 @@ export default function AdminPage() {
                 <CardContent className="space-y-0">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Frais collectés des utilisateurs</p>
                   {[
-                    { label: `Dépôts (OmniPay)`, val: fmt(commissions?.totalDepositFees || 0), color: "text-emerald-600" },
+                    { label: "Dépôts", val: fmt(commissions?.totalDepositFees || 0), color: "text-emerald-600" },
                     { label: `Retraits`, val: fmt(commissions?.totalWithdrawalFees || 0), color: "text-cyan-600" },
                     { label: "Total frais perçus", val: fmt(commissions?.totalFees || 0), color: "text-indigo-600", bold: true },
                   ].map(item => (
@@ -1719,22 +1545,10 @@ export default function AdminPage() {
                       <span className={`text-sm font-${(item as any).bold ? "black" : "semibold"} ${item.color}`}>{comLoading ? "—" : item.val}</span>
                     </div>
                   ))}
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-3 mb-2">Coût OmniPay déduit</p>
-                  {[
-                    { label: `Dépôts (@${commissions?.omnipayDepositRate ?? omnipayRates?.deposit ?? 3}%)`, val: fmt(commissions?.omnipayCostDeposit || 0), color: "text-rose-500" },
-                    { label: `Retraits (@${commissions?.omnipayWithdrawalRate ?? omnipayRates?.withdrawal ?? 3}%)`, val: fmt(commissions?.omnipayCostWithdrawal || 0), color: "text-rose-500" },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">
-                      <span className="text-xs text-muted-foreground">{item.label}</span>
-                      <span className={`text-sm font-semibold ${item.color}`}>{comLoading ? "—" : `- ${item.val}`}</span>
-                    </div>
-                  ))}
-                  <div className={`mt-3 p-3 rounded-xl border ${(commissions?.adminNetProfit ?? 0) >= 0 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-rose-500/10 border-rose-500/20"}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-3 mb-2">Rentabilité nette</p>
+                  <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
                     <p className="text-xs text-muted-foreground">Bénéfice net admin</p>
-                    <p className={`text-xl font-black ${(commissions?.adminNetProfit ?? 0) >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-                      {comLoading ? "—" : `${fmt(commissions?.adminNetProfit || 0)} XOF`}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Ce mois : {comLoading ? "—" : `${fmt(commissions?.monthNetProfit || 0)} XOF`}</p>
+                    <p className="mt-1 text-sm font-bold text-amber-700 dark:text-amber-300">Non calculé — consulter les frais AlphaPay</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1843,9 +1657,9 @@ export default function AdminPage() {
           </TabsContent>
 
           {/* ══════════════════════════════════════
-              TAB — LIQUIDITÉ OMNIPAY
+              TAB — LIQUIDITÉ PAIEMENTS
           ══════════════════════════════════════ */}
-          <TabsContent value="liquidity" className="space-y-5 mt-5">
+          {false && <TabsContent value="liquidity" className="space-y-5 mt-5">
             {(() => {
               const COUNTRY_MAP: Record<string, { name: string; flag: string; omniCode: string; color: string; gradient: string; border: string }> = {
                 BJ:  { name: "Bénin",           flag: "🇧🇯", omniCode: "BEN", color: "text-teal-400",   gradient: "from-teal-500 to-cyan-600",     border: "border-teal-500/30" },
@@ -1862,7 +1676,7 @@ export default function AdminPage() {
               };
 
               const omniBalances: Record<string, number> = {};
-              ((omnipayBalance?.balance) ?? []).forEach((b: any) => {
+              ((alphapayBalance?.balance) ?? []).forEach((b: any) => {
                 omniBalances[b.countryCode] = b.amount ?? 0;
               });
 
@@ -1908,7 +1722,7 @@ export default function AdminPage() {
                   <div className="bg-gradient-to-r from-rose-600 via-orange-600 to-amber-600 px-5 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">🏦</span>
-                      <p className="text-white font-bold text-sm">Analyse de Liquidité OmniPay</p>
+                      <p className="text-white font-bold text-sm">Analyse de couverture des paiements</p>
                       <span className="text-xs text-white/60 hidden sm:block">— Mis à jour toutes les 10s</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1951,7 +1765,7 @@ export default function AdminPage() {
                             <div className="text-right shrink-0">
                               {row.shortfall > 0 ? (
                                 <div>
-                                  <p className="text-[10px] text-muted-foreground font-medium">À ajouter dans OmniPay</p>
+                                  <p className="text-[10px] text-muted-foreground font-medium">Montant à couvrir</p>
                                   <p className="text-base font-black text-red-400" data-testid={`shortfall-${row.code}`}>+{fmt(Math.ceil(row.shortfall))} XOF</p>
                                 </div>
                               ) : (
@@ -1965,7 +1779,7 @@ export default function AdminPage() {
 
                           <div className="grid grid-cols-3 gap-2 mb-3 text-center">
                             <div className="bg-background/40 rounded-lg p-2">
-                              <p className="text-[10px] text-muted-foreground">Solde OmniPay</p>
+                              <p className="text-[10px] text-muted-foreground">Solde prestataire</p>
                               <p className="text-xs font-bold text-foreground">{fmt(row.omniBalance)} XOF</p>
                             </div>
                             <div className="bg-background/40 rounded-lg p-2">
@@ -1983,7 +1797,7 @@ export default function AdminPage() {
 
                           <div>
                             <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-                              <span>Couverture OmniPay</span>
+                              <span>Couverture disponible</span>
                               <span className={`font-bold ${row.coverage < 50 ? "text-red-400" : row.coverage < 100 ? "text-amber-400" : "text-emerald-400"}`}>
                                 {row.coverage}%
                               </span>
@@ -1996,7 +1810,7 @@ export default function AdminPage() {
                             </div>
                             {row.shortfall > 0 && (
                               <p className="text-[10px] text-red-400 mt-1.5 font-medium">
-                                ⚠ Rechargez le wallet {row.meta.name} de <strong>+{fmt(Math.ceil(row.shortfall))} XOF</strong> dans OmniPay pour couvrir tous les retraits
+                                Couverture insuffisante pour {row.meta.name} : <strong>+{fmt(Math.ceil(row.shortfall))} XOF</strong> nécessaires.
                               </p>
                             )}
                           </div>
@@ -2007,7 +1821,7 @@ export default function AdminPage() {
                 </div>
               );
             })()}
-          </TabsContent>
+          </TabsContent>}
 
           {/* ══════════════════════════════════════
               TAB — BÉNÉFICES
@@ -2041,7 +1855,6 @@ export default function AdminPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <button
-                      onClick={() => setWdDialog(true)}
                       className="flex items-center gap-2 bg-white text-emerald-700 font-black px-5 py-3 rounded-2xl text-sm hover:bg-emerald-50 transition-colors shadow-lg"
                       data-testid="btn-benefices-withdraw"
                     >
@@ -2049,7 +1862,7 @@ export default function AdminPage() {
                       Retirer mes bénéfices
                     </button>
                     <button
-                      onClick={() => { refetchCommissions(); queryClient.invalidateQueries({ queryKey: ["/api/admin/profit-transactions"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/omnipay/withdrawals"] }); }}
+                      onClick={() => { refetchCommissions(); queryClient.invalidateQueries({ queryKey: ["/api/admin/profit-transactions"] }); queryClient.invalidateQueries({ queryKey: ["/api/admin/alphapay/withdrawals"] }); }}
                       className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold px-4 py-2 rounded-xl text-xs transition-colors"
                       data-testid="btn-benefices-refresh"
                     >
@@ -2065,8 +1878,6 @@ export default function AdminPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 { label: "Frais collectés (total)", val: commissions?.totalFees || 0, icon: Coins, grad: "from-indigo-500 to-violet-600", desc: "Toutes transactions" },
-                { label: "Coût OmniPay déduit", val: -(commissions?.totalOmniPayCost || 0), icon: TrendingDown, grad: "from-rose-500 to-orange-500", desc: "Frais prestataire" },
-                { label: "Bénéfice net total", val: commissions?.adminNetProfit || 0, icon: TrendingUp, grad: "from-emerald-500 to-teal-600", desc: "Depuis le début" },
                 { label: "Déjà retiré", val: -(commissions?.totalWithdrawn || 0), icon: Send, grad: "from-amber-500 to-yellow-600", desc: "Retraits confirmés" },
               ].map((item, i) => (
                 <Card key={i} className="border-0 overflow-hidden shadow-sm" data-testid={`benefice-card-${i}`}>
@@ -2089,6 +1900,18 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
               ))}
+              <Card className="border border-amber-500/20 bg-amber-500/5 shadow-sm" data-testid="benefice-card-not-calculated">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-muted-foreground font-medium">Bénéfice net</p>
+                    <div className="h-7 w-7 rounded-lg bg-amber-500/15 flex items-center justify-center">
+                      <TrendingUp className="h-3.5 w-3.5 text-amber-600" />
+                    </div>
+                  </div>
+                  <p className="text-sm font-bold text-amber-700 dark:text-amber-300">Non calculé — consulter les frais AlphaPay</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Le coût réel du prestataire n’est pas configuré.</p>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Fees breakdown */}
@@ -2147,11 +1970,6 @@ export default function AdminPage() {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="text-[10px] text-muted-foreground">{new Date(wd.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
-                            {wd.status === "pending" && (
-                              <button onClick={() => wdCheckM.mutate(wd.id)} disabled={wdCheckM.isPending} className="text-[10px] text-indigo-500 font-bold hover:underline flex items-center gap-0.5 ml-auto">
-                                <RefreshCw className="h-2.5 w-2.5" />Vérifier
-                              </button>
-                            )}
                           </div>
                         </div>
                       ))}
@@ -2244,11 +2062,9 @@ export default function AdminPage() {
                 <p className="text-2xl font-black text-violet-600">{merchantsLoading ? "—" : (merchants || []).length}</p>
                 <p className="text-xs text-muted-foreground">marchands</p>
               </div>
-              <Link href="/admin/payment-providers">
-                <button className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 transition-colors text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm flex-shrink-0" data-testid="btn-go-admin-payment-providers">
-                  <Link2 className="h-3.5 w-3.5" />
-                  Fournisseurs
-                </button>
+              <Link href="/admin/payment-providers" className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-700" data-testid="btn-go-admin-payment-providers">
+                <Link2 className="h-3.5 w-3.5" />
+                AlphaPay
               </Link>
               <Link href="/admin/merchants">
                 <button className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 transition-colors text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm flex-shrink-0" data-testid="btn-go-admin-merchants">
@@ -2467,7 +2283,7 @@ export default function AdminPage() {
               TAB 4 — WALLETS & SOLDE
           ══════════════════════════════════════ */}
           <TabsContent value="wallets" forceMount className="space-y-4 mt-5 data-[state=inactive]:hidden">
-            {/* OmniPay Balance */}
+            {/* AlphaPay balance */}
             <Card className="border-0 overflow-hidden shadow-md">
               <CardContent className="p-0">
                 <div className="p-5" style={{ background: "linear-gradient(135deg, #0c4a6e 0%, #0e7490 60%, #06b6d4 100%)" }}>
@@ -2477,22 +2293,22 @@ export default function AdminPage() {
                         <Building2 className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Solde OmniPay</p>
+                        <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Solde AlphaPay</p>
                         <p className="text-white font-black text-sm">Compte marchand global</p>
                       </div>
                     </div>
-                    <button onClick={() => refetchOmni()} className="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors" data-testid="btn-refresh-omnipay">
+                    <button onClick={() => refetchAlpha()} className="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors" data-testid="btn-refresh-alphapay">
                       <RefreshCw className="h-4 w-4 text-white" />
                     </button>
                   </div>
-                  {omniLoading ? (
+                  {alphaLoading ? (
                     <Skeleton className="h-8 w-48 bg-white/20" />
-                  ) : !omnipayBalance?.balance?.length ? (
+                  ) : !alphapayBalance?.balance?.length ? (
                     <p className="text-white/60 text-sm">Solde non disponible</p>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {(omnipayBalance?.balance || []).map((b: any, i: number) => (
-                        <div key={i} className="bg-white/10 rounded-2xl px-3 py-2.5" data-testid={`omnipay-balance-${b.countryCode}`}>
+                      {(alphapayBalance?.balance || []).map((b: any, i: number) => (
+                        <div key={i} className="bg-white/10 rounded-2xl px-3 py-2.5" data-testid={`provider-balance-${b.countryCode}`}>
                           <p className="text-white/60 text-xs">{b.countryName} ({b.currency})</p>
                           <p className="text-white font-black text-lg">{new Intl.NumberFormat("fr-FR").format(parseFloat(b.amount || "0"))}</p>
                           {b.pending && parseFloat(b.pending) > 0 && <p className="text-white/50 text-xs">En attente: {b.pending}</p>}
@@ -2647,7 +2463,7 @@ export default function AdminPage() {
                                   {result && (
                                     <div className={`mt-1 text-xs font-semibold ${result.action === "completed" ? "text-emerald-600" : "text-blue-600"}`}>
                                       {result.action === "completed"
-                                        ? "✓ Déjà traité par OmniPay — statut mis à jour"
+                                        ? "Déjà traité — statut mis à jour"
                                         : `✓ Rejeté · ${fmtAmt(result.refundedAmount || 0, result.currency || tx.currency)} remboursés`}
                                     </div>
                                   )}
@@ -2674,8 +2490,8 @@ export default function AdminPage() {
               );
             })()}
 
-            {/* ══ OmniPay Movements ══ */}
-            {(() => {
+            {/* ══ AlphaPay transaction movements (currently unavailable) ══ */}
+            {false && (() => {
               const COUNTRY_INFO: Record<string, { name: string; flag: string }> = {
                 BJ: { name: "Bénin", flag: "🇧🇯" }, CI: { name: "Côte d\'Ivoire", flag: "🇨🇮" },
                 BF: { name: "Burkina Faso", flag: "🇧🇫" }, TG: { name: "Togo", flag: "🇹🇬" },
@@ -2683,12 +2499,12 @@ export default function AdminPage() {
                 CM: { name: "Cameroun", flag: "🇨🇲" }, COD: { name: "RD Congo", flag: "🇨🇩" },
                 COG: { name: "Congo-Brazza.", flag: "🇨🇬" },
               };
-              const omnipayBals: Record<string, { amount: number; currency: string }> = {};
-              (omnipayMovements?.omnipayBalances || []).forEach((b: any) => {
+              const providerBalances: Record<string, { amount: number; currency: string }> = {};
+              (alphapayMovements?.alphapayBalances || []).forEach((b: any) => {
                 const code = b.countryCode?.toUpperCase();
-                if (code) omnipayBals[code] = { amount: parseFloat(b.amount || "0"), currency: b.currency || "XOF" };
+                if (code) providerBalances[code] = { amount: parseFloat(b.amount || "0"), currency: b.currency || "XOF" };
               });
-              const allMvts: any[] = omnipayMovements?.movements || [];
+              const allMvts: any[] = alphapayMovements?.movements || [];
               const byCountry: Record<string, any[]> = {};
               for (const m of allMvts) {
                 const c = m.derivedCountry || "??";
@@ -2696,27 +2512,27 @@ export default function AdminPage() {
                 if (byCountry[c].length < 50) byCountry[c].push(m);
               }
               const activeCountries = Array.from(new Set([
-                ...Object.keys(omnipayBals),
+                ...Object.keys(providerBalances),
                 ...Object.keys(byCountry).filter(c => c !== "??"),
               ])).sort();
               const fmtAmt = (n: number, cur: string) =>
                 new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " " + cur;
 
               return (
-                <Card className="border-border/50 overflow-hidden" data-testid="card-omnipay-movements">
+                <Card className="border-border/50 overflow-hidden" data-testid="card-provider-movements">
                   <CardHeader className="pb-3 px-5 pt-5">
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle className="text-sm font-bold flex items-center gap-2">
                           <Activity className="h-4 w-4 text-indigo-500" />
-                          Mouvements OmniPay en temps réel
+                          Mouvements AlphaPay
                         </CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">50 derniers mouvements · actualisation auto toutes les 60s</p>
                       </div>
                       <button
                         onClick={() => refetchMovements()}
                         className="h-8 w-8 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 flex items-center justify-center transition-colors"
-                        data-testid="btn-refresh-omnipay-movements"
+                        data-testid="btn-refresh-provider-movements"
                       >
                         <RefreshCw className={`h-3.5 w-3.5 text-indigo-600 ${movementsLoading ? "animate-spin" : ""}`} />
                       </button>
@@ -2731,14 +2547,14 @@ export default function AdminPage() {
                       <div className="divide-y divide-border/30">
                         {activeCountries.map(code => {
                           const info = COUNTRY_INFO[code] || { name: code, flag: "🌍" };
-                          const bal = omnipayBals[code];
-                          const pending = omnipayMovements?.pendingByCountry?.[code] || 0;
+                          const bal = providerBalances[code];
+                          const pending = alphapayMovements?.pendingByCountry?.[code] || 0;
                           const mvts: any[] = byCountry[code] || [];
                           let running = bal?.amount ?? 0;
                           const enriched = mvts.map(tx => {
                             const amt = parseFloat(tx.amount || "0");
                             const isCompleted = tx.status === "completed";
-                            // Seules les transactions complétées affectent le solde OmniPay
+                            // Seules les transactions complétées affectent le solde AlphaPay
                             if (isCompleted) {
                               const balanceAfter = running;
                               const balanceBefore = tx.type === "deposit" ? running - amt : running + amt;
@@ -3189,39 +3005,39 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* ── TAUX OMNIPAY (COÛT RÉEL) ── */}
-            <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+            {/* Le coût fournisseur ne se configure pas depuis l'interface. */}
+            {false && <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
               <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-xl bg-rose-500/10 flex items-center justify-center">
                     <TrendingDown className="h-4 w-4 text-rose-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold">Taux de coût OmniPay</p>
+                    <p className="text-sm font-bold">Taux de coût prestataire</p>
                     <p className="text-xs text-muted-foreground">Utilisé pour calculer votre bénéfice net réel</p>
                   </div>
                 </div>
-                {!omnipayRateEdit && (
+                {!providerRateEdit && (
                   <Button size="sm" variant="outline" className="h-8 text-xs font-bold gap-1.5 rounded-xl"
-                    onClick={() => setOmnipayRateEdit({
-                      deposit: String(omnipayRates?.deposit ?? 3),
-                      withdrawal: String(omnipayRates?.withdrawal ?? 3),
+                    onClick={() => setProviderRateEdit({
+                      deposit: String(alphapayRates?.deposit ?? 3),
+                      withdrawal: String(alphapayRates?.withdrawal ?? 3),
                     })}
-                    data-testid="btn-edit-omnipay-rates"
+                    data-testid="btn-edit-provider-rates"
                   >
                     <PenLine className="h-3 w-3" /> Modifier
                   </Button>
                 )}
               </div>
 
-              {omnipayRatesLoading ? (
+              {alphapayRatesLoading ? (
                 <div className="p-5 space-y-3">
                   {[1,2].map(i => <Skeleton key={i} className="h-12 rounded-xl" />)}
                 </div>
-              ) : omnipayRateEdit ? (
+              ) : providerRateEdit ? (
                 <div className="p-5 space-y-4">
                   <div className="p-3 rounded-xl bg-amber-500/8 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
-                    Entrez les taux que OmniPay vous facture (voir votre contrat OmniPay). Par défaut : 3% collecte, 3% décaissement.
+                    Le coût fournisseur n’est pas configurable dans cette interface.
                   </div>
                   {[
                     { key: "deposit" as const, label: "Collecte (PAY-IN) — Dépôts", icon: <TrendingUp className="h-4 w-4 text-rose-600" /> },
@@ -3235,34 +3051,34 @@ export default function AdminPage() {
                       <div className="relative flex-1 max-w-[140px]">
                         <Input
                           type="number" min="0" max="100" step="0.5"
-                          value={omnipayRateEdit[key]}
-                          onChange={e => setOmnipayRateEdit(prev => prev ? { ...prev, [key]: e.target.value } : prev)}
+                          value={providerRateEdit![key]}
+                          onChange={e => setProviderRateEdit(prev => prev ? { ...prev, [key]: e.target.value } : prev)}
                           className="pr-8 h-10 text-sm font-bold"
-                          data-testid={`input-omnipay-rate-${key}`}
+                          data-testid={`input-provider-rate-${key}`}
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-bold">%</span>
                       </div>
                     </div>
                   ))}
                   <div className="flex gap-2 pt-1">
-                    <Button size="sm" variant="outline" className="h-9 text-xs rounded-xl" onClick={() => setOmnipayRateEdit(null)}>Annuler</Button>
+                    <Button size="sm" variant="outline" className="h-9 text-xs rounded-xl" onClick={() => setProviderRateEdit(null)}>Annuler</Button>
                     <Button size="sm" className="h-9 text-xs rounded-xl font-bold"
-                      disabled={omnipayRatesM.isPending}
-                      onClick={() => omnipayRatesM.mutate({
-                        deposit: parseFloat(omnipayRateEdit.deposit),
-                        withdrawal: parseFloat(omnipayRateEdit.withdrawal),
+                      disabled={alphapayRatesM.isPending}
+                      onClick={() => alphapayRatesM.mutate({
+                        deposit: parseFloat(providerRateEdit!.deposit),
+                        withdrawal: parseFloat(providerRateEdit!.withdrawal),
                       })}
-                      data-testid="btn-save-omnipay-rates"
+                      data-testid="btn-save-provider-rates"
                     >
-                      {omnipayRatesM.isPending ? "Enregistrement..." : "Enregistrer"}
+                      {alphapayRatesM.isPending ? "Enregistrement..." : "Enregistrer"}
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div className="p-5 grid grid-cols-2 gap-3">
                   {[
-                    { label: "Collecte (PAY-IN)", value: omnipayRates?.deposit ?? 3, icon: <TrendingUp className="h-4 w-4 text-rose-600" />, bg: "bg-rose-500/8" },
-                    { label: "Décaissement (PAY-OUT)", value: omnipayRates?.withdrawal ?? 3, icon: <TrendingDown className="h-4 w-4 text-rose-600" />, bg: "bg-rose-500/8" },
+                    { label: "Collecte (PAY-IN)", value: alphapayRates?.deposit ?? 3, icon: <TrendingUp className="h-4 w-4 text-rose-600" />, bg: "bg-rose-500/8" },
+                    { label: "Décaissement (PAY-OUT)", value: alphapayRates?.withdrawal ?? 3, icon: <TrendingDown className="h-4 w-4 text-rose-600" />, bg: "bg-rose-500/8" },
                   ].map(({ label, value, icon, bg }) => (
                     <div key={label} className={`rounded-xl p-4 ${bg} border border-border/30 text-center`}>
                       <div className="flex justify-center mb-2">{icon}</div>
@@ -3272,7 +3088,7 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
-            </div>
+            </div>}
 
           </TabsContent>
 
@@ -4145,12 +3961,22 @@ export default function AdminPage() {
           <TabsContent value="settings" className="space-y-5 mt-5">
             <GlobalMaintenanceCard />
             <WithdrawalModeCard />
-            <OmniPayCard />
+            <Card className="border-border/50">
+              <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+                <div>
+                  <p className="text-sm font-bold">Configuration AlphaPay</p>
+                  <p className="mt-1 text-xs text-muted-foreground">État du service, soldes et journal des opérations.</p>
+                </div>
+                <Link href="/admin/payment-providers" className="inline-flex items-center rounded-md border border-border bg-background px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted">
+                  Gérer AlphaPay
+                </Link>
+              </CardContent>
+            </Card>
             <AdminEmailCard />
             {/* ── OTP CONFIG ── */}
             {(() => {
               const OTP_DEFAULTS: Record<string, Record<string, { requiresOtp: boolean; defaultOtp?: string }>> = {
-                Orange: { CM: { requiresOtp: true, defaultOtp: "0000" }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
+                Orange: { CM: { requiresOtp: true }, BF: { requiresOtp: true }, CI: { requiresOtp: true }, SN: { requiresOtp: true } },
                 Moov: { CI: { requiresOtp: true } },
               };
               const PM_COLORS: Record<string, { bg: string; border: string; badge: string; text: string; dot: string }> = {
@@ -4166,7 +3992,7 @@ export default function AdminPage() {
               const DEFAULT_COLOR = { bg: "from-slate-500 to-slate-400", border: "border-slate-300 dark:border-slate-600", badge: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300", text: "text-slate-900 dark:text-slate-100", dot: "bg-slate-500" };
 
 
-              const pmsWithCountries = (paymentMethods ?? []).filter((pm: any) => (pm.countries ?? []).some((c: string) => !suspendedCountryCodes.includes(c)));
+              const pmsWithCountries = false ? (paymentMethods ?? []).filter((pm: any) => (pm.countries ?? []).some((c: string) => !suspendedCountryCodes.includes(c))) : [];
               if (pmsWithCountries.length === 0) return null;
 
               return (
@@ -4177,7 +4003,7 @@ export default function AdminPage() {
                   </div>
                   <p className="text-xs text-muted-foreground -mt-1">
                     Activez l'OTP par opérateur et par pays pour les dépôts, paiements par lien ou API.
-                    Si un code est renseigné, il est envoyé en arrière-plan à OmniPay sans interaction de l'utilisateur.
+                    Aucun code secret d'opérateur n'est conservé ni transmis depuis cette interface.
                     Les pays suspendus sont exclus.
                   </p>
                   <div className="grid gap-3">
@@ -4423,7 +4249,7 @@ export default function AdminPage() {
                 <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
                   <CheckCircle2 className="h-10 w-10 text-green-500" />
                   <p className="font-semibold text-base">Aucune erreur récente</p>
-                  <p className="text-xs text-muted-foreground max-w-xs">Les erreurs de paiement OmniPay apparaissent ici dès qu'elles surviennent.</p>
+                  <p className="text-xs text-muted-foreground max-w-xs">Les erreurs de paiement apparaissent ici dès qu'elles surviennent.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -4722,7 +4548,7 @@ export default function AdminPage() {
       <Dialog open={!!depositDialog} onOpenChange={(o) => { if (!o) setDepositDialog(null); }}>
         <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-emerald-500" />Dépôt via OmniPay</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-emerald-500" />Dépôt administrateur</DialogTitle>
             <DialogDescription>
               {depositDialog?.name ? `Wallet de ${depositDialog.name}` : "Sélectionner un wallet"}
             </DialogDescription>
@@ -4859,113 +4685,6 @@ export default function AdminPage() {
               data-testid="btn-confirm-reset"
             >
               {resetStatsM.isPending ? "Suppression…" : "Réinitialiser"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── MODAL RETRAIT OMNIPAY ADMIN ── */}
-      <Dialog open={wdDialog} onOpenChange={(o) => { if (!o) { setWdDialog(false); setWdForm({ amount: "", phone: "", operator: "", recipientName: "", note: "" }); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center">
-                <TrendingDown className="h-4 w-4 text-white" />
-              </div>
-              Retrait depuis OmniPay
-            </DialogTitle>
-            <DialogDescription>
-              Transférez des fonds depuis le solde OmniPay vers un numéro Mobile Money.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {omnipayBalance?.balance && (
-              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-3">
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">Solde disponible :</p>
-                <div className="flex flex-wrap gap-3">
-                  {omnipayBalance.balance.map((b: any, i: number) => (
-                    <span key={i} className="text-sm font-black text-emerald-600 dark:text-emerald-300">
-                      {b.amount.toLocaleString()} {b.currency} <span className="text-xs font-normal text-muted-foreground">({b.countryName})</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="wd-amount">Montant (XOF) *</Label>
-              <Input
-                id="wd-amount"
-                type="number"
-                placeholder="Ex: 50000"
-                value={wdForm.amount}
-                onChange={e => setWdForm(f => ({ ...f, amount: e.target.value }))}
-                data-testid="input-wd-amount"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="wd-phone">Numéro de téléphone *</Label>
-              <Input
-                id="wd-phone"
-                placeholder="Ex: 22901234567"
-                value={wdForm.phone}
-                onChange={e => setWdForm(f => ({ ...f, phone: e.target.value }))}
-                data-testid="input-wd-phone"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="wd-operator">Opérateur *</Label>
-              <Select value={wdForm.operator} onValueChange={v => setWdForm(f => ({ ...f, operator: v }))}>
-                <SelectTrigger id="wd-operator" data-testid="select-wd-operator">
-                  <SelectValue placeholder="Choisir l'opérateur" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MTN">MTN Mobile Money</SelectItem>
-                  <SelectItem value="MOOV">Moov Money</SelectItem>
-                  <SelectItem value="ORANGE">Orange Money</SelectItem>
-                  <SelectItem value="WAVE">Wave</SelectItem>
-                  <SelectItem value="FREE">Free Money</SelectItem>
-                  <SelectItem value="AIRTEL">Airtel Money</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="wd-recipient">Nom du bénéficiaire</Label>
-              <Input
-                id="wd-recipient"
-                placeholder="Ex: Vianney Essou"
-                value={wdForm.recipientName}
-                onChange={e => setWdForm(f => ({ ...f, recipientName: e.target.value }))}
-                data-testid="input-wd-recipient"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="wd-note">Note (optionnel)</Label>
-              <Textarea
-                id="wd-note"
-                placeholder="Ex: Paiement prestataire..."
-                value={wdForm.note}
-                onChange={e => setWdForm(f => ({ ...f, note: e.target.value }))}
-                className="resize-none"
-                rows={2}
-                data-testid="input-wd-note"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setWdDialog(false)} disabled={wdM.isPending}>Annuler</Button>
-            <Button
-              className="bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white"
-              disabled={wdM.isPending || !wdForm.amount || !wdForm.phone || !wdForm.operator}
-              onClick={() => wdM.mutate({
-                amount: parseFloat(wdForm.amount),
-                phoneNumber: wdForm.phone,
-                operator: wdForm.operator,
-                recipientName: wdForm.recipientName || undefined,
-                note: wdForm.note || undefined,
-              })}
-              data-testid="btn-confirm-admin-wd"
-            >
-              {wdM.isPending ? "Envoi en cours…" : "Confirmer le retrait"}
             </Button>
           </DialogFooter>
         </DialogContent>

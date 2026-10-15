@@ -303,7 +303,7 @@ export default function DashboardPage() {
                       const isSrPay = tx.description?.startsWith("Paiement API SR");
                       const isApiPay = !!(tx as any).apiKeyId || tx.description?.startsWith("Paiement via API") || tx.description?.startsWith("Dépôt via API") || isSrPay;
                       const label = isPayLink ? "Paiement" : isSrPay ? "Paiement API SR" : isApiPay ? "Paiement API" : tx.type === "deposit" ? "Dépôt" : tx.type === "transfer" ? "Transfert" : "Retrait";
-                      const provider = tx.provider && tx.provider.toLowerCase() !== "omnipay" ? tx.provider : null;
+                      const provider = (tx as any).operator || (tx.provider ? "Paiement Mobile Money" : null);
                       return (
                         <div key={tx.id} className="flex items-center gap-3 py-3 hover:bg-muted/30 rounded-xl px-2 transition-colors group" data-testid={`transaction-item-${tx.id}`}>
                           <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${tx.type === "deposit" ? "bg-emerald-500/10" : "bg-orange-500/10"}`}>

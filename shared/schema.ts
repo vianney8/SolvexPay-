@@ -135,7 +135,7 @@ export const adminWithdrawals = pgTable("admin_withdrawals", {
   operator: text("operator").notNull(),
   recipientName: text("recipient_name"),
   reference: text("reference").notNull(),
-  omnipayId: text("omnipay_id"),
+  providerId: text("omnipay_id"), // Existing physical column retained for accounting history.
   status: text("status").notNull().default("pending"),
   note: text("note"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -159,7 +159,7 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
-// ── Payment Providers (multi-fournisseurs : OmniPay, ...) ──
+// Provider configuration records; only AlphaPay can process new operations.
 export const paymentProviders = pgTable("payment_providers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   code: text("code").notNull().unique(),

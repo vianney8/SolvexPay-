@@ -27,7 +27,7 @@ const SR_OPERATORS = [
   { code: "WAVE", label: "Wave", countries: ["CI", "SN"], otp: false, note: "Lien de paiement Wave généré" },
   { code: "TMONEY", label: "T-Money", countries: ["TG"], otp: false, note: "Confirmation USSD automatique" },
   { code: "FREE", label: "Free Money", countries: ["SN"], otp: false, note: "Alias: MIXX" },
-  { code: "AIRTEL", label: "Airtel Money", countries: ["COG", "COD"], otp: false, note: "Confirmation USSD automatique" },
+  { code: "AIRTEL", label: "Airtel Money", countries: ["COD"], otp: false, note: "Confirmation USSD automatique" },
   { code: "VODACOM", label: "Vodacom M-Pesa", countries: ["COD"], otp: false, note: "Confirmation USSD automatique" },
 ];
 
@@ -39,7 +39,6 @@ const SR_COUNTRIES = [
   { code: "ML", name: "Mali", currency: "XOF", operators: ["MOOV", "ORANGE"] },
   { code: "TG", name: "Togo", currency: "XOF", operators: ["MOOV", "TMONEY"] },
   { code: "CM", name: "Cameroun", currency: "XAF", operators: ["MTN", "ORANGE"] },
-  { code: "COG", name: "Congo-Brazzaville", currency: "XAF", operators: ["MTN", "AIRTEL"] },
   { code: "COD", name: "Congo-Kinshasa", currency: "CDF", operators: ["AIRTEL", "VODACOM"] },
 ];
 

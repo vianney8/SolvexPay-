@@ -1,1 +1,2 @@
 - [Installation des dépendances importées](package-installer.md) — le callback d’installation refuse une liste de paquets vide.
+- [Identité client AlphaPay](alphapay-customer.md) — les exemples REST simplifiés omettent des champs obligatoires pour les payins et payouts.

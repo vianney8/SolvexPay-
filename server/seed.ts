@@ -10,10 +10,6 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   fee_transfer: "6",
   fee_api: "6",
 
-  // ── Taux OmniPay ──
-  omnipay_rate_deposit: "3",
-  omnipay_rate_withdrawal: "3",
-
   // ── Mode de retrait ──
   withdrawalMode: "auto",
 
