@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import solvexpayIcon from "@/assets/images/solvexpay-icon.jpg";
+import { PAYMENT_COUNTRIES as COUNTRIES_DATA, PAYMENT_OPERATORS } from "@/lib/payment-catalog-ui";
 
 const BASE_URL = "https://solvexpay.com";
 
@@ -26,16 +27,6 @@ const SECTIONS = [
   { id: "errors", label: "Codes d'erreur", icon: AlertCircle },
 ];
 
-const COUNTRIES_DATA: Array<{ code: string; name: string; flag: string; currency: string; operators: string[] }> = [
-  { code: "BJ", name: "Bénin",             flag: "🇧🇯", currency: "XOF", operators: ["MTN", "Moov"] },
-  { code: "CI", name: "Côte d'Ivoire",     flag: "🇨🇮", currency: "XOF", operators: ["MTN", "Moov", "Orange", "Wave"] },
-  { code: "SN", name: "Sénégal",           flag: "🇸🇳", currency: "XOF", operators: ["Orange", "Wave", "Free"] },
-  { code: "BF", name: "Burkina Faso",      flag: "🇧🇫", currency: "XOF", operators: ["Moov", "Orange"] },
-  { code: "TG", name: "Togo",              flag: "🇹🇬", currency: "XOF", operators: ["Moov", "TMoney"] },
-  { code: "CM", name: "Cameroun",          flag: "🇨🇲", currency: "XAF", operators: ["MTN", "Orange"] },
-  { code: "COG", name: "Congo-Brazzaville", flag: "🇨🇬", currency: "XAF", operators: ["MTN", "Airtel"] },
-];
-
 const OPERATOR_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
   MTN:    { bg: "bg-amber-100 dark:bg-amber-900/40",  text: "text-amber-800 dark:text-amber-200",  dot: "bg-amber-500" },
   Orange: { bg: "bg-orange-100 dark:bg-orange-900/40", text: "text-orange-800 dark:text-orange-200", dot: "bg-orange-500" },
@@ -46,16 +37,10 @@ const OPERATOR_STYLES: Record<string, { bg: string; text: string; dot: string }>
   Free:   { bg: "bg-rose-100 dark:bg-rose-900/40",    text: "text-rose-800 dark:text-rose-200",    dot: "bg-rose-500" },
 };
 
-const OPERATORS = [
-  { code: "MTN", countries: "BJ, CI, CM, COG" },
-  { code: "ORANGE", countries: "CI, BF, CM, ML, SN" },
-  { code: "WAVE", countries: "CI, SN" },
-  { code: "MOOV", countries: "BJ, CI, BF, TG, ML" },
-  { code: "TMONEY", countries: "TG" },
-  { code: "AIRTEL", countries: "COD, COG" },
-  { code: "VODACOM", countries: "COD" },
-  { code: "FREE", countries: "SN" },
-];
+const OPERATORS = PAYMENT_OPERATORS.map(operator => ({
+  code: operator.code.toUpperCase(),
+  countries: operator.countries.join(", "),
+}));
 
 const ERRORS = [
   { code: 400, key: "INVALID_AMOUNT", desc: "Montant invalide ou inférieur au minimum (100 XOF)" },
@@ -179,12 +164,12 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
                   </div>
                 </div>
                 <p className="text-white/80 text-sm leading-relaxed">
-                  Intégrez les paiements Mobile Money dans votre application en quelques lignes de code. SolvexPay agrège 8 opérateurs dans 9 pays africains.
+                  Intégrez les paiements Mobile Money dans votre application en quelques lignes de code. SolvexPay agrège les opérateurs disponibles dans 9 pays africains.
                 </p>
                 <div className="flex flex-wrap gap-2 mt-4">
                   <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">REST · JSON</span>
                   <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">HTTPS requis</span>
-                  <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">9 pays · 8 opérateurs</span>
+                  <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold">9 pays · 34 combinaisons actives</span>
                 </div>
               </div>
 
@@ -313,8 +298,8 @@ function DocContent({ activeSection, setActiveSection }: { activeSection: string
                           <div>
                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Paramètre <code className="font-mono bg-muted px-1 rounded">operator</code></p>
                             <div className="flex flex-wrap gap-1">
-                              {["MTN","Orange","Moov","Wave","TMoney","Airtel","Free"].map(op => (
-                                <code key={op} className="px-1.5 py-0.5 rounded bg-muted border border-border/60 text-[10px] font-mono font-bold">{op}</code>
+                              {PAYMENT_OPERATORS.map(({ code }) => (
+                                <code key={code} className="px-1.5 py-0.5 rounded bg-muted border border-border/60 text-[10px] font-mono font-bold">{code}</code>
                               ))}
                             </div>
                           </div>
@@ -670,6 +655,24 @@ else:
 
                 <CodeBlock lang="bash — Forcer la vérification" code={`curl -X POST ${BASE_URL}/api/v1/transactions/a1b2c3d4-e5f6-7890-abcd-ef1234567890/verify \\
   -H "Authorization: Bearer sk_live_xxxxxxxxxxxx"`} />
+
+                <div className="border border-amber-500/30 rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/5 border-b border-amber-500/20">
+                    <MethodBadge method="POST" />
+                    <code className="text-sm font-mono font-semibold">/api/v1/transactions/:id/confirm-otp</code>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    <p className="text-xs text-muted-foreground">À appeler côté serveur avec la clé API autorisée pour cette transaction. Le navigateur ne doit jamais recevoir ni exposer la clé.</p>
+                    <div className="border border-border/60 rounded-xl overflow-hidden">
+                      <ParamRow name="otp" type="string" required desc="Code reçu de l’opérateur (4 à 32 caractères)" />
+                    </div>
+                    <CodeBlock lang="bash — confirmer le code opérateur" code={`curl -X POST ${BASE_URL}/api/v1/transactions/txn_abc123/confirm-otp \\
+  -H "Authorization: Bearer sk_live_votre_cle_api" \\
+  -H "Content-Type: application/json" \\
+  -d '{"otp":"CODE_RECU"}'`} />
+                    <p className="text-xs text-muted-foreground">La réponse inclut le statut transactionnel et <code className="font-mono">requiresOtp</code>. Vérifiez toujours le statut côté serveur avant de confirmer la commande.</p>
+                  </div>
+                </div>
 
                 <CodeBlock lang="javascript (Node.js) — Vérification après timeout" code={`// À utiliser si votre webhook n'arrive pas après 3-5 minutes
 async function verifyPayment(transactionId) {

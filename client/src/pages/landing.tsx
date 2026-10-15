@@ -9,21 +9,12 @@ import {
   Key, Send,
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
+import { PAYMENT_COUNTRIES, PAYMENT_OPERATORS } from "@/lib/payment-catalog-ui";
 
-const ALL_COUNTRIES = [
-  { iso: "BJ",  flag: "🇧🇯", name: "Bénin" },
-  { iso: "CI",  flag: "🇨🇮", name: "Côte d'Ivoire" },
-  { iso: "SN",  flag: "🇸🇳", name: "Sénégal" },
-  { iso: "CM",  flag: "🇨🇲", name: "Cameroun" },
-  { iso: "COD", flag: "🇨🇩", name: "RD Congo" },
-  { iso: "BF",  flag: "🇧🇫", name: "Burkina Faso" },
-  { iso: "TG",  flag: "🇹🇬", name: "Togo" },
-  { iso: "ML",  flag: "🇲🇱", name: "Mali" },
-  { iso: "COG", flag: "🇨🇬", name: "Congo-Brazzaville" },
-];
+const ALL_COUNTRIES = PAYMENT_COUNTRIES.map(c => ({ iso: c.code, flag: c.flag, name: c.name }));
 
 const FAQS = [
-  { q: "Comment fonctionne SolvexPay ?", a: "SolvexPay est une passerelle de paiement Mobile Money pan-africaine. Après inscription, vous créez des liens de paiement ou utilisez notre API pour encaisser via MTN, Orange, Wave, Moov et plus. Tout le flux de paiement est hébergé sur notre plateforme sécurisée." },
+  { q: "Comment fonctionne SolvexPay ?", a: "SolvexPay aide les commerçants à encaisser en Mobile Money. Après inscription, créez des liens de paiement ou intégrez l’API pour garder vos clients dans votre propre formulaire, sans redirection lorsque le réseau le permet." },
   { q: "Quels sont les frais ?", a: "Les frais sont simples et transparents. Consultez la section Tarifs pour les taux exacts en vigueur. Aucun abonnement mensuel, aucun frais caché." },
   { q: "Le KYC est-il obligatoire ?", a: "Le KYC est requis pour débloquer tous les plafonds. Sans KYC vous pouvez tester la plateforme avec des limites réduites. La vérification prend généralement moins de 24h." },
   { q: "Comment intégrer l'API ?", a: "Créez votre compte, accédez à 'Clés API' dans votre tableau de bord. Utilisez l'API JSON POST /api/v1/deposit depuis votre serveur pour garder le client sur votre propre formulaire. La page checkout hébergée reste facultative." },
@@ -78,7 +69,7 @@ export default function LandingPage() {
   const feeTransfer = serviceFees?.transfer ?? 7;
 
   const stat1 = useCountUp(activeCount, 1800, statsVisible);
-  const stat2 = useCountUp(10, 2000, statsVisible);
+  const stat2 = useCountUp(PAYMENT_OPERATORS.length, 2000, statsVisible);
   const stat3 = useCountUp(999, 2200, statsVisible);
   const stat4 = useCountUp(24, 1500, statsVisible);
 
@@ -176,7 +167,7 @@ export default function LandingPage() {
               </div>
 
               <p className="anim-up-2 text-lg text-gray-500 leading-relaxed max-w-lg">
-                La passerelle de paiement pan-africaine pour les entreprises. MTN, Orange, Wave, Moov et 7 autres opérateurs — tout dans une seule intégration simple.
+                Les réseaux Mobile Money de 9 pays — tout dans une seule intégration simple, avec vos propres formulaires.
               </p>
 
               <div className="anim-up-3 flex flex-col sm:flex-row gap-4">
@@ -204,7 +195,7 @@ export default function LandingPage() {
 
               <div className="anim-up-4 flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-gray-400 font-semibold mr-1">Opérateurs :</span>
-                {["MTN", "Orange", "Wave", "Moov", "TMoney", "Vodacom", "Airtel"].map((op) => (
+                {PAYMENT_OPERATORS.map(({ code: op }) => (
                   <div key={op} className="rounded-xl overflow-hidden shadow-sm border border-gray-100">
                     <OperatorLogo operator={op} size={30} />
                   </div>
@@ -341,7 +332,7 @@ export default function LandingPage() {
                 color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", btnBg: "linear-gradient(135deg,#7c3aed,#5b21b6)",
               },
               {
-                icon: Smartphone, title: "Mobile Money Direct", badge: "10+ réseaux",
+                icon: Smartphone, title: "Mobile Money Direct", badge: `${PAYMENT_OPERATORS.length} réseaux`,
                 desc: "Dépôts et retraits vers 10+ opérateurs depuis votre tableau de bord. Confirmation USSD instantanée.",
                 points: ["Confirmation USSD", "Vérification temps réel", "Multi-opérateurs"],
                 color: "#059669", bg: "#f0fdf4", border: "#bbf7d0", btnBg: "linear-gradient(135deg,#059669,#047857)",

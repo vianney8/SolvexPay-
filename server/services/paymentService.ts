@@ -3,6 +3,7 @@ import { paymentProviders, paymentProviderLogs, transactions, wallets, adminWith
 import { eq, and, desc, sql, ne } from "drizzle-orm";
 import { AlphaPayService, alphapayStatusToString, directPaymentResponse, type PaymentParams, type PaymentResponse, type PaymentState } from "./alphapay";
 import { amountInXOF, paymentWalletDelta } from "./paymentAccounting";
+import { needsPaymentConfirmation } from "@shared/payment-catalog";
 export { amountInXOF } from "./paymentAccounting";
 
 type Receipt = PaymentResponse & { kind: "payment" | "payout" | "checkout" };
@@ -122,6 +123,25 @@ class PaymentService {
   transfer(params: PaymentParams) { return this.initiate("transfer", params); }
   async getBalance() { requireConfigured(); return new AlphaPayService().getBalance(); }
 
+  async confirmOtp(reference: string, otp: string) {
+    requireConfigured();
+    const binding = await findBinding(reference);
+    const receipt = binding?.response as Receipt | null;
+    const request = binding?.request as BindingRequest | undefined;
+    if (!request || request.action !== "deposit" || !receipt?.id || receipt.kind !== "payment" || receipt.requires_redirect ||
+        !needsPaymentConfirmation(request.params.operator || "")) {
+      throw Object.assign(new Error("Cette opération ne permet pas la confirmation par code."), { status: 400 });
+    }
+    const [local] = await db.select().from(transactions).where(eq(transactions.reference, reference)).limit(1);
+    if (!local) throw Object.assign(new Error("Paiement introuvable."), { status: 404 });
+    if (local.status !== "pending") throw Object.assign(new Error("Ce paiement est déjà traité. Vérifiez son statut."), { status: 409 });
+    // OTPs are ephemeral: never persist or log them. A confirmation error does
+    // not reject the original payment or trigger any accounting movement.
+    try { await new AlphaPayService().confirmOtp(receipt.id, otp); }
+    catch { throw Object.assign(new Error("Code non confirmé. Vérifiez le code ou le statut du paiement avant de réessayer."), { status: 422 }); }
+    return this.getStatus(reference);
+  }
+
   async getStatus(reference: string): Promise<PaymentResponse> {
     requireConfigured();
     let binding = await findBinding(reference);
@@ -178,6 +198,7 @@ class PaymentService {
     return {
       success: 1, reference, status: result.status, id: result.id,
       requires_redirect: presentation.requires_redirect,
+      requires_otp: state === "pending" && presentation.requires_redirect !== true && receipt.kind === "payment" && needsPaymentConfirmation(saved.params.operator || ""),
       instructions: presentation.instructions, message: presentation.message,
     };
   }

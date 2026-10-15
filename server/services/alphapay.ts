@@ -1,5 +1,6 @@
 import { AlphaPayClient } from "alphapay-node";
 import crypto from "node:crypto";
+import { PAYMENT_NETWORKS, alphaCountryCode, getPaymentNetwork, needsPaymentConfirmation } from "@shared/payment-catalog";
 
 export type PaymentState = "pending" | "completed" | "failed";
 export function alphapayStatusToString(status: unknown): PaymentState {
@@ -16,22 +17,7 @@ export function verifyAlphaPaySignature(rawBody: Buffer, signature: string, time
   return crypto.timingSafeEqual(expected, Buffer.from(signature, "hex"));
 }
 
-const NETWORKS: Record<string, Record<string, string>> = {
-  MTN: { BJ: "mtn_bj", CI: "mtn_ci", CM: "mtn_cm" },
-  MOOV: { BJ: "moov_bj", CI: "moov_ci", BF: "moov_bf", ML: "moov_ml", TG: "moov_tg" },
-  ORANGE: { CI: "orange_ci", BF: "orange_bf", ML: "orange_ml", CM: "orange_cm", SN: "orange_sn", CD: "orange_cd" },
-  WAVE: { CI: "wave_ci", SN: "wave_sn" },
-  FREE: { SN: "freemoney_sn" }, MIXX: { SN: "freemoney_sn" },
-  TMONEY: { TG: "togocel" }, TOGOCEL: { TG: "togocel" },
-  VODACOM: { CD: "vodacom_cd" }, AIRTEL: { CD: "airtel_cd" },
-};
-
-export function getAlphaPayNetwork(operator: string, country: string): string {
-  const iso = country.toUpperCase() === "COD" ? "CD" : country.toUpperCase();
-  const network = NETWORKS[operator.toUpperCase()]?.[iso];
-  if (!network) throw new Error("Ce pays ou cet opérateur n’est pas pris en charge par AlphaPay.");
-  return network;
-}
+export const getAlphaPayNetwork = getPaymentNetwork;
 
 export interface PaymentParams {
   msisdn: string;
@@ -60,6 +46,7 @@ export interface PaymentResponse {
   kind?: "payment" | "payout" | "checkout";
   requires_redirect?: boolean;
   instructions?: string;
+  requires_otp?: boolean;
 }
 
 export const DIRECT_PAYMENT_UNAVAILABLE = "Cet opérateur exige une page externe pour cette tentative. Le paiement n’est pas disponible sans redirection. Aucune page externe ne sera ouverte ; conservez la référence pour vérifier son statut.";
@@ -70,7 +57,7 @@ export function directPaymentResponse(receipt: PaymentResponse): PaymentResponse
   const { payment_url: _externalUrl, ...safe } = receipt;
   return {
     ...safe, requires_redirect: requiresRedirect,
-    ...(requiresRedirect ? { message: DIRECT_PAYMENT_UNAVAILABLE, instructions: undefined } : {}),
+    ...(requiresRedirect ? { message: DIRECT_PAYMENT_UNAVAILABLE, instructions: undefined, requires_otp: false } : {}),
   };
 }
 
@@ -133,6 +120,7 @@ export class AlphaPayService {
       success: 1, id: result.id, status: result.status, reference: params.reference,
       payment_url: url, kind: checkout ? "checkout" : "payment",
       instructions: typeof result.instructions === "string" ? result.instructions.slice(0, 2000) : undefined,
+      requires_otp: !checkout && needsPaymentConfirmation(network) && alphapayStatusToString(result.status) === "pending",
     };
     return params.directOnly ? directPaymentResponse(response) : response;
   }
@@ -153,11 +141,11 @@ export class AlphaPayService {
   context(params: PaymentParams) {
     const network = params.operator || "";
     const suffix = network === "togocel" ? "tg" : network.split("_").at(-1);
-    const country = (params.country === "COD" ? "CD" : params.country || suffix || "").toUpperCase();
-    if (!Object.values(NETWORKS).some(networks => networks[country] === network)) {
+    const country = alphaCountryCode(params.country || suffix || "");
+    if (!Object.values(PAYMENT_NETWORKS).some(networks => networks[country] === network)) {
       throw new Error("Réseau AlphaPay non pris en charge pour ce pays.");
     }
-    const localCurrency = country === "CM" ? "XAF" : country === "CD" ? "CDF" : "XOF";
+    const localCurrency = ["CM", "CG"].includes(country) ? "XAF" : country === "CD" ? "CDF" : "XOF";
     const currency = params.currency || localCurrency;
     if (currency !== localCurrency) throw new Error("La devise du paiement doit correspondre au pays sélectionné.");
     if (!Number.isSafeInteger(params.amount) || params.amount <= 0 || params.amount > 1_000_000_000) throw new Error("Montant entier invalide ou trop élevé.");
@@ -172,6 +160,11 @@ export class AlphaPayService {
       return { status: session.status, sessionOnly: true };
     }
     return this.request("get", `/${kind === "payout" ? "payouts" : "payments"}/${encodeURIComponent(id)}/verify/`);
+  }
+
+  async confirmOtp(id: string, otp: string) {
+    if (!/^[a-zA-Z0-9 -]{4,32}$/.test(otp)) throw new Error("Code opérateur invalide.");
+    return this.request("post", `/payments/${encodeURIComponent(id)}/confirm-otp/`, { otp });
   }
 
   async getBalance() {

@@ -14,22 +14,13 @@ import {
   ChevronUp, Smartphone, RefreshCw, Clock, Wifi, Store,
 } from "lucide-react";
 import solvexpayLogo from "@/assets/images/solvexpay-logo.png";
+import { PAYMENT_COUNTRIES as COUNTRIES, paymentOperatorLabel } from "@/lib/payment-catalog-ui";
+import { OperatorConfirmationCode } from "@/components/operator-confirmation-code";
 
 function formatAmount(amount: number | string) {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
   return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
 }
-
-const COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"], phonePlaceholder: "01 90 12 34 56" },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"], phonePlaceholder: "07 12 34 56 78" },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
-  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], phonePlaceholder: "77 123 45 67" },
-  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
-  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
-];
 
 function parsePhoneNumber(raw: string): { countryCode: string | null; localNumber: string } {
   if (!raw) return { countryCode: null, localNumber: "" };
@@ -47,11 +38,6 @@ function parsePhoneNumber(raw: string): { countryCode: string | null; localNumbe
   }
   return { countryCode: null, localNumber: normalized };
 }
-
-const OPERATOR_LABEL: Record<string, string> = {
-  MTN: "MTN Money", Orange: "Orange Money", Moov: "Moov Money", Wave: "Wave",
-  TMoney: "T-Money", Vodacom: "Vodacom M-Pesa", Airtel: "Airtel Money", Free: "Free Money",
-};
 
 function PageWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -95,6 +81,7 @@ export default function PayApiPage() {
   const [otp, setOtp] = useState("");
   const [redirectBlocked, setRedirectBlocked] = useState(false);
   const [paymentInstructions, setPaymentInstructions] = useState("");
+  const [requiresOtp, setRequiresOtp] = useState(false);
   const [country, setCountry] = useState("BJ");
   const [operator, setOperator] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -168,6 +155,7 @@ export default function PayApiPage() {
       });
       if (res.ok) {
         const data = await res.json();
+        if (typeof data.requiresOtp === "boolean") setRequiresOtp(data.requiresOtp);
         if (data.status) {
           setVerifyStatus(data.status);
           setVerifyCount((c) => c + 1);
@@ -209,6 +197,7 @@ export default function PayApiPage() {
     },
     onSuccess: (data: any) => {
       setPendingReference(data.reference || data.sendavaReference || data.id || null);
+      setRequiresOtp(data.requiresOtp === true);
       setPaymentInstructions(typeof data.instructions === "string" && data.instructions ? data.instructions : typeof data.message === "string" ? data.message : "");
       const paymentUrl = data.paymentUrl || data.payment_url;
       let hasExternalPaymentUrl = false;
@@ -464,6 +453,17 @@ export default function PayApiPage() {
                 <p className="text-sm text-white/65 whitespace-pre-wrap">{paymentInstructions}</p>
               </div>
             )}
+            {isPending && requiresOtp && !redirectBlocked && pendingReference && (
+              <OperatorConfirmationCode
+                endpoint={`/api/payment-api/public/${id}/confirm-otp`}
+                reference={pendingReference}
+                includeReference={false}
+                onResult={(data) => {
+                  if (typeof data.requiresOtp === "boolean") setRequiresOtp(data.requiresOtp);
+                  checkStatus(pendingReference);
+                }}
+              />
+            )}
 
             {pendingReference && (
               <div className="text-center">
@@ -618,7 +618,7 @@ export default function PayApiPage() {
                         <OperatorLogo operator={op} size={52} />
                       </div>
                       <span className={`text-[11px] font-bold text-center leading-tight ${operator === op ? "text-blue-700" : isDisabled ? "text-gray-400" : "text-gray-500"}`}>
-                        {OPERATOR_LABEL[op] || op}
+                        {paymentOperatorLabel(op)}
                       </span>
                     </button>
                   );
@@ -628,7 +628,7 @@ export default function PayApiPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                Numéro {operator ? OPERATOR_LABEL[operator] || operator : "Mobile Money"}
+                Numéro {operator ? paymentOperatorLabel(operator) : "Mobile Money"}
               </Label>
               <div className="flex gap-0 rounded-xl border border-gray-200 overflow-hidden focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                 <div className="flex items-center gap-2 px-3 bg-gray-50 border-r border-gray-200 flex-shrink-0">

@@ -82,19 +82,23 @@ function FreeMoneyLogo({ size = 48 }: { size?: number }) {
 }
 
 export function OperatorLogo({ operator, size = 48 }: OperatorLogoProps) {
-  const op = operator.toLowerCase();
+  const op = operator.toLowerCase().replace(/[\s_-]/g, "");
   if (op === "mtn") return <MtnLogo size={size} />;
   if (op === "orange") return <OrangeLogo size={size} />;
   if (op === "wave") return <WaveLogo size={size} />;
   if (op === "moov") return <MoovLogo size={size} />;
-  if (op === "tmoney") return <TMoneyLogo size={size} />;
+  if (op === "tmoney" || op === "togocel") return <TMoneyLogo size={size} />;
   if (op === "vodacom") return <VodacomLogo size={size} />;
   if (op === "airtel") return <AirtelLogo size={size} />;
-  if (op === "free") return <FreeMoneyLogo size={size} />;
+  if (op === "free" || op === "freemoney") return <FreeMoneyLogo size={size} />;
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="24" cy="24" r="24" fill="#6B7280"/>
-      <text x="50%" y="52%" dominantBaseline="middle" textAnchor="middle" fontFamily="Arial" fontWeight="700" fontSize="10" fill="white">{operator.slice(0, 3).toUpperCase()}</text>
-    </svg>
+    <div
+      aria-label={operator}
+      title={operator}
+      className="flex items-center justify-center rounded-full border border-border/60 bg-muted text-foreground font-bold text-center leading-tight"
+      style={{ width: size, height: size, fontSize: Math.max(9, Math.min(13, size / 4)) }}
+    >
+      {operator.split(/[\s_-]+/).map(part => part[0]).join("").slice(0, 3).toUpperCase()}
+    </div>
   );
 }

@@ -19,29 +19,11 @@ import {
   Smartphone, Upload, BadgeCheck, AlertTriangle,
   ChevronRight, Store,
 } from "lucide-react";
+import { PAYMENT_COUNTRIES as WITHDRAWAL_COUNTRIES } from "@/lib/payment-catalog-ui";
 
-const countryCodes = [
-  { code: "+229", country: "Bénin", label: "BJ +229" },
-  { code: "+225", country: "Côte d'Ivoire", label: "CI +225" },
-  { code: "+226", country: "Burkina Faso", label: "BF +226" },
-  { code: "+228", country: "Togo", label: "TG +228" },
-  { code: "+221", country: "Sénégal", label: "SN +221" },
-  { code: "+223", country: "Mali", label: "ML +223" },
-  { code: "+237", country: "Cameroun", label: "CM +237" },
-  { code: "+243", country: "RD Congo", label: "COD +243" },
-  { code: "+242", country: "Congo", label: "COG +242" },
-];
-
-const WITHDRAWAL_COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", operators: ["MTN", "Moov"] },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", operators: ["Orange", "MTN", "Moov", "Wave"] },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", operators: ["Moov", "Orange"] },
-  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", operators: ["TMoney", "Moov"] },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", operators: ["Orange", "Wave", "Free"] },
-  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", operators: ["Orange", "Moov"] },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", operators: ["MTN", "Orange"] },
-  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", operators: ["Vodacom", "Airtel", "Orange"] },
-];
+const countryCodes = WITHDRAWAL_COUNTRIES.map(c => ({
+  code: c.prefix, country: c.name, label: `${c.code} ${c.prefix}`,
+}));
 
 function detectCountryCode(phone: string) {
   return countryCodes.find(c => phone?.startsWith(c.code))?.code || "+229";
@@ -476,7 +458,7 @@ export default function SettingsPage() {
                           <span className="text-base">{wSelectedCountry.flag}</span>
                           <span className="text-sm font-semibold text-muted-foreground">{wSelectedCountry.prefix}</span>
                         </div>
-                        <Input value={wPhone} onChange={(e) => setWPhone(e.target.value.replace(/[^0-9\s]/g, ""))} placeholder="97 00 00 00" className="flex-1 h-11 border-0 rounded-none focus-visible:ring-0 bg-transparent" data-testid="input-withdrawal-phone" />
+                        <Input value={wPhone} onChange={(e) => setWPhone(e.target.value.replace(/[^0-9\s]/g, ""))} placeholder={wSelectedCountry.phonePlaceholder} className="flex-1 h-11 border-0 rounded-none focus-visible:ring-0 bg-transparent" data-testid="input-withdrawal-phone" />
                       </div>
                       <p className="text-xs text-muted-foreground">Entrez uniquement le numéro local, sans indicatif</p>
                     </div>

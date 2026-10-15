@@ -17,22 +17,12 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Wallet as WalletType } from "@shared/schema";
+import { PAYMENT_COUNTRIES as COUNTRIES, paymentOperatorLabel } from "@/lib/payment-catalog-ui";
+import { OperatorConfirmationCode } from "@/components/operator-confirmation-code";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 }
-
-const COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"], phonePlaceholder: "01 90 12 34 56" },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"], phonePlaceholder: "07 12 34 56 78" },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
-  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], phonePlaceholder: "77 123 45 67" },
-  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
-  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
-];
-
 
 export default function DepositPage() {
   const { user } = useAuth();
@@ -53,6 +43,7 @@ export default function DepositPage() {
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [redirectBlocked, setRedirectBlocked] = useState(false);
   const [paymentInstructions, setPaymentInstructions] = useState("");
+  const [requiresOtp, setRequiresOtp] = useState(false);
   const [verifyCount, setVerifyCount] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
@@ -137,6 +128,7 @@ export default function DepositPage() {
     },
     onSuccess: (data: any) => {
       setPendingReference(data.reference || data.sendavaReference || data.id || null);
+      setRequiresOtp(data.requiresOtp === true);
       setPaymentInstructions(typeof data.instructions === "string" && data.instructions ? data.instructions : typeof data.message === "string" ? data.message : "");
       const paymentUrl = data.paymentUrl || data.payment_url;
       let hasExternalPaymentUrl = false;
@@ -178,6 +170,7 @@ export default function DepositPage() {
       }
       if (terminal) setRedirectBlocked(false);
       else if (data.requiresRedirect === true || data.requires_redirect === true || hasExternalPaymentUrl) setRedirectBlocked(true);
+      if (typeof data.requiresOtp === "boolean") setRequiresOtp(data.requiresOtp);
       if (data.status === "SUCCESS") {
         setVerifyStatus("SUCCESS");
         setPaymentStatus("success");
@@ -342,6 +335,17 @@ export default function DepositPage() {
               <p className="text-sm text-emerald-800 whitespace-pre-wrap">{paymentInstructions}</p>
             </div>
           )}
+          {isPending && requiresOtp && !redirectBlocked && pendingReference && (
+            <OperatorConfirmationCode
+              endpoint="/api/transactions/confirm-otp"
+              reference={pendingReference}
+              onResult={(data) => {
+                if (typeof data.requiresOtp === "boolean") setRequiresOtp(data.requiresOtp);
+                if (data.instructions || data.message) setPaymentInstructions(data.instructions || data.message || "");
+                verifyMutation.mutate(pendingReference);
+              }}
+            />
+          )}
 
           {pendingReference && (
             <p className="text-center text-[10px] text-gray-400 font-mono" data-testid="text-deposit-ref">Réf : {pendingReference}</p>
@@ -490,7 +494,7 @@ export default function DepositPage() {
                             <OperatorLogo operator={op} size={52} />
                           </div>
                           <span className={`text-xs font-bold text-center leading-tight ${operator === op ? "text-primary" : isDisabled ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
-                            {op === "MTN" ? "MTN Money" : op === "Orange" ? "Orange Money" : op === "Moov" ? "Moov Money" : op === "Wave" ? "Wave" : op === "TMoney" ? "T-Money" : op === "Vodacom" ? "Vodacom M-Pesa" : op === "Airtel" ? "Airtel Money" : op}
+                        {paymentOperatorLabel(op)}
                           </span>
                         </button>
                       );

@@ -6,6 +6,8 @@ import rateLimit from "express-rate-limit";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
 import { verifyAlphaPaySignature, alphapayStatusToString, getAlphaPayNetwork } from "./services/alphapay";
+import { PAYMENT_COUNTRIES, PAYMENT_OPERATORS, solvexCountryCode } from "@shared/payment-catalog";
+import { ensurePaymentCatalog } from "./services/paymentCatalog";
 import { paymentService, isApiKeyConfigured, getProviderByCode, activateProvider, invalidateActiveProviderCache, seedPaymentProviders, reservePayout, onPaymentSettled, isAlphaPayment } from "./services/paymentService";
 import { testResendConnection } from "./services/resend";
 import { notifyTransactionCompleted, notifyWithdrawal, handleTelegramCallback } from "./services/telegram";
@@ -85,15 +87,15 @@ const upload = multer({
 
 const SUPPORTED_CURRENCIES = ["XOF", "XAF", "CDF"] as const;
 
-const SUPPORTED_OPERATORS = ["MTN", "Moov", "Orange", "TMoney", "Wave", "Vodacom", "Airtel"] as const;
-const SUPPORTED_COUNTRIES = ["BJ", "BF", "TG", "CM", "CI", "COD", "COG"] as const;
+const SUPPORTED_OPERATORS = PAYMENT_OPERATORS.map(operator => operator.code);
+const SUPPORTED_COUNTRIES = PAYMENT_COUNTRIES.map(country => country.code);
 
 const depositSchema = z.object({
   amount: z.number().min(100, "Montant minimum: 100"),
   currency: z.enum(SUPPORTED_CURRENCIES).default("XOF"),
   phoneNumber: z.string().min(8, "Numero de telephone invalide"),
   operator: z.string().min(1, "Operateur requis"),
-  country: z.string().min(2, "Pays requis"),
+  country: z.string().min(2, "Pays requis").transform(solvexCountryCode),
   customerName: z.string().optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
@@ -105,14 +107,14 @@ const withdrawSchema = z.object({
   amount: z.number().min(100, "Montant minimum: 100"),
   phoneNumber: z.string().min(8, "Numero de telephone invalide"),
   operator: z.string().min(1, "Operateur requis"),
-  country: z.string().min(2, "Pays requis"),
+  country: z.string().min(2, "Pays requis").transform(solvexCountryCode),
 });
 
 const transferSchema = z.object({
   amount: z.number().min(500, "Montant minimum: 500"),
   phoneNumber: z.string().min(8, "Numero de telephone invalide"),
   operator: z.string().min(1, "Operateur requis"),
-  country: z.string().min(2, "Pays requis"),
+  country: z.string().min(2, "Pays requis").transform(solvexCountryCode),
   firstName: z.string().min(1, "Prenom du destinataire requis"),
   lastName: z.string().min(1, "Nom du destinataire requis"),
 });
@@ -153,7 +155,7 @@ const updatePaymentLinkSchema = z.object({
 const publicPaySchema = z.object({
   phoneNumber: z.string().min(8, "Numero de telephone invalide"),
   operator: z.string().min(1, "Operateur requis"),
-  country: z.string().min(2, "Pays requis"),
+  country: z.string().min(2, "Pays requis").transform(solvexCountryCode),
   customerName: z.string().optional(),
   customerEmail: z.string().email("L’adresse email du payeur est requise par AlphaPay."),
   customAmount: z.number().min(100).optional(),
@@ -221,8 +223,8 @@ async function getOperatorFeeRate(
   try {
     const { db } = await import("./db");
     const { paymentMethods: pmTable } = await import("@shared/schema");
-    const { eq } = await import("drizzle-orm");
-    const [pm] = await db.select().from(pmTable).where(eq(pmTable.code, operatorCode));
+    const { sql } = await import("drizzle-orm");
+    const [pm] = await db.select().from(pmTable).where(sql`lower(${pmTable.code}) = ${operatorCode.toLowerCase()}`);
     if (pm) {
       // 1. Per-country fee (most specific)
       if (country && pm.countryFees) {
@@ -470,6 +472,7 @@ export async function registerRoutes(
     if (transaction.type === "deposit" && transaction.status === "completed") await notifyTransactionCompleted(transaction);
     else if (transaction.type === "withdrawal") await notifyWithdrawal(transaction, transaction.status === "completed" ? "success" : "failed");
   });
+  await ensurePaymentCatalog();
   await setupAuth(app);
   registerAuthRoutes(app);
 
@@ -771,6 +774,7 @@ export async function registerRoutes(
         providerId: depositResponse.id,
         paymentUrl: depositResponse.payment_url,
         requiresRedirect: depositResponse.requires_redirect === true,
+        requiresOtp: depositResponse.requires_otp === true,
         instructions: depositResponse.instructions,
         message: depositResponse.message,
       });
@@ -996,7 +1000,7 @@ export async function registerRoutes(
       }
 
       const frontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: frontendStatus, alphapayStatus: result.status, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
+      res.json({ success: result.success, status: frontendStatus, alphapayStatus: result.status, requiresRedirect: result.requires_redirect === true, requiresOtp: result.requires_otp === true, instructions: result.instructions, message: result.message });
     } catch (error: any) {
       console.error("Verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -1049,7 +1053,7 @@ export async function registerRoutes(
       }
 
       const publicFrontendStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: publicFrontendStatus, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
+      res.json({ success: result.success, status: publicFrontendStatus, requiresRedirect: result.requires_redirect === true, requiresOtp: result.requires_otp === true, instructions: result.instructions, message: result.message });
     } catch (error: any) {
       console.error("Public verify error:", error);
       res.status(500).json({ message: error.message || "Erreur de verification" });
@@ -1113,7 +1117,7 @@ export async function registerRoutes(
       }
       if (await isAlphaPayment(transaction.reference)) {
         const receipt = await paymentService.getReceipt(transaction.reference);
-        return res.json({ ...transaction, requiresRedirect: receipt?.requires_redirect === true, instructions: receipt?.instructions, reference: transaction.reference, message: receipt?.message || "Cette intention de paiement existe déjà ; vérifiez son statut." });
+        return res.json({ ...transaction, requiresRedirect: receipt?.requires_redirect === true, requiresOtp: receipt?.requires_otp === true, instructions: receipt?.instructions, reference: transaction.reference, message: receipt?.message || "Cette intention de paiement existe déjà ; vérifiez son statut." });
       }
       const validation = publicPaySchema.safeParse(req.body);
       if (!validation.success) {
@@ -1186,6 +1190,7 @@ export async function registerRoutes(
         reference: transaction.reference,
         paymentUrl: depositResponse.payment_url || null,
         requiresRedirect: depositResponse.requires_redirect === true,
+        requiresOtp: depositResponse.requires_otp === true,
         instructions: depositResponse.instructions,
         message: depositResponse.message,
         status: "pending",
@@ -1238,7 +1243,7 @@ export async function registerRoutes(
         }
       }
       const publicStatus = statusStr === "completed" ? "SUCCESS" : statusStr === "failed" ? "FAILED" : "PENDING";
-      res.json({ success: result.success, status: publicStatus, requiresRedirect: result.requires_redirect === true, instructions: result.instructions, message: result.message });
+      res.json({ success: result.success, status: publicStatus, requiresRedirect: result.requires_redirect === true, requiresOtp: result.requires_otp === true, instructions: result.instructions, message: result.message });
     } catch (err: any) {
       console.error("payment-api/public/:id/verify error:", err);
       res.status(500).json({ message: err.message || "Erreur de vérification" });
@@ -1532,17 +1537,8 @@ export async function registerRoutes(
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const methods = await db.select().from(pmTable);
       if (methods.length === 0) {
-        const defaultMethods = [
-          { code: "MTN", name: "MTN Mobile Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "CM", "COG"] },
-          { code: "Orange", name: "Orange Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "BF", "CM", "ML", "SN", "COD"] },
-          { code: "Moov", name: "Moov Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "BF", "TG", "ML"] },
-          { code: "Wave", name: "Wave", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "SN"] },
-          { code: "TMoney", name: "T-Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["TG"] },
-          { code: "Free", name: "Free Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["SN"] },
-          { code: "Airtel", name: "Airtel Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["COD", "COG"] },
-          { code: "Vodacom", name: "Vodacom M-Pesa", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["COD"] },
-        ];
-        const inserted = await db.insert(pmTable).values(defaultMethods as any).returning();
+        await ensurePaymentCatalog();
+        const inserted = await db.select().from(pmTable);
         paymentMethodsCache = { data: inserted, ts: Date.now() };
         return res.json(inserted);
       }
@@ -1703,6 +1699,7 @@ export async function registerRoutes(
         providerId: depositResponse.id,
         paymentUrl: depositResponse.payment_url,
         requiresRedirect: depositResponse.requires_redirect === true,
+        requiresOtp: depositResponse.requires_otp === true,
         instructions: depositResponse.instructions,
         message: depositResponse.message,
       });
@@ -1937,7 +1934,7 @@ export async function registerRoutes(
         }
 
         const operatorUpper = operator.toUpperCase();
-        const countryUpper = country.toUpperCase();
+        const countryUpper = solvexCountryCode(country);
 
         const suspRaw = await storage.getSystemSetting("suspended_countries");
         const suspendedList: string[] = suspRaw ? JSON.parse(suspRaw) : [];
@@ -2033,6 +2030,7 @@ export async function registerRoutes(
           phone,
           message: alphapayResponse.message || defaultMessage,
           requires_redirect: alphapayResponse.requires_redirect === true,
+          requires_otp: alphapayResponse.requires_otp === true,
           instructions: alphapayResponse.instructions,
           created_at: transaction.createdAt,
         });
@@ -2233,7 +2231,7 @@ export async function registerRoutes(
 
       const { amount, phone, operator, country, otp, description, customer_name, customer_email } = validation.data;
       const operatorUpper = operator.toUpperCase();
-      const countryUpper = country.toUpperCase();
+      const countryUpper = solvexCountryCode(country);
 
       // ── Vérification pays suspendu ──
       const suspRaw = await storage.getSystemSetting("suspended_countries");
@@ -2342,6 +2340,7 @@ export async function registerRoutes(
         phone,
         message: alphapayResponse.message || defaultMessage,
         requires_redirect: alphapayResponse.requires_redirect === true,
+        requires_otp: alphapayResponse.requires_otp === true,
         instructions: alphapayResponse.instructions,
         created_at: transaction.createdAt,
       });
@@ -3268,17 +3267,8 @@ export async function registerRoutes(
       const { paymentMethods: pmTable } = await import("@shared/schema");
       const methods = await db.select().from(pmTable);
       if (methods.length === 0) {
-        const defaultMethods = [
-          { code: "MTN", name: "MTN Mobile Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "CM", "COG"] },
-          { code: "Orange", name: "Orange Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "BF", "CM", "ML", "SN", "COD"] },
-          { code: "Moov", name: "Moov Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["BJ", "CI", "BF", "TG", "ML"] },
-          { code: "Wave", name: "Wave", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["CI", "SN"] },
-          { code: "TMoney", name: "T-Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["TG"] },
-          { code: "Free", name: "Free Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["SN"] },
-          { code: "Airtel", name: "Airtel Money", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["COD", "COG"] },
-          { code: "Vodacom", name: "Vodacom M-Pesa", category: "mobile_money", isActive: true, inMaintenance: false, feeType: "percentage", feeValue: "5", countries: ["COD"] },
-        ];
-        const inserted = await db.insert(pmTable).values(defaultMethods as any).returning();
+        await ensurePaymentCatalog();
+        const inserted = await db.select().from(pmTable);
         return res.json(inserted);
       }
       res.json(methods);
@@ -4241,6 +4231,57 @@ export async function registerRoutes(
     }, 30000);
   })();
 
+  const otpLimiter = rateLimit({ windowMs: 15 * 60_000, max: 10, standardHeaders: true, legacyHeaders: false, message: { message: "Trop de tentatives de code. Réessayez plus tard." } });
+  const confirmationSchema = z.object({
+    reference: z.string().min(8).max(128).optional(),
+    otp: z.string().trim().min(4).max(32).regex(/^[a-zA-Z0-9 -]+$/, "Code opérateur invalide."),
+  });
+  const sendConfirmedPayment = async (reference: string, otp: string, res: any) => {
+    const result = await paymentService.confirmOtp(reference, otp);
+    const state = alphapayStatusToString(result.status);
+    return res.json({
+      success: true, reference, status: state === "completed" ? "SUCCESS" : state === "failed" ? "FAILED" : "PENDING",
+      requiresOtp: result.requires_otp === true, requiresRedirect: result.requires_redirect === true,
+      instructions: result.instructions, message: result.message,
+    });
+  };
+  app.post("/api/transactions/confirm-otp", isAuthenticated, otpLimiter, async (req: any, res) => {
+    const parsed = confirmationSchema.safeParse(req.body);
+    if (!parsed.success || !parsed.data.reference) return res.status(400).json({ message: "Référence et code opérateur requis." });
+    try {
+      const transaction = await storage.getTransactionByReference(parsed.data.reference);
+      if (!transaction || transaction.userId !== req.user.id) return res.status(404).json({ message: "Paiement introuvable." });
+      return await sendConfirmedPayment(transaction.reference, parsed.data.otp, res);
+    } catch (error: any) { res.status(error.status || 503).json({ message: error.message || "Confirmation indisponible. Vérifiez le statut." }); }
+  });
+  app.post("/api/payment-links/public/:slug/confirm-otp", otpLimiter, async (req, res) => {
+    const parsed = confirmationSchema.safeParse(req.body);
+    if (!parsed.success || !parsed.data.reference) return res.status(400).json({ message: "Référence et code opérateur requis." });
+    try {
+      const link = await storage.getPaymentLinkBySlug(String(req.params.slug));
+      const transaction = await storage.getTransactionByReference(parsed.data.reference);
+      if (!link || !transaction || transaction.paymentLinkId !== link.id) return res.status(404).json({ message: "Paiement introuvable." });
+      return await sendConfirmedPayment(transaction.reference, parsed.data.otp, res);
+    } catch (error: any) { res.status(error.status || 503).json({ message: error.message || "Confirmation indisponible. Vérifiez le statut." }); }
+  });
+  app.post("/api/payment-api/public/:id/confirm-otp", otpLimiter, async (req, res) => {
+    const parsed = confirmationSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Code opérateur invalide." });
+    try {
+      const transaction = await storage.getTransactionById(String(req.params.id));
+      if (!transaction || !transaction.apiKeyId) return res.status(404).json({ message: "Paiement introuvable." });
+      return await sendConfirmedPayment(transaction.reference, parsed.data.otp, res);
+    } catch (error: any) { res.status(error.status || 503).json({ message: error.message || "Confirmation indisponible. Vérifiez le statut." }); }
+  });
+  app.post("/api/v1/transactions/:id/confirm-otp", authenticateApiKey, otpLimiter, async (req: any, res) => {
+    const parsed = confirmationSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Code opérateur invalide." });
+    try {
+      const transaction = await storage.getTransactionById(String(req.params.id));
+      if (!transaction || transaction.userId !== req.merchantApiKey.userId || transaction.apiKeyId !== req.merchantApiKey.id) return res.status(404).json({ message: "Paiement introuvable." });
+      return await sendConfirmedPayment(transaction.reference, parsed.data.otp, res);
+    } catch (error: any) { res.status(error.status || 503).json({ message: error.message || "Confirmation indisponible. Vérifiez le statut." }); }
+  });
   app.use("/api", (_req, res) => res.status(404).json({ message: "Route API introuvable." }));
   return httpServer;
 }

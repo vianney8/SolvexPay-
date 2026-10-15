@@ -24,26 +24,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { Wallet as WalletType } from "@shared/schema";
+import { PAYMENT_COUNTRIES as COUNTRIES, paymentOperatorLabel } from "@/lib/payment-catalog-ui";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 }
-
-const COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯", prefix: "+229", currency: "XOF", operators: ["MTN", "Moov"], phonePlaceholder: "01 90 12 34 56" },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", prefix: "+225", currency: "XOF", operators: ["Orange", "MTN", "Moov", "Wave"], phonePlaceholder: "07 12 34 56 78" },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫", prefix: "+226", currency: "XOF", operators: ["Moov", "Orange"], phonePlaceholder: "70 12 34 56" },
-  { code: "TG", name: "Togo", flag: "🇹🇬", prefix: "+228", currency: "XOF", operators: ["TMoney", "Moov"], phonePlaceholder: "90 12 34 56" },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳", prefix: "+221", currency: "XOF", operators: ["Orange", "Wave", "Free"], phonePlaceholder: "77 123 45 67" },
-  { code: "ML", name: "Mali", flag: "🇲🇱", prefix: "+223", currency: "XOF", operators: ["Orange", "Moov"], phonePlaceholder: "70 12 34 56" },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲", prefix: "+237", currency: "XAF", operators: ["MTN", "Orange"], phonePlaceholder: "6 12 34 56 12" },
-  { code: "COD", name: "RD Congo", flag: "🇨🇩", prefix: "+243", currency: "CDF", operators: ["Vodacom", "Airtel", "Orange"], phonePlaceholder: "81 234 56 78" },
-];
-
-const OPERATOR_LABEL: Record<string, string> = {
-  MTN: "MTN Money", Orange: "Orange Money", Moov: "Moov Money", Wave: "Wave",
-  TMoney: "T-Money", Vodacom: "Vodacom M-Pesa", Airtel: "Airtel Money", Free: "Free Money",
-};
 
 export default function TransferPage() {
   const { toast } = useToast();
@@ -133,7 +118,7 @@ export default function TransferPage() {
               </div>
               <div className="bg-muted/40 rounded-2xl p-5 space-y-2 text-sm text-left">
                 <div className="flex justify-between"><span className="text-muted-foreground">Montant</span><span className="font-bold">{formatCurrency(transferAmount)} {currency}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Opérateur</span><span className="font-semibold flex items-center gap-1.5"><OperatorLogo operator={operator} size={18} />{OPERATOR_LABEL[operator] || operator}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Opérateur</span><span className="font-semibold flex items-center gap-1.5"><OperatorLogo operator={operator} size={18} />{paymentOperatorLabel(operator)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Pays</span><span className="font-semibold">{selectedCountry.flag} {selectedCountry.name}</span></div>
                 {recipientName && <div className="flex justify-between"><span className="text-muted-foreground">Bénéficiaire</span><span className="font-semibold">{recipientName}</span></div>}
               </div>
@@ -253,7 +238,7 @@ export default function TransferPage() {
                         <OperatorLogo operator={op} size={52} />
                       </div>
                       <span className={`text-xs font-bold text-center leading-tight ${operator === op ? "text-primary" : "text-muted-foreground"}`}>
-                        {OPERATOR_LABEL[op] || op}
+                        {paymentOperatorLabel(op)}
                       </span>
                     </button>
                   ))}

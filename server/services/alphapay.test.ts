@@ -4,12 +4,14 @@ import crypto from "node:crypto";
 import { AlphaPayService, getAlphaPayNetwork, alphapayStatusToString, verifyAlphaPaySignature, directPaymentResponse } from "./alphapay";
 import { paymentWalletDelta, amountInXOF } from "./paymentAccounting";
 import type { AlphaPayClient } from "alphapay-node";
+import { PAYMENT_COUNTRIES, PAYMENT_OPERATORS, getPaymentNetwork, alphaCountryCode, solvexCountryCode, needsPaymentConfirmation } from "@shared/payment-catalog";
 
 const now = 1_800_000_000_000;
 const timestamp = String(now / 1000);
 const raw = Buffer.from('{"event":"transaction.success","data":{"id":"example"}}');
 const secret = "test-only-webhook-secret";
 const signature = crypto.createHmac("sha256", secret).update(`${timestamp}.`).update(raw).digest("hex");
+const params = { msisdn: "+2290190000000", amount: 1000, reference: "test-reference", firstName: "Test", lastName: "Client", operator: "mtn_bj", country: "BJ", currency: "XOF", email: "test@example.invalid" };
 
 test("webhook signature checks the exact raw payload and signed timestamp", () => {
   assert.equal(verifyAlphaPaySignature(raw, signature, timestamp, secret, now), true);
@@ -32,11 +34,68 @@ test("AlphaPay networks use exact country-specific codes; unsupported pairs fail
   assert.equal(getAlphaPayNetwork("TMoney", "TG"), "togocel");
   assert.equal(getAlphaPayNetwork("Vodacom", "COD"), "vodacom_cd");
   assert.equal(getAlphaPayNetwork("Free", "SN"), "freemoney_sn");
-  assert.throws(() => getAlphaPayNetwork("Airtel", "COG"));
+  assert.equal(getAlphaPayNetwork("Airtel", "COG"), "airtel_cg");
   assert.throws(() => getAlphaPayNetwork("Wave", "BJ"));
 });
 
-const params = { msisdn: "+2290190000000", amount: 1000, reference: "test-reference", firstName: "Test", lastName: "Client", operator: "mtn_bj", country: "BJ", currency: "XOF", email: "test@example.invalid" };
+test("every country/operator choice maps to an active AlphaPay network checked in the live catalogue", () => {
+  const active = new Set("celtiis_bj coris_bj moov_bj mtn_bj djamo_ci moov_ci mtn_ci orange_ci wave_ci moov_bf orange_bf touchcash_bf mixx_tg moov_tg togocel djamo_sn expresso_sn freemoney_sn orange_sn paydunya_sn wave_sn wizall_sn mobi_cash_ml moov_ml orange_ml wave_ml mtn_cm orange_cm afrimoney_cd airtel_cd orange_cd vodacom_cd airtel_cg mtn_cg".split(" "));
+  const actual: string[] = [];
+  for (const country of PAYMENT_COUNTRIES) {
+    for (const operator of country.operators) {
+      const network = getPaymentNetwork(operator, country.code);
+      assert.equal(active.has(network), true, `${country.code}/${operator}`);
+      actual.push(network);
+      assert.equal(PAYMENT_OPERATORS.some(entry => entry.code === operator && entry.countries.includes(country.code)), true);
+    }
+  }
+  assert.equal(PAYMENT_COUNTRIES.length, 9);
+  assert.equal(actual.length, 34);
+  assert.equal(new Set(actual).size, 34);
+  assert.deepEqual(new Set(actual), active);
+  assert.throws(() => getPaymentNetwork("Wave", "BF")); // Listed by AlphaPay, but inactive.
+  assert.throws(() => getPaymentNetwork("MTN", "SLE")); // Not an existing operational country.
+});
+
+test("country aliases and network-specific confirmation remain distinct", () => {
+  assert.equal(alphaCountryCode("COG"), "CG");
+  assert.equal(alphaCountryCode("COD"), "CD");
+  assert.equal(solvexCountryCode("CG"), "COG");
+  assert.equal(solvexCountryCode("CD"), "COD");
+  assert.equal(getPaymentNetwork("Mixx", "TG"), "mixx_tg");
+  assert.equal(getPaymentNetwork("TMoney", "TG"), "togocel");
+  assert.equal(getPaymentNetwork("Mobi Cash", "ML"), "mobi_cash_ml");
+  assert.equal(needsPaymentConfirmation("coris_bj"), true);
+  assert.equal(needsPaymentConfirmation("wizall_sn"), true);
+  assert.equal(needsPaymentConfirmation("mtn_bj"), false);
+});
+
+test("Congo-Brazzaville uses XAF with the exact AlphaPay country and network", async () => {
+  const client = new AlphaPayService("sk_test_example", fakeClient(async (_method, _path, options) => {
+    assert.equal(options.body.country, "CG");
+    assert.equal(options.body.currency, "XAF");
+    assert.equal(options.body.method, "mtn_cg");
+    return { id: "example-payout", status: "PENDING" };
+  }));
+  await client.transfer({ ...params, country: "COG", currency: "XAF", operator: "mtn_cg" });
+});
+
+test("Coris/Wizall confirmation is optional only for appropriate direct pending payments", async () => {
+  const client = new AlphaPayService("sk_test_example", fakeClient(async () => ({ id: "example-coris", status: "PENDING", checkout_url: "" })));
+  assert.equal((await client.deposit({ ...params, operator: "coris_bj", directOnly: true })).requires_otp, true);
+  const blocked = new AlphaPayService("sk_test_example", fakeClient(async () => ({ id: "example-coris", status: "PENDING", checkout_url: "https://checkout.alphapay.me/example" })));
+  assert.equal((await blocked.deposit({ ...params, operator: "coris_bj", directOnly: true })).requires_otp, false);
+});
+
+test("operator OTP confirmation calls the dedicated endpoint without persisting or reinitializing a payment", async () => {
+  const calls: any[] = [];
+  const client = new AlphaPayService("sk_test_example", fakeClient(async (...args) => { calls.push(args); return { status: "SUCCESS" }; }));
+  await client.confirmOtp("provider-id", "123456");
+  assert.deepEqual(calls, [["POST", "/payments/provider-id/confirm-otp/", { body: { otp: "123456" }, idempotencyKey: undefined }]]);
+  await assert.rejects(client.confirmOtp("provider-id", ""));
+  assert.equal(calls.length, 1);
+});
+
 function fakeClient(run: (...args: any[]) => any) {
   return { http: { request: run } } as unknown as AlphaPayClient;
 }

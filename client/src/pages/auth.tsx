@@ -9,20 +9,12 @@ import { OperatorLogo } from "@/components/operator-logo";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
 import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { PAYMENT_COUNTRIES, PAYMENT_OPERATORS } from "@/lib/payment-catalog-ui";
 
-const ALL_COUNTRY_CODES = [
-  { code: "+229", iso: "BJ",  country: "Bénin",          flag: "🇧🇯" },
-  { code: "+225", iso: "CI",  country: "Côte d'Ivoire",  flag: "🇨🇮" },
-  { code: "+226", iso: "BF",  country: "Burkina Faso",   flag: "🇧🇫" },
-  { code: "+228", iso: "TG",  country: "Togo",           flag: "🇹🇬" },
-  { code: "+221", iso: "SN",  country: "Sénégal",        flag: "🇸🇳" },
-  { code: "+223", iso: "ML",  country: "Mali",           flag: "🇲🇱" },
-  { code: "+237", iso: "CM",  country: "Cameroun",       flag: "🇨🇲" },
-  { code: "+243", iso: "COD", country: "RD Congo",       flag: "🇨🇩" },
-  { code: "+242", iso: "COG", country: "Congo-Brazza.",  flag: "🇨🇬" },
-];
-
-const operators = ["MTN", "Orange", "Wave", "Moov", "TMoney", "Airtel", "Vodacom", "Free"];
+const ALL_COUNTRY_CODES = PAYMENT_COUNTRIES.map(c => ({
+  code: c.prefix, iso: c.code, country: c.name, flag: c.flag,
+}));
+const operators = PAYMENT_OPERATORS.map(operator => operator.code);
 
 function AuthPanel() {
   return (
@@ -349,13 +341,13 @@ export function LoginPage() {
           {/* Colorful operator bar */}
           <div className="flex items-center gap-2 p-3 rounded-2xl bg-gradient-to-r from-violet-50 to-emerald-50 border border-violet-100/80">
             <div className="flex -space-x-1.5">
-              {["MTN", "Orange", "Wave", "Moov"].map((op) => (
+              {operators.map((op) => (
                 <div key={op} className="ring-2 ring-white rounded-full overflow-hidden flex-shrink-0">
                   <OperatorLogo operator={op} size={26} />
                 </div>
               ))}
             </div>
-            <p className="text-xs font-semibold text-violet-700 flex-1">MTN, Orange, Wave, Moov et 6 autres opérateurs</p>
+            <p className="text-xs font-semibold text-violet-700 flex-1">Opérateurs Mobile Money dans {PAYMENT_COUNTRIES.length} pays</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

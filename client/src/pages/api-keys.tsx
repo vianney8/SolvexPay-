@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import type { ApiKey } from "@shared/schema";
+import { PAYMENT_COUNTRIES, PAYMENT_OPERATORS, paymentOperatorLabel } from "@/lib/payment-catalog-ui";
+import { getPaymentNetwork, needsPaymentConfirmation } from "@shared/payment-catalog";
 
 function formatDate(date: string | Date | null) {
   if (!date) return "Jamais";
@@ -100,27 +102,22 @@ function KeyConfigSection({ apiKey }: { apiKey: any }) {
   );
 }
 
-const SR_OPERATORS = [
-  { code: "MTN", label: "MTN Mobile Money", countries: ["BJ", "CI", "CM"], otp: false, note: "Suivre les instructions et le statut retournés" },
-  { code: "MOOV", label: "Moov Money", countries: ["BJ", "TG", "BF", "ML", "CI"], otp: false, note: "Suivre les instructions et le statut retournés" },
-  { code: "ORANGE", label: "Orange Money", countries: ["CI", "SN", "BF", "ML", "CM"], otp: true, note: "Code opérateur fourni par le client si requis (CI, BF)" },
-  { code: "WAVE", label: "Wave", countries: ["CI", "SN"], otp: false, note: "Disponibilité précisée dans la réponse API" },
-  { code: "TMONEY", label: "T-Money", countries: ["TG"], otp: false, note: "Suivre les instructions et le statut retournés" },
-  { code: "FREE", label: "Free Money", countries: ["SN"], otp: false, note: "Alias: MIXX" },
-  { code: "AIRTEL", label: "Airtel Money", countries: ["COD"], otp: false, note: "Suivre les instructions et le statut retournés" },
-  { code: "VODACOM", label: "Vodacom M-Pesa", countries: ["COD"], otp: false, note: "Suivre les instructions et le statut retournés" },
-];
-
-const SR_COUNTRIES = [
-  { code: "BJ", name: "Bénin", currency: "XOF", operators: ["MTN", "MOOV"] },
-  { code: "CI", name: "Côte d'Ivoire", currency: "XOF", operators: ["MTN", "MOOV", "ORANGE", "WAVE"] },
-  { code: "SN", name: "Sénégal", currency: "XOF", operators: ["ORANGE", "WAVE", "FREE"] },
-  { code: "BF", name: "Burkina Faso", currency: "XOF", operators: ["MOOV", "ORANGE"] },
-  { code: "ML", name: "Mali", currency: "XOF", operators: ["MOOV", "ORANGE"] },
-  { code: "TG", name: "Togo", currency: "XOF", operators: ["MOOV", "TMONEY"] },
-  { code: "CM", name: "Cameroun", currency: "XAF", operators: ["MTN", "ORANGE"] },
-  { code: "COD", name: "Congo-Kinshasa", currency: "CDF", operators: ["AIRTEL", "VODACOM"] },
-];
+const SR_COUNTRIES = PAYMENT_COUNTRIES.map(country => ({
+  code: country.code,
+  name: country.name,
+  currency: country.currency,
+  operators: country.operators.map(operator => operator.toUpperCase()),
+}));
+const SR_OPERATORS = PAYMENT_OPERATORS.map(operator => ({
+  code: operator.code.toUpperCase(),
+  label: paymentOperatorLabel(operator.code),
+  countries: operator.countries,
+  otp: false,
+  note: operator.countries.some(country => {
+    try { return needsPaymentConfirmation(getPaymentNetwork(operator.code, country)); }
+    catch { return false; }
+  }) ? "Confirmation par code opérateur possible après initiation." : "Suivre les instructions et le statut retournés.",
+}));
 
 function SrWebhookConfig({ srKey }: { srKey: any }) {
   const { toast } = useToast();
@@ -326,6 +323,7 @@ Content-Type: application/json`}</pre>
   "id": "txn_abc123",       // ID de la transaction SolvexPay
   "status": "pending",      // Statut en cours
   "requires_redirect": false,
+  "requiresOtp": true,      // Confirmer le code reçu après initiation si true
   "reference": "REF...",    // Référence de transaction
   "amount": 5000,
   "fees": 350,              // Frais SolvexPay (% configuré)
@@ -391,7 +389,7 @@ Content-Type: application/json`}</pre>
             <DocToggle id="operators" label="📡 Détails opérateurs et OTP" />
             {docSection === "operators" && (
               <div className="bg-black/40 border border-green-500/10 rounded-2xl p-4 space-y-3 text-xs">
-                <p className="text-green-300/70 text-[11px]">Certains opérateurs nécessitent un OTP (mot de passe à usage unique) que le client doit fournir avant le paiement.</p>
+                <p className="text-green-300/70 text-[11px]">Le champ otp envoyé à /sr/pay concerne seulement le code préalable demandé par certains parcours (ex. Orange CI/BF). Il est distinct du code de confirmation reçu après initiation, signalé par requiresOtp.</p>
                 <div className="space-y-2">
                   {activeSrOperators.map((op) => (
                     <div key={op.code} className="bg-black/30 rounded-xl p-3 border border-green-500/10 flex items-start gap-3">
@@ -399,10 +397,10 @@ Content-Type: application/json`}</pre>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-bold text-green-200 text-[11px]">{op.label}</span>
                           <code className="bg-green-500/10 px-1.5 py-0.5 rounded text-green-400 text-[10px]">{op.code.toLowerCase()}</code>
-                          {op.otp ? (
-                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/20 text-amber-400 text-[9px] font-bold"><AlertCircle className="h-2.5 w-2.5" />OTP selon pays</span>
+                          {op.note.includes("Confirmation") ? (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/20 text-amber-400 text-[9px] font-bold"><AlertCircle className="h-2.5 w-2.5" />Code après initiation</span>
                           ) : (
-                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 text-[9px] font-bold"><CheckCircle2 className="h-2.5 w-2.5" />OTP optionnel</span>
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 text-[9px] font-bold"><CheckCircle2 className="h-2.5 w-2.5" />Selon parcours</span>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1 mb-1">
@@ -416,8 +414,8 @@ Content-Type: application/json`}</pre>
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <AlertCircle className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="text-[11px] text-amber-300/80 space-y-1">
-                    <p className="font-bold text-amber-300">Opérateurs nécessitant un OTP</p>
-                    <p><strong>ORANGE (CI, BF) :</strong> Transmettez le code opérateur dans le champ <code className="bg-black/40 px-1 rounded">otp</code> s'il est requis. Ne pré-remplissez pas de code et ne supposez pas de parcours USSD particulier.</p>
+                    <p className="font-bold text-amber-300">Confirmer après initiation</p>
+                    <p>Si l’initiation ou la vérification retourne <code className="bg-black/40 px-1 rounded">requiresOtp: true</code>, transmettez le code reçu à <code className="bg-black/40 px-1 rounded">POST /api/v1/transactions/:id/confirm-otp</code> avec <code className="bg-black/40 px-1 rounded">{`{"otp":"CODE_RECU"}`}</code>. Cet endpoint doit être appelé côté serveur, avec la clé propriétaire de la transaction. Ne journalisez ni ne persistez ce code.</p>
                   </div>
                 </div>
               </div>

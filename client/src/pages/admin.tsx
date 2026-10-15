@@ -27,6 +27,7 @@ import {
   Trash2, Smartphone, Bell, X, BellOff, BellRing, HeadphonesIcon, Code2, User,
   ShieldCheck, Pencil, Loader2, ChevronLeft, ChevronRight,
 } from "lucide-react";
+import { PAYMENT_COUNTRIES as COUNTRIES } from "@/lib/payment-catalog-ui";
 
 function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: string }) {
   const [broken, setBroken] = useState(false);
@@ -75,17 +76,6 @@ function KycImage({ src, alt, testId }: { src: string; alt: string; testId?: str
     </>
   );
 }
-
-const COUNTRIES = [
-  { code: "BJ", name: "Bénin", flag: "🇧🇯" },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮" },
-  { code: "BF", name: "Burkina Faso", flag: "🇧🇫" },
-  { code: "TG", name: "Togo", flag: "🇹🇬" },
-  { code: "SN", name: "Sénégal", flag: "🇸🇳" },
-  { code: "ML", name: "Mali", flag: "🇲🇱" },
-  { code: "CM", name: "Cameroun", flag: "🇨🇲" },
-  { code: "COD", name: "RD Congo", flag: "🇨🇩" },
-];
 
 const TX_TYPE_LABELS: Record<string, string> = { deposit: "Dépôt", withdrawal: "Retrait", transfer: "Transfert" };
 
