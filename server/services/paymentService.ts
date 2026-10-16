@@ -206,11 +206,7 @@ class PaymentService {
     if (!local && !admin) throw new Error("L’opération locale n’est pas encore enregistrée ; réessayez.");
     if (state === "completed" && !result.sessionOnly) {
       const [accounting] = await db.select().from(transactions).where(eq(transactions.reference, reference)).limit(1);
-      const localAmount = saved.params.sourceAmount ?? saved.params.amount;
-      const localCurrency = saved.params.sourceCurrency ?? expected.currency;
-      if (accounting && (Number(accounting.amount) !== localAmount || accounting.currency !== localCurrency)) {
-        throw new Error("Montant ou devise comptable incohérent : rapprochement requis.");
-      }
+      if (saved.params.sourceAmount && accounting && (Number(accounting.amount) !== saved.params.sourceAmount || accounting.currency !== saved.params.sourceCurrency)) throw new Error("Conversion crypto incohérente : rapprochement requis.");
       const minimumNet = receipt.kind === "payout" ? saved.params.amount
         : accounting ? saved.params.amount * (1 - Number(accounting.fees || 0) / Number(accounting.amount)) : saved.params.amount;
       if (!Number.isFinite(Number(result.net_amount)) || Number(result.net_amount) < minimumNet) {
