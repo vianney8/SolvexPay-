@@ -18,6 +18,8 @@ import multer from "multer";
 import path from "path";
 import crypto from "crypto";
 import axios from "axios";
+import { withPaymentActor, requireNotMaintenance, requirePaymentAllowed } from "./services/paymentPolicy";
+import { decidePayout, hasPayoutApproval } from "./services/paymentService";
 
 function safeUserSelect(t: any) {
   return {
@@ -352,16 +354,6 @@ function setGlobalMaintenanceCache(val: boolean) {
 
 // ── AlphaPay enabled/disabled cache ───────────────────────────────────────────
 async function getAlphapayEnabled(): Promise<boolean> { return isApiKeyConfigured(); }
-
-
-async function requireNotMaintenance(req: any, res: any, next: any) {
-  const maintenance = await getGlobalMaintenance();
-  if (maintenance && !req.user?.isAdmin) {
-    return res.status(503).json({ maintenance: true, message: "Le site est actuellement en maintenance. Veuillez réessayer plus tard." });
-  }
-  next();
-}
-
 function adminCacheGet(key: string): any | null {
   const entry = _adminCache.get(key);
   if (!entry) return null;
@@ -695,7 +687,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/deposit", isAuthenticated, requireNotMaintenance, paymentLimiter, async (req: any, res) => {
+  app.post("/api/transactions/deposit", isAuthenticated, withPaymentActor, requireNotMaintenance, requirePaymentAllowed("payin"), paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
       if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
@@ -736,7 +728,6 @@ export async function registerRoutes(
       const isWave = operator.toLowerCase() === "wave";
       const returnUrl = `${req.protocol}://${req.get("host")}/api/payment/callback?reference=${reference}`;
       const alphaDepositOperator = getAlphaPayOperatorCode(operator, country);
-
 
 
       const globalDepositFee = parseFloat((await storage.getSystemSetting("fee_deposit")) || "7");
@@ -800,7 +791,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/withdraw", isAuthenticated, requireNotMaintenance, paymentLimiter, async (req: any, res) => {
+  app.post("/api/transactions/withdraw", isAuthenticated, withPaymentActor, requireNotMaintenance, requirePaymentAllowed("payout"), paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
       if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
@@ -903,7 +894,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions/transfer", isAuthenticated, requireNotMaintenance, paymentLimiter, async (req: any, res) => {
+  app.post("/api/transactions/transfer", isAuthenticated, withPaymentActor, requireNotMaintenance, requirePaymentAllowed("payout"), paymentLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
       if (req.user.isBlocked) return res.status(403).json({ message: "Votre compte est suspendu. Contactez le support." });
@@ -1116,7 +1107,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/payment-api/public/:id/pay", requireNotMaintenance, async (req, res) => {
+  app.post("/api/payment-api/public/:id/pay", withPaymentActor, requireNotMaintenance, requirePaymentAllowed("payin"), async (req, res) => {
     try {
       const { id } = req.params as Record<string, string>;
       const transaction = await storage.getTransactionById(id);
@@ -1596,7 +1587,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/payment-links/public/:slug/pay", requireNotMaintenance, async (req, res) => {
+  app.post("/api/payment-links/public/:slug/pay", withPaymentActor, requireNotMaintenance, requirePaymentAllowed("payin"), async (req, res) => {
     try {
       const { slug } = req.params as Record<string, string>;
       
@@ -1851,7 +1842,7 @@ export async function registerRoutes(
   }
 
   // ── Checkout redirect : GET /api/v1/checkout?key=sk_live_...&amount=...&description=... ──
-  app.get("/api/v1/checkout", async (req: any, res) => {
+  app.get("/api/v1/checkout", withPaymentActor, requireNotMaintenance, requirePaymentAllowed("payin"), async (req: any, res) => {
     try {
       const { key, amount: amountStr, description, customer_name, customer_email, country, metadata } = req.query as Record<string, string>;
 
@@ -1909,7 +1900,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/v1/deposit", authenticateApiKey, async (req: any, res) => {
+  app.post("/api/v1/deposit", authenticateApiKey, withPaymentActor, requireNotMaintenance, requirePaymentAllowed("payin"), async (req: any, res) => {
     try {
       const { amount, phone, operator, country, description, customer_name, customer_email, otp, metadata } = req.body;
       const isSrKey = !!(req.merchantApiKey as any).isSrKey;
@@ -2195,7 +2186,7 @@ export async function registerRoutes(
 
   // ─── SR API — PAIEMENT DIRECT SANS REDIRECTION ───────────────────────────────
 
-  app.post("/api/v1/sr/pay", requireNotMaintenance, async (req: any, res) => {
+  app.post("/api/v1/sr/pay", withPaymentActor, requireNotMaintenance, requirePaymentAllowed("payin"), async (req: any, res) => {
     try {
       // ── Authentification clé SR ──
       const authHeader = req.headers.authorization as string | undefined;
@@ -2654,12 +2645,14 @@ export async function registerRoutes(
       const search = (req.query.search as string || "").trim();
       const statusFilter = (req.query.status as string || "all").trim();
       const typeFilter = (req.query.type as string || "all").trim();
-      const cacheKey = `${page}|${search}|${statusFilter}|${typeFilter}`;
+      const approvalOnly = req.query.approvalOnly === "true";
+      const cacheKey = `${page}|${search}|${statusFilter}|${typeFilter}|${approvalOnly}`;
       const cached = adminTxCache.get(cacheKey);
       if (cached && Date.now() - cached.ts < ADMIN_TX_TTL) return res.json(cached.data);
 
       const buildWhere = () => {
         const conditions: any[] = [];
+        if (approvalOnly) conditions.push(sqlExpr`exists (select 1 from payment_provider_logs p where p.provider_code = 'alphapay' and p.action = 'payout_approval' and p.status = 'awaiting_approval' and p.reference = ${txTable.reference})`);
         if (search) {
           const like = `%${search}%`;
           conditions.push(
@@ -2723,7 +2716,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/transactions/:id/status", isAdmin, async (req, res) => {
+  app.patch("/api/admin/transactions/:id/status", isAdmin, withPaymentActor, async (req, res) => {
     try {
       const { id } = req.params as Record<string, string>;
       const { status, motif } = req.body;
@@ -2736,68 +2729,17 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction introuvable" });
       }
 
+      if (await hasPayoutApproval(transaction.reference)) {
+        if (!["completed", "failed"].includes(status)) return res.status(409).json({ message: "Impossible de remettre une demande manuelle en attente." });
+        const result = await decidePayout(transaction.reference, status === "completed" ? "approve" : "reject");
+        adminTxCache.clear();
+        userTxCacheDel(transaction.userId);
+        _adminCache.clear();
+        return res.json(result);
+      }
       if (await isAlphaPayment(transaction.reference)) return res.status(409).json({ message: "Le statut AlphaPay est confirmé uniquement par vérification serveur. Utilisez la vérification du paiement." });
-
-      if (status === "completed" && transaction.type === "withdrawal" && transaction.status === "pending") {
-        const alphapayOnValidate = await getAlphapayEnabled();
-
-        if (!alphapayOnValidate) {
-          // AlphaPay désactivé : l'admin a traité le retrait manuellement, on valide directement
-          const tx = await storage.updateTransactionStatus(id, "completed");
-          adminTxCache.clear();
-          if (tx) notifyWithdrawal(tx, "success").catch(() => {});
-          return res.json({ ...tx, manuallyValidated: true });
-        }
-
-        if (!isApiKeyConfigured()) {
-          return res.status(503).json({ message: "Service de paiement AlphaPay non configuré" });
-        }
-
-        const amount = parseFloat(transaction.amount);
-        const txFees = parseFloat((transaction as any).fees || "0");
-        const txCurrency = (transaction as any).currency || "XOF";
-        const operator = (transaction as any).provider || "";
-        const phoneNumber = (transaction as any).phoneNumber || "";
-
-        // Net amount to send = stored amount minus stored fees
-        const amountXOFForNet = txCurrency === "CDF" ? Math.floor(amount * 0.22) : amount;
-        const netXOF = amountXOFForNet - txFees;
-        const netAmountLocal = txCurrency === "CDF" ? Math.round(netXOF / 0.22) : netXOF;
-
-        const { users: usersTable } = await import("@shared/models/auth");
-        const { db: dbInst } = await import("./db");
-        const { eq: eqDyn } = await import("drizzle-orm");
-        const [txUser] = await dbInst.select({ firstName: usersTable.firstName, lastName: usersTable.lastName })
-          .from(usersTable).where(eqDyn(usersTable.id, transaction.userId));
-
-        const resolvedFirstName = txUser?.firstName || "Client";
-        const resolvedLastName = txUser?.lastName || "SolvexPay";
-
-        const txCountry = (transaction as any).payerCountry || "BJ";
-        const alphapayOperator = getAlphaPayOperatorCode(operator, txCountry);
-
-        console.log(`Admin: initiating AlphaPay transfer for manual withdrawal tx ${id} (${phoneNumber}, ${alphapayOperator}, amount: ${amount}, fees: ${txFees}, net: ${netAmountLocal})`);
-        try {
-          const transferResponse = await paymentService.transfer({
-            msisdn: phoneNumber,
-            amount: netAmountLocal,
-            reference: transaction.reference,
-            firstName: resolvedFirstName,
-            lastName: resolvedLastName,
-            operator: alphapayOperator,
-          });
-          console.log(`Admin: AlphaPay transfer response for tx ${id}:`, transferResponse);
-
-          const tx = await storage.updateTransactionStatus(id, "completed");
-          if (tx) notifyWithdrawal(tx, "success").catch(() => {});
-          return res.json({ ...tx, providerId: transferResponse.id, alphapayTriggered: true });
-        } catch (alphapayError: any) {
-          console.error(`Admin: AlphaPay transfer failed for tx ${id}:`, alphapayError);
-          return res.status(502).json({
-            message: `Échec du paiement AlphaPay: ${alphapayError.message || "Erreur inconnue"}`,
-            alphapayError: true,
-          });
-        }
+      if (status === "completed" && ["withdrawal", "transfer"].includes(transaction.type)) {
+        return res.status(409).json({ message: "Opération historique : rapprochement manuel requis, aucun nouvel envoi ni succès forcé autorisé." });
       }
 
       if (status === "failed" && transaction.type === "withdrawal" && transaction.status === "pending") {
@@ -2818,9 +2760,9 @@ export async function registerRoutes(
       const tx = await storage.updateTransactionStatus(id, status);
       adminTxCache.clear();
       res.json(tx);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Admin update tx status error:", error);
-      res.status(500).json({ message: "Erreur serveur" });
+      res.status(error.status || 500).json({ message: error.message || "Erreur serveur" });
     }
   });
 
@@ -3650,7 +3592,7 @@ export async function registerRoutes(
   });
 
   // Admin deposit into a user wallet via AlphaPay
-  app.post("/api/admin/wallets/:userId/deposit", isAdmin, async (req, res) => {
+  app.post("/api/admin/wallets/:userId/deposit", isAdmin, withPaymentActor, requireNotMaintenance, requirePaymentAllowed("payin"), async (req, res) => {
     try {
       const { userId } = req.params as Record<string, string>;
       const { amount, phoneNumber, operator, motif, firstName, lastName } = req.body;

@@ -6,6 +6,7 @@ import { amountInXOF, paymentWalletDelta } from "./paymentAccounting";
 import { needsPaymentConfirmation } from "@shared/payment-catalog";
 import { PAYMENT_COUNTRIES, alphaCountryCode } from "@shared/payment-catalog";
 import { quotePayment, paymentInputError } from "./paymentQuote";
+import { assertPaymentAllowed, policyError, withdrawalIsManual } from "./paymentPolicy";
 export { amountInXOF } from "./paymentAccounting";
 
 type Receipt = PaymentResponse & { kind: "payment" | "payout" | "checkout" };
@@ -80,6 +81,8 @@ class PaymentService {
   }
 
   private async initiate(action: "deposit" | "transfer", params: PaymentParams): Promise<PaymentResponse> {
+    await assertPaymentAllowed(params.operator || "", params.sourceCountry || params.country || "", action === "deposit" ? "payin" : "payout");
+    if (action === "transfer") await assertPayoutApproved(params.reference);
     requireConfigured();
     const service = new AlphaPayService();
     try { service.context(params); }
@@ -121,6 +124,7 @@ class PaymentService {
   }
 
   async deposit(params: PaymentParams) {
+    await assertPaymentAllowed(params.operator || "", params.country || "", "payin");
     const country = PAYMENT_COUNTRIES.find(c => c.iso === alphaCountryCode(params.country || ""));
     const operator = params.operator === "crypto" ? "Crypto" : country?.operators.find(o => {
       try { return new AlphaPayService().context({ ...params, operator: params.operator }).network === getNetwork(o, country.code); } catch { return false; }
@@ -134,13 +138,15 @@ class PaymentService {
     }
     if (quote.otpRequired && !params.otp?.trim()) throw paymentInputError("Le code de paiement de votre opérateur est obligatoire avant de payer.");
     const prepared = params.operator === "crypto" ? {
-      ...params, sourceAmount: params.amount, sourceCurrency: params.currency || country.currency,
+      ...params, sourceAmount: params.amount, sourceCurrency: params.currency || country.currency, sourceCountry: params.country,
       amount: quote.providerAmount, currency: "USD", country: "XX",
     } : params;
     const receipt = await this.initiate("deposit", { ...prepared, checkout: false, directOnly: false });
     return { ...receipt, requires_redirect: !!receipt.payment_url || receipt.requires_redirect === true };
   }
   async transfer(params: PaymentParams) {
+    await assertPaymentAllowed(params.operator || "", params.country || "", "payout");
+    await assertPayoutApproved(params.reference);
     await validatePayout(params);
     return this.initiate("transfer", params);
   }
@@ -168,7 +174,16 @@ class PaymentService {
   async getStatus(reference: string): Promise<PaymentResponse> {
     requireConfigured();
     let binding = await findBinding(reference);
-    if (!binding) throw Object.assign(new Error("Cette opération historique n’est pas gérée par AlphaPay ; rapprochement manuel requis."), { code: "LEGACY_PAYMENT" });
+    if (!binding) {
+      const approval = await payoutApproval(reference);
+      if (approval?.status === "awaiting_approval") return {
+        success: 1, reference, status: "PENDING", approvalRequired: true,
+        message: "Fonds réservés. En attente de validation administrateur ; aucun envoi effectué.",
+      };
+      if (approval?.status === "cancelled") return { success: 1, reference, status: "FAILED" };
+      if (approval) throw policyError("Approbation enregistrée sans liaison fournisseur : rapprochement manuel requis, fonds conservés. Aucun nouvel envoi automatique.", "PAYOUT_RECONCILIATION_REQUIRED", 409);
+      throw Object.assign(new Error("Cette opération historique n’est pas gérée par AlphaPay ; rapprochement manuel requis."), { code: "LEGACY_PAYMENT" });
+    }
     if (binding.status === "rejected") {
       await settlePayment(reference, "failed");
       return { success: 1, reference, status: "FAILED" };
@@ -176,6 +191,12 @@ class PaymentService {
     let receipt = binding.response as Receipt | null;
     if (!receipt?.id) {
       const saved = binding.request as BindingRequest;
+      // A manual payout has one send attempt, owned by its approval claim.
+      // Polling may overlap that attempt or follow a timeout. Even the same
+      // idempotency key must not turn public status checks into payout sends.
+      if (saved.action === "transfer" && await hasPayoutApproval(reference)) {
+        throw policyError("Envoi manuel soumis sans réponse fournisseur confirmée : fonds conservés pour rapprochement, aucun nouvel envoi autorisé.", "PAYOUT_RECONCILIATION_REQUIRED", 409);
+      }
       await this.initiate(saved.action, saved.params);
       binding = await findBinding(reference);
       receipt = binding?.response as Receipt;
@@ -249,6 +270,8 @@ async function validatePayout(params: PaymentParams) {
 }
 
 export async function reservePayout(userId: string, params: PaymentParams, feesXOF: number, type: "withdrawal" | "transfer") {
+  await assertPaymentAllowed(params.operator || "", params.country || "", "payout");
+  const manual = await withdrawalIsManual();
   requireConfigured();
   await validatePayout(params);
   const context = new AlphaPayService().context(params);
@@ -262,10 +285,16 @@ export async function reservePayout(userId: string, params: PaymentParams, feesX
       userId, type, amount: String(params.amount), currency: context.currency,
       reference: params.reference, status: "pending", fees: String(feesXOF),
       phoneNumber: params.msisdn, provider: context.network,
-      description: `AlphaPay — ${type === "withdrawal" ? "retrait" : "transfert"}`,
+      payerCountry: params.country,
+      description: `AlphaPay — ${type === "withdrawal" ? "retrait" : "transfert"}${manual ? " — validation administrateur requise" : ""}`,
     }).returning();
+    if (manual) await tx.insert(paymentProviderLogs).values({
+      providerCode: "alphapay", action: "payout_approval", reference: params.reference,
+      request: { params: { ...params, otp: undefined }, userId, type }, status: "awaiting_approval",
+    });
     return created;
   });
+  if (manual) return { ...transaction, approvalRequired: true, providerId: null, message: "Fonds réservés. En attente de validation administrateur ; aucun envoi effectué." };
   try {
     const receipt = await paymentService.transfer(params);
     return { ...transaction, providerId: receipt.id };
@@ -275,5 +304,58 @@ export async function reservePayout(userId: string, params: PaymentParams, feesX
       throw error;
     }
     return { ...transaction, providerId: null, message: "Demande en cours de rapprochement AlphaPay. Fonds réservés, ne renvoyez pas une nouvelle demande." };
+  }
+}
+
+async function payoutApproval(reference: string, connection: Pick<typeof db, "select"> = db) {
+  const [approval] = await connection.select().from(paymentProviderLogs).where(and(
+    eq(paymentProviderLogs.providerCode, "alphapay"), eq(paymentProviderLogs.action, "payout_approval"),
+    eq(paymentProviderLogs.reference, reference),
+  )).limit(1);
+  return approval;
+}
+
+export async function hasPayoutApproval(reference: string) { return !!await payoutApproval(reference); }
+
+async function assertPayoutApproved(reference: string) {
+  const approval = await payoutApproval(reference);
+  if (approval && approval.status !== "submitted") throw policyError("Validation administrateur requise avant envoi.", "APPROVAL_REQUIRED", 409);
+  if (!approval && await withdrawalIsManual()) throw policyError("Le mode manuel exige une demande réservée puis approuvée.", "APPROVAL_REQUIRED", 409);
+}
+
+/** Claim under the accounting row lock. Never change an approval back to awaiting. */
+export async function decidePayout(reference: string, decision: "approve" | "reject") {
+  const approval = await payoutApproval(reference);
+  if (!approval) throw policyError("Demande manuelle introuvable.", "NOT_FOUND", 404);
+  const params = (approval.request as { params: PaymentParams }).params;
+  if (decision === "approve") {
+    await assertPaymentAllowed(params.operator || "", params.country || "", "payout");
+    requireConfigured();
+    await validatePayout(params);
+  }
+  const claimed = await db.transaction(async tx => {
+    const [local] = await tx.select().from(transactions).where(eq(transactions.reference, reference)).for("update");
+    const current = await payoutApproval(reference, tx);
+    if (!local || !current || current.status !== "awaiting_approval" || local.status !== "pending") return false;
+    await tx.update(paymentProviderLogs).set({ status: decision === "approve" ? "submitted" : "cancelled" }).where(eq(paymentProviderLogs.id, current.id));
+    if (decision === "reject") {
+      const delta = paymentWalletDelta(local, "failed");
+      const [wallet] = await tx.update(wallets).set({ balanceXOF: sql`${wallets.balanceXOF} + ${delta}`, updatedAt: new Date() }).where(eq(wallets.userId, local.userId)).returning();
+      if (!wallet) throw new Error("Portefeuille introuvable ; rejet annulé.");
+      await tx.update(transactions).set({ status: "failed", description: "Demande manuelle rejetée avant envoi — fonds restitués" }).where(eq(transactions.id, local.id));
+    }
+    return true;
+  });
+  if (!claimed) return { reference, alreadyDecided: true, message: "Cette demande a déjà été décidée ; vérifiez son statut sans nouvel envoi." };
+  if (decision === "reject") return { reference, status: "failed", refunded: true };
+  try {
+    const receipt = await paymentService.transfer(params);
+    return { reference, status: "pending", providerId: receipt.id, message: "Envoi soumis ; succès soumis à vérification AlphaPay." };
+  } catch (error: any) {
+    if (error.code === "ALPHAPAY_REJECTED") {
+      await settlePayment(reference, "failed");
+      throw error;
+    }
+    return { reference, status: "pending", message: "Envoi incertain ou bloqué. Fonds conservés pour rapprochement ; ne créez pas un nouvel envoi." };
   }
 }

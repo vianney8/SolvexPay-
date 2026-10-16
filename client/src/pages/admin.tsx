@@ -980,8 +980,8 @@ export default function AdminPage() {
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/transactions"] });
-      if (data?.alphapayTriggered) {
-        toast({ title: "Paiement envoyé via AlphaPay", description: "Le transfert a été initié avec succès." });
+      if (data?.message) {
+        toast({ title: "Demande traitée", description: data.message });
       } else if (data?.refunded) {
         toast({ title: "Transaction rejetée", description: "Le solde a été remboursé à l'utilisateur." });
       } else {
@@ -1163,7 +1163,7 @@ export default function AdminPage() {
   const { data: pendingWithdrawalsData } = useQuery<{ data: any[]; total: number }>({
     queryKey: ["/api/admin/transactions", "pending-withdrawals"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/transactions?status=pending&type=withdrawal&page=1", { credentials: "include" });
+      const res = await fetch("/api/admin/transactions?status=pending&approvalOnly=true&page=1", { credentials: "include" });
       if (!res.ok) throw new Error("Erreur serveur");
       return res.json();
     },
@@ -3557,12 +3557,12 @@ export default function AdminPage() {
               TAB 7 — TRANSACTIONS
           ══════════════════════════════════════ */}
           <TabsContent value="transactions" className="space-y-4 mt-5">
-            {pendingWithdrawals.length > 0 && !isAutoWithdrawal && (
+            {pendingWithdrawals.length > 0 && (
               <Card className="border-amber-500/30 bg-amber-500/5 overflow-hidden">
                 <CardContent className="p-0">
                   <div className="bg-amber-500/10 px-4 py-2.5 flex items-center gap-2">
                     <Clock className="h-4 w-4 text-amber-600" />
-                    <p className="text-sm font-bold text-amber-700 dark:text-amber-400">{pendingWithdrawals.length} retrait(s) en attente de validation</p>
+                    <p className="text-sm font-bold text-amber-700 dark:text-amber-400">{pendingWithdrawals.length} retrait(s) ou transfert(s) en attente d’approbation</p>
                   </div>
                   <div className="divide-y divide-border/30">
                     {pendingWithdrawals.map((tx: any) => (
@@ -3570,18 +3570,7 @@ export default function AdminPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-bold">{fmt(parseFloat(tx.amount))} {tx.currency || "XOF"}</p>
-                            {tx.fees && parseFloat(tx.fees) > 0 && (() => {
-                              const fees = parseFloat(tx.fees);
-                              const amount = parseFloat(tx.amount);
-                              const net = amount - fees;
-                              const pct = amount > 0 ? ((fees / amount) * 100).toFixed(1) : "0";
-                              return (
-                                <>
-                                  <span className="text-xs text-orange-500">Frais: {fmt(fees)} ({pct}%)</span>
-                                  <span className="text-xs text-emerald-600 font-bold">→ Net: {fmt(net)}</span>
-                                </>
-                              );
-                            })()}
+                            <span className="text-xs text-orange-500">Frais réservés en supplément : {fmt(parseFloat(tx.fees || "0"))} XOF</span>
                           </div>
                           <p className="text-xs text-muted-foreground">{tx.userDisplayName || "—"} · {tx.phoneNumber} · {tx.provider || "—"} · {fmtDate(tx.createdAt)}</p>
                         </div>
@@ -4920,7 +4909,7 @@ export default function AdminPage() {
               {withdrawConfirm?.status === "completed" ? <CheckCircle2 className="h-8 w-8 text-white" /> : <XCircle className="h-8 w-8 text-white" />}
             </div>
             <DialogTitle className="text-center text-lg">
-              {withdrawConfirm?.status === "completed" ? "Valider ce retrait ?" : "Rejeter ce retrait ?"}
+              {withdrawConfirm?.status === "completed" ? "Approuver cet envoi ?" : "Rejeter cette demande ?"}
             </DialogTitle>
             <DialogDescription className="text-center text-sm space-y-1">
               {withdrawConfirm && (
@@ -4928,8 +4917,8 @@ export default function AdminPage() {
                   <span className="block font-bold text-foreground">{fmt(parseFloat(withdrawConfirm.tx.amount))} {withdrawConfirm.tx.currency || "XOF"}</span>
                   <span className="block">{withdrawConfirm.tx.userDisplayName || "—"} · {withdrawConfirm.tx.phoneNumber} · {withdrawConfirm.tx.provider}</span>
                   {withdrawConfirm.status === "completed"
-                    ? "Le retrait sera marqué comme complété. Assurez-vous d'avoir envoyé les fonds."
-                    : "Le retrait sera rejeté et le solde remboursé à l'utilisateur."}
+                    ? "L’envoi sera soumis à AlphaPay, sous réserve des restrictions en vigueur. Le succès sera confirmé uniquement après vérification AlphaPay. Les fonds sont déjà réservés."
+                    : "La demande non envoyée sera rejetée et les fonds réservés (montant et frais) seront restitués une seule fois."}
                 </>
               )}
             </DialogDescription>

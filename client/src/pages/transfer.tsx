@@ -41,6 +41,7 @@ export default function TransferPage() {
   const [amount, setAmount] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState("");
   const [kycGateOpen, setKycGateOpen] = useState(false);
 
   const selectedCountry = COUNTRIES.find(c => c.code === country)!;
@@ -65,7 +66,8 @@ export default function TransferPage() {
       const res = await apiRequest("POST", "/api/transactions/transfer", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      setPaymentMessage(data.message || "Demande soumise à AlphaPay. Consultez l’historique pour connaître le statut confirmé de l’envoi.");
       queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
@@ -111,9 +113,9 @@ export default function TransferPage() {
                 <CheckCircle2 className="h-10 w-10 text-white" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold" data-testid="text-transfer-status">Transfert initié !</h2>
+                <h2 className="text-2xl font-bold" data-testid="text-transfer-status">Demande de transfert enregistrée</h2>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  Le bénéficiaire recevra les fonds immédiatement sur son compte Mobile Money.
+                  {paymentMessage}
                 </p>
               </div>
               <div className="bg-muted/40 rounded-2xl p-5 space-y-2 text-sm text-left">

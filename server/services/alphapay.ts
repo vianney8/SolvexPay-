@@ -20,6 +20,7 @@ export function verifyAlphaPaySignature(rawBody: Buffer, signature: string, time
 export const getAlphaPayNetwork = getPaymentNetwork;
 
 export interface PaymentParams {
+  sourceCountry?: string;
   msisdn: string;
   amount: number;
   reference: string;
@@ -39,6 +40,7 @@ export interface PaymentParams {
 }
 
 export interface PaymentResponse {
+  approvalRequired?: boolean;
   success: number;
   id?: string;
   reference?: string;

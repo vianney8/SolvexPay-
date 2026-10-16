@@ -64,6 +64,7 @@ export default function WithdrawPage() {
   const [phone, setPhone] = useState(stripPrefix((user as any)?.withdrawalPhone || ""));
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState("");
   const [withdrawRef, setWithdrawRef] = useState("");
   const [kycGateOpen, setKycGateOpen] = useState(false);
 
@@ -158,12 +159,13 @@ export default function WithdrawPage() {
       return res.json();
     },
     onSuccess: (data: any) => {
+      setPaymentMessage(data.message || "Demande soumise à AlphaPay. Consultez l’historique pour connaître le statut confirmé de l’envoi.");
       queryClient.invalidateQueries({ queryKey: ["/api/wallet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       setWithdrawRef(data.reference || data.sendavaReference || "");
       setSuccess(true);
-      toast({ title: "Retrait initié", description: "Les fonds seront envoyés sur votre Mobile Money." });
+      toast({ title: "Demande de retrait enregistrée", description: data.message || "En attente de confirmation AlphaPay." });
     },
     onError: (error: any) => {
       try {
@@ -194,9 +196,9 @@ export default function WithdrawPage() {
                 <CheckCircle2 className="h-10 w-10 text-white" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold" data-testid="text-withdraw-status">Retrait initié !</h2>
+                <h2 className="text-2xl font-bold" data-testid="text-withdraw-status">Demande de retrait enregistrée</h2>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  Les fonds seront envoyés sur votre compte Mobile Money dans quelques minutes.
+                  {paymentMessage}
                 </p>
               </div>
               <div className="bg-muted/40 rounded-2xl p-5 space-y-2 text-sm text-left">
