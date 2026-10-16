@@ -5,3 +5,4 @@
 - [Parcours et codes AlphaPay](alphapay-otp-parcours.md) — vérifier le formulaire réel ; distinguer code préalable obligatoire et confirmation après initiation.
 - [Audits SQL en lecture seule](readonly-sql-audits.md) — une lecture SQL peut aussi entraîner un ajout automatique de module dans la configuration du workspace.
 - [Exemptions et sorties manuelles](payment-restriction-decisions.md) — exemption admin limitée à la maintenance générale ; mode manuel aussi sur les transferts.
+- [Succès AlphaPay et net reçu](alphapay-net-and-success.md) — les frais déduits peuvent bloquer un vrai succès ; distinguer montant payé, net fournisseur et crédit du portefeuille.
