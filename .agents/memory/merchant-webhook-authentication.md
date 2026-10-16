@@ -8,3 +8,9 @@ Un règlement SolvexPay réussi ne prouve pas que le marchand a accepté sa noti
 **Why:** Le récepteur Sika a rejeté des notifications `transaction.completed` avec HTTP 401, « Signature invalide. », alors que les opérations étaient correctement réglées. La clé marchande utilisée n’avait pas de secret de webhook partagé configuré.
 
 **How to apply:** Vérifier séparément le crédit atomique et l’accusé de réception marchand. Sur 401 de signature, corriger le secret partagé et la signature attendue, sans désactiver la vérification côté marchand ni renvoyer des clés API au hasard. Réutiliser l’identifiant de transaction et ne jamais recréditer un paiement pour retenter sa notification. Ne pas annoncer les clients servis sur la seule base d’un règlement local ou d’un envoi HTTP.
+
+Le contrat de réception Sika utilise son secret `SOLVEXPAY_WEBHOOK_SECRET` et l’en-tête `x-solvexpay-signature`, contenant `sha256=` suivi du HMAC-SHA256 hexadécimal du corps JSON brut.
+
+**Why:** Le récepteur strict refuse une signature absente avant tout traitement, y compris pour les anciens paiements.
+
+**How to apply:** Faire configurer le même secret existant des deux côtés par le flux sécurisé, sans le lire depuis un dépôt ni l’afficher. Associer ce secret à la clé marchande concernée dans SolvexPay, puis retenter uniquement les confirmations non acceptées.
