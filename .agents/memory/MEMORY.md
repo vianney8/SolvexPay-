@@ -6,3 +6,4 @@
 - [Audits SQL en lecture seule](readonly-sql-audits.md) — une lecture SQL peut aussi entraîner un ajout automatique de module dans la configuration du workspace.
 - [Exemptions et sorties manuelles](payment-restriction-decisions.md) — exemption admin limitée à la maintenance générale ; mode manuel aussi sur les transferts.
 - [Succès AlphaPay et net reçu](alphapay-net-and-success.md) — les frais déduits peuvent bloquer un vrai succès ; distinguer montant payé, net fournisseur et crédit du portefeuille.
+- [Authentification des confirmations marchandes](merchant-webhook-authentication.md) — règlement local et acceptation côté Sika sont distincts ; un 401 de signature nécessite le secret partagé.
