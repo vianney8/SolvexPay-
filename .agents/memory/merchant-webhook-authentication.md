@@ -14,3 +14,9 @@ Le contrat de réception Sika utilise son secret `SOLVEXPAY_WEBHOOK_SECRET` et l
 **Why:** Le récepteur strict refuse une signature absente avant tout traitement, y compris pour les anciens paiements.
 
 **How to apply:** Faire configurer le même secret existant des deux côtés par le flux sécurisé, sans le lire depuis un dépôt ni l’afficher. Associer ce secret à la clé marchande concernée dans SolvexPay, puis retenter uniquement les confirmations non acceptées.
+
+Après acceptation de la signature, Sika peut encore répondre `404 Payment not found`. Cela indique que son récepteur ne retrouve pas l’association avec le paiement local, et non que le paiement AlphaPay ou le crédit SolvexPay doit être recommencé.
+
+**Why:** Une même régularisation peut avoir des notifications acceptées et un paiement restant introuvable chez le marchand.
+
+**How to apply:** Conserver les accusés déjà obtenus et ne retenter que les notifications non acceptées. Examiner l’association côté Sika à partir de l’identifiant SolvexPay et d’une preuve du paiement local ; ne pas fabriquer une association sur le seul montant ou contourner les contrôles d’accès du récepteur.
