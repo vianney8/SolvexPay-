@@ -8,6 +8,7 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "test:payments": "tsx --test server/services/alphapay.test.ts server/services/paymentQuote.test.ts server/services/paymentService.test.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

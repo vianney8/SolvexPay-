@@ -5,7 +5,8 @@ import { execSync } from "child_process";
 import rateLimit from "express-rate-limit";
 import { storage, generateApiKey, generateSlug, generateReference } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, registerAuthRoutes } from "./replit_integrations/auth";
-import { verifyAlphaPaySignature, alphapayStatusToString, getAlphaPayNetwork } from "./services/alphapay";
+import { alphapayStatusToString, getAlphaPayNetwork } from "./services/alphapay";
+import { alphaPayWebhook, alphaPayBrowserReturn, alphaPayWaveReturn } from "./services/paymentNotifications";
 import { PAYMENT_COUNTRIES, PAYMENT_OPERATORS, solvexCountryCode } from "@shared/payment-catalog";
 import { ensurePaymentCatalog } from "./services/paymentCatalog";
 import { quotePayment } from "./services/paymentQuote";
@@ -2370,54 +2371,9 @@ export async function registerRoutes(
 
   // ─── SR API — CALLBACK WAVE (retour depuis l'app Wave) ───────────────────────
   // Wave redirige ici après que le client ait payé (ou annulé).
-  // On vérifie le statut AlphaPay immédiatement, on crédite si confirmé,
-  // puis on redirige vers la page de confirmation publique /pay-api/:id.
-  app.get("/api/v1/sr/wave-callback", async (req, res) => {
-    const { id: transactionId, reference } = req.query as Record<string, string>;
-    console.log(`[SR Wave Callback] transactionId=${transactionId} reference=${reference}`);
-
-    let redirectTarget = `${req.protocol}://${req.get("host")}/pay-api/${transactionId}?status=callback&reference=${encodeURIComponent(reference || "")}`;
-
-    if (transactionId && reference) {
-      try {
-        const result = await paymentService.getStatus(reference);
-        const statusStr = alphapayStatusToString(result.status);
-        const transaction = await storage.getTransactionById(transactionId);
-
-        if (transaction && transaction.status === "pending") {
-          if (statusStr === "completed") {
-            const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
-            if (updated && transaction.type === "deposit") {
-              const grossAmt = parseFloat(transaction.amount);
-              const txFees = parseFloat((transaction as any).fees || "0") || 0;
-              const netAmt = grossAmt - txFees;
-              await storage.updateWalletBalance(
-                transaction.userId,
-                transaction.currency,
-                netAmt > 0 ? netAmt : grossAmt
-              );
-              const completedTx = await storage.getTransactionById(transaction.id);
-              if (completedTx) {
-                forwardToMerchantWebhooks(completedTx);
-                notifyTransactionCompleted(completedTx).catch(() => {});
-              }
-              console.log(`[SR Wave Callback] ✓ Transaction ${reference} completed and credited`);
-            }
-          }
-          // Ne jamais marquer "failed" ici : le webhook AlphaPay s'en charge
-          // avec des codes numériques fiables.
-        }
-
-        // Historical callbacks return only to our own status page, never to an external site.
-      } catch (err) {
-        console.error("[SR Wave Callback] Error verifying status:", err);
-        // En cas d'erreur AlphaPay, on redirige quand même vers la page de confirmation
-        // qui fera le polling et récupèrera le statut au prochain cycle.
-      }
-    }
-
-    res.redirect(redirectTarget);
-  });
+  // La paire ID/référence doit correspondre avant vérification. Seul le service
+  // rapprocheur règle le paiement ; ce retour ne modifie jamais le portefeuille.
+  app.get("/api/v1/sr/wave-callback", alphaPayWaveReturn(paymentService, id => storage.getTransactionById(id)));
 
   // ─── END API V1 ───────────────────────────────────────────────────────────────
 
@@ -2431,80 +2387,15 @@ export async function registerRoutes(
     res.json({ imageUrl });
   });
 
-  app.post("/api/webhooks/alphapay", async (req, res) => {
-    const secret = process.env.ALPHAPAY_WEBHOOK_SECRET || "";
-    if (!secret) return res.status(503).json({ message: "Webhook AlphaPay non configuré." });
-    const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.alloc(0);
-    if (!verifyAlphaPaySignature(rawBody, req.get("X-Webhook-Signature") || "", req.get("X-Webhook-Timestamp") || "", secret)) {
-      return res.status(401).json({ message: "Signature AlphaPay invalide ou expirée." });
-    }
-    if (req.body?.event === "webhook.test") return res.json({ received: true });
-    if (!String(req.body?.event || "").startsWith("transaction.")) return res.json({ received: true, ignored: true });
-    const providerId = req.body?.data?.id;
-    if (typeof providerId !== "string") return res.status(400).json({ message: "Identifiant AlphaPay requis." });
-    try {
-      let reference = await paymentService.referenceForWebhook(providerId);
-      // Checkout webhooks contain the payment ID, not necessarily the session ID.
-      // Only consider our own persisted checkout bindings, and verify them through AlphaPay.
-      if (!reference) {
-        const { db } = await import("./db");
-        const { paymentProviderLogs: logs } = await import("@shared/schema");
-        const { and, eq, sql, desc } = await import("drizzle-orm");
-        const sessions = await db.select({ reference: logs.reference }).from(logs).where(and(eq(logs.providerCode, "alphapay"),eq(logs.action, "binding"),sql`${logs.response}->>'kind' = 'checkout'`)).orderBy(desc(logs.createdAt)).limit(30);
-        for (const session of sessions) {
-          if (!session.reference) continue;
-          const verified = await paymentService.getStatus(session.reference);
-          if (verified.id === providerId) { reference = session.reference; break; }
-        }
-      }
-      if (!reference) return res.status(409).json({ message: "Opération non rapprochée ; nouvelle livraison nécessaire." });
-      await paymentService.getStatus(reference);
-      res.json({ received: true });
-    } catch {
-      res.status(503).json({ message: "Vérification AlphaPay à réessayer." });
-    }
-  });
+  app.post("/api/webhooks/alphapay", alphaPayWebhook(paymentService, async () => {
+    const { db } = await import("./db");
+    const { paymentProviderLogs: logs } = await import("@shared/schema");
+    const { and, eq, sql, desc } = await import("drizzle-orm");
+    const sessions = await db.select({ reference: logs.reference }).from(logs).where(and(eq(logs.providerCode, "alphapay"),eq(logs.action, "binding"),sql`${logs.response}->>'kind' = 'checkout'`)).orderBy(desc(logs.createdAt)).limit(30);
+    return sessions.flatMap(session => session.reference ? [session.reference] : []);
+  }));
 
-  app.get("/api/payment/callback", async (req, res) => {
-    const { reference, merchant_redirect } = req.query as Record<string, string>;
-    console.log(`AlphaPay payment redirect callback: reference=${reference} merchant_redirect=${merchant_redirect}`);
-
-    if (reference) {
-      try {
-        const result = await paymentService.getStatus(reference);
-        const statusStr = alphapayStatusToString(result.status);
-        const transaction = await storage.getTransactionByReference(reference);
-        if (transaction && transaction.status === "pending") {
-          if (statusStr === "completed") {
-            const updated = await storage.updateTransactionStatusIfPending(transaction.id, "completed");
-            if (updated && transaction.type === "deposit") {
-              const grossAmt = parseFloat(transaction.amount);
-              const txFees = parseFloat((transaction as any).fees || "0") || 0;
-              const netAmt = grossAmt - txFees;
-              await storage.updateWalletBalance(
-                transaction.userId,
-                transaction.currency,
-                netAmt > 0 ? netAmt : grossAmt
-              );
-              const completedTx = await storage.getTransactionByReference(reference);
-              if (completedTx) {
-                forwardToMerchantWebhooks(completedTx);
-                notifyTransactionCompleted(completedTx).catch(() => {});
-              }
-            }
-          }
-          // Ne jamais marquer comme "failed" ici : le webhook AlphaPay ou le polling
-          // du marchand s'en chargera avec des codes numériques fiables.
-        }
-      } catch (error) {
-        console.error("Callback verify error:", error);
-      }
-    }
-
-    // Si le marchand a fourni une URL de redirection (cas SR API Wave), on y redirige.
-    // Sinon, on redirige vers la page de dépôt interne (cas dashboard).
-    res.redirect(`/deposit?status=callback&reference=${encodeURIComponent(String(reference || ""))}`);
-  });
+  app.get("/api/payment/callback", alphaPayBrowserReturn(paymentService));
 
   app.get("/api/settings/webhook-urls", isAuthenticated, async (req, res) => {
     const baseUrl = req.protocol + "://" + req.get("host");
