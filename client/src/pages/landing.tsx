@@ -5,7 +5,7 @@ import { OperatorLogo } from "@/components/operator-logo";
 import {
   ArrowRight, Shield, Zap, Globe, Smartphone, Code2, LinkIcon,
   CheckCircle2, ChevronDown, ChevronUp, Lock, Webhook,
-  CreditCard, Clock, TrendingUp, Users, Menu, X, ExternalLink,
+  CreditCard, TrendingUp, Users, Menu, X, ExternalLink,
   Key, Send,
 } from "lucide-react";
 import solvexpayLogo from "../assets/images/solvexpay-logo.png";
@@ -16,10 +16,10 @@ const ALL_COUNTRIES = PAYMENT_COUNTRIES.map(c => ({ iso: c.code, flag: c.flag, n
 const FAQS = [
   { q: "Comment fonctionne SolvexPay ?", a: "SolvexPay aide les commerçants à encaisser en Mobile Money. Après inscription, créez des liens de paiement ou intégrez l’API pour garder vos clients dans votre propre formulaire, sans redirection lorsque le réseau le permet." },
   { q: "Quels sont les frais ?", a: "Les frais sont simples et transparents. Consultez la section Tarifs pour les taux exacts en vigueur. Aucun abonnement mensuel, aucun frais caché." },
-  { q: "Le KYC est-il obligatoire ?", a: "Le KYC est requis pour débloquer tous les plafonds. Sans KYC vous pouvez tester la plateforme avec des limites réduites. La vérification prend généralement moins de 24h." },
+  { q: "Quelles vérifications peuvent être demandées ?", a: "Selon votre activité, le parcours utilisé, le niveau de risque et les exigences applicables, des informations d’identité, des justificatifs d’activité ou des éléments sur l’origine et la destination des fonds peuvent être demandés. Les exigences et délais varient selon les situations." },
   { q: "Comment intégrer l'API ?", a: "Créez votre compte, accédez à 'Clés API' dans votre tableau de bord. Utilisez l'API JSON POST /api/v1/deposit depuis votre serveur pour garder le client sur votre propre formulaire. La page checkout hébergée reste facultative." },
   { q: "Quels pays sont couverts ?", a: "9 pays : Bénin, Côte d'Ivoire, Burkina Faso, Togo, Sénégal, Mali, Cameroun, RD Congo, Congo-Brazzaville. Couverture en constante expansion." },
-  { q: "Comment recevoir les notifications de paiement ?", a: "Configurez votre URL webhook dans les paramètres de votre clé API. SolvexPay envoie automatiquement une requête POST signée HMAC-SHA256 à chaque changement de statut de transaction." },
+  { q: "Comment recevoir les notifications de paiement ?", a: "Si les webhooks sont configurés pour votre intégration, ils peuvent vous transmettre une notification POST signée lorsque le statut d'une transaction évolue. Vérifiez toujours le statut confirmé côté serveur." },
 ];
 
 const LIVE_NOTIFS = [
@@ -70,8 +70,6 @@ export default function LandingPage() {
 
   const stat1 = useCountUp(activeCount, 1800, statsVisible);
   const stat2 = useCountUp(PAYMENT_OPERATORS.length, 2000, statsVisible);
-  const stat3 = useCountUp(999, 2200, statsVisible);
-  const stat4 = useCountUp(24, 1500, statsVisible);
 
   useEffect(() => {
     const interval = setInterval(() => setNotifIdx(i => (i + 1) % LIVE_NOTIFS.length), 3500);
@@ -185,7 +183,7 @@ export default function LandingPage() {
               </div>
 
               <div className="anim-up-4 flex flex-wrap gap-5">
-                {[{ icon: Shield, label: "KYC sécurisé" }, { icon: Zap, label: "Instantané 24/7" }, { icon: Lock, label: "Chiffrement SSL" }].map((b) => (
+                {[{ icon: Shield, label: "Vérifications adaptées" }, { icon: Zap, label: "Suivi des opérations" }, { icon: Lock, label: "Bonnes pratiques de sécurité" }].map((b) => (
                   <div key={b.label} className="flex items-center gap-2 text-sm text-gray-500 font-medium">
                     <b.icon className="h-4 w-4 text-violet-500" />
                     {b.label}
@@ -295,12 +293,10 @@ export default function LandingPage() {
       {/* STATS */}
       <section ref={statsRef} className="py-14 bg-white border-y border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {[
               { value: stat1, suffix: "+", label: "Pays couverts", icon: Globe, color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
               { value: stat2, suffix: "+", label: "Opérateurs Mobile Money", icon: Smartphone, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
-              { value: `${(stat3 / 10).toFixed(1)}`, suffix: "%", label: "Disponibilité garantie", icon: TrendingUp, color: "#059669", bg: "#f0fdf4", border: "#bbf7d0" },
-              { value: stat4, suffix: "/7", label: "Support disponible", icon: Clock, color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
             ].map((s) => (
               <div key={s.label} className="rounded-3xl p-6 text-center border" style={{ background: s.bg, borderColor: s.border }}>
                 <div className="w-11 h-11 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "white", boxShadow: `0 2px 12px ${s.color}22` }}>
@@ -333,14 +329,14 @@ export default function LandingPage() {
               },
               {
                 icon: Smartphone, title: "Mobile Money Direct", badge: `${PAYMENT_OPERATORS.length} réseaux`,
-                desc: "Dépôts et retraits vers 10+ opérateurs depuis votre tableau de bord. Confirmation USSD instantanée.",
-                points: ["Confirmation USSD", "Vérification temps réel", "Multi-opérateurs"],
+                desc: "Dépôts et retraits vers plusieurs opérateurs depuis votre tableau de bord, selon la disponibilité du réseau.",
+                points: ["Instructions de paiement", "Suivi du statut", "Multi-opérateurs"],
                 color: "#059669", bg: "#f0fdf4", border: "#bbf7d0", btnBg: "linear-gradient(135deg,#059669,#047857)",
               },
               {
                 icon: Code2, title: "API Gateway", badge: "Développeurs",
                 desc: "Intégrez SolvexPay dans votre application. API RESTful complète avec webhooks HMAC-SHA256.",
-                points: ["Page hébergée sécurisée", "Webhooks signés", "Documentation complète"],
+                points: ["Page de paiement hébergée", "Webhooks signés", "Documentation complète"],
                 color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", btnBg: "linear-gradient(135deg,#2563eb,#1d4ed8)",
               },
             ].map((f) => (
@@ -384,8 +380,8 @@ export default function LandingPage() {
             <div className="grid md:grid-cols-3 gap-8">
               {[
                 { step: "01", icon: Users, title: "Créez votre compte", desc: "Inscription gratuite en 30 secondes avec votre email. Activation immédiate.", color: "#7c3aed", bg: "#f5f3ff" },
-                { step: "02", icon: Shield, title: "Vérifiez votre identité", desc: "Complétez votre KYC pour débloquer tous les plafonds. Validé en moins de 24h.", color: "#2563eb", bg: "#eff6ff" },
-                { step: "03", icon: Zap, title: "Acceptez vos paiements", desc: "Créez des liens ou intégrez l'API. Recevez instantanément via Mobile Money.", color: "#059669", bg: "#f0fdf4" },
+                { step: "02", icon: Shield, title: "Complétez les vérifications", desc: "Des informations et justificatifs peuvent être demandés selon votre profil et les exigences applicables.", color: "#2563eb", bg: "#eff6ff" },
+                { step: "03", icon: Zap, title: "Acceptez vos paiements", desc: "Créez des liens ou intégrez l’API. Le traitement dépend des réseaux et prestataires concernés.", color: "#059669", bg: "#f0fdf4" },
               ].map((s) => (
                 <div key={s.step} className="text-center relative">
                   <div className="relative inline-block">
@@ -431,7 +427,7 @@ export default function LandingPage() {
 
           <div className="rounded-2xl p-4 flex items-start gap-3 bg-amber-50 border border-amber-100">
             <Zap className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-amber-800">Aucun abonnement mensuel. Vous payez uniquement sur les transactions réussies, disponible <strong>24/7</strong>.</p>
+            <p className="text-sm text-amber-800">Aucun abonnement mensuel. Les tarifs et la disponibilité des opérations peuvent varier selon le moyen de paiement et le prestataire.</p>
           </div>
         </div>
       </section>
@@ -446,9 +442,9 @@ export default function LandingPage() {
               <p className="text-gray-500 mb-8 leading-relaxed">API RESTful documentée, webhooks HMAC-SHA256, page de paiement hébergée. Deux méthodes pour tous les cas d'usage.</p>
               <div className="space-y-4 mb-8">
                 {[
-                  { icon: Key, title: "Clés API sécurisées", desc: "Format sk_live_xxx. Générées depuis votre tableau de bord.", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
-                  { icon: Webhook, title: "Webhooks en temps réel", desc: "Notification POST signée à chaque changement de statut.", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
-                  { icon: Shield, title: "Page hébergée SolvexPay", desc: "Aucun formulaire à gérer. Votre client paie sur notre page sécurisée.", color: "#059669", bg: "#f0fdf4", border: "#bbf7d0" },
+                  { icon: Key, title: "Gestion des clés API", desc: "Format sk_live_xxx. Clés générées depuis votre tableau de bord.", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
+                  { icon: Webhook, title: "Notifications de statut", desc: "Notifications POST signées lorsque le statut évolue, selon le fonctionnement de l’API.", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
+                  { icon: Shield, title: "Page hébergée SolvexPay", desc: "Votre client peut effectuer son paiement sur une page hébergée.", color: "#059669", bg: "#f0fdf4", border: "#bbf7d0" },
                 ].map((f) => (
                   <div key={f.title} className="flex items-start gap-3 p-4 rounded-2xl border" style={{ background: f.bg, borderColor: f.border }}>
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-white shadow-sm">
@@ -555,7 +551,37 @@ export default function LandingPage() {
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </button>
           </Link>
-          <p className="text-white/40 text-xs mt-6">Inscription gratuite · Aucune carte bancaire · KYC en moins de 24h</p>
+          <p className="text-white/60 text-xs mt-6">Inscription gratuite · Aucune carte bancaire requise · Vérifications selon le parcours</p>
+        </div>
+      </section>
+
+      {/* CONFORMITÉ — synthèse publique */}
+      <section className="py-16 sm:py-20" style={{ background: "#f4f6f1" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+            <div>
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold border mb-5" style={{ background: "#eaf1e9", color: "#3e7866", borderColor: "#d5e3d8" }}>Confiance et responsabilité</span>
+              <h2 className="text-3xl sm:text-4xl font-black text-gray-900 leading-tight">Des repères clairs pour chaque opération.</h2>
+              <p className="text-gray-600 mt-4 leading-relaxed">SolvexPay est une interface technique ; le traitement dépend également des réseaux Mobile Money, d’AlphaPay lorsque disponible et des prestataires concernés. Conditions, délais et disponibilités peuvent varier.</p>
+              <Link href="/conformite" className="inline-flex items-center gap-2 mt-6 px-5 py-3 rounded-xl text-sm font-black text-white shadow-sm transition-opacity hover:opacity-90" style={{ background: "#315c53" }}>
+                Lire Conformité et utilisation responsable <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { title: "Vérifications adaptées", text: "Des justificatifs peuvent être demandés selon le profil, le risque et les exigences applicables." },
+                { title: "Statut confirmé", text: "Une capture d’écran ou un retour navigateur ne remplace pas la confirmation effective du serveur." },
+                { title: "Marchands responsables", text: "Prix, frais, livraison, remboursements et litiges restent à la charge du marchand." },
+              ].map((item, index) => (
+                <a key={item.title} href={["/conformite#verifications", "/conformite#securite-client", "/conformite#marchands"][index]} className="block rounded-2xl border p-5 transition-transform hover:-translate-y-1" style={{ background: "#fbfcf9", borderColor: "#dfe7de" }}>
+                  <span className="block text-[11px] font-black uppercase tracking-widest text-[#739084]">0{index + 1}</span>
+                  <h3 className="mt-3 font-black text-[#173c36]">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[#61716b]">{item.text}</p>
+                  <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#3e7866]">En savoir plus <ArrowRight className="h-3 w-3" /></span>
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -568,7 +594,7 @@ export default function LandingPage() {
                 <img src={solvexpayLogo} alt="SolvexPay" className="w-9 h-9 rounded-xl" />
                 <span className="font-black text-xl" style={{ background: "linear-gradient(135deg, #a78bfa, #60a5fa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SolvexPay</span>
               </div>
-              <p className="text-sm text-gray-400 leading-relaxed">La passerelle de paiement Mobile Money pour l'Afrique. Simple, sécurisée, instantanée.</p>
+              <p className="text-sm text-gray-400 leading-relaxed">Une passerelle technique pour accompagner les paiements Mobile Money en Afrique, selon la disponibilité des réseaux et prestataires.</p>
               <div className="flex gap-1.5 flex-wrap">
                 {activeCountries.map(c => <span key={c.iso} className="text-base">{c.flag}</span>)}
               </div>
@@ -576,7 +602,7 @@ export default function LandingPage() {
             <div>
               <p className="text-xs font-black uppercase tracking-wider text-gray-500 mb-4">Produit</p>
               <ul className="space-y-3">
-                {[["#fonctionnalites", "Fonctionnalités"], ["#tarifs", "Tarifs"], ["#api", "API"], ["/documentation", "Documentation"]].map(([href, label]) => (
+                {[["#fonctionnalites", "Fonctionnalités"], ["#tarifs", "Tarifs"], ["#api", "API"], ["/documentation", "Documentation"], ["/conformite", "Conformité et utilisation responsable"]].map(([href, label]) => (
                   <li key={href}><a href={href} className="text-sm text-gray-400 hover:text-white transition-colors">{label}</a></li>
                 ))}
               </ul>
