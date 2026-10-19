@@ -20,3 +20,9 @@ La disponibilité et les consignes doivent être lues dans les tarifs propres au
 **Why:** Le catalogue des réseaux actifs comporte des réseaux absents du checkout réel. Les exigences de code peuvent changer avec la route prioritaire sans modification côté SolvexPay.
 
 **How to apply:** Consulter /pricing/my-rates/ plutôt que déduire les capacités d’un simple is_active. Les taux de change AlphaPay peuvent ne fournir qu’un sens pour une paire ; utiliser l’inverse du taux officiel lorsqu’il est fourni, jamais une constante supposée.
+
+Pour les encaissements Orange, imposer le code préalable au Burkina Faso et ne pas le demander au Sénégal ; les autres réseaux gardent leurs règles dynamiques.
+
+**Why:** L’utilisateur a explicitement demandé ces deux exceptions le 19 octobre 2026, indépendamment du drapeau renvoyé dans les tarifs.
+
+**How to apply:** Appliquer la même règle aux devis affichés et à la validation serveur. Garder le montant total frais compris dans les instructions Burkina Faso ; ne pas étendre cette exigence aux retraits.

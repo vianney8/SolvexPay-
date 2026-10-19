@@ -22,14 +22,25 @@ test("quotes enforce live directions, OTP totals and explicit USD crypto convers
       { from_currency: "CDF", to_currency: "USD", rate: 0.00044 },
     ] };
     return [
-      { country_code: "BF", network_code: "orange_bf", payin: { available: true, otp_required: true, otp_instructions: "*144*4*6*{amount}#", tiers: [{ min_amount: 200, max_amount: 1e8, currency: "XOF", percent: 4.5, fixed: 0, fee_charge_mode: "ADD_ON" }] }, payout: { available: false } },
+      { country_code: "BF", network_code: "orange_bf", payin: { available: true, otp_required: false, tiers: [{ min_amount: 200, max_amount: 1e8, currency: "XOF", percent: 4.5, fixed: 0, fee_charge_mode: "ADD_ON" }] }, payout: { available: true, otp_required: true, tiers: [{ min_amount: 200, max_amount: 1e8, currency: "XOF", percent: 0, fixed: 0, fee_charge_mode: "ADD_ON" }] } },
+      { country_code: "SN", network_code: "orange_sn", payin: { available: true, otp_required: true, otp_instructions: "Obtenez un code", tiers: [{ min_amount: 200, max_amount: 1e8, currency: "XOF", percent: 0, fixed: 0, fee_charge_mode: "ADD_ON" }] } },
+      { country_code: "CI", network_code: "orange_ci", payin: { available: true, otp_required: true, otp_instructions: "#144*82#", tiers: [{ min_amount: 200, max_amount: 1e8, currency: "XOF", percent: 0, fixed: 0, fee_charge_mode: "ADD_ON" }] } },
       { country_code: "XX", network_code: "crypto", payin: { available: true, tiers: [{ min_amount: 1, max_amount: 50000, currency: "USD", percent: 2.7, fixed: 0, fee_charge_mode: "ADD_ON" }] }, payout: { available: false } },
     ];
   };
   try {
     const orange = await quotePayment({ country: "BF", operator: "Orange", amount: 2500, currency: "XOF" });
     assert.equal(orange.otpRequired, true);
-    assert.equal(orange.otpInstructions, "*144*4*6*2613.00#");
+    assert.ok(orange.otpInstructions.includes("*144*4*6*2613.00#"));
+    const senegal = await quotePayment({ country: "SN", operator: "Orange", amount: 2500, currency: "XOF" });
+    assert.equal(senegal.otpRequired, false);
+    assert.equal(senegal.otpInstructions, "");
+    const ivoryCoast = await quotePayment({ country: "CI", operator: "Orange", amount: 2500, currency: "XOF" });
+    assert.equal(ivoryCoast.otpRequired, true);
+    assert.equal(ivoryCoast.otpInstructions, "#144*82#");
+    const payout = await quotePayment({ country: "BF", operator: "Orange", amount: 2500, currency: "XOF", direction: "payout" });
+    assert.equal(payout.otpRequired, false);
+    assert.equal(payout.otpInstructions, "");
     const crypto = await quotePayment({ country: "BJ", operator: "Crypto", amount: 2500, currency: "XOF" });
     assert.equal(crypto.providerAmount, 4.41);
     assert.equal(crypto.providerCurrency, "USD");
@@ -37,7 +48,6 @@ test("quotes enforce live directions, OTP totals and explicit USD crypto convers
     assert.equal(crypto.sourceCurrency, "XOF");
     assert.equal(crypto.providerTotal, 4.53);
     await assert.rejects(quotePayment({ country: "BJ", operator: "Crypto", amount: 2500, currency: "XOF", direction: "payout" }));
-    await assert.rejects(quotePayment({ country: "BF", operator: "Orange", amount: 2500, currency: "XOF", direction: "payout" }));
     await assert.rejects(quotePayment({ country: "BJ", operator: "Coris", amount: 2500, currency: "XOF" }));
     await assert.rejects(quotePayment({ country: "BJ", operator: "Crypto", amount: 1, currency: "XOF" }));
     assert.ok(calls.every(path => !path.includes("softpay") && !path.includes("initialize")));

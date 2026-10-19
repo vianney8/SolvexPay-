@@ -137,10 +137,11 @@ class PaymentService {
       throw Object.assign(new Error("Tarifs AlphaPay indisponibles : aucun paiement n’a été initié. Réessayez plus tard."), { status: 503, code: "ALPHAPAY_REJECTED" });
     }
     if (quote.otpRequired && !params.otp?.trim()) throw paymentInputError("Le code de paiement de votre opérateur est obligatoire avant de payer.");
+    const paymentParams = { ...params, otp: quote.otpRequired ? params.otp?.trim() : undefined };
     const prepared = params.operator === "crypto" ? {
-      ...params, sourceAmount: params.amount, sourceCurrency: params.currency || country.currency, sourceCountry: params.country,
+      ...paymentParams, sourceAmount: params.amount, sourceCurrency: params.currency || country.currency, sourceCountry: params.country,
       amount: quote.providerAmount, currency: "USD", country: "XX",
-    } : params;
+    } : paymentParams;
     const receipt = await this.initiate("deposit", { ...prepared, checkout: false, directOnly: false });
     return { ...receipt, requires_redirect: !!receipt.payment_url || receipt.requires_redirect === true };
   }

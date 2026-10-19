@@ -68,10 +68,20 @@ export async function quotePayment(input: { country: string; operator: string; a
   if (!tier) throw paymentInputError("Le montant est hors des limites AlphaPay pour ce moyen de paiement.");
   const providerFee = calculateProviderFee(providerAmount, tier, providerCurrency);
   const providerTotal = Number((providerAmount + (tier.fee_charge_mode === "DEDUCTED" ? 0 : providerFee)).toFixed(2));
+  // Explicit merchant policy: Orange BF uses a pre-payment code; Orange SN
+  // does not. Other networks keep their live AlphaPay requirements.
+  const otpRequired = direction === "payin" && (
+    network === "orange_bf" || (network !== "orange_sn" && capability.otp_required === true)
+  );
+  const otpInstructions = otpRequired
+    ? String(capability.otp_instructions || (network === "orange_bf"
+      ? "Composez *144*4*6*{amount}# pour obtenir votre code de paiement Orange Money."
+      : "")).replaceAll("{amount}", providerTotal.toFixed(2))
+    : "";
   return {
     available: true, network, direction, sourceAmount: input.amount, sourceCurrency: input.currency,
     providerAmount, providerCurrency, providerFee, providerTotal,
-    otpRequired: direction === "payin" && capability.otp_required === true,
-    otpInstructions: String(capability.otp_instructions || "").replace("{amount}", providerTotal.toFixed(2)),
+    otpRequired,
+    otpInstructions,
   };
 }
