@@ -41,16 +41,13 @@ export default function ConformitePage() {
 
       <div className="mx-auto max-w-7xl px-5 pb-20 pt-10 sm:px-8 sm:pt-16">
         <div className="max-w-4xl">
-          <p className="mb-4 text-xs font-black uppercase tracking-[0.19em] text-[#598073]">SolvexPay · repères publics</p>
+          <p className="mb-4 text-xs font-black uppercase tracking-[0.19em] text-[#598073]">SolvexPay · engagements d’utilisation</p>
           <h1 className="max-w-3xl text-4xl font-black leading-[1.08] tracking-tight text-[#173c36] sm:text-6xl">
-            Conformité et utilisation responsable
+            Conformité, sécurité et utilisation du service
           </h1>
           <p className="mt-6 max-w-3xl text-base leading-7 text-[#50635f] sm:text-lg sm:leading-8">
-            Ces repères expliquent le fonctionnement du service et les précautions attendues des marchands et de leurs clients. Ils décrivent des principes généraux, et non des conditions contractuelles exhaustives ni une garantie de disponibilité ou de résultat.
+            SolvexPay accompagne les marchands dans le suivi de leurs paiements. Ces engagements précisent le rôle de la plateforme, les informations utiles à la sécurité des opérations et les responsabilités de chacun.
           </p>
-          <div className="mt-7 rounded-2xl border border-[#d8e4dc] bg-[#eaf1e9] p-5 text-sm leading-6 text-[#415c53]">
-            Les opérations restent soumises aux conditions de service et aux exigences des opérateurs et prestataires concernés. Ces engagements d’utilisation responsable ne constituent ni un agrément réglementaire ni une certification.
-          </div>
         </div>
 
         <div className="mt-12 grid gap-10 lg:grid-cols-[250px_minmax(0,760px)] lg:items-start lg:gap-16">
@@ -72,23 +69,23 @@ export default function ConformitePage() {
 
           <article className="rounded-[26px] border border-[#e1e7df] bg-[#fbfcf9] px-5 py-7 shadow-[0_14px_45px_rgba(34,67,54,0.05)] sm:px-9 sm:py-10">
             <Topic id="service" title="1. Nature du service">
-              <p>SolvexPay fournit une interface technique destinée à faciliter la création et le suivi de demandes de paiement, notamment par Mobile Money et, lorsque disponible, AlphaPay. Le traitement et le mouvement des fonds s’effectuent au moyen des opérateurs, établissements et autres prestataires impliqués dans l’opération ; SolvexPay ne remplace pas ces intervenants.</p>
-              <p>La disponibilité des moyens de paiement, les pays, plafonds, frais, délais et conditions d’acceptation peuvent varier selon le parcours, le prestataire, le réseau, les vérifications nécessaires et les circonstances de l’opération. Une interruption, un refus ou un délai supplémentaire peut survenir. SolvexPay n’est pas présenté comme une banque ; l’utilisation du service n’offre pas de garantie absolue de disponibilité ou de réussite des paiements.</p>
+              <p>SolvexPay fournit une plateforme technique permettant aux marchands de créer et suivre des demandes de paiement, notamment par Mobile Money. Les opérateurs et autres partenaires de paiement exécutent les opérations et assurent le mouvement des fonds selon le parcours concerné. Les rôles de chacun dépendent du moyen de paiement et des intervenants mobilisés.</p>
+              <p>Les moyens disponibles, pays, plafonds, frais, délais et conditions d’acceptation peuvent varier selon le parcours, le réseau, les vérifications nécessaires et les circonstances de l’opération. Une opération peut être refusée, retardée ou interrompue par un intervenant du parcours.</p>
             </Topic>
 
             <Topic id="verifications" title="2. Vérification des clients et bénéficiaires effectifs">
-              <p>Selon le profil, les fonctionnalités demandées, le niveau de risque et les exigences applicables, des informations ou justificatifs peuvent être demandés avant ou pendant l’utilisation du service. Il peut s’agir de documents d’identité exacts et à jour, de justificatifs d’activité, de documents relatifs à l’entreprise et à ses bénéficiaires effectifs, ou d’éléments permettant de comprendre l’origine et la destination des fonds.</p>
-              <p>Le marchand s’engage à fournir des informations sincères, complètes et actualisées et à signaler les changements pertinents. La nature et l’étendue des vérifications dépendent du parcours et des exigences des prestataires concernés. Aucune vérification, décision ou durée de traitement automatique n’est promise pour chaque compte ou chaque opération.</p>
+              <p>Selon le profil, les fonctionnalités demandées, le niveau de risque et les exigences applicables, des informations ou justificatifs peuvent être demandés avant ou pendant l’utilisation du service. Les demandes peuvent concerner l’identité du titulaire et de ses représentants, l’existence et l’activité de l’entreprise, ses bénéficiaires effectifs ainsi que l’origine ou la destination des fonds.</p>
+              <p>Les documents transmis doivent être authentiques, lisibles, en cours de validité et appartenir à la personne concernée. Le titulaire fournit des informations exactes et complètes et les actualise lorsque sa situation change. Des justificatifs actualisés ou complémentaires peuvent être demandés si le profil, l’opération ou les exigences applicables le nécessitent.</p>
             </Topic>
 
             <Topic id="lbc-ft" title="3. Prévention du blanchiment et du financement du terrorisme">
-              <p>Le service ne doit pas être utilisé pour dissimuler l’origine, la propriété ou la destination de fonds, contourner des sanctions ou des restrictions applicables, financer le terrorisme ou faciliter toute autre activité illicite. Il est interdit de fractionner des opérations dans le but d’éviter des contrôles ou des limites, ou d’utiliser des prête-noms pour masquer les personnes impliquées.</p>
-              <p>Lorsque des obligations applicables ou les exigences des partenaires le justifient, une opération peut être refusée, retardée, suspendue ou soumise à un examen complémentaire. Des informations peuvent être communiquées aux autorités compétentes lorsque la loi l’impose. Les modalités d’examen dépendent du risque identifié, du parcours et des intervenants concernés.</p>
+              <p>Le service ne peut servir à dissimuler l’origine, la propriété ou la destination de fonds, contourner des sanctions ou restrictions applicables, financer le terrorisme ou faciliter une activité illicite. Sont également interdits le fractionnement destiné à éviter des limites ou vérifications et l’usage de prête-noms visant à masquer les personnes impliquées.</p>
+              <p>Lorsque le risque identifié, les exigences d’un partenaire ou le droit applicable le justifient, des informations complémentaires peuvent être demandées et l’accès au service ou une opération peut être limité ou suspendu. Toute mesure est motivée par les circonstances et proportionnée au risque ou à l’obligation concernée. Elle ne supprime pas les droits du titulaire sur les fonds, sous réserve des restrictions prévues par la loi. Les informations sont communiquées aux autorités compétentes lorsque la loi l’exige.</p>
             </Topic>
 
             <Topic id="fraude" title="4. Fraude et usages interdits">
-              <p>Sont notamment interdits l’usurpation d’identité, l’utilisation de comptes ou de moyens de paiement sans autorisation, les fonds volés, les preuves ou captures d’écran falsifiées, les escroqueries, les accès non autorisés et la vente ou la promotion de biens et services illicites. Toute tentative de contourner une mesure de sécurité ou une restriction applicable est également proscrite.</p>
-              <p>SolvexPay est un outil de traitement de paiements, pas un produit d’investissement. Aucun paiement, solde ou usage du service ne garantit un gain, un rendement ou un résultat financier.</p>
+              <p>Sont interdits l’usurpation d’identité, l’utilisation sans autorisation d’un compte ou d’un moyen de paiement, les fonds volés, les justificatifs falsifiés, les escroqueries, les accès non autorisés et la vente ou la promotion de biens ou services illicites. Il est également interdit de partager, louer ou revendre un compte ou des clés API, de manipuler artificiellement un solde ou des opérations, ou de contourner les vérifications et restrictions applicables.</p>
+              <p>SolvexPay est un service de paiement et non un produit d’investissement. Un paiement ou un solde ne promet aucun gain, rendement ni résultat financier.</p>
             </Topic>
 
             <Topic id="marchands" title="5. Responsabilités des marchands">
@@ -97,27 +94,28 @@ export default function ConformitePage() {
             </Topic>
 
             <Topic id="donnees" title="6. Données et justificatifs">
-              <p>Selon le parcours utilisé, des données d’identité et de contact, des informations sur l’activité, des données de transaction et des justificatifs nécessaires peuvent être recueillis. Elles sont utilisées pour fournir et suivre le service, contribuer à sa sécurité et répondre aux obligations applicables.</p>
-              <p>L’accès est limité aux personnes habilitées et aux prestataires qui ont besoin de ces informations pour les finalités concernées. Certaines données peuvent être communiquées lorsque la loi l’exige. Les informations sont conservées en fonction de leur finalité et des délais légaux applicables, sans qu’une durée uniforme soit annoncée ici. Les droits des personnes s’exercent selon le droit applicable par les canaux de support affichés sur l’accueil ; n’envoyez pas de mot de passe, code à usage unique ou clé API lors d’une demande.</p>
+              <p>Selon le parcours, SolvexPay peut recueillir des données d’identité et de contact, des informations sur l’activité, des données de transaction et les justificatifs nécessaires. Elles servent à fournir et suivre le service, sécuriser les opérations, effectuer les vérifications requises et satisfaire aux obligations applicables.</p>
+              <p>Les données sont accessibles aux personnes habilitées et aux partenaires de paiement qui en ont besoin pour exécuter l’opération ou répondre aux finalités concernées ; elles peuvent aussi être communiquées aux autorités lorsque la loi l’exige. Leur conservation dépend de leur usage et des délais légaux applicables. Les demandes relatives aux droits prévus par la loi peuvent être adressées via les canaux de support indiqués sur l’accueil. Ne transmettez jamais de mot de passe, code à usage unique ou clé API dans une demande.</p>
             </Topic>
 
             <Topic id="securite-client" title="7. Protégez votre compte et vos paiements">
-              <p>Ne communiquez jamais votre code OTP, votre mot de passe ou vos clés API à un tiers, y compris à une personne se présentant comme membre du support. Saisissez un code de paiement uniquement dans le formulaire officiel correspondant à l’opération que vous avez vous-même initiée. Vérifiez soigneusement le domaine du site avant de saisir des informations ou de confirmer une opération et contactez le support via les canaux affichés sur l’accueil en cas de doute.</p>
-              <p>Une capture d’écran, un reçu transmis par un client ou le retour du navigateur ne suffit pas à établir qu’un paiement a été reçu. Seul le statut confirmé par le serveur et les informations de transaction disponibles dans le service font foi pour le suivi. Le marchand devrait vérifier ce statut avant de remettre un bien ou de fournir un service.</p>
+              <p>Ne communiquez jamais votre code à usage unique, votre mot de passe ou vos clés API, y compris à une personne se présentant comme membre du support. Saisissez un code de paiement uniquement dans le parcours correspondant à une opération que vous avez initiée. Vérifiez l’adresse du site avant de saisir des informations ou de confirmer une opération. En cas de doute, utilisez les canaux de support affichés sur l’accueil.</p>
+              <p>Une capture d’écran, un reçu ou une preuve de débit ne suffit pas à établir que le paiement a été reçu avec succès. Consultez la référence et le statut affichés dans le service avant de livrer un bien ou de fournir une prestation.</p>
             </Topic>
 
             <Topic id="reclamations" title="8. Questions et réclamations">
-              <p>Pour une question ou une réclamation, utilisez les canaux de support affichés sur la page d’accueil. Pour faciliter l’examen, indiquez la référence de transaction si elle est disponible, la date, le montant et une description factuelle du problème. N’incluez aucun secret d’authentification, code OTP, mot de passe ou clé API.</p>
-              <p>Une vérification peut nécessiter des échanges avec l’opérateur ou le prestataire concerné. Les éléments fournis servent à rechercher l’opération et à orienter la demande ; ils ne garantissent pas une issue ou un délai précis.</p>
+              <p>Pour toute question ou réclamation, contactez le support via les canaux affichés sur l’accueil. Indiquez, si vous les avez, la référence de transaction, sa date, le montant, la devise, l’opérateur concerné, le statut visible et une description factuelle. Joignez les éléments utiles en masquant les données qui ne sont pas nécessaires ; ne transmettez jamais de code à usage unique, mot de passe ou clé API.</p>
+              <p>Si l’opération apparaît en attente, ne lancez pas une nouvelle tentative avant d’avoir vérifié son statut. Un débit constaté ou une preuve de débit ne suffit pas à conclure que le paiement a abouti : le rapprochement avec l’opérateur ou le partenaire concerné peut être nécessaire avant toute correction ou restauration de solde.</p>
             </Topic>
 
             <Topic id="transactions" title="9. Confirmation, délais et erreurs d’opération">
-              <p>Les délais dépendent notamment des réseaux Mobile Money, des prestataires et des confirmations nécessaires. Une demande initiée n’est pas nécessairement acceptée ou réglée : aucune validation ne doit être considérée comme acquise avant confirmation effective de l’opération par le service et le réseau concerné.</p>
-              <p>Lorsque des actifs numériques ou des réseaux crypto sont proposés dans un parcours applicable, leurs confirmations peuvent prendre un temps variable. Une adresse, un réseau ou une référence saisis incorrectement peuvent entraîner un retard ou une perte irréversible ; vérifiez les informations avant confirmation. Les erreurs de réseau ou d’adresse ne peuvent pas toujours être annulées ou récupérées.</p>
+              <p>Les délais dépendent des réseaux, des partenaires de paiement et des confirmations nécessaires. Une demande initiée n’est pas nécessairement acceptée ou réglée : vérifiez le statut de l’opération dans le service. En cas de différence entre le statut affiché et le débit observé, adressez une réclamation pour permettre le rapprochement avant toute correction ou restauration.</p>
+              <p>Un remboursement commercial lié à une vente, une livraison ou une prestation relève du marchand et de ses conditions de vente. Il se distingue de la recherche d’une anomalie de paiement ; un remboursement n’est pas automatique du seul fait d’une contestation. Les droits impératifs applicables restent préservés.</p>
+              <p>Lorsque des actifs numériques ou des réseaux crypto sont proposés dans un parcours applicable, leurs confirmations peuvent prendre un temps variable. Une adresse, un réseau ou une référence incorrects peuvent entraîner un retard ou une perte irréversible ; vérifiez les informations avant confirmation. Les erreurs de réseau ou d’adresse ne peuvent pas toujours être annulées ou récupérées.</p>
             </Topic>
 
             <div className="mt-5 rounded-2xl bg-[#eef3ed] p-5 text-sm leading-6 text-[#50635f]">
-              Cette synthèse ne remplace pas les conditions applicables à une opération particulière ni les règles des prestataires concernés.
+              Ces informations ont une portée générale. Les conditions applicables à l’opération et le droit en vigueur prévalent.
             </div>
           </article>
         </div>

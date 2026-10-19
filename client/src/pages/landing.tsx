@@ -555,25 +555,27 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CONFORMITÉ — synthèse publique */}
+      {/* CONFORMITÉ */}
       <section className="py-16 sm:py-20" style={{ background: "#f4f6f1" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
             <div>
-              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold border mb-5" style={{ background: "#eaf1e9", color: "#3e7866", borderColor: "#d5e3d8" }}>Confiance et responsabilité</span>
-              <h2 className="text-3xl sm:text-4xl font-black text-gray-900 leading-tight">Des repères clairs pour chaque opération.</h2>
-              <p className="text-gray-600 mt-4 leading-relaxed">SolvexPay est une interface technique ; le traitement dépend également des réseaux Mobile Money, d’AlphaPay lorsque disponible et des prestataires concernés. Conditions, délais et disponibilités peuvent varier.</p>
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold border mb-5" style={{ background: "#eaf1e9", color: "#3e7866", borderColor: "#d5e3d8" }}>Conformité et sécurité</span>
+              <h2 className="text-3xl sm:text-4xl font-black text-gray-900 leading-tight">Des responsabilités claires, des paiements mieux suivis.</h2>
+              <p className="text-gray-600 mt-4 leading-relaxed">SolvexPay fournit la plateforme technique ; les opérateurs et partenaires de paiement exécutent les opérations selon le parcours. Disponibilités, conditions et délais peuvent varier.</p>
               <Link href="/conformite" className="inline-flex items-center gap-2 mt-6 px-5 py-3 rounded-xl text-sm font-black text-white shadow-sm transition-opacity hover:opacity-90" style={{ background: "#315c53" }}>
-                Lire Conformité et utilisation responsable <ArrowRight className="h-4 w-4" />
+                Conformité, sécurité et utilisation du service <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               {[
-                { title: "Vérifications adaptées", text: "Des justificatifs peuvent être demandés selon le profil, le risque et les exigences applicables." },
-                { title: "Statut confirmé", text: "Une capture d’écran ou un retour navigateur ne remplace pas la confirmation effective du serveur." },
-                { title: "Marchands responsables", text: "Prix, frais, livraison, remboursements et litiges restent à la charge du marchand." },
+                { title: "Vérifications adaptées", text: "Des documents lisibles et à jour peuvent être demandés sur l’identité, l’entreprise ou l’origine des fonds.", href: "/conformite#verifications" },
+                { title: "Prévention LBC-FT", text: "Le service ne peut être utilisé pour dissimuler l’origine des fonds ou contourner les vérifications.", href: "/conformite#lbc-ft" },
+                { title: "Prévention de la fraude", text: "Usurpation, partage ou revente de comptes et manipulation artificielle des opérations sont interdits.", href: "/conformite#fraude" },
+                { title: "Réclamations et suivi", text: "Fournissez les références utiles ; une opération en attente doit être rapprochée avant toute nouvelle tentative.", href: "/conformite#reclamations" },
+                { title: "Engagements marchands", text: "Les prix, la livraison et les remboursements commerciaux relèvent du marchand.", href: "/conformite#marchands" },
               ].map((item, index) => (
-                <a key={item.title} href={["/conformite#verifications", "/conformite#securite-client", "/conformite#marchands"][index]} className="block rounded-2xl border p-5 transition-transform hover:-translate-y-1" style={{ background: "#fbfcf9", borderColor: "#dfe7de" }}>
+                <a key={item.title} href={item.href} className="block rounded-2xl border p-5 transition-transform hover:-translate-y-1" style={{ background: "#fbfcf9", borderColor: "#dfe7de" }}>
                   <span className="block text-[11px] font-black uppercase tracking-widest text-[#739084]">0{index + 1}</span>
                   <h3 className="mt-3 font-black text-[#173c36]">{item.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-[#61716b]">{item.text}</p>
@@ -602,7 +604,7 @@ export default function LandingPage() {
             <div>
               <p className="text-xs font-black uppercase tracking-wider text-gray-500 mb-4">Produit</p>
               <ul className="space-y-3">
-                {[["#fonctionnalites", "Fonctionnalités"], ["#tarifs", "Tarifs"], ["#api", "API"], ["/documentation", "Documentation"], ["/conformite", "Conformité et utilisation responsable"]].map(([href, label]) => (
+                {[["#fonctionnalites", "Fonctionnalités"], ["#tarifs", "Tarifs"], ["#api", "API"], ["/documentation", "Documentation"], ["/conformite", "Conformité, sécurité et utilisation"]].map(([href, label]) => (
                   <li key={href}><a href={href} className="text-sm text-gray-400 hover:text-white transition-colors">{label}</a></li>
                 ))}
               </ul>
