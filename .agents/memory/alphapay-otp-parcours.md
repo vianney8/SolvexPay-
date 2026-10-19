@@ -11,7 +11,7 @@ Vérifier le véritable formulaire AlphaPay avec des coordonnées fictives avant
 
 Les codes préalables Orange ne sont pas équivalents à une confirmation SMS après initiation.
 
-**Why:** Le formulaire hébergé examiné demande un code obligatoire avant paiement pour Orange Côte d’Ivoire et Orange Burkina Faso, alors que les champs SolvexPay étaient présentés comme facultatifs. En Côte d’Ivoire, l’instruction observée est de composer #144*82#, puis l’option 2. Au Burkina Faso, l’instruction utilise *144*4*6*{amount}#, avec le total réellement débité, frais fournisseur compris.
+**Why:** Le formulaire hébergé examiné demande un code obligatoire avant paiement pour Orange Côte d’Ivoire et Orange Burkina Faso, alors que les champs SolvexPay étaient présentés comme facultatifs. En Côte d’Ivoire, l’instruction observée est de composer #144*82#, puis l’option 2. Pour le Burkina Faso, l’utilisateur a corrigé la consigne : afficher explicitement #144# pour obtenir le code OTP, avec le total réellement débité, frais fournisseur compris.
 
 **How to apply:** Vérifier les instructions et exigences actuelles du parcours correspondant avant de modifier les formulaires ; ne pas réutiliser mécaniquement une règle de confirmation après initiation ou le montant hors frais. L’absence de code dans le formulaire initial ne prouve pas l’absence de validation ultérieure ou de redirection.
 

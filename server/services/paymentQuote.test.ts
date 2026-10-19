@@ -31,7 +31,9 @@ test("quotes enforce live directions, OTP totals and explicit USD crypto convers
   try {
     const orange = await quotePayment({ country: "BF", operator: "Orange", amount: 2500, currency: "XOF" });
     assert.equal(orange.otpRequired, true);
-    assert.ok(orange.otpInstructions.includes("*144*4*6*2613.00#"));
+    assert.ok(orange.otpInstructions.includes("Composez #144#"));
+    assert.ok(orange.otpInstructions.includes("2613.00 XOF, frais compris"));
+    assert.ok(orange.otpInstructions.includes("champ ci-dessous"));
     const senegal = await quotePayment({ country: "SN", operator: "Orange", amount: 2500, currency: "XOF" });
     assert.equal(senegal.otpRequired, false);
     assert.equal(senegal.otpInstructions, "");

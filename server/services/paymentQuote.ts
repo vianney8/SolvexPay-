@@ -74,9 +74,9 @@ export async function quotePayment(input: { country: string; operator: string; a
     network === "orange_bf" || (network !== "orange_sn" && capability.otp_required === true)
   );
   const otpInstructions = otpRequired
-    ? String(capability.otp_instructions || (network === "orange_bf"
-      ? "Composez *144*4*6*{amount}# pour obtenir votre code de paiement Orange Money."
-      : "")).replaceAll("{amount}", providerTotal.toFixed(2))
+    ? (network === "orange_bf"
+      ? `Composez #144# puis suivez le menu Orange Money pour obtenir votre code OTP. Montant total à payer : ${providerTotal.toFixed(2)} ${providerCurrency}, frais compris. Saisissez ensuite le code obtenu dans le champ ci-dessous.`
+      : String(capability.otp_instructions || "").replaceAll("{amount}", providerTotal.toFixed(2)))
     : "";
   return {
     available: true, network, direction, sourceAmount: input.amount, sourceCurrency: input.currency,
